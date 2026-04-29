@@ -3,8 +3,69 @@
 // ============================================================
 
 const CARD_TYPES = ['square', 'circle', 'triangle', 'cross', 'star'];
+const SHAPES = ['circle', 'triangle', 'cross', 'square', 'star'];
 const MAX_PLAYERS = 15;
 const MAX_RISK = 6;
+
+const MODES = {
+  PHYSICAL: 'physical',
+  ONLINE: 'online',
+};
+
+// ─── Deck helpers ─────────────────────────────────────────────
+
+/**
+ * Generate a single Whot-style deck (73 cards: 5 shapes × 14 numbers + 1 Whot/20)
+ * Numbers 1–14 per shape, plus one Whot card (shape: 'whot', number: 20)
+ */
+function generateDeck() {
+  const cards = [];
+  let idCounter = 0;
+  for (const shape of SHAPES) {
+    for (let num = 1; num <= 14; num++) {
+      cards.push({ id: `${shape}-${num}-${idCounter++}`, shape, number: num });
+    }
+  }
+  // Whot card
+  cards.push({ id: `whot-20-${idCounter++}`, shape: 'whot', number: 20 });
+  return cards;
+}
+
+function shuffleDeck(cards) {
+  const a = [...cards];
+  for (let i = a.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [a[i], a[j]] = [a[j], a[i]];
+  }
+  return a;
+}
+
+/**
+ * Build a shuffled deck — 1 deck for ≤10 players, 2 decks for 11–15
+ */
+function buildDeck(playerCount) {
+  const base = generateDeck();
+  const full = playerCount > 10 ? [...base, ...generateDeck()] : base;
+  return shuffleDeck(full);
+}
+
+/**
+ * Deal cards from deck to playerCount players, cardsPerPlayer each
+ * Returns { hands: Map<playerId, card[]>, remainingDeck }
+ * Caller passes orderedPlayerIds to know which slot belongs to whom
+ */
+function dealCards(deck, orderedPlayerIds, cardsPerPlayer = 6) {
+  const hands = new Map();
+  let remaining = [...deck];
+
+  for (const pid of orderedPlayerIds) {
+    hands.set(pid, remaining.splice(0, cardsPerPlayer));
+  }
+
+  return { hands, remainingDeck: remaining };
+}
+
+// ─── Room / Player creation ────────────────────────────────────
 
 /**
  * Generate a random room code (6 uppercase alphanumeric chars)
@@ -19,21 +80,28 @@ function generateRoomCode() {
 /**
  * Create a new room with a host
  */
-function createRoom(hostSocketId) {
+function createRoom(hostSocketId, mode = MODES.PHYSICAL) {
   return {
     code: generateRoomCode(),
     hostSocketId,
-    players: [],          // Array of player objects
-    turnOrder: [],        // Array of player IDs (alive only, maintained deterministically)
-    currentTurnIndex: 0,  // Index into turnOrder
-    currentCardType: null,// Required card type announced this turn
-    phase: 'lobby',       // lobby | playing | bluff_resolution | spin_pending | round_end | game_over
+    mode,
+    players: [],
+    turnOrder: [],
+    currentTurnIndex: 0,
+    currentCardType: null,
+    phase: 'lobby',
     roundNumber: 1,
     lastAction: null,
     bluffUsedThisTurn: false,
     cardPlayedThisTurn: false,
     spinTargetId: null,
     createdAt: Date.now(),
+    // Online-only fields (null in physical mode)
+    deck: null,
+    playedPile: null,
+    hands: null,        // Map<playerId, card[]> — not serialized directly
+    currentCard: null,  // top card that sets the required shape
+    lastPlayedCard: null,
   };
 }
 
@@ -45,137 +113,209 @@ function createPlayer(id, username, socketId) {
     id,
     username,
     socketId,
-    status: 'alive',     // alive | eliminated
-    riskLevel: 1,        // 1–6; increases on survive-spin
+    status: 'alive',
+    riskLevel: 1,
     isSpectator: false,
     connectedAt: Date.now(),
   };
 }
 
-/**
- * Pick a random card type for a turn
- */
+// ─── Card type helpers ─────────────────────────────────────────
+
 function randomCardType() {
   return CARD_TYPES[Math.floor(Math.random() * CARD_TYPES.length)];
 }
 
+function randomShape() {
+  return SHAPES[Math.floor(Math.random() * SHAPES.length)];
+}
+
 /**
- * Get the current active player (whose turn it is)
+ * Assign a new required card type (called after an elimination)
+ * Online mode picks from SHAPES; physical mode picks from CARD_TYPES
  */
+function newCardType(room) {
+  room.currentCardType = room.mode === MODES.ONLINE ? randomShape() : randomCardType();
+  return room;
+}
+
+// ─── Player helpers ────────────────────────────────────────────
+
 function getCurrentPlayer(room) {
   if (!room.turnOrder.length) return null;
   const playerId = room.turnOrder[room.currentTurnIndex % room.turnOrder.length];
   return room.players.find(p => p.id === playerId) || null;
 }
 
-/**
- * Advance to the next living player's turn
- * @returns updated room (mutates in place)
- */
+// ─── Turn management ───────────────────────────────────────────
+
 function advanceTurn(room) {
   if (!room.turnOrder.length) return room;
-  // Move to next index, wrap around
   room.currentTurnIndex = (room.currentTurnIndex + 1) % room.turnOrder.length;
   room.lastAction = null;
   room.phase = 'playing';
   room.bluffUsedThisTurn = false;
   room.cardPlayedThisTurn = false;
   room.isFirstTurn = false;
+  room.lastPlayedCard = null;
   return room;
 }
 
-/**
- * Assign a new random card type (called after an elimination)
- */
-function newCardType(room) {
-  room.currentCardType = randomCardType();
-  return room;
-}
+// ─── Game start ────────────────────────────────────────────────
 
-/**
- * Start the game: shuffle players, pick random starting player
- */
 function startGame(room) {
   const alivePlayers = room.players.filter(p => p.status === 'alive');
   if (alivePlayers.length < 2) throw new Error('Need at least 2 players');
 
-  // Shuffle for turn order
   const shuffled = [...alivePlayers].sort(() => Math.random() - 0.5);
   room.turnOrder = shuffled.map(p => p.id);
   room.currentTurnIndex = 0;
-  room.currentCardType = randomCardType();
   room.phase = 'playing';
   room.roundNumber = 1;
   room.lastAction = null;
   room.isFirstTurn = true;
+  room.lastPlayedCard = null;
+
+  if (room.mode === MODES.ONLINE) {
+    const deck = buildDeck(alivePlayers.length);
+    const { hands, remainingDeck } = dealCards(deck, room.turnOrder, 6);
+    room.hands = hands;
+    room.deck = remainingDeck;
+    room.playedPile = [];
+
+    // Pick a non-Whot starting card from the top of the remaining deck
+    let startIdx = room.deck.findIndex(c => c.shape !== 'whot');
+    if (startIdx === -1) startIdx = 0;
+    const [startCard] = room.deck.splice(startIdx, 1);
+    room.currentCard = startCard;
+    room.currentCardType = startCard.shape;
+  } else {
+    room.currentCardType = randomCardType();
+    room.deck = null;
+    room.playedPile = null;
+    room.hands = null;
+    room.currentCard = null;
+  }
+
   return room;
 }
 
-/**
- * Perform a gun spin for a player.
- * Returns { eliminated: boolean, roll: number, riskLevel: number }
- */
-function spinGun(player) {
-  const roll = Math.floor(Math.random() * 6) + 1; // 1–6
-  const eliminated = roll <= player.riskLevel;
+// ─── Online-mode card play ─────────────────────────────────────
 
-  if (eliminated) {
-    player.status = 'eliminated';
-    player.isSpectator = true;
+/**
+ * Validate and play a card from a player's hand.
+ * A card is valid if its shape matches currentCardType OR it is a Whot card.
+ * Whot cards let the player nominate the next shape (passed as nominatedShape).
+ * Returns { ok: boolean, error?: string, card?: object }
+ */
+function validateAndPlayCard(room, playerId, cardId, nominatedShape = null) {
+  if (room.mode !== MODES.ONLINE) return { ok: false, error: 'Not in online mode' };
+
+  const hand = room.hands.get(playerId);
+  if (!hand) return { ok: false, error: 'Player has no hand' };
+
+  const cardIdx = hand.findIndex(c => c.id === cardId);
+  if (cardIdx === -1) return { ok: false, error: 'Card not in hand' };
+
+  const card = hand[cardIdx];
+  const isWhot = card.shape === 'whot';
+  const matchesShape = card.shape === room.currentCardType;
+
+  if (!isWhot && !matchesShape) {
+    return { ok: false, error: 'Card does not match required shape' };
+  }
+
+  // Remove from hand
+  hand.splice(cardIdx, 1);
+
+  // Add to played pile
+  room.playedPile.push(card);
+  room.lastPlayedCard = card;
+  room.cardPlayedThisTurn = true;
+
+  // Update current shape
+  if (isWhot && nominatedShape && SHAPES.includes(nominatedShape)) {
+    room.currentCardType = nominatedShape;
+    room.currentCard = { ...card, nominatedShape };
+  } else if (!isWhot) {
+    room.currentCard = card;
+    room.currentCardType = card.shape;
+  }
+
+  return { ok: true, card };
+}
+
+/**
+ * Ensure the draw pile has cards; reshuffle played pile if needed
+ */
+function ensureDrawPile(room) {
+  if (room.deck.length >= 5) return;
+  if (room.playedPile.length === 0) return;
+
+  // Keep the top card of played pile as the current card
+  const topCard = room.playedPile.pop();
+  room.deck = shuffleDeck(room.playedPile);
+  room.playedPile = [topCard];
+}
+
+/**
+ * Draw a card for a player from the deck
+ */
+function drawCardForPlayer(room, playerId) {
+  ensureDrawPile(room);
+  if (room.deck.length === 0) return null;
+
+  const card = room.deck.shift();
+  const hand = room.hands.get(playerId);
+  if (hand) hand.push(card);
+  return card;
+}
+
+// ─── Bluff resolution ──────────────────────────────────────────
+
+/**
+ * Online mode: server auto-resolves bluff by checking if lastPlayedCard was valid.
+ * Returns { bluffIsCorrect: boolean, spinTarget: player }
+ */
+function resolveBluffOnline(room) {
+  const currentPlayerId = room.turnOrder[room.currentTurnIndex];
+  const currentPlayer = room.players.find(p => p.id === currentPlayerId);
+
+  const prevIdx = (room.currentTurnIndex - 1 + room.turnOrder.length) % room.turnOrder.length;
+  const prevPlayerId = room.turnOrder[prevIdx];
+  const prevPlayer = room.players.find(p => p.id === prevPlayerId);
+
+  // Check if the previous player's card was actually valid
+  // (we check against the shape required before that card was played)
+  // lastPlayedCard is the card played by prevPlayer
+  const card = room.lastPlayedCard;
+  let bluffIsCorrect = false;
+
+  if (!card) {
+    // No card was played → previous player bluffed
+    bluffIsCorrect = true;
   } else {
-    // Survive: increase risk, cap at MAX_RISK
-    player.riskLevel = Math.min(player.riskLevel + 1, MAX_RISK);
+    // Whot is always valid; otherwise must match
+    bluffIsCorrect = false; // they played a real card that was validated server-side
   }
 
-  return { eliminated, roll, riskLevel: player.riskLevel };
+  const spinTarget = bluffIsCorrect ? prevPlayer : currentPlayer;
+  return { bluffIsCorrect, spinTarget };
 }
 
 /**
- * Eliminate a player from the turn order
- * Adjusts currentTurnIndex so the next call to getCurrentPlayer is correct
- */
-function eliminateFromTurnOrder(room, playerId) {
-  const idx = room.turnOrder.indexOf(playerId);
-  if (idx === -1) return;
-
-  room.turnOrder.splice(idx, 1);
-
-  // If the removed player was before or at current index, step back
-  // so currentTurnIndex still points to the same "next" player
-  if (idx <= room.currentTurnIndex && room.currentTurnIndex > 0) {
-    room.currentTurnIndex--;
-  }
-  // Wrap if needed
-  if (room.turnOrder.length > 0) {
-    room.currentTurnIndex = room.currentTurnIndex % room.turnOrder.length;
-  }
-}
-
-/**
- * Resolve a bluff call:
- * correct bluff → previous player spins
- * incorrect bluff → accuser (current player) spins
- *
- * Returns { spinTarget: player, spinResult, nextPhase }
+ * Physical mode: host declares bluff result
+ * Online mode: use resolveBluffOnline instead
  */
 function resolveBluff(room, bluffIsCorrect) {
   const currentPlayerId = room.turnOrder[room.currentTurnIndex];
   const currentPlayer = room.players.find(p => p.id === currentPlayerId);
 
-  // Previous player = the one before current in turn order
   const prevIdx = (room.currentTurnIndex - 1 + room.turnOrder.length) % room.turnOrder.length;
   const prevPlayerId = room.turnOrder[prevIdx];
   const prevPlayer = room.players.find(p => p.id === prevPlayerId);
 
-  let spinTarget;
-  if (bluffIsCorrect) {
-    // Bluff call was correct → previous player (the bluffer) spins
-    spinTarget = prevPlayer;
-  } else {
-    // Bluff call was wrong → accuser (current player) spins
-    spinTarget = currentPlayer;
-  }
-
+  const spinTarget = bluffIsCorrect ? prevPlayer : currentPlayer;
   const spinResult = spinGun(spinTarget);
 
   if (spinResult.eliminated) {
@@ -194,9 +334,67 @@ function resolveBluff(room, bluffIsCorrect) {
   return { spinTarget, spinResult };
 }
 
+// ─── Online round reset ────────────────────────────────────────
+
 /**
- * Handle player disconnect: mark eliminated, remove from turn order
+ * Reset for a new round in online mode: rebuild deck, redeal to alive players, new starting card
  */
+function resetRoundOnline(room) {
+  const alivePlayers = room.players.filter(p => p.status === 'alive');
+  const deck = buildDeck(alivePlayers.length);
+  const aliveIds = alivePlayers.map(p => p.id);
+
+  const { hands, remainingDeck } = dealCards(deck, aliveIds, 6);
+  room.hands = hands;
+  room.deck = remainingDeck;
+  room.playedPile = [];
+
+  let startIdx = room.deck.findIndex(c => c.shape !== 'whot');
+  if (startIdx === -1) startIdx = 0;
+  const [startCard] = room.deck.splice(startIdx, 1);
+  room.currentCard = startCard;
+  room.currentCardType = startCard.shape;
+
+  room.phase = 'playing';
+  room.lastAction = null;
+  room.lastPlayedCard = null;
+  room.bluffUsedThisTurn = false;
+  room.cardPlayedThisTurn = false;
+  room.roundNumber++;
+
+  return room;
+}
+
+// ─── Gun spin ──────────────────────────────────────────────────
+
+function spinGun(player) {
+  const roll = Math.floor(Math.random() * 6) + 1;
+  const eliminated = roll <= player.riskLevel;
+
+  if (eliminated) {
+    player.status = 'eliminated';
+    player.isSpectator = true;
+  } else {
+    player.riskLevel = Math.min(player.riskLevel + 1, MAX_RISK);
+  }
+
+  return { eliminated, roll, riskLevel: player.riskLevel };
+}
+
+function eliminateFromTurnOrder(room, playerId) {
+  const idx = room.turnOrder.indexOf(playerId);
+  if (idx === -1) return;
+
+  room.turnOrder.splice(idx, 1);
+
+  if (idx <= room.currentTurnIndex && room.currentTurnIndex > 0) {
+    room.currentTurnIndex--;
+  }
+  if (room.turnOrder.length > 0) {
+    room.currentTurnIndex = room.currentTurnIndex % room.turnOrder.length;
+  }
+}
+
 function handleDisconnect(room, socketId) {
   const player = room.players.find(p => p.socketId === socketId);
   if (!player || player.status === 'eliminated') return null;
@@ -207,17 +405,11 @@ function handleDisconnect(room, socketId) {
   return player;
 }
 
-/**
- * Check if only one player remains alive → game over
- */
 function checkGameOver(room) {
   const alive = room.players.filter(p => p.status === 'alive');
   return alive.length <= 1 ? alive[0] || null : false;
 }
 
-/**
- * Declare a round winner (player finished their 5 cards)
- */
 function declareRoundWinner(room, playerId) {
   const winner = room.players.find(p => p.id === playerId);
   if (!winner) return null;
@@ -227,9 +419,6 @@ function declareRoundWinner(room, playerId) {
   return winner;
 }
 
-/**
- * Reconnect a player: update their socketId
- */
 function reconnectPlayer(room, playerId, newSocketId) {
   const player = room.players.find(p => p.id === playerId);
   if (!player) return null;
@@ -237,23 +426,31 @@ function reconnectPlayer(room, playerId, newSocketId) {
   return player;
 }
 
+// ─── Serialization ─────────────────────────────────────────────
+
 /**
- * Serialize room state to send to clients (sanitized)
+ * Serialize room state for a specific client.
+ * requestingPlayerId: if provided, includes that player's hand in myHand.
  */
-function serializeRoom(room) {
+function serializeRoom(room, requestingPlayerId = null) {
+  const isOnline = room.mode === MODES.ONLINE;
+
   return {
     code: room.code,
+    mode: room.mode,
     players: room.players.map(p => ({
       id: p.id,
       username: p.username,
       status: p.status,
       riskLevel: p.riskLevel,
       isSpectator: p.isSpectator,
+      handSize: isOnline && room.hands ? (room.hands.get(p.id) || []).length : undefined,
     })),
     turnOrder: room.turnOrder,
     currentTurnIndex: room.currentTurnIndex,
     currentPlayerId: room.turnOrder[room.currentTurnIndex] || null,
     currentCardType: room.currentCardType,
+    currentCard: room.currentCard || null,
     phase: room.phase,
     roundNumber: room.roundNumber,
     lastAction: room.lastAction,
@@ -261,10 +458,28 @@ function serializeRoom(room) {
     cardPlayedThisTurn: room.cardPlayedThisTurn || false,
     spinTargetId: room.spinTargetId || null,
     isFirstTurn: room.isFirstTurn || false,
+    // Online-only
+    deckSize: isOnline && room.deck ? room.deck.length : undefined,
+    playedPileSize: isOnline && room.playedPile ? room.playedPile.length : undefined,
+    myHand: isOnline && requestingPlayerId && room.hands
+      ? (room.hands.get(requestingPlayerId) || [])
+      : undefined,
   };
 }
 
 module.exports = {
+  MODES,
+  CARD_TYPES,
+  SHAPES,
+  MAX_PLAYERS,
+  MAX_RISK,
+  generateRoomCode,
+  randomCardType,
+  randomShape,
+  generateDeck,
+  shuffleDeck,
+  buildDeck,
+  dealCards,
   createRoom,
   createPlayer,
   startGame,
@@ -272,14 +487,16 @@ module.exports = {
   newCardType,
   spinGun,
   resolveBluff,
+  resolveBluffOnline,
   eliminateFromTurnOrder,
   handleDisconnect,
   checkGameOver,
   declareRoundWinner,
   reconnectPlayer,
+  validateAndPlayCard,
+  ensureDrawPile,
+  drawCardForPlayer,
+  resetRoundOnline,
   serializeRoom,
-  generateRoomCode,
-  randomCardType,
-  CARD_TYPES,
-  MAX_PLAYERS,
+  getCurrentPlayer,
 };
