@@ -31,6 +31,20 @@ export function useGame() {
     setTimeout(() => setNotification(null), 3500);
   }, []);
 
+  // ─── Warn before refresh/close during active game ────────
+  useEffect(() => {
+    const activePhases = ['playing', 'bluff_resolution', 'spin_pending'];
+    if (!roomCode || !activePhases.includes(roomState?.phase)) return;
+
+    const handleBeforeUnload = (e) => {
+      e.preventDefault();
+      e.returnValue = '';
+    };
+
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    return () => window.removeEventListener('beforeunload', handleBeforeUnload);
+  }, [roomCode, roomState?.phase]);
+
   // ─── Socket event listeners ───────────────────────────────
   useEffect(() => {
     const onConnect = () => {
