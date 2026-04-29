@@ -11,7 +11,7 @@ const { registerSocketHandlers, rooms } = require('./socketHandlers');
 const PORT = process.env.PORT || 3001;
 
 const app = express();
-app.use(cors({ origin: '*' }));
+app.use(cors({ origin: process.env.CLIENT_URL || '*' }));
 app.use(express.json());
 
 // ─── Health check / room info endpoints ─────────────────────
@@ -26,7 +26,7 @@ app.get('/room/:code', (req, res) => {
 // ─── HTTP + Socket.IO server ─────────────────────────────────
 const server = http.createServer(app);
 const io = new Server(server, {
-  cors: { origin: '*', methods: ['GET', 'POST'] },
+  cors: { origin: process.env.CLIENT_URL || '*', methods: ['GET', 'POST'] },
   pingTimeout: 60000,
   pingInterval: 25000,
 });
