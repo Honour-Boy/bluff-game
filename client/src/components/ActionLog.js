@@ -1,0 +1,60 @@
+'use client';
+
+export function ActionLog({ lastAction }) {
+  if (!lastAction) return null;
+
+  const messages = {
+    spin: ({ targetName, eliminated, roll, riskLevel }) =>
+      eliminated
+        ? `💀 ${targetName} rolled ${roll} (risk ${riskLevel - 1}) — ELIMINATED`
+        : `😮‍💨 ${targetName} rolled ${roll} (risk ${riskLevel - 1}) — SURVIVED. Risk now ${riskLevel}/6`,
+    bluff_resolved: ({ bluffCorrect, spinTargetName, eliminated, roll }) =>
+      bluffCorrect
+        ? `✅ Bluff was CORRECT — ${spinTargetName} spun, rolled ${roll}, ${eliminated ? 'ELIMINATED' : 'survived'}`
+        : `❌ Bluff was WRONG — ${spinTargetName} (accuser) spun, rolled ${roll}, ${eliminated ? 'ELIMINATED' : 'survived'}`,
+    bluff_called: ({ callerId }) => `⚠️ Bluff called! Host: reveal the last 3 cards physically.`,
+    round_win: ({ winnerName }) => `🏆 ${winnerName} finished all 5 cards — Round Winner! Others reshuffle.`,
+    game_over: ({ winnerName }) => `🎉 GAME OVER — ${winnerName} is the last player standing!`,
+    continued: ({ playerId }) => `→ Player continued their turn.`,
+    disconnected: ({ playerName }) => `🔌 ${playerName} disconnected — eliminated.`,
+  };
+
+  const fn = messages[lastAction.type];
+  if (!fn) return null;
+
+  const text = fn(lastAction);
+
+  const colors = {
+    spin: lastAction.eliminated ? 'var(--accent2)' : 'var(--alive)',
+    bluff_resolved: lastAction.bluffCorrect ? 'var(--alive)' : 'var(--accent2)',
+    bluff_called: 'var(--warning)',
+    round_win: 'var(--accent)',
+    game_over: 'var(--accent)',
+    continued: 'var(--text-dim)',
+    disconnected: 'var(--accent2)',
+  };
+
+  const color = colors[lastAction.type] || 'var(--text-dim)';
+
+  return (
+    <div
+      className="fade-in"
+      style={{
+        padding: '12px 16px',
+        background: 'var(--surface2)',
+        border: `1px solid ${color}`,
+        borderLeft: `3px solid ${color}`,
+        borderRadius: 'var(--radius)',
+        color: color,
+        fontSize: 12,
+        letterSpacing: '0.04em',
+        lineHeight: 1.5,
+      }}
+    >
+      <div style={{ fontSize: 9, color: 'var(--text-dim)', marginBottom: 4, letterSpacing: '0.1em', textTransform: 'uppercase' }}>
+        Last Event
+      </div>
+      {text}
+    </div>
+  );
+}
