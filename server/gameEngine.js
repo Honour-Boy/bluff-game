@@ -76,11 +76,19 @@ function advanceTurn(room) {
   if (!room.turnOrder.length) return room;
   // Move to next index, wrap around
   room.currentTurnIndex = (room.currentTurnIndex + 1) % room.turnOrder.length;
-  room.currentCardType = randomCardType();
   room.lastAction = null;
   room.phase = 'playing';
   room.bluffUsedThisTurn = false;
   room.cardPlayedThisTurn = false;
+  room.isFirstTurn = false;
+  return room;
+}
+
+/**
+ * Assign a new random card type (called after an elimination)
+ */
+function newCardType(room) {
+  room.currentCardType = randomCardType();
   return room;
 }
 
@@ -99,6 +107,7 @@ function startGame(room) {
   room.phase = 'playing';
   room.roundNumber = 1;
   room.lastAction = null;
+  room.isFirstTurn = true;
   return room;
 }
 
@@ -251,6 +260,7 @@ function serializeRoom(room) {
     bluffUsedThisTurn: room.bluffUsedThisTurn || false,
     cardPlayedThisTurn: room.cardPlayedThisTurn || false,
     spinTargetId: room.spinTargetId || null,
+    isFirstTurn: room.isFirstTurn || false,
   };
 }
 
@@ -259,6 +269,7 @@ module.exports = {
   createPlayer,
   startGame,
   advanceTurn,
+  newCardType,
   spinGun,
   resolveBluff,
   eliminateFromTurnOrder,

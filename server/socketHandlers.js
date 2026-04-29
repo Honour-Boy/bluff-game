@@ -211,10 +211,12 @@ function registerSocketHandlers(io, socket) {
       const player = room.players.find(p => p.id === playerId);
       if (!player) return callback({ success: false, error: 'Player not found' });
 
+      const riskLevelBefore = player.riskLevel;
       const spinResult = engine.spinGun(player);
 
       if (spinResult.eliminated) {
         engine.eliminateFromTurnOrder(room, player.id);
+        engine.newCardType(room);
       }
 
       room.phase = 'playing';
@@ -229,6 +231,8 @@ function registerSocketHandlers(io, socket) {
         roll: spinResult.roll,
         eliminated: spinResult.eliminated,
         riskLevel: spinResult.riskLevel,
+        riskLevelBefore,
+        ...(spinResult.eliminated ? { newCardType: room.currentCardType } : {}),
       };
 
       const gameOverWinner = engine.checkGameOver(room);
@@ -272,6 +276,7 @@ function registerSocketHandlers(io, socket) {
       const currentPlayerId = room.turnOrder[room.currentTurnIndex];
       if (playerId !== currentPlayerId) return callback({ success: false, error: 'Not your turn' });
       if (room.bluffUsedThisTurn) return callback({ success: false, error: 'Bluff already called this turn' });
+      if (room.isFirstTurn) return callback({ success: false, error: 'Cannot call bluff on the first turn' });
 
       room.bluffUsedThisTurn = true;
       room.phase = 'bluff_resolution';
