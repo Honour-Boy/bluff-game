@@ -27,9 +27,12 @@ function createRoom(hostSocketId) {
     turnOrder: [],        // Array of player IDs (alive only, maintained deterministically)
     currentTurnIndex: 0,  // Index into turnOrder
     currentCardType: null,// Required card type announced this turn
-    phase: 'lobby',       // lobby | playing | bluff_resolution | round_end | game_over
+    phase: 'lobby',       // lobby | playing | bluff_resolution | spin_pending | round_end | game_over
     roundNumber: 1,
-    lastAction: null,     // Track last action for bluff resolution
+    lastAction: null,
+    bluffUsedThisTurn: false,
+    cardPlayedThisTurn: false,
+    spinTargetId: null,
     createdAt: Date.now(),
   };
 }
@@ -76,6 +79,8 @@ function advanceTurn(room) {
   room.currentCardType = randomCardType();
   room.lastAction = null;
   room.phase = 'playing';
+  room.bluffUsedThisTurn = false;
+  room.cardPlayedThisTurn = false;
   return room;
 }
 
@@ -243,6 +248,9 @@ function serializeRoom(room) {
     phase: room.phase,
     roundNumber: room.roundNumber,
     lastAction: room.lastAction,
+    bluffUsedThisTurn: room.bluffUsedThisTurn || false,
+    cardPlayedThisTurn: room.cardPlayedThisTurn || false,
+    spinTargetId: room.spinTargetId || null,
   };
 }
 

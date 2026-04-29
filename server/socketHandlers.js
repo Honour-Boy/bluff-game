@@ -30,6 +30,8 @@ function registerSocketHandlers(io, socket) {
   socket.on('create_room', ({ username }, callback) => {
     try {
       const room = engine.createRoom(socket.id);
+      room.cardPlayedThisTurn = false;
+      room.bluffUsedThisTurn = false;
       rooms.set(room.code, room);
 
       socket.join(room.code);
@@ -163,12 +165,48 @@ function registerSocketHandlers(io, socket) {
     }
   });
 
-  // ─── HOST: Trigger gun spin for specific player ───────────
-  socket.on('trigger_spin', ({ roomCode, playerId }, callback) => {
+  // (trigger_spin removed — spin is now player-initiated via player_spin)
+
+  // ─── HOST: Resolve bluff — sets spin_pending, player spins themselves ──
+  socket.on('resolve_bluff', ({ roomCode, bluffIsCorrect }, callback) => {
     try {
       const room = rooms.get(roomCode);
       if (!room) return callback({ success: false, error: 'Room not found' });
       if (room.hostSocketId !== socket.id) return callback({ success: false, error: 'Not the host' });
+
+      const currentPlayerId = room.turnOrder[room.currentTurnIndex];
+      const currentPlayer = room.players.find(p => p.id === currentPlayerId);
+
+      const prevIdx = (room.currentTurnIndex - 1 + room.turnOrder.length) % room.turnOrder.length;
+      const prevPlayerId = room.turnOrder[prevIdx];
+      const prevPlayer = room.players.find(p => p.id === prevPlayerId);
+
+      const spinTarget = bluffIsCorrect ? prevPlayer : currentPlayer;
+
+      room.phase = 'spin_pending';
+      room.spinTargetId = spinTarget.id;
+      room.lastAction = {
+        type: 'spin_pending',
+        spinTargetId: spinTarget.id,
+        spinTargetName: spinTarget.username,
+        bluffCorrect: bluffIsCorrect,
+      };
+
+      console.log(`[Room ${roomCode}] Bluff resolved. ${spinTarget.username} must spin.`);
+      broadcastRoomState(io, roomCode);
+      callback({ success: true });
+    } catch (err) {
+      callback({ success: false, error: err.message });
+    }
+  });
+
+  // ─── PLAYER: Pull the trigger (self-initiated spin) ──────
+  socket.on('player_spin', ({ roomCode, playerId }, callback) => {
+    try {
+      const room = rooms.get(roomCode?.toUpperCase());
+      if (!room) return callback({ success: false, error: 'Room not found' });
+      if (room.phase !== 'spin_pending') return callback({ success: false, error: 'No spin pending' });
+      if (room.spinTargetId !== playerId) return callback({ success: false, error: 'Not your spin' });
 
       const player = room.players.find(p => p.id === playerId);
       if (!player) return callback({ success: false, error: 'Player not found' });
@@ -179,47 +217,29 @@ function registerSocketHandlers(io, socket) {
         engine.eliminateFromTurnOrder(room, player.id);
       }
 
+      room.phase = 'playing';
+      room.spinTargetId = null;
+      room.cardPlayedThisTurn = false;
+      room.bluffUsedThisTurn = true;
+
       room.lastAction = {
-        type: 'spin',
-        targetId: player.id,
-        targetName: player.username,
-        ...spinResult,
+        type: 'spin_result',
+        spinTargetId: player.id,
+        spinTargetName: player.username,
+        roll: spinResult.roll,
+        eliminated: spinResult.eliminated,
+        riskLevel: spinResult.riskLevel,
       };
 
-      // Check game over after spin
       const gameOverWinner = engine.checkGameOver(room);
       if (gameOverWinner) {
         room.phase = 'game_over';
         room.lastAction = { type: 'game_over', winnerId: gameOverWinner.id, winnerName: gameOverWinner.username };
       }
 
-      console.log(`[Room ${roomCode}] Spin for ${player.username}: roll=${spinResult.roll}, eliminated=${spinResult.eliminated}`);
+      console.log(`[Room ${roomCode}] ${player.username} spun: roll=${spinResult.roll}, eliminated=${spinResult.eliminated}`);
+      broadcastRoomState(io, roomCode.toUpperCase());
       callback({ success: true, spinResult });
-      broadcastRoomState(io, roomCode);
-    } catch (err) {
-      callback({ success: false, error: err.message });
-    }
-  });
-
-  // ─── HOST: Resolve bluff ─────────────────────────────────
-  socket.on('resolve_bluff', ({ roomCode, bluffIsCorrect }, callback) => {
-    try {
-      const room = rooms.get(roomCode);
-      if (!room) return callback({ success: false, error: 'Room not found' });
-      if (room.hostSocketId !== socket.id) return callback({ success: false, error: 'Not the host' });
-
-      const { spinTarget, spinResult } = engine.resolveBluff(room, bluffIsCorrect);
-
-      // Check game over
-      const gameOverWinner = engine.checkGameOver(room);
-      if (gameOverWinner) {
-        room.phase = 'game_over';
-        room.lastAction = { type: 'game_over', winnerId: gameOverWinner.id, winnerName: gameOverWinner.username };
-      }
-
-      console.log(`[Room ${roomCode}] Bluff resolved. ${spinTarget.username} spun. Eliminated: ${spinResult.eliminated}`);
-      callback({ success: true });
-      broadcastRoomState(io, roomCode);
     } catch (err) {
       callback({ success: false, error: err.message });
     }
@@ -242,43 +262,69 @@ function registerSocketHandlers(io, socket) {
     }
   });
 
-  // ─── PLAYER: Call bluff (marks intent, host resolves) ────
+  // ─── PLAYER: Call bluff ──────────────────────────────────
   socket.on('call_bluff', ({ roomCode, playerId }, callback) => {
     try {
-      const room = rooms.get(roomCode);
+      const room = rooms.get(roomCode?.toUpperCase());
       if (!room) return callback({ success: false, error: 'Room not found' });
       if (room.phase !== 'playing') return callback({ success: false, error: 'Not in playing phase' });
 
-      // Verify it's this player's turn to call bluff (they must be the current player)
       const currentPlayerId = room.turnOrder[room.currentTurnIndex];
-      if (playerId !== currentPlayerId) return callback({ success: false, error: 'Not your turn to call bluff' });
+      if (playerId !== currentPlayerId) return callback({ success: false, error: 'Not your turn' });
+      if (room.bluffUsedThisTurn) return callback({ success: false, error: 'Bluff already called this turn' });
 
+      room.bluffUsedThisTurn = true;
       room.phase = 'bluff_resolution';
       room.lastAction = { type: 'bluff_called', callerId: playerId };
 
-      // Notify host via room broadcast
-      io.to(room.hostSocketId).emit('bluff_called', { callerId: playerId });
-
+      broadcastRoomState(io, roomCode.toUpperCase());
       callback({ success: true });
-      broadcastRoomState(io, roomCode);
     } catch (err) {
       callback({ success: false, error: err.message });
     }
   });
 
-  // ─── PLAYER: Continue turn ───────────────────────────────
-  socket.on('player_continue', ({ roomCode, playerId }, callback) => {
+  // ─── PLAYER: Play card face-down ─────────────────────────
+  socket.on('play_card', ({ roomCode, playerId }, callback) => {
     try {
-      const room = rooms.get(roomCode);
+      const room = rooms.get(roomCode?.toUpperCase());
       if (!room) return callback({ success: false, error: 'Room not found' });
 
-      // Only current player can continue
       const currentPlayerId = room.turnOrder[room.currentTurnIndex];
       if (playerId !== currentPlayerId) return callback({ success: false, error: 'Not your turn' });
+      if (room.phase !== 'playing') return callback({ success: false, error: 'Cannot play card now' });
 
-      room.lastAction = { type: 'continued', playerId };
+      room.lastAction = { type: 'card_played', playerId };
+      room.cardPlayedThisTurn = true;
+      broadcastRoomState(io, roomCode.toUpperCase());
       callback({ success: true });
-      broadcastRoomState(io, roomCode);
+    } catch (err) {
+      callback({ success: false, error: err.message });
+    }
+  });
+
+  // ─── PLAYER: End turn ────────────────────────────────────
+  socket.on('end_turn', ({ roomCode, playerId }, callback) => {
+    try {
+      const room = rooms.get(roomCode?.toUpperCase());
+      if (!room) return callback({ success: false, error: 'Room not found' });
+
+      const currentPlayerId = room.turnOrder[room.currentTurnIndex];
+      if (playerId !== currentPlayerId) return callback({ success: false, error: 'Not your turn' });
+      if (!room.cardPlayedThisTurn) return callback({ success: false, error: 'Play a card first' });
+
+      room.cardPlayedThisTurn = false;
+      room.bluffUsedThisTurn = false;
+      engine.advanceTurn(room);
+
+      const gameOverWinner = engine.checkGameOver(room);
+      if (gameOverWinner) {
+        room.phase = 'game_over';
+        room.lastAction = { type: 'game_over', winnerId: gameOverWinner.id, winnerName: gameOverWinner.username };
+      }
+
+      broadcastRoomState(io, roomCode.toUpperCase());
+      callback({ success: true });
     } catch (err) {
       callback({ success: false, error: err.message });
     }

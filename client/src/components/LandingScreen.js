@@ -1,9 +1,11 @@
 'use client';
 
 import { useState } from 'react';
+import { HowToPlayModal } from './HowToPlayModal';
 
 export function LandingScreen({ onCreateRoom, onJoinRoom, error, setError, connected }) {
   const [mode, setMode] = useState(null); // null | 'host' | 'join'
+  const [showHowToPlay, setShowHowToPlay] = useState(false);
   const [username, setUsername] = useState('');
   const [roomCode, setRoomCode] = useState('');
 
@@ -130,13 +132,16 @@ export function LandingScreen({ onCreateRoom, onJoinRoom, error, setError, conne
             >
               🚪 Join Room (Player)
             </button>
-
-            <div style={{ marginTop: 16, padding: '14px', background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 'var(--radius)', fontSize: 11, color: 'var(--text-dim)', lineHeight: 1.8 }}>
-              <div style={{ color: 'var(--accent)', fontWeight: 700, marginBottom: 6, letterSpacing: '0.1em' }}>HOW TO PLAY</div>
-              Host creates a room, up to 15 players join with a code. Host announces the required card type each turn. Players play face-down — truthfully or bluffing. Call a bluff to force a reveal. The caught party spins the gun. Last alive wins.
-            </div>
+            <button
+              style={{ padding: '12px', fontSize: 12, letterSpacing: '0.1em', borderColor: 'var(--border)', color: 'var(--text-dim)' }}
+              onClick={() => setShowHowToPlay(true)}
+            >
+              ? How to Play
+            </button>
           </div>
         )}
+
+        {showHowToPlay && <HowToPlayModal onClose={() => setShowHowToPlay(false)} />}
 
         {/* Host: create room */}
         {mode === 'host' && (

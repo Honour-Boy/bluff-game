@@ -14,8 +14,9 @@ export default function Home() {
     roomState, myPlayer, isMyTurn, currentPlayer,
     error, connected, notification,
     createRoom, joinRoom, startGame,
-    nextTurn, resolveBluff, triggerSpin,
-    declareRoundWin, callBluff, playerContinue,
+    nextTurn, resolveBluff,
+    playCard, endTurn, playerSpin,
+    declareRoundWin, callBluff,
     leaveGame, setError,
   } = game;
 
@@ -49,7 +50,6 @@ export default function Home() {
         startGame={startGame}
         nextTurn={nextTurn}
         resolveBluff={resolveBluff}
-        triggerSpin={triggerSpin}
         declareRoundWin={declareRoundWin}
         leaveGame={leaveGame}
       />
@@ -64,9 +64,10 @@ export default function Home() {
         roomState={roomState}
         myPlayer={myPlayer}
         isMyTurn={isMyTurn}
-        currentPlayer={currentPlayer}
         callBluff={callBluff}
-        playerContinue={playerContinue}
+        playCard={playCard}
+        endTurn={endTurn}
+        playerSpin={playerSpin}
         leaveGame={leaveGame}
       />
     );

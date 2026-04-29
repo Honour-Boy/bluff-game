@@ -2,7 +2,7 @@
 
 import { RiskMeter } from './RiskMeter';
 
-export function PlayerList({ players, turnOrder, currentPlayerId, onSpin, onRoundWin, isHost, phase }) {
+export function PlayerList({ players, turnOrder, currentPlayerId, isHost, phase }) {
   if (!players || players.length === 0) {
     return (
       <div style={{ color: 'var(--text-dim)', fontSize: 12, padding: '20px 0', textAlign: 'center' }}>
@@ -93,27 +93,6 @@ export function PlayerList({ players, turnOrder, currentPlayerId, onSpin, onRoun
               </div>
             </div>
 
-            {/* Host action buttons */}
-            {isHost && isAlive && phase === 'playing' && (
-              <div style={{ display: 'flex', gap: 6, flexShrink: 0 }}>
-                <button
-                  className="danger"
-                  style={{ padding: '5px 10px', fontSize: 10 }}
-                  onClick={() => onSpin(player.id)}
-                  title="Trigger gun spin for this player"
-                >
-                  🔫 Spin
-                </button>
-                <button
-                  className="success"
-                  style={{ padding: '5px 10px', fontSize: 10 }}
-                  onClick={() => onRoundWin(player.id)}
-                  title="Declare this player round winner"
-                >
-                  🏆 Win
-                </button>
-              </div>
-            )}
           </div>
         );
       })}

@@ -175,11 +175,23 @@ export function useGame() {
     });
   }, [socket, roomCode]);
 
-  const triggerSpin = useCallback((targetPlayerId) => {
-    socket.emit('trigger_spin', { roomCode, playerId: targetPlayerId }, (res) => {
+  const playCard = useCallback(() => {
+    socket.emit('play_card', { roomCode, playerId }, (res) => {
       if (!res.success) setError(res.error);
     });
-  }, [socket, roomCode]);
+  }, [socket, roomCode, playerId]);
+
+  const endTurn = useCallback(() => {
+    socket.emit('end_turn', { roomCode, playerId }, (res) => {
+      if (!res.success) setError(res.error);
+    });
+  }, [socket, roomCode, playerId]);
+
+  const playerSpin = useCallback(() => {
+    socket.emit('player_spin', { roomCode, playerId }, (res) => {
+      if (!res.success) setError(res.error);
+    });
+  }, [socket, roomCode, playerId]);
 
   const declareRoundWin = useCallback((winnerPlayerId) => {
     socket.emit('round_win', { roomCode, playerId: winnerPlayerId }, (res) => {
@@ -189,12 +201,6 @@ export function useGame() {
 
   const callBluff = useCallback(() => {
     socket.emit('call_bluff', { roomCode, playerId }, (res) => {
-      if (!res.success) setError(res.error);
-    });
-  }, [socket, roomCode, playerId]);
-
-  const playerContinue = useCallback(() => {
-    socket.emit('player_continue', { roomCode, playerId }, (res) => {
       if (!res.success) setError(res.error);
     });
   }, [socket, roomCode, playerId]);
@@ -226,10 +232,11 @@ export function useGame() {
     startGame,
     nextTurn,
     resolveBluff,
-    triggerSpin,
+    playCard,
+    endTurn,
+    playerSpin,
     declareRoundWin,
     callBluff,
-    playerContinue,
     leaveGame,
     setError,
   };

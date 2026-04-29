@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { CardShape } from './CardShape';
 import { PlayerList } from './PlayerList';
 import { ActionLog } from './ActionLog';
+import { HowToPlayModal } from './HowToPlayModal';
 
 export function HostUI({
   roomCode,
@@ -11,11 +12,11 @@ export function HostUI({
   startGame,
   nextTurn,
   resolveBluff,
-  triggerSpin,
   declareRoundWin,
   leaveGame,
 }) {
   const [confirmAction, setConfirmAction] = useState(null); // { type, payload }
+  const [showHowToPlay, setShowHowToPlay] = useState(false);
 
   if (!roomState) {
     return (
@@ -25,18 +26,27 @@ export function HostUI({
     );
   }
 
-  const { players, turnOrder, currentPlayerId, currentCardType, phase, roundNumber, lastAction } = roomState;
+  const {
+    players, turnOrder, currentPlayerId, currentCardType,
+    phase, roundNumber, lastAction, currentTurnIndex, spinTargetId,
+  } = roomState;
+
   const currentPlayer = players?.find(p => p.id === currentPlayerId);
   const alivePlayers = players?.filter(p => p.status === 'alive') || [];
   const isLobby = phase === 'lobby';
   const isPlaying = phase === 'playing';
   const isBluffResolution = phase === 'bluff_resolution';
+  const isSpinPending = phase === 'spin_pending';
   const isRoundEnd = phase === 'round_end';
   const isGameOver = phase === 'game_over';
 
-  const handleSpin = (playerId) => {
-    setConfirmAction({ type: 'spin', payload: playerId });
-  };
+  // Derive prev player for bluff resolution display
+  const prevIdx = turnOrder?.length
+    ? (currentTurnIndex - 1 + turnOrder.length) % turnOrder.length
+    : 0;
+  const prevPlayerId = turnOrder?.[prevIdx];
+  const prevPlayer = players?.find(p => p.id === prevPlayerId);
+  const spinTargetPlayer = players?.find(p => p.id === spinTargetId);
 
   const handleRoundWin = (playerId) => {
     setConfirmAction({ type: 'roundWin', payload: playerId });
@@ -44,7 +54,6 @@ export function HostUI({
 
   const executeConfirm = () => {
     if (!confirmAction) return;
-    if (confirmAction.type === 'spin') triggerSpin(confirmAction.payload);
     if (confirmAction.type === 'roundWin') declareRoundWin(confirmAction.payload);
     setConfirmAction(null);
   };
@@ -60,27 +69,36 @@ export function HostUI({
             GAME MASTER PANEL
           </div>
         </div>
-        <div style={{ textAlign: 'right' }}>
-          <div style={{ fontSize: 10, color: 'var(--text-dim)', letterSpacing: '0.12em', marginBottom: 4 }}>ROOM CODE</div>
-          <div style={{
-            fontFamily: "'Bebas Neue', sans-serif",
-            fontSize: 36,
-            letterSpacing: '0.2em',
-            color: 'var(--accent)',
-            border: '1px solid var(--accent)',
-            padding: '4px 16px',
-            borderRadius: 'var(--radius)',
-            background: 'rgba(232,255,74,0.04)',
-            cursor: 'pointer',
-          }}
-            title="Click to copy"
-            onClick={() => navigator.clipboard?.writeText(roomCode)}
+        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 8 }}>
+          <div style={{ textAlign: 'right' }}>
+            <div style={{ fontSize: 10, color: 'var(--text-dim)', letterSpacing: '0.12em', marginBottom: 4 }}>ROOM CODE</div>
+            <div
+              style={{
+                fontFamily: "'Bebas Neue', sans-serif",
+                fontSize: 36,
+                letterSpacing: '0.2em',
+                color: 'var(--accent)',
+                border: '1px solid var(--accent)',
+                padding: '4px 16px',
+                borderRadius: 'var(--radius)',
+                background: 'rgba(232,255,74,0.04)',
+                cursor: 'pointer',
+              }}
+              title="Click to copy"
+              onClick={() => navigator.clipboard?.writeText(roomCode)}
+            >
+              {roomCode}
+            </div>
+            <div style={{ fontSize: 9, color: 'var(--text-dim)', marginTop: 4 }}>
+              {alivePlayers.length} alive · Round {roundNumber}
+            </div>
+          </div>
+          <button
+            onClick={() => setShowHowToPlay(true)}
+            style={{ fontSize: 10, color: 'var(--text-dim)', border: '1px solid var(--border)', background: 'none', padding: '3px 8px', borderRadius: 4, cursor: 'pointer' }}
           >
-            {roomCode}
-          </div>
-          <div style={{ fontSize: 9, color: 'var(--text-dim)', marginTop: 4 }}>
-            {alivePlayers.length} alive · Round {roundNumber}
-          </div>
+            ? How to Play
+          </button>
         </div>
       </div>
 
@@ -88,7 +106,7 @@ export function HostUI({
       <div style={{
         padding: '10px 16px',
         background: 'var(--surface)',
-        border: `1px solid ${isBluffResolution ? 'var(--accent2)' : isGameOver ? 'var(--accent)' : isRoundEnd ? 'var(--alive)' : 'var(--border)'}`,
+        border: `1px solid ${isBluffResolution || isSpinPending ? 'var(--accent2)' : isGameOver ? 'var(--accent)' : isRoundEnd ? 'var(--alive)' : 'var(--border)'}`,
         borderRadius: 'var(--radius)',
         display: 'flex',
         alignItems: 'center',
@@ -101,11 +119,12 @@ export function HostUI({
           fontWeight: 700,
           letterSpacing: '0.15em',
           textTransform: 'uppercase',
-          color: isBluffResolution ? 'var(--accent2)' : isGameOver ? 'var(--accent)' : isRoundEnd ? 'var(--alive)' : 'var(--text-dim)',
+          color: isBluffResolution || isSpinPending ? 'var(--accent2)' : isGameOver ? 'var(--accent)' : isRoundEnd ? 'var(--alive)' : 'var(--text-dim)',
         }}>
           {isLobby && '⏳ Waiting for players'}
           {isPlaying && '🎮 Game in progress'}
-          {isBluffResolution && '⚠️ Bluff called — reveal 3 cards!'}
+          {isBluffResolution && '⚠️ Bluff called — reveal last card!'}
+          {isSpinPending && `🔫 Waiting for ${spinTargetPlayer?.username ?? '...'} to spin`}
           {isRoundEnd && '🏆 Round ended — players reshuffle'}
           {isGameOver && '🎉 Game over!'}
         </div>
@@ -116,10 +135,9 @@ export function HostUI({
         )}
       </div>
 
-      {/* Current card & player (during game) */}
-      {(isPlaying || isBluffResolution) && (
+      {/* Current card & player */}
+      {(isPlaying || isBluffResolution || isSpinPending) && (
         <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap' }}>
-          {/* Required card */}
           <div className="card" style={{ flex: 1, minWidth: 160 }}>
             <div style={{ fontSize: 10, color: 'var(--text-dim)', letterSpacing: '0.12em', marginBottom: 12 }}>
               REQUIRED CARD
@@ -129,8 +147,6 @@ export function HostUI({
               Announce this physically to players
             </div>
           </div>
-
-          {/* Current player */}
           <div className="card" style={{ flex: 1, minWidth: 160 }}>
             <div style={{ fontSize: 10, color: 'var(--text-dim)', letterSpacing: '0.12em', marginBottom: 12 }}>
               CURRENT PLAYER
@@ -160,7 +176,6 @@ export function HostUI({
           HOST CONTROLS
         </div>
         <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
-          {/* Start game */}
           {isLobby && (
             <button
               className="primary"
@@ -172,7 +187,6 @@ export function HostUI({
             </button>
           )}
 
-          {/* Next turn */}
           {(isPlaying || isRoundEnd) && (
             <button className="primary" onClick={nextTurn}>
               → Next Turn
@@ -181,20 +195,43 @@ export function HostUI({
 
           {/* Bluff resolution */}
           {isBluffResolution && (
-            <>
-              <div style={{ width: '100%', fontSize: 12, color: 'var(--warning)', marginBottom: 6 }}>
-                Reveal the last 3 cards physically, then:
+            <div style={{ width: '100%' }}>
+              <div style={{ fontSize: 12, color: 'var(--text)', marginBottom: 10, lineHeight: 1.6 }}>
+                The current player called bluff on the previous player's last card.<br />
+                <span style={{ color: 'var(--text-dim)' }}>Physically reveal the last card played, then confirm:</span>
               </div>
-              <button className="success" onClick={() => resolveBluff(true)}>
-                ✅ Bluff Correct (previous player spins)
-              </button>
-              <button className="danger" onClick={() => resolveBluff(false)}>
-                ❌ Bluff Wrong (accuser spins)
-              </button>
-            </>
+              <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', marginBottom: 10 }}>
+                <button className="success" onClick={() => resolveBluff(true)} style={{ flex: 1 }}>
+                  They were lying ✓
+                </button>
+                <button className="danger" onClick={() => resolveBluff(false)} style={{ flex: 1 }}>
+                  They told the truth ✗
+                </button>
+              </div>
+              <div style={{ fontSize: 11, color: 'var(--text-dim)', lineHeight: 1.7 }}>
+                They were lying → <strong style={{ color: 'var(--accent2)' }}>{prevPlayer?.username ?? '?'}</strong> spins<br />
+                They told the truth → <strong style={{ color: 'var(--accent2)' }}>{currentPlayer?.username ?? '?'}</strong> spins
+              </div>
+            </div>
           )}
 
-          {/* Game over — reset option */}
+          {/* Spin pending */}
+          {isSpinPending && (
+            <div style={{
+              width: '100%',
+              padding: '14px',
+              background: 'rgba(255,74,110,0.05)',
+              border: '1px solid var(--accent2)',
+              borderRadius: 'var(--radius)',
+              fontSize: 13,
+              color: 'var(--accent2)',
+              textAlign: 'center',
+              animation: 'pulse 1.5s ease-in-out infinite',
+            }}>
+              🔫 Waiting for <strong>{spinTargetPlayer?.username ?? '...'}</strong> to pull the trigger...
+            </div>
+          )}
+
           {isGameOver && (
             <button className="primary" onClick={leaveGame}>
               🔄 New Game
@@ -202,6 +239,35 @@ export function HostUI({
           )}
         </div>
       </div>
+
+      {/* Declare Round Winner — only during playing phase */}
+      {isPlaying && (
+        <div className="card">
+          <div style={{ fontSize: 10, color: 'var(--text-dim)', letterSpacing: '0.12em', marginBottom: 14 }}>
+            DECLARE ROUND WINNER
+          </div>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+            {alivePlayers.map(p => (
+              <div key={p.id} style={{
+                display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                padding: '8px 12px',
+                background: 'var(--surface2)',
+                border: '1px solid var(--border)',
+                borderRadius: 'var(--radius)',
+              }}>
+                <span style={{ fontSize: 13 }}>{p.username}</span>
+                <button
+                  className="success"
+                  style={{ padding: '4px 12px', fontSize: 11 }}
+                  onClick={() => handleRoundWin(p.id)}
+                >
+                  🏆 Win
+                </button>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* Player list */}
       <div className="card">
@@ -221,14 +287,12 @@ export function HostUI({
           players={players}
           turnOrder={turnOrder}
           currentPlayerId={currentPlayerId}
-          onSpin={handleSpin}
-          onRoundWin={handleRoundWin}
           isHost={true}
           phase={phase}
         />
       </div>
 
-      {/* Confirm modal */}
+      {/* Round win confirm modal */}
       {confirmAction && (
         <div style={{
           position: 'fixed',
@@ -241,21 +305,14 @@ export function HostUI({
         }}>
           <div className="card fade-in" style={{ maxWidth: 360, width: '90%', textAlign: 'center' }}>
             <div style={{ fontFamily: "'Bebas Neue', sans-serif", fontSize: 28, marginBottom: 12 }}>
-              {confirmAction.type === 'spin' ? '🔫 Confirm Spin' : '🏆 Confirm Round Win'}
+              🏆 Confirm Round Win
             </div>
             <div style={{ color: 'var(--text-dim)', fontSize: 12, marginBottom: 24 }}>
-              {confirmAction.type === 'spin'
-                ? 'Trigger a gun spin for this player?'
-                : 'Declare this player the round winner?'}
+              Declare this player the round winner?
             </div>
             <div style={{ display: 'flex', gap: 12, justifyContent: 'center' }}>
               <button onClick={() => setConfirmAction(null)}>Cancel</button>
-              <button
-                className={confirmAction.type === 'spin' ? 'danger' : 'success'}
-                onClick={executeConfirm}
-              >
-                Confirm
-              </button>
+              <button className="success" onClick={executeConfirm}>Confirm</button>
             </div>
           </div>
         </div>
@@ -268,6 +325,16 @@ export function HostUI({
       >
         Leave game
       </button>
+
+      {/* How to Play modal */}
+      {showHowToPlay && <HowToPlayModal onClose={() => setShowHowToPlay(false)} />}
+
+      <style>{`
+        @keyframes pulse {
+          0%, 100% { opacity: 1; }
+          50%       { opacity: 0.5; }
+        }
+      `}</style>
     </div>
   );
 }
