@@ -24,6 +24,7 @@ function broadcastRoomState(io, roomCode) {
  * Register all socket events for a connected socket
  */
 function registerSocketHandlers(io, socket) {
+  const disconnectTimers = new Map();
 
   // ─── HOST: Create a new room ─────────────────────────────
   socket.on('create_room', ({ username }, callback) => {
@@ -100,6 +101,13 @@ function registerSocketHandlers(io, socket) {
 
       const player = room.players.find(p => p.id === playerId);
       if (!player) return callback({ success: false, error: 'Player not found' });
+
+      const oldSocketId = player.socketId;
+      if (disconnectTimers.has(oldSocketId)) {
+        clearTimeout(disconnectTimers.get(oldSocketId));
+        disconnectTimers.delete(oldSocketId);
+        console.log(`[Room ${code}] Player ${player.username} reconnected — elimination cancelled`);
+      }
 
       engine.reconnectPlayer(room, playerId, socket.id);
       socket.join(code);
@@ -280,22 +288,34 @@ function registerSocketHandlers(io, socket) {
   socket.on('disconnect', () => {
     console.log(`[Socket] Disconnected: ${socket.id}`);
 
-    // Search all rooms for this socket
     for (const [code, room] of rooms.entries()) {
-      // If host disconnects, notify players
       if (room.hostSocketId === socket.id) {
         io.to(code).emit('host_disconnected');
         continue;
       }
 
-      // If player disconnects during game, eliminate them
+      const player = room.players.find(p => p.socketId === socket.id);
+      if (!player || player.status === 'eliminated') continue;
+
       if (room.phase === 'playing' || room.phase === 'bluff_resolution') {
-        const eliminated = engine.handleDisconnect(room, socket.id);
-        if (eliminated) {
-          console.log(`[Room ${code}] Player ${eliminated.username} disconnected → eliminated`);
-          room.lastAction = { type: 'disconnected', playerId: eliminated.id, playerName: eliminated.username };
-          broadcastRoomState(io, code);
-        }
+        console.log(`[Room ${code}] Player ${player.username} disconnected — starting 10s grace period`);
+
+        io.to(code).emit('player_disconnecting', { playerId: player.id, playerName: player.username });
+
+        const timer = setTimeout(() => {
+          const stillDisconnected = room.players.find(p => p.id === player.id && p.socketId === socket.id);
+          if (stillDisconnected && stillDisconnected.status === 'alive') {
+            const eliminated = engine.handleDisconnect(room, socket.id);
+            if (eliminated) {
+              console.log(`[Room ${code}] Player ${eliminated.username} grace period expired → eliminated`);
+              room.lastAction = { type: 'disconnected', playerId: eliminated.id, playerName: eliminated.username };
+              broadcastRoomState(io, code);
+            }
+          }
+          disconnectTimers.delete(socket.id);
+        }, 30000);
+
+        disconnectTimers.set(socket.id, timer);
       }
     }
   });
