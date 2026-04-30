@@ -400,6 +400,12 @@ function registerSocketHandlers(io, socket) {
       const result = engine.validateAndPlayCard(room, playerId, cardId);
       if (!result.ok) return callback({ success: false, error: result.error });
 
+      // Whot card: player nominates the next required shape.
+      // This only takes effect if a valid SHAPES value is provided.
+      if (result.card.shape === 'whot' && nominatedShape && engine.SHAPES.includes(nominatedShape)) {
+        room.currentCardType = nominatedShape;
+      }
+
       room.lastAction = {
         type: 'card_played_online',
         playerId,
@@ -495,6 +501,14 @@ function registerSocketHandlers(io, socket) {
     } catch (err) {
       callback({ success: false, error: err.message });
     }
+  });
+
+  // ─── PLAYER: Acknowledge spin result (synced overlay dismiss) ───
+  // When the spin target clicks Continue, broadcast to all room members
+  // so every client can dismiss their spin overlay simultaneously.
+  socket.on('spin_acknowledged', async ({ roomCode } = {}) => {
+    const code = roomCode?.toUpperCase();
+    if (code) io.to(code).emit('spin_acknowledged');
   });
 
   // ─── PLAYER: Intentional leave ───────────────────────────

@@ -73,6 +73,86 @@ function CylinderSVG({ bulletChambers, landingChamberIndex, rotation, animating,
   );
 }
 
+// ─── Share button ─────────────────────────────────────────────
+function ShareButton({ roomCode }) {
+  const [showFallback, setShowFallback] = useState(false);
+  const message = `Join my Bluff game! Room code: ${roomCode}`;
+  const url = typeof window !== 'undefined' ? `${window.location.origin}?ref=${roomCode}` : '';
+  const fullText = `${message}\n${url}`;
+
+  const handleShare = async () => {
+    if (typeof navigator !== 'undefined' && navigator.share) {
+      try {
+        await navigator.share({ title: 'Join my Bluff game!', text: message, url });
+        return;
+      } catch (e) {
+        if (e.name === 'AbortError') return;
+      }
+    }
+    setShowFallback(f => !f);
+  };
+
+  const enc = encodeURIComponent;
+  const links = [
+    { label: '💬 WhatsApp', href: `https://wa.me/?text=${enc(fullText)}` },
+    { label: '✈️ Telegram', href: `https://t.me/share/url?url=${enc(url)}&text=${enc(message)}` },
+    { label: '💬 SMS', href: `sms:?body=${enc(fullText)}` },
+    { label: '📧 Email', href: `mailto:?subject=${enc('Join my Bluff game!')}&body=${enc(fullText)}` },
+  ];
+
+  return (
+    <div style={{ position: 'relative', display: 'inline-block' }}>
+      <button
+        onClick={handleShare}
+        style={{
+          fontSize: 11, color: 'var(--accent)',
+          border: '1px solid var(--accent)',
+          background: 'rgba(232,255,74,0.04)',
+          padding: '5px 12px', borderRadius: 4, cursor: 'pointer',
+          letterSpacing: '0.06em',
+        }}
+      >
+        🔗 Share Room
+      </button>
+      {showFallback && (
+        <div style={{
+          position: 'absolute', top: 'calc(100% + 6px)', left: 0,
+          background: 'var(--surface2)', border: '1px solid var(--border)',
+          borderRadius: 6, padding: 8, zIndex: 2000,
+          display: 'flex', flexDirection: 'column', gap: 4, minWidth: 170,
+          boxShadow: '0 4px 20px rgba(0,0,0,0.4)',
+        }}>
+          {links.map(({ label, href }) => (
+            <a
+              key={label}
+              href={href}
+              target="_blank"
+              rel="noreferrer"
+              onClick={() => setShowFallback(false)}
+              style={{
+                display: 'block', padding: '7px 10px',
+                color: 'var(--text)', fontSize: 12,
+                textDecoration: 'none', borderRadius: 4,
+                background: 'transparent',
+              }}
+              onMouseEnter={e => e.currentTarget.style.background = 'var(--surface)'}
+              onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
+            >
+              {label}
+            </a>
+          ))}
+          <button
+            onClick={() => setShowFallback(false)}
+            style={{ marginTop: 2, padding: '5px', fontSize: 11, color: 'var(--text-dim)', background: 'none', border: 'none', cursor: 'pointer', textDecoration: 'underline' }}
+          >
+            Cancel
+          </button>
+        </div>
+      )}
+    </div>
+  );
+}
+
 export function HostUI({
   roomCode,
   roomState,
@@ -81,6 +161,8 @@ export function HostUI({
   resolveBluff,
   declareRoundWin,
   leaveGame,
+  acknowledgeSpinResult,
+  spinDismissed,
 }) {
   const [confirmAction, setConfirmAction] = useState(null);
   const [showHowToPlay, setShowHowToPlay] = useState(false);
@@ -92,6 +174,13 @@ export function HostUI({
   const [spinComplete, setSpinComplete] = useState(false);
   const [cylinderRotation, setCylinderRotation] = useState(0);
   const [cylinderAnimating, setCylinderAnimating] = useState(false);
+
+  // When spin target clicks Continue → spinDismissed fires → auto-close overlay for host too
+  useEffect(() => {
+    if (spinDismissed && spinData) {
+      setSpinData(null);
+    }
+  }, [spinDismissed]); // eslint-disable-line
 
   useEffect(() => {
     const action = roomState?.lastAction;
@@ -203,6 +292,9 @@ export function HostUI({
             </div>
             <div style={{ fontSize: 9, color: 'var(--text-dim)', marginTop: 4 }}>
               {alivePlayers.length} alive · Round {roundNumber}
+            </div>
+            <div style={{ marginTop: 8 }}>
+              <ShareButton roomCode={roomCode} />
             </div>
           </div>
           <button
@@ -523,9 +615,10 @@ export function HostUI({
               <div style={{ fontSize: 12, color: 'var(--text-dim)', marginBottom: 28 }}>
                 Rolled {spinData.roll} — Risk was {spinData.riskLevelBefore}/6
               </div>
+              {/* Host clicks Continue → broadcasts overlay dismiss to all players */}
               <button
                 className="primary"
-                onClick={() => setSpinData(null)}
+                onClick={acknowledgeSpinResult}
                 style={{ padding: '10px 32px', fontSize: 14 }}
               >
                 Continue
