@@ -1,14 +1,18 @@
 import './globals.css';
 
 export const metadata = {
+  metadataBase: new URL(
+    process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'
+  ),
   title: 'BLUFF - Real-Time Multiplayer Card Game',
-  description: 'Bluff, bet, and outwit your opponents in this fast-paced real-time multiplayer card game.',
+  description:
+    'Challenge your friends in BLUFF — a fast-paced real-time multiplayer card game of deception, strategy, and nerve.',
 
   // Favicon
   icons: {
-    icon: '/images/favicon.png',
-    shortcut: '/images/favicon.png',
-    apple: '/images/favicon.png',
+    icon: '/images/logo.png',
+    shortcut: '/images/logo.png',
+    apple: '/images/logo.png',
   },
 
   // Open Graph metadata for social sharing (WhatsApp, Telegram, Facebook, LinkedIn, etc.)

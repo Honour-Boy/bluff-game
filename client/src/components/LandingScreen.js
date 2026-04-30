@@ -1,43 +1,55 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { HowToPlayModal } from './HowToPlayModal';
+import { UserProfile } from './UserProfile';
 import { ShapeIcon } from './ShapeIcon';
 
-export function LandingScreen({ onCreateRoom, onJoinRoom, error, setError, connected }) {
-  const [mode, setMode] = useState(null); // null | 'host' | 'join'
+export function LandingScreen({
+  username,
+  onCreateRoom,
+  onJoinRoom,
+  onSignOut,
+  onUpdateUsername,
+  onUpdatePassword,
+  initialJoinCode,   // ?join=CODE — auto-opens join form with code locked
+  error,
+  setError,
+  connected,
+}) {
+  const [mode, setMode] = useState(null);              // null | 'host' | 'join'
   const [showHowToPlay, setShowHowToPlay] = useState(false);
-  const [username, setUsername] = useState('');
+  const [showProfile, setShowProfile] = useState(false);
   const [roomCode, setRoomCode] = useState('');
-  const [selectedGameMode, setSelectedGameMode] = useState(null); // null | 'physical' | 'online'
-  const [hostUsername, setHostUsername] = useState('');
+  const [selectedGameMode, setSelectedGameMode] = useState(null); // 'physical' | 'online'
+  const [codeLocked, setCodeLocked] = useState(false); // true when code comes from URL
+
+  // Auto-open join form when a ?join= code is in the URL
+  useEffect(() => {
+    if (initialJoinCode) {
+      setRoomCode(initialJoinCode.toUpperCase());
+      setCodeLocked(true);
+      setMode('join');
+    }
+  }, [initialJoinCode]); // eslint-disable-line
 
   const handleJoin = (e) => {
     e.preventDefault();
     setError(null);
-    const name = username.trim();
-    if (!name) return setError('Enter a username');
-    if (name.length < 4) return setError('Username must be at least 4 characters');
     if (!roomCode.trim() || roomCode.trim().length < 4) return setError('Enter a valid room code');
-    onJoinRoom(roomCode.trim(), name);
+    onJoinRoom(roomCode.trim());
   };
 
   const handleCreate = (e) => {
     e.preventDefault();
     setError(null);
     if (!selectedGameMode) return setError('Select a game mode');
-    if (selectedGameMode === 'online') {
-      const name = hostUsername.trim();
-      if (!name) return setError('Enter your username');
-      if (name.length < 4) return setError('Username must be at least 4 characters');
-    }
-    onCreateRoom(selectedGameMode, hostUsername.trim());
+    onCreateRoom(selectedGameMode);
   };
 
   const handleBackFromHost = () => {
     setMode(null);
     setSelectedGameMode(null);
-    setHostUsername('');
     setError(null);
   };
 
@@ -68,6 +80,37 @@ export function LandingScreen({ onCreateRoom, onJoinRoom, error, setError, conne
       <div style={{ position: 'fixed', top: 20, right: 20, width: 60, height: 60, borderTop: '2px solid var(--accent)', borderRight: '2px solid var(--accent)', opacity: 0.3 }} />
       <div style={{ position: 'fixed', bottom: 20, left: 20, width: 60, height: 60, borderBottom: '2px solid var(--accent)', borderLeft: '2px solid var(--accent)', opacity: 0.3 }} />
       <div style={{ position: 'fixed', bottom: 20, right: 20, width: 60, height: 60, borderBottom: '2px solid var(--accent)', borderRight: '2px solid var(--accent)', opacity: 0.3 }} />
+
+      {/* User bar — top right */}
+      <div style={{
+        position: 'fixed', top: 14, right: 14, zIndex: 10,
+        display: 'flex', alignItems: 'center', gap: 8,
+      }}>
+        <button
+          onClick={() => setShowProfile(true)}
+          style={{
+            fontSize: 11, color: 'var(--text-dim)',
+            border: '1px solid var(--border)',
+            background: 'var(--surface2)',
+            padding: '5px 10px', borderRadius: 4,
+            cursor: 'pointer', letterSpacing: '0.06em',
+          }}
+        >
+          👤 {username}
+        </button>
+        <button
+          onClick={onSignOut}
+          style={{
+            fontSize: 11, color: 'var(--text-dim)',
+            border: '1px solid var(--border)',
+            background: 'none',
+            padding: '5px 10px', borderRadius: 4,
+            cursor: 'pointer',
+          }}
+        >
+          Sign out
+        </button>
+      </div>
 
       <div className="fade-in" style={{ width: '100%', maxWidth: 480, position: 'relative', zIndex: 1 }}>
         {/* Logo */}
@@ -203,22 +246,6 @@ export function LandingScreen({ onCreateRoom, onJoinRoom, error, setError, conne
               })}
             </div>
 
-            {/* Online: username field */}
-            {selectedGameMode === 'online' && (
-              <div>
-                <label style={{ fontSize: 10, color: 'var(--text-dim)', letterSpacing: '0.1em', display: 'block', marginBottom: 6 }}>
-                  YOUR USERNAME
-                </label>
-                <input
-                  value={hostUsername}
-                  onChange={e => setHostUsername(e.target.value)}
-                  placeholder="Enter your name"
-                  maxLength={20}
-                  autoFocus
-                />
-              </div>
-            )}
-
             {/* Physical: host role note */}
             {selectedGameMode === 'physical' && (
               <div style={{ fontSize: 10, color: 'var(--text-dim)', letterSpacing: '0.12em', padding: '8px 12px', background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 'var(--radius)' }}>
@@ -226,11 +253,17 @@ export function LandingScreen({ onCreateRoom, onJoinRoom, error, setError, conne
               </div>
             )}
 
+            {selectedGameMode === 'online' && (
+              <div style={{ fontSize: 11, color: 'var(--text-dim)', padding: '8px 12px', background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 'var(--radius)' }}>
+                Playing as: <strong style={{ color: 'var(--text)' }}>{username}</strong>
+              </div>
+            )}
+
             <button
               type="submit"
               className="primary"
               style={{ padding: '16px', fontSize: 13, opacity: !selectedGameMode ? 0.5 : 1 }}
-              disabled={!selectedGameMode || (selectedGameMode === 'online' && !hostUsername.trim())}
+              disabled={!selectedGameMode}
             >
               ▶ Create Room
             </button>
@@ -246,34 +279,50 @@ export function LandingScreen({ onCreateRoom, onJoinRoom, error, setError, conne
             <div style={{ fontSize: 10, color: 'var(--text-dim)', letterSpacing: '0.15em', marginBottom: 4 }}>
               PLAYER — JOIN WITH ROOM CODE
             </div>
-            <div>
-              <label style={{ fontSize: 10, color: 'var(--text-dim)', letterSpacing: '0.1em', display: 'block', marginBottom: 6 }}>
-                USERNAME
-              </label>
-              <input
-                value={username}
-                onChange={e => setUsername(e.target.value)}
-                placeholder="Enter your name"
-                maxLength={20}
-                autoFocus
-              />
+
+            {/* Authenticated username display */}
+            <div style={{ padding: '8px 12px', background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 'var(--radius)', fontSize: 11, color: 'var(--text-dim)' }}>
+              Joining as: <strong style={{ color: 'var(--text)' }}>{username}</strong>
             </div>
+
             <div>
               <label style={{ fontSize: 10, color: 'var(--text-dim)', letterSpacing: '0.1em', display: 'block', marginBottom: 6 }}>
                 ROOM CODE
               </label>
               <input
                 value={roomCode}
-                onChange={e => setRoomCode(e.target.value.toUpperCase())}
+                onChange={e => !codeLocked && setRoomCode(e.target.value.toUpperCase())}
                 placeholder="e.g. ABC123"
                 maxLength={6}
-                style={{ letterSpacing: '0.2em', fontSize: 16, fontWeight: 700 }}
+                readOnly={codeLocked}
+                autoFocus
+                style={{
+                  letterSpacing: '0.2em', fontSize: 16, fontWeight: 700,
+                  ...(codeLocked ? { opacity: 0.8, cursor: 'default', background: 'var(--surface)' } : {}),
+                }}
               />
+              {codeLocked && (
+                <div style={{ fontSize: 10, color: 'var(--accent)', marginTop: 4, letterSpacing: '0.08em' }}>
+                  Code from share link · locked
+                </div>
+              )}
             </div>
+
             <button type="submit" className="primary" style={{ padding: '14px', fontSize: 13 }}>
               Join Game →
             </button>
-            <button type="button" style={{ fontSize: 11 }} onClick={() => { setMode(null); setError(null); }}>
+            <button
+              type="button"
+              style={{ fontSize: 11 }}
+              onClick={() => {
+                setMode(null);
+                setError(null);
+                if (!initialJoinCode) {
+                  setRoomCode('');
+                  setCodeLocked(false);
+                }
+              }}
+            >
               ← Back
             </button>
           </form>
@@ -281,6 +330,15 @@ export function LandingScreen({ onCreateRoom, onJoinRoom, error, setError, conne
       </div>
 
       {showHowToPlay && <HowToPlayModal onClose={() => setShowHowToPlay(false)} />}
+
+      {showProfile && (
+        <UserProfile
+          username={username}
+          onUpdateUsername={onUpdateUsername}
+          onUpdatePassword={onUpdatePassword}
+          onClose={() => setShowProfile(false)}
+        />
+      )}
     </div>
   );
 }

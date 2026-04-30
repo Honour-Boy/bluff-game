@@ -6,21 +6,10 @@ import { ShapeIcon, SHAPE_COLORS } from './ShapeIcon';
 import { RiskMeter } from './RiskMeter';
 import { ActionLog } from './ActionLog';
 import { HowToPlayModal } from './HowToPlayModal';
+import { TurnActionModal, WaitingForPlayerBanner } from './TurnActionModal';
 
 // ─── Constants ────────────────────────────────────────────────
 const SHAPES = ['circle', 'triangle', 'cross', 'square', 'star'];
-
-// ─── Seeded shuffle (same PRNG as PlayerUI/HostUI) ────────────
-function seededShuffle(arr, seed) {
-  const a = [...arr];
-  let s = seed;
-  for (let i = a.length - 1; i > 0; i--) {
-    s = (s * 1664525 + 1013904223) & 0xffffffff;
-    const j = Math.abs(s) % (i + 1);
-    [a[i], a[j]] = [a[j], a[i]];
-  }
-  return a;
-}
 
 // ─── Cylinder SVG ────────────────────────────────────────────
 const CYL = 200, CX = 100, CY = 100, ORBIT = 58, CHAM_R = 20;
@@ -193,7 +182,7 @@ function ShareButton({ roomCode, senderName }) {
   const [showFallback, setShowFallback] = useState(false);
 
   const message = `Join ${senderName}'s Bluff game! Room code: ${roomCode}`;
-  const url = typeof window !== 'undefined' ? `${window.location.origin}?ref=${roomCode}` : '';
+  const url = typeof window !== 'undefined' ? `${window.location.origin}?join=${roomCode}` : '';
   const fullText = `${message}\n${url}`;
 
   const handleShare = async () => {
@@ -297,6 +286,8 @@ export function OnlinePlayerUI({
   const [selectedCardId, setSelectedCardId] = useState(null);
   // Whot nomination: stores the cardId waiting for a shape to be picked
   const [whotPickerCard, setWhotPickerCard] = useState(null);
+  // Turn action modal
+  const [showTurnModal, setShowTurnModal] = useState(false);
 
   // Spectator state
   const [spectatingId, setSpectatingId] = useState(null);
@@ -318,23 +309,22 @@ export function OnlinePlayerUI({
     const action = roomState?.lastAction;
     if (action?.type !== 'spin_result') return;
 
-    const actionKey = `${action.spinTargetId}:${action.roll}`;
+    const actionKey = `${action.spinTargetId}:${JSON.stringify(action.chamber)}`;
     if (lastSpinKeyRef.current === actionKey) return;
     lastSpinKeyRef.current = actionKey;
 
-    const { roll, eliminated, spinTargetName, spinTargetId: targetId, riskLevelBefore } = action;
-    const landingChamberIndex = (roll - 1) % 6;
-    // Correct formula: chamber i starts at (i*60 - 90)°. To land at top pointer (-90°):
-    // finalAngle = 10*360 - landingChamberIndex*60  (subtract, not add)
+    const { spinIndex, eliminated, spinTargetName, spinTargetId: targetId, chamber } = action;
+    const landingChamberIndex = spinIndex ?? 0;
+    // Chamber i starts at (i*60 - 90)°. To land at top pointer: finalAngle = 10*360 - spinIndex*60
     const finalAngle = 10 * 360 - landingChamberIndex * 60;
-    const safeRiskBefore = riskLevelBefore ?? 1;
-    const shuffled = seededShuffle([0, 1, 2, 3, 4, 5], roll);
-    const bulletChambers = new Set(shuffled.slice(0, safeRiskBefore));
+    const bulletChambers = new Set(
+      (chamber || []).map((v, i) => v === 'bullet' ? i : -1).filter(i => i !== -1)
+    );
 
     setCylinderRotation(0);
     setCylinderAnimating(false);
     setSpinComplete(false);
-    setSpinData({ roll, eliminated, spinTargetName, spinTargetId: targetId, riskLevelBefore: safeRiskBefore, bulletChambers, landingChamberIndex, finalAngle });
+    setSpinData({ spinIndex: landingChamberIndex, eliminated, spinTargetName, spinTargetId: targetId, bulletChambers, landingChamberIndex, finalAngle });
 
     requestAnimationFrame(() => {
       requestAnimationFrame(() => {
@@ -384,6 +374,16 @@ export function OnlinePlayerUI({
     return () => clearTimeout(timer);
   }, [spinComplete]); // eslint-disable-line
 
+  // Open turn modal when it becomes this player's turn
+  useEffect(() => {
+    const isPlaying = roomState?.phase === 'playing';
+    if (isMyTurn && isPlaying && !roomState?.cardPlayedThisTurn && myPlayer?.status === 'alive') {
+      setShowTurnModal(true);
+    } else {
+      setShowTurnModal(false);
+    }
+  }, [isMyTurn, roomState?.phase, roomState?.cardPlayedThisTurn]); // eslint-disable-line
+
   if (!roomState || !myPlayer) {
     return (
       <div style={{ color: 'var(--text-dim)', textAlign: 'center', padding: 40 }}>
@@ -415,6 +415,13 @@ export function OnlinePlayerUI({
   const currentPlayer = players?.find(p => p.id === currentPlayerId);
   const otherPlayers = players?.filter(p => p.id !== myPlayer.id) || [];
   const alivePlayers = players?.filter(p => p.status === 'alive') || [];
+
+  // Previous player in turn order (for "Call X's bluff" label)
+  const myTurnIdx = turnOrder?.indexOf(myPlayer.id) ?? -1;
+  const prevPlayerId = myTurnIdx >= 0 && turnOrder?.length > 1
+    ? turnOrder[(myTurnIdx - 1 + turnOrder.length) % turnOrder.length]
+    : null;
+  const prevPlayer = prevPlayerId ? players?.find(p => p.id === prevPlayerId) : null;
 
   // Action hint for playing phase
   let actionHint = '';
@@ -644,13 +651,7 @@ export function OnlinePlayerUI({
 
       {/* Waiting for someone else's turn */}
       {!isMyTurn && isPlaying && currentPlayer && !isEliminated && (
-        <div style={{
-          padding: '12px 14px', background: 'var(--surface)',
-          border: '1px solid var(--border)', borderRadius: 'var(--radius)',
-          fontSize: 12, color: 'var(--text-dim)',
-        }}>
-          Waiting for <span style={{ color: 'var(--text)', fontWeight: 700 }}>{currentPlayer.username}</span> to play...
-        </div>
+        <WaitingForPlayerBanner playerName={currentPlayer.username} />
       )}
 
       {/* ── Spin pending ── */}
@@ -885,7 +886,7 @@ export function OnlinePlayerUI({
                 {spinData.eliminated ? '💀 ELIMINATED' : '😮‍💨 SURVIVED'}
               </div>
               <div style={{ fontSize: 12, color: 'var(--text-dim)', marginBottom: 28 }}>
-                Rolled {spinData.roll} — Risk was {spinData.riskLevelBefore}/6
+                Chamber {spinData.landingChamberIndex + 1} · {spinData.eliminated ? 'bullet found' : 'empty'}
               </div>
               {isSpinTarget ? (
                 /* Spin target: clicking Continue dismisses everyone's overlay */
@@ -994,6 +995,17 @@ export function OnlinePlayerUI({
 
       {/* How to Play modal */}
       {showHowToPlay && <HowToPlayModal onClose={() => setShowHowToPlay(false)} initialTab="online" />}
+
+      {/* Turn action modal — shown to active player at turn start */}
+      <TurnActionModal
+        visible={showTurnModal && !isEliminated}
+        isFirstTurn={isFirstTurn}
+        bluffUsed={bluffUsedThisTurn}
+        cardPlayed={cardPlayedThisTurn}
+        prevPlayerName={prevPlayer?.username || null}
+        onCallBluff={() => { callBluff(); setShowTurnModal(false); }}
+        onClose={() => setShowTurnModal(false)}
+      />
 
       <style>{`
         @keyframes pulse {

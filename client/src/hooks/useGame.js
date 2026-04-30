@@ -7,21 +7,18 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { getSocket } from '../lib/socket';
 
-const LS_ROOM_CODE = 'bluff_roomCode';
-const LS_PLAYER_ID = 'bluff_playerId';
-const LS_IS_HOST = 'bluff_isHost';
-
-export function useGame() {
+export function useGame(getAccessToken) {
   const socket = getSocket();
 
-  const [roomCode, setRoomCode] = useState(null);
-  const [isHost, setIsHost] = useState(false);
-  const [playerId, setPlayerId] = useState(null);
-  const [roomState, setRoomState] = useState(null);
-  const [error, setError] = useState(null);
-  const [connected, setConnected] = useState(socket.connected);
+  const [roomCode, setRoomCode]       = useState(null);
+  const [isHost, setIsHost]           = useState(false);
+  const [playerId, setPlayerId]       = useState(null);
+  const [roomState, setRoomState]     = useState(null);
+  const [error, setError]             = useState(null);
+  const [connected, setConnected]     = useState(socket.connected);
   const [notification, setNotification] = useState(null);
-  // Shared spin-overlay dismiss signal — set true when spin target acknowledges result
+  const [authenticated, setAuthenticated] = useState(false);
+  // Shared spin-overlay dismiss signal
   const [spinDismissed, setSpinDismissed] = useState(false);
 
   // ─── Show transient notification ──────────────────────────
@@ -31,57 +28,50 @@ export function useGame() {
   }, []);
 
   const clearSession = useCallback(() => {
-    localStorage.removeItem(LS_ROOM_CODE);
-    localStorage.removeItem(LS_PLAYER_ID);
-    localStorage.removeItem(LS_IS_HOST);
     setRoomCode(null);
     setPlayerId(null);
     setIsHost(false);
     setRoomState(null);
   }, []);
 
+  // ─── Authenticate socket with Supabase JWT ────────────────
+  const authenticateSocket = useCallback(async () => {
+    if (!getAccessToken) return;
+    const token = await getAccessToken();
+    if (!token) return;
+    socket.emit('authenticate', { token }, (res) => {
+      if (res?.success) setAuthenticated(true);
+      else console.warn('[socket] auth failed:', res?.error);
+    });
+  }, [socket, getAccessToken]);
+
   // ─── Warn before refresh/close whenever in a room ────────
-  // On beforeunload: show browser dialog AND notify server immediately so
-  // the player is removed from the room without waiting for the grace period.
-  // This prevents duplicate player entries when they rejoin after reloading.
   useEffect(() => {
     if (!roomCode) return;
-
     const handleBeforeUnload = (e) => {
-      // Tell the server we're leaving intentionally so it can clean up now
       socket.emit('leave_room', { roomCode, playerId });
       e.preventDefault();
       e.returnValue = '';
     };
-
     window.addEventListener('beforeunload', handleBeforeUnload);
     return () => window.removeEventListener('beforeunload', handleBeforeUnload);
   }, [roomCode, playerId, socket]);
 
-  // ─── Screen wake lock — keeps screen on while in a room ──────
-  // Prevents device from sleeping mid-game, which would cause disconnections.
+  // ─── Screen wake lock ─────────────────────────────────────
   useEffect(() => {
     if (!roomCode) return;
     let wakeLock = null;
-
     const acquire = async () => {
       try {
-        if (typeof navigator !== 'undefined' && navigator.wakeLock) {
+        if (typeof navigator !== 'undefined' && navigator.wakeLock)
           wakeLock = await navigator.wakeLock.request('screen');
-        }
-      } catch (err) {
-        // Silently fail — wake lock is a progressive enhancement
-      }
+      } catch (_) { /* silent */ }
     };
-
     acquire();
-
-    // Re-acquire after the user returns to the tab (visibility change releases the lock)
     const onVisibilityChange = () => {
       if (document.visibilityState === 'visible') acquire();
     };
     document.addEventListener('visibilitychange', onVisibilityChange);
-
     return () => {
       document.removeEventListener('visibilitychange', onVisibilityChange);
       wakeLock?.release?.().catch(() => {});
@@ -90,27 +80,25 @@ export function useGame() {
 
   // ─── Socket event listeners ───────────────────────────────
   useEffect(() => {
-    // Simple connect/disconnect tracking — no reconnect-on-reload logic.
-    // If a player reloads they are cleared to the landing screen (see mount effect).
-    const onConnect = () => { setConnected(true); setError(null); };
-    const onDisconnect = () => setConnected(false);
+    const onConnect = () => {
+      setConnected(true);
+      setError(null);
+      // Re-authenticate on reconnect
+      authenticateSocket();
+    };
+    const onDisconnect = () => {
+      setConnected(false);
+      setAuthenticated(false);
+    };
     const onRoomState = (state) => {
       setRoomState(state);
-      // If a fresh spin_result just arrived, reset spinDismissed so the
-      // new overlay can be dismissed again (previous spin may have left it true).
-      if (state?.lastAction?.type === 'spin_result') {
-        setSpinDismissed(false);
-      }
+      if (state?.lastAction?.type === 'spin_result') setSpinDismissed(false);
     };
     const onBluffCalled = () => notify('⚠️ Bluff called! Host: reveal the last card.', 'warning');
     const onSpinAcknowledged = () => setSpinDismissed(true);
-
-    // Host lost connection — show countdown warning to all players
     const onHostDisconnecting = ({ countdown } = {}) => {
       notify(`Host disconnected. Game ends in ${countdown ?? 10}s if they don't return.`, 'error');
     };
-
-    // Host never returned — end the game for all clients
     const onGameEnded = ({ reason } = {}) => {
       clearSession();
       notify(reason || 'The game has ended.', 'error');
@@ -133,60 +121,36 @@ export function useGame() {
       socket.off('host_disconnecting', onHostDisconnecting);
       socket.off('game_ended', onGameEnded);
     };
-  }, [socket, notify, clearSession]);
+  }, [socket, notify, clearSession, authenticateSocket]);
 
-  // ─── On mount: clear any stale session from a previous page load ───
-  // Reload = disconnect. No reconnect attempt. Player returns to landing screen.
+  // ─── On mount: authenticate if already connected ──────────
   useEffect(() => {
-    const savedCode = localStorage.getItem(LS_ROOM_CODE);
-    if (savedCode) {
-      // Stale session from a previous tab or reload — clear it immediately.
-      localStorage.removeItem(LS_ROOM_CODE);
-      localStorage.removeItem(LS_PLAYER_ID);
-      localStorage.removeItem(LS_IS_HOST);
-      // State is already null/false from initial useState — nothing to reset.
-    }
-  }, []); // eslint-disable-line
+    if (socket.connected && getAccessToken) authenticateSocket();
+  }, [getAccessToken]); // eslint-disable-line
 
   // ─── Actions ──────────────────────────────────────────────
 
   /**
-   * Create a room. In online mode, also joins as a player so the host has a playerId.
+   * Create a room. In online mode, host is also auto-joined as a player on the server.
    */
-  const createRoom = useCallback((mode = 'physical', username = '') => {
+  const createRoom = useCallback((mode = 'physical') => {
     socket.emit('create_room', { mode }, (res) => {
       if (res.success) {
         setRoomCode(res.roomCode);
         setIsHost(true);
-        localStorage.setItem(LS_ROOM_CODE, res.roomCode);
-        localStorage.setItem(LS_IS_HOST, 'true');
-        localStorage.removeItem(LS_PLAYER_ID);
-
-        // Online: also join as a player so the host participates in the game
-        if (mode === 'online' && username.trim()) {
-          socket.emit('join_room', { roomCode: res.roomCode, username: username.trim() }, (joinRes) => {
-            if (joinRes.success) {
-              setPlayerId(joinRes.playerId);
-              localStorage.setItem(LS_PLAYER_ID, joinRes.playerId);
-            }
-          });
-        }
+        if (res.playerId) setPlayerId(res.playerId);
       } else {
         setError(res.error);
       }
     });
   }, [socket]);
 
-  const joinRoom = useCallback((code, username) => {
-    const savedPlayerId = localStorage.getItem(LS_PLAYER_ID);
-    socket.emit('join_room', { roomCode: code.toUpperCase(), username, playerId: savedPlayerId }, (res) => {
+  const joinRoom = useCallback((code) => {
+    socket.emit('join_room', { roomCode: code.toUpperCase() }, (res) => {
       if (res.success) {
         setRoomCode(res.roomCode);
         setPlayerId(res.playerId);
         setIsHost(false);
-        localStorage.setItem(LS_ROOM_CODE, res.roomCode);
-        localStorage.setItem(LS_PLAYER_ID, res.playerId);
-        localStorage.setItem(LS_IS_HOST, 'false');
       } else {
         setError(res.error);
       }
@@ -224,13 +188,12 @@ export function useGame() {
   }, [socket, roomCode, playerId]);
 
   const playerSpin = useCallback(() => {
-    setSpinDismissed(false); // reset dismiss state before a new spin
+    setSpinDismissed(false);
     socket.emit('player_spin', { roomCode, playerId }, (res) => {
       if (!res.success) setError(res.error);
     });
   }, [socket, roomCode, playerId]);
 
-  // Spin target calls this after clicking Continue — dismisses overlay for all clients
   const acknowledgeSpinResult = useCallback(() => {
     socket.emit('spin_acknowledged', { roomCode });
     setSpinDismissed(true);
@@ -269,13 +232,13 @@ export function useGame() {
 
   const leaveGame = useCallback(() => {
     clearSession();
-  }, []);
+  }, [clearSession]);
 
   // Derived state
-  const myPlayer = roomState?.players?.find(p => p.id === playerId) || null;
-  const isMyTurn = roomState?.currentPlayerId === playerId;
+  const myPlayer      = roomState?.players?.find(p => p.id === playerId) || null;
+  const isMyTurn      = roomState?.currentPlayerId === playerId;
   const currentPlayer = roomState?.players?.find(p => p.id === roomState?.currentPlayerId) || null;
-  const gameMode = roomState?.mode || null;
+  const gameMode      = roomState?.mode || null;
 
   return {
     // State
@@ -289,6 +252,7 @@ export function useGame() {
     gameMode,
     error,
     connected,
+    authenticated,
     notification,
     spinDismissed,
     // Actions

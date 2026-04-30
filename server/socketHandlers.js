@@ -2,12 +2,20 @@
 // SOCKET HANDLERS — All Socket.IO event logic
 // ============================================================
 
-const { v4: uuidv4 } = require('uuid');
+const { createClient } = require('@supabase/supabase-js');
 const engine = require('./gameEngine');
+
+// ─── Supabase admin client (server-side only) ─────────────────
+// Used to verify JWT tokens and look up profiles.
+// Requires SUPABASE_URL + SUPABASE_SERVICE_ROLE_KEY env vars.
+const supabase = createClient(
+  process.env.SUPABASE_URL,
+  process.env.SUPABASE_SERVICE_ROLE_KEY,
+  { auth: { autoRefreshToken: false, persistSession: false } }
+);
 
 /**
  * In-memory store: roomCode → roomState
- * This is the single source of truth for all game state.
  */
 const rooms = new Map();
 
@@ -23,10 +31,6 @@ async function saveRoom(room) {
 
 // ─── Broadcast helpers ────────────────────────────────────────
 
-/**
- * In physical mode: broadcast identical serialized state to all room members.
- * In online mode: send personalized state (including myHand) to each connected socket.
- */
 async function broadcastRoomState(io, roomCode) {
   const room = await getRoom(roomCode);
   if (!room) return;
@@ -34,7 +38,6 @@ async function broadcastRoomState(io, roomCode) {
   if (room.mode === engine.MODES.ONLINE) {
     const sockets = await io.in(roomCode).fetchSockets();
     for (const s of sockets) {
-      // Match socket to a player by socketId
       const player = room.players.find(p => p.socketId === s.id);
       const playerId = player ? player.id : null;
       s.emit('room_state', engine.serializeRoom(room, playerId));
@@ -46,26 +49,67 @@ async function broadcastRoomState(io, roomCode) {
 
 // ─── Register all handlers ────────────────────────────────────
 
-// Track host disconnect timers per room: roomCode → timeoutId
 const hostDisconnectTimers = new Map();
 
 function registerSocketHandlers(io, socket) {
   const disconnectTimers = new Map();
 
+  // ─── AUTHENTICATE socket with Supabase JWT ───────────────
+  // Must be called once after connecting, before any game events.
+  socket.on('authenticate', async ({ token } = {}, callback) => {
+    if (!token) return callback?.({ success: false, error: 'No token provided' });
+
+    try {
+      const { data, error } = await supabase.auth.getUser(token);
+      if (error || !data?.user) {
+        return callback?.({ success: false, error: 'Invalid or expired token' });
+      }
+
+      // Fetch display username from profiles table
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('username')
+        .eq('id', data.user.id)
+        .single();
+
+      socket.userId   = data.user.id;
+      socket.username = profile?.username
+        || data.user.user_metadata?.username
+        || data.user.user_metadata?.full_name
+        || data.user.email?.split('@')[0]
+        || 'Player';
+
+      callback?.({ success: true });
+    } catch (err) {
+      callback?.({ success: false, error: 'Authentication failed' });
+    }
+  });
+
   // ─── HOST: Create a new room ─────────────────────────────
-  socket.on('create_room', async ({ username, mode } = {}, callback) => {
+  socket.on('create_room', async ({ mode } = {}, callback) => {
+    if (!socket.userId) return callback({ success: false, error: 'Not authenticated' });
+
     try {
       const roomMode = mode === engine.MODES.ONLINE ? engine.MODES.ONLINE : engine.MODES.PHYSICAL;
       const room = engine.createRoom(socket.id, roomMode);
+      room.hostUserId = socket.userId;
       room.cardPlayedThisTurn = false;
       room.bluffUsedThisTurn = false;
       await saveRoom(room);
 
       socket.join(room.code);
+      console.log(`[Room ${room.code}] Created by ${socket.username} (mode: ${roomMode})`);
 
-      console.log(`[Room ${room.code}] Created by host ${socket.id} (mode: ${roomMode})`);
+      // In online mode, auto-join host as a player
+      if (roomMode === engine.MODES.ONLINE) {
+        const player = engine.createPlayer(socket.userId, socket.username, socket.id);
+        room.players.push(player);
+        await saveRoom(room);
+        callback({ success: true, roomCode: room.code, isHost: true, mode: roomMode, playerId: socket.userId });
+      } else {
+        callback({ success: true, roomCode: room.code, isHost: true, mode: roomMode });
+      }
 
-      callback({ success: true, roomCode: room.code, isHost: true, mode: roomMode });
       await broadcastRoomState(io, room.code);
     } catch (err) {
       callback({ success: false, error: err.message });
@@ -73,7 +117,9 @@ function registerSocketHandlers(io, socket) {
   });
 
   // ─── PLAYER: Join an existing room ──────────────────────
-  socket.on('join_room', async ({ roomCode, username, playerId }, callback) => {
+  socket.on('join_room', async ({ roomCode } = {}, callback) => {
+    if (!socket.userId) return callback({ success: false, error: 'Not authenticated' });
+
     try {
       const code = roomCode?.toUpperCase();
       const room = await getRoom(code);
@@ -81,31 +127,22 @@ function registerSocketHandlers(io, socket) {
       if (room.phase !== 'lobby') return callback({ success: false, error: 'Game already started' });
       if (room.players.length >= engine.MAX_PLAYERS) return callback({ success: false, error: 'Room is full' });
 
-      // Username validation — only for new joins (not reconnects)
-      const trimmedName = username?.trim() || '';
-      const isReconnect = !!(playerId && room.players.find(p => p.id === playerId));
-      if (!isReconnect) {
-        if (trimmedName.length < 4) {
-          return callback({ success: false, error: 'Username must be at least 4 characters' });
-        }
-        const nameTaken = room.players.some(
-          p => p.username.toLowerCase() === trimmedName.toLowerCase()
-        );
-        if (nameTaken) {
-          return callback({ success: false, error: 'That name is already taken. Choose another.' });
-        }
-      }
-
-      let player = playerId ? room.players.find(p => p.id === playerId) : null;
-
+      // Reconnect if already in room
+      let player = room.players.find(p => p.id === socket.userId);
       if (player) {
         engine.reconnectPlayer(room, player.id, socket.id);
-        console.log(`[Room ${code}] Reconnected player ${player.username}`);
+        console.log(`[Room ${code}] Reconnected: ${player.username}`);
       } else {
-        const id = uuidv4();
-        player = engine.createPlayer(id, username?.trim() || 'Unknown', socket.id);
+        // Duplicate name check (case-insensitive)
+        const nameTaken = room.players.some(
+          p => p.username.toLowerCase() === socket.username.toLowerCase()
+        );
+        if (nameTaken) {
+          return callback({ success: false, error: 'That name is already taken in this room.' });
+        }
+        player = engine.createPlayer(socket.userId, socket.username, socket.id);
         room.players.push(player);
-        console.log(`[Room ${code}] New player joined: ${player.username}`);
+        console.log(`[Room ${code}] Joined: ${player.username}`);
       }
 
       await saveRoom(room);
@@ -117,25 +154,21 @@ function registerSocketHandlers(io, socket) {
     }
   });
 
-  // ─── HOST: Reconnect to room after refresh ───────────────
-  socket.on('host_reconnect', async ({ roomCode }, callback) => {
+  // ─── HOST: Reconnect after refresh ──────────────────────
+  socket.on('host_reconnect', async ({ roomCode } = {}, callback) => {
     try {
       const code = roomCode?.toUpperCase();
       const room = await getRoom(code);
       if (!room) return callback({ success: false, error: 'Room not found' });
 
-      // Cancel any pending host-disconnect game-over timer
       if (hostDisconnectTimers.has(code)) {
         clearTimeout(hostDisconnectTimers.get(code));
         hostDisconnectTimers.delete(code);
-        console.log(`[Room ${code}] Host reconnected — game-over timer cancelled`);
       }
 
       room.hostSocketId = socket.id;
       await saveRoom(room);
       socket.join(code);
-
-      console.log(`[Room ${code}] Host reconnected`);
       callback({ success: true, isHost: true, mode: room.mode });
       await broadcastRoomState(io, code);
     } catch (err) {
@@ -143,28 +176,27 @@ function registerSocketHandlers(io, socket) {
     }
   });
 
-  // ─── PLAYER: Reconnect mid-game after refresh ────────────
-  socket.on('player_reconnect', async ({ roomCode, playerId }, callback) => {
+  // ─── PLAYER: Reconnect mid-game ──────────────────────────
+  socket.on('player_reconnect', async ({ roomCode } = {}, callback) => {
+    if (!socket.userId) return callback({ success: false, error: 'Not authenticated' });
+
     try {
       const code = roomCode?.toUpperCase();
       const room = await getRoom(code);
       if (!room) return callback({ success: false, error: 'Room not found' });
 
-      const player = room.players.find(p => p.id === playerId);
+      const player = room.players.find(p => p.id === socket.userId);
       if (!player) return callback({ success: false, error: 'Player not found' });
 
       const oldSocketId = player.socketId;
       if (disconnectTimers.has(oldSocketId)) {
         clearTimeout(disconnectTimers.get(oldSocketId));
         disconnectTimers.delete(oldSocketId);
-        console.log(`[Room ${code}] Player ${player.username} reconnected — elimination cancelled`);
       }
 
-      engine.reconnectPlayer(room, playerId, socket.id);
+      engine.reconnectPlayer(room, socket.userId, socket.id);
       await saveRoom(room);
       socket.join(code);
-
-      console.log(`[Room ${code}] Player ${player.username} reconnected mid-game`);
       callback({ success: true, playerId: player.id, mode: room.mode });
       await broadcastRoomState(io, code);
     } catch (err) {
@@ -173,7 +205,7 @@ function registerSocketHandlers(io, socket) {
   });
 
   // ─── HOST: Start the game ─────────────────────────────────
-  socket.on('start_game', async ({ roomCode }, callback) => {
+  socket.on('start_game', async ({ roomCode } = {}, callback) => {
     try {
       const room = await getRoom(roomCode);
       if (!room) return callback({ success: false, error: 'Room not found' });
@@ -181,8 +213,6 @@ function registerSocketHandlers(io, socket) {
 
       engine.startGame(room);
       await saveRoom(room);
-
-      console.log(`[Room ${roomCode}] Game started (${room.mode}). Turn order: ${room.turnOrder.join(', ')}`);
       callback({ success: true });
       await broadcastRoomState(io, roomCode);
     } catch (err) {
@@ -190,15 +220,12 @@ function registerSocketHandlers(io, socket) {
     }
   });
 
-  // ─── HOST: Advance to next turn (physical only) ──────────
-  socket.on('next_turn', async ({ roomCode }, callback) => {
+  // ─── HOST: Next turn (physical) ──────────────────────────
+  socket.on('next_turn', async ({ roomCode } = {}, callback) => {
     try {
       const room = await getRoom(roomCode);
       if (!room) return callback({ success: false, error: 'Room not found' });
       if (room.hostSocketId !== socket.id) return callback({ success: false, error: 'Not the host' });
-      if (room.phase !== 'playing' && room.phase !== 'round_end') {
-        return callback({ success: false, error: 'Cannot advance turn now' });
-      }
 
       engine.advanceTurn(room);
 
@@ -216,8 +243,8 @@ function registerSocketHandlers(io, socket) {
     }
   });
 
-  // ─── HOST: Resolve bluff (physical mode) — sets spin_pending ──
-  socket.on('resolve_bluff', async ({ roomCode, bluffIsCorrect }, callback) => {
+  // ─── HOST: Resolve bluff (physical) ─────────────────────
+  socket.on('resolve_bluff', async ({ roomCode, bluffIsCorrect } = {}, callback) => {
     try {
       const room = await getRoom(roomCode);
       if (!room) return callback({ success: false, error: 'Room not found' });
@@ -227,8 +254,7 @@ function registerSocketHandlers(io, socket) {
       const currentPlayer = room.players.find(p => p.id === currentPlayerId);
 
       const prevIdx = (room.currentTurnIndex - 1 + room.turnOrder.length) % room.turnOrder.length;
-      const prevPlayerId = room.turnOrder[prevIdx];
-      const prevPlayer = room.players.find(p => p.id === prevPlayerId);
+      const prevPlayer = room.players.find(p => p.id === room.turnOrder[prevIdx]);
 
       const spinTarget = bluffIsCorrect ? prevPlayer : currentPlayer;
 
@@ -242,7 +268,6 @@ function registerSocketHandlers(io, socket) {
       };
 
       await saveRoom(room);
-      console.log(`[Room ${roomCode}] Bluff resolved. ${spinTarget.username} must spin.`);
       await broadcastRoomState(io, roomCode);
       callback({ success: true });
     } catch (err) {
@@ -250,8 +275,8 @@ function registerSocketHandlers(io, socket) {
     }
   });
 
-  // ─── PLAYER: Pull the trigger (self-initiated spin) ──────
-  socket.on('player_spin', async ({ roomCode, playerId }, callback) => {
+  // ─── PLAYER: Pull the trigger ────────────────────────────
+  socket.on('player_spin', async ({ roomCode, playerId } = {}, callback) => {
     try {
       const code = roomCode?.toUpperCase();
       const room = await getRoom(code);
@@ -269,12 +294,9 @@ function registerSocketHandlers(io, socket) {
         engine.eliminateFromTurnOrder(room, player.id);
         engine.newCardType(room);
 
-        // Online mode: survivor draws a card after an elimination
         if (room.mode === engine.MODES.ONLINE) {
           const currentPlayerId = room.turnOrder[room.currentTurnIndex];
-          if (currentPlayerId) {
-            engine.drawCardForPlayer(room, currentPlayerId);
-          }
+          if (currentPlayerId) engine.drawCardForPlayer(room, currentPlayerId);
         }
       }
 
@@ -283,11 +305,14 @@ function registerSocketHandlers(io, socket) {
       room.cardPlayedThisTurn = false;
       room.bluffUsedThisTurn = true;
 
+      // spinIndex + chamber are now the authoritative result — no frontend randomness
       room.lastAction = {
         type: 'spin_result',
         spinTargetId: player.id,
         spinTargetName: player.username,
-        roll: spinResult.roll,
+        spinIndex: spinResult.spinIndex,       // ← exact slot index 0-5
+        chamber: spinResult.chamber,           // ← full chamber layout
+        roll: spinResult.spinIndex,            // ← alias kept for ActionLog compat
         eliminated: spinResult.eliminated,
         riskLevel: spinResult.riskLevel,
         riskLevelBefore,
@@ -301,7 +326,7 @@ function registerSocketHandlers(io, socket) {
       }
 
       await saveRoom(room);
-      console.log(`[Room ${code}] ${player.username} spun: roll=${spinResult.roll}, eliminated=${spinResult.eliminated}`);
+      console.log(`[Room ${code}] ${player.username} spun slot ${spinResult.spinIndex} → ${spinResult.eliminated ? 'ELIMINATED' : 'survived'}`);
       await broadcastRoomState(io, code);
       callback({ success: true, spinResult });
     } catch (err) {
@@ -309,8 +334,8 @@ function registerSocketHandlers(io, socket) {
     }
   });
 
-  // ─── HOST: Declare round winner (physical only) ──────────
-  socket.on('round_win', async ({ roomCode, playerId }, callback) => {
+  // ─── HOST: Declare round winner (physical) ───────────────
+  socket.on('round_win', async ({ roomCode, playerId } = {}, callback) => {
     try {
       const room = await getRoom(roomCode);
       if (!room) return callback({ success: false, error: 'Room not found' });
@@ -328,7 +353,7 @@ function registerSocketHandlers(io, socket) {
   });
 
   // ─── PLAYER: Call bluff ──────────────────────────────────
-  socket.on('call_bluff', async ({ roomCode, playerId }, callback) => {
+  socket.on('call_bluff', async ({ roomCode, playerId } = {}, callback) => {
     try {
       const code = roomCode?.toUpperCase();
       const room = await getRoom(code);
@@ -341,9 +366,9 @@ function registerSocketHandlers(io, socket) {
       if (room.isFirstTurn) return callback({ success: false, error: 'Cannot call bluff on the first turn' });
 
       room.bluffUsedThisTurn = true;
+      const callerPlayer = room.players.find(p => p.id === playerId);
 
       if (room.mode === engine.MODES.ONLINE) {
-        // Auto-resolve: server reveals the card and decides who spins
         const { bluffIsCorrect, spinTarget, revealedCard, accuser, accused } = engine.resolveBluffOnline(room);
 
         room.phase = 'spin_pending';
@@ -354,18 +379,13 @@ function registerSocketHandlers(io, socket) {
           spinTargetName: spinTarget.username,
           bluffCorrect: bluffIsCorrect,
           autoResolved: true,
-          // Full bluff reveal context so clients can show the result
           accuserId: accuser?.id,
           accuserName: accuser?.username,
           accusedId: accused?.id,
           accusedName: accused?.username,
           revealedCard: revealedCard || null,
         };
-
-        console.log(`[Room ${code}] Online bluff: ${accuser?.username} called on ${accused?.username}, revealed ${revealedCard?.shape ?? 'nothing'}, correct=${bluffIsCorrect}. ${spinTarget.username} spins.`);
       } else {
-        // Physical: host resolves manually
-        const callerPlayer = room.players.find(p => p.id === playerId);
         room.phase = 'bluff_resolution';
         room.lastAction = {
           type: 'bluff_called',
@@ -383,16 +403,14 @@ function registerSocketHandlers(io, socket) {
   });
 
   // ─── PLAYER: Play card face-down (physical) ──────────────
-  socket.on('play_card', async ({ roomCode, playerId }, callback) => {
+  socket.on('play_card', async ({ roomCode, playerId } = {}, callback) => {
     try {
       const code = roomCode?.toUpperCase();
       const room = await getRoom(code);
       if (!room) return callback({ success: false, error: 'Room not found' });
-
-      const currentPlayerId = room.turnOrder[room.currentTurnIndex];
-      if (playerId !== currentPlayerId) return callback({ success: false, error: 'Not your turn' });
+      if (room.turnOrder[room.currentTurnIndex] !== playerId) return callback({ success: false, error: 'Not your turn' });
       if (room.phase !== 'playing') return callback({ success: false, error: 'Cannot play card now' });
-      if (room.mode !== engine.MODES.PHYSICAL) return callback({ success: false, error: 'Use play_card_online in online mode' });
+      if (room.mode !== engine.MODES.PHYSICAL) return callback({ success: false, error: 'Use play_card_online' });
 
       const physPlayer = room.players.find(p => p.id === playerId);
       room.lastAction = { type: 'card_played', playerId, playerName: physPlayer?.username || null };
@@ -406,23 +424,19 @@ function registerSocketHandlers(io, socket) {
     }
   });
 
-  // ─── PLAYER: Play a specific card (online mode) ──────────
-  socket.on('play_card_online', async ({ roomCode, playerId, cardId, nominatedShape }, callback) => {
+  // ─── PLAYER: Play specific card (online) ─────────────────
+  socket.on('play_card_online', async ({ roomCode, playerId, cardId, nominatedShape } = {}, callback) => {
     try {
       const code = roomCode?.toUpperCase();
       const room = await getRoom(code);
       if (!room) return callback({ success: false, error: 'Room not found' });
-      if (room.mode !== engine.MODES.ONLINE) return callback({ success: false, error: 'Only in online mode' });
-
-      const currentPlayerId = room.turnOrder[room.currentTurnIndex];
-      if (playerId !== currentPlayerId) return callback({ success: false, error: 'Not your turn' });
+      if (room.mode !== engine.MODES.ONLINE) return callback({ success: false, error: 'Online mode only' });
+      if (room.turnOrder[room.currentTurnIndex] !== playerId) return callback({ success: false, error: 'Not your turn' });
       if (room.phase !== 'playing') return callback({ success: false, error: 'Cannot play card now' });
 
       const result = engine.validateAndPlayCard(room, playerId, cardId);
       if (!result.ok) return callback({ success: false, error: result.error });
 
-      // Whot card: player nominates the next required shape.
-      // This only takes effect if a valid SHAPES value is provided.
       if (result.card.shape === 'whot' && nominatedShape && engine.SHAPES.includes(nominatedShape)) {
         room.currentCardType = nominatedShape;
       }
@@ -432,7 +446,6 @@ function registerSocketHandlers(io, socket) {
         type: 'card_played_online',
         playerId,
         playerName: actingPlayer?.username || null,
-        // Card details hidden from broadcast — only visible via spectate or bluff reveal
       };
 
       await saveRoom(room);
@@ -444,19 +457,16 @@ function registerSocketHandlers(io, socket) {
   });
 
   // ─── PLAYER: End turn ────────────────────────────────────
-  socket.on('end_turn', async ({ roomCode, playerId }, callback) => {
+  socket.on('end_turn', async ({ roomCode, playerId } = {}, callback) => {
     try {
       const code = roomCode?.toUpperCase();
       const room = await getRoom(code);
       if (!room) return callback({ success: false, error: 'Room not found' });
-
-      const currentPlayerId = room.turnOrder[room.currentTurnIndex];
-      if (playerId !== currentPlayerId) return callback({ success: false, error: 'Not your turn' });
+      if (room.turnOrder[room.currentTurnIndex] !== playerId) return callback({ success: false, error: 'Not your turn' });
       if (!room.cardPlayedThisTurn) return callback({ success: false, error: 'Play a card first' });
 
-      // Online mode: check if the player's hand is now empty → round win
       if (room.mode === engine.MODES.ONLINE) {
-        const hand = room.hands ? room.hands.get(playerId) : null;
+        const hand = room.hands?.get(playerId);
         if (hand && hand.length === 0) {
           engine.declareRoundWinner(room, playerId);
           await saveRoom(room);
@@ -483,13 +493,13 @@ function registerSocketHandlers(io, socket) {
     }
   });
 
-  // ─── HOST: Start next round (online mode) ───────────────
-  socket.on('start_next_round', async ({ roomCode }, callback) => {
+  // ─── HOST: Start next round (online) ─────────────────────
+  socket.on('start_next_round', async ({ roomCode } = {}, callback) => {
     try {
       const room = await getRoom(roomCode);
       if (!room) return callback({ success: false, error: 'Room not found' });
       if (room.hostSocketId !== socket.id) return callback({ success: false, error: 'Not the host' });
-      if (room.mode !== engine.MODES.ONLINE) return callback({ success: false, error: 'Only in online mode' });
+      if (room.mode !== engine.MODES.ONLINE) return callback({ success: false, error: 'Online mode only' });
       if (room.phase !== 'round_end') return callback({ success: false, error: 'Not in round_end phase' });
 
       engine.resetRoundOnline(room);
@@ -501,7 +511,6 @@ function registerSocketHandlers(io, socket) {
       }
 
       await saveRoom(room);
-      console.log(`[Room ${roomCode}] Round ${room.roundNumber} started (online)`);
       callback({ success: true });
       await broadcastRoomState(io, roomCode);
     } catch (err) {
@@ -509,53 +518,45 @@ function registerSocketHandlers(io, socket) {
     }
   });
 
-  // ─── HOST: Spectate a player's hand (online mode) ───────
-  socket.on('spectate_player', async ({ roomCode, targetPlayerId }, callback) => {
+  // ─── HOST: Spectate a player's hand ─────────────────────
+  socket.on('spectate_player', async ({ roomCode, targetPlayerId } = {}, callback) => {
     try {
       const room = await getRoom(roomCode);
       if (!room) return callback({ success: false, error: 'Room not found' });
       if (room.hostSocketId !== socket.id) return callback({ success: false, error: 'Not the host' });
-      if (room.mode !== engine.MODES.ONLINE) return callback({ success: false, error: 'Only in online mode' });
 
-      const hand = room.hands ? room.hands.get(targetPlayerId) : null;
+      const hand = room.hands?.get(targetPlayerId);
       if (!hand) return callback({ success: false, error: 'Player has no hand' });
-
       callback({ success: true, hand });
     } catch (err) {
       callback({ success: false, error: err.message });
     }
   });
 
-  // ─── PLAYER: Acknowledge spin result (synced overlay dismiss) ───
-  // When the spin target clicks Continue, broadcast to all room members
-  // so every client can dismiss their spin overlay simultaneously.
+  // ─── Spin result acknowledgement (synced overlay dismiss) ─
   socket.on('spin_acknowledged', async ({ roomCode } = {}) => {
     const code = roomCode?.toUpperCase();
     if (code) io.to(code).emit('spin_acknowledged');
   });
 
-  // ─── PLAYER: Intentional leave ───────────────────────────
-  // Emitted by the client on beforeunload so the server cleans up immediately
-  // without waiting for the 30-second grace period.
+  // ─── Intentional leave ───────────────────────────────────
   socket.on('leave_room', async ({ roomCode, playerId } = {}) => {
     try {
       const code = roomCode?.toUpperCase();
       const room = await getRoom(code);
       if (!room) return;
 
-      // Cancel any pending grace-period timer for this socket
       if (disconnectTimers.has(socket.id)) {
         clearTimeout(disconnectTimers.get(socket.id));
         disconnectTimers.delete(socket.id);
       }
 
-      // Remove player from players array entirely (not just mark eliminated)
       const idx = room.players.findIndex(p => p.id === playerId);
       if (idx !== -1) {
         const player = room.players[idx];
         room.players.splice(idx, 1);
         engine.eliminateFromTurnOrder(room, playerId);
-        console.log(`[Room ${code}] Player ${player.username} left intentionally`);
+        console.log(`[Room ${code}] ${player.username} left`);
 
         const gameOverWinner = engine.checkGameOver(room);
         if (gameOverWinner) {
@@ -568,28 +569,22 @@ function registerSocketHandlers(io, socket) {
         await broadcastRoomState(io, code);
       }
     } catch (err) {
-      console.error('[leave_room] error:', err.message);
+      console.error('[leave_room]', err.message);
     }
   });
 
-  // ─── DISCONNECT ──────────────────────────────────────────
+  // ─── Disconnect ──────────────────────────────────────────
   socket.on('disconnect', async () => {
     console.log(`[Socket] Disconnected: ${socket.id}`);
 
     for (const [code, room] of rooms.entries()) {
-      // ── Host disconnected ──
       if (room.hostSocketId === socket.id) {
-        console.log(`[Room ${code}] Host disconnected — 10s grace period before game ends`);
         io.to(code).emit('host_disconnecting', { countdown: 10 });
-
         const timer = setTimeout(() => {
-          // Host never reconnected — end the game for everyone
           io.to(code).emit('game_ended', { reason: 'The host left the game.' });
           rooms.delete(code);
           hostDisconnectTimers.delete(code);
-          console.log(`[Room ${code}] Host grace period expired — room deleted`);
         }, 10000);
-
         hostDisconnectTimers.set(code, timer);
         continue;
       }
@@ -597,37 +592,28 @@ function registerSocketHandlers(io, socket) {
       const player = room.players.find(p => p.socketId === socket.id);
       if (!player || player.status === 'eliminated') continue;
 
-      // ── Player disconnected in lobby — remove immediately, no grace period ──
       if (room.phase === 'lobby') {
         const idx = room.players.findIndex(p => p.id === player.id);
         if (idx !== -1) room.players.splice(idx, 1);
-        console.log(`[Room ${code}] Player ${player.username} disconnected from lobby — removed`);
         await saveRoom(room);
         await broadcastRoomState(io, code);
         continue;
       }
 
-      // ── Player disconnected mid-game — 30s grace period ──
-      if (room.phase === 'playing' || room.phase === 'bluff_resolution' || room.phase === 'spin_pending') {
-        console.log(`[Room ${code}] Player ${player.username} disconnected — starting 30s grace period`);
-
+      if (['playing', 'bluff_resolution', 'spin_pending'].includes(room.phase)) {
         io.to(code).emit('player_disconnecting', { playerId: player.id, playerName: player.username });
 
         const timer = setTimeout(async () => {
-          const stillDisconnected = room.players.find(p => p.id === player.id && p.socketId === socket.id);
-          if (stillDisconnected && stillDisconnected.status === 'alive') {
+          const still = room.players.find(p => p.id === player.id && p.socketId === socket.id);
+          if (still?.status === 'alive') {
             const eliminated = engine.handleDisconnect(room, socket.id);
             if (eliminated) {
-              console.log(`[Room ${code}] Player ${eliminated.username} grace period expired → eliminated`);
               room.lastAction = { type: 'disconnected', playerId: eliminated.id, playerName: eliminated.username };
-
-              // Auto-end game if only one player remains after disconnect
-              const gameOverWinner = engine.checkGameOver(room);
-              if (gameOverWinner) {
+              const winner = engine.checkGameOver(room);
+              if (winner) {
                 room.phase = 'game_over';
-                room.lastAction = { type: 'game_over', winnerId: gameOverWinner.id, winnerName: gameOverWinner.username };
+                room.lastAction = { type: 'game_over', winnerId: winner.id, winnerName: winner.username };
               }
-
               await saveRoom(room);
               await broadcastRoomState(io, code);
             }
