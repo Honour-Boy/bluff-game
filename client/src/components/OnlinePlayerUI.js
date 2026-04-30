@@ -2,21 +2,13 @@
 
 import { useState, useEffect, useRef } from 'react';
 import { CardShape } from './CardShape';
+import { ShapeIcon, SHAPE_COLORS } from './ShapeIcon';
 import { RiskMeter } from './RiskMeter';
 import { ActionLog } from './ActionLog';
 import { HowToPlayModal } from './HowToPlayModal';
 
 // ─── Constants ────────────────────────────────────────────────
 const SHAPES = ['circle', 'triangle', 'cross', 'square', 'star'];
-
-const SHAPE_ICONS = {
-  circle: '⭕',
-  triangle: '🔺',
-  cross: '✖️',
-  square: '⬛',
-  star: '⭐',
-  whot: '🃏',
-};
 
 // ─── Seeded shuffle (same PRNG as PlayerUI/HostUI) ────────────
 function seededShuffle(arr, seed) {
@@ -175,9 +167,11 @@ function CardHand({ hand, selectedCardId, onCardClick, interactive = true }) {
                 userSelect: 'none',
               }}
             >
-              <div style={{ fontSize: 22, lineHeight: 1 }}>
-                {isWhot ? '🃏' : SHAPE_ICONS[card.shape]}
-              </div>
+              <ShapeIcon
+                shape={card.shape}
+                size={22}
+                color={isWhot ? 'var(--accent)' : undefined}
+              />
               <div style={{
                 fontSize: 10,
                 color: isWhot ? 'var(--accent)' : 'var(--text-dim)',
@@ -315,6 +309,10 @@ export function OnlinePlayerUI({
   const [cylinderRotation, setCylinderRotation] = useState(0);
   const [cylinderAnimating, setCylinderAnimating] = useState(false);
 
+  // Elimination popup state (separate from spin overlay — shows after overlay closes)
+  const prevStatusRef = useRef(null);
+  const [justEliminated, setJustEliminated] = useState(false);
+
   // Trigger spin overlay when a spin_result arrives
   useEffect(() => {
     const action = roomState?.lastAction;
@@ -326,7 +324,9 @@ export function OnlinePlayerUI({
 
     const { roll, eliminated, spinTargetName, spinTargetId: targetId, riskLevelBefore } = action;
     const landingChamberIndex = (roll - 1) % 6;
-    const finalAngle = 10 * 360 + landingChamberIndex * 60;
+    // Correct formula: chamber i starts at (i*60 - 90)°. To land at top pointer (-90°):
+    // finalAngle = 10*360 - landingChamberIndex*60  (subtract, not add)
+    const finalAngle = 10 * 360 - landingChamberIndex * 60;
     const safeRiskBefore = riskLevelBefore ?? 1;
     const shuffled = seededShuffle([0, 1, 2, 3, 4, 5], roll);
     const bulletChambers = new Set(shuffled.slice(0, safeRiskBefore));
@@ -362,6 +362,27 @@ export function OnlinePlayerUI({
       });
     }
   }, [roomState?.lastAction]); // eslint-disable-line
+
+  // Detect when this player transitions from alive → eliminated, show popup after overlay
+  useEffect(() => {
+    const currentStatus = myPlayer?.status || null;
+    if (prevStatusRef.current === 'alive' && currentStatus === 'eliminated') {
+      // Show elimination popup after a brief delay so spin overlay dismisses first
+      setTimeout(() => setJustEliminated(true), 400);
+    }
+    prevStatusRef.current = currentStatus;
+  }, [myPlayer?.status]); // eslint-disable-line
+
+  // 15s auto-advance after spin result — dismiss overlay if spin target hasn't clicked Continue
+  useEffect(() => {
+    if (!spinComplete || !spinData) return;
+    const amTarget = spinData.spinTargetId === myPlayer?.id;
+    const timer = setTimeout(() => {
+      if (amTarget) acknowledgeSpinResult?.();
+      else setSpinData(null);
+    }, 15000);
+    return () => clearTimeout(timer);
+  }, [spinComplete]); // eslint-disable-line
 
   if (!roomState || !myPlayer) {
     return (
@@ -661,8 +682,9 @@ export function OnlinePlayerUI({
                     padding: '6px 10px', background: 'var(--surface2)',
                     border: '1px solid var(--border)', borderRadius: 4,
                     fontSize: 13, fontWeight: 700,
+                    animation: 'cardFlipIn 0.5s ease-out',
                   }}>
-                    <span>{lastAction.revealedCard.shape === 'whot' ? '🃏' : SHAPE_ICONS[lastAction.revealedCard.shape]}</span>
+                    <ShapeIcon shape={lastAction.revealedCard.shape} size={20} />
                     <span style={{ color: 'var(--text)', textTransform: 'capitalize' }}>
                       {lastAction.revealedCard.shape === 'whot' ? 'WHOT' : lastAction.revealedCard.shape}
                     </span>
@@ -925,7 +947,7 @@ export function OnlinePlayerUI({
                   onMouseEnter={e => e.currentTarget.style.borderColor = 'var(--accent)'}
                   onMouseLeave={e => e.currentTarget.style.borderColor = 'var(--border)'}
                 >
-                  <span style={{ fontSize: 26 }}>{SHAPE_ICONS[shape]}</span>
+                  <ShapeIcon shape={shape} size={28} />
                   <span style={{ fontSize: 10, letterSpacing: '0.08em', textTransform: 'uppercase', color: 'var(--text-dim)' }}>{shape}</span>
                 </button>
               ))}
@@ -940,6 +962,36 @@ export function OnlinePlayerUI({
         </div>
       )}
 
+      {/* ── Elimination popup — appears after spin overlay closes ── */}
+      {justEliminated && !spinData && (
+        <div style={{
+          position: 'fixed', inset: 0,
+          background: 'rgba(0,0,0,0.95)',
+          display: 'flex', flexDirection: 'column',
+          alignItems: 'center', justifyContent: 'center',
+          zIndex: 8800, padding: 24,
+        }}>
+          <div className="card fade-in" style={{ maxWidth: 360, width: '100%', textAlign: 'center', border: '1px solid var(--accent2)' }}>
+            <div style={{ fontFamily: "'Bebas Neue', sans-serif", fontSize: 56, color: 'var(--accent2)', marginBottom: 12 }}>
+              💀 ELIMINATED
+            </div>
+            <div style={{ fontSize: 14, color: 'var(--text)', marginBottom: 8 }}>
+              You&apos;ve been eliminated from this round.
+            </div>
+            <div style={{ fontSize: 12, color: 'var(--text-dim)', marginBottom: 24, lineHeight: 1.6 }}>
+              You can still watch the game from the spectator view.
+            </div>
+            <button
+              className="primary"
+              onClick={() => setJustEliminated(false)}
+              style={{ padding: '10px 32px' }}
+            >
+              Continue Watching
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* How to Play modal */}
       {showHowToPlay && <HowToPlayModal onClose={() => setShowHowToPlay(false)} initialTab="online" />}
 
@@ -947,6 +999,11 @@ export function OnlinePlayerUI({
         @keyframes pulse {
           0%, 100% { opacity: 1; }
           50%       { opacity: 0.5; }
+        }
+        @keyframes cardFlipIn {
+          0%   { transform: rotateY(90deg) scaleX(0.4); opacity: 0; }
+          60%  { transform: rotateY(-8deg) scaleX(1.02); opacity: 1; }
+          100% { transform: rotateY(0deg) scaleX(1); opacity: 1; }
         }
       `}</style>
     </div>

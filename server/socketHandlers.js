@@ -81,6 +81,21 @@ function registerSocketHandlers(io, socket) {
       if (room.phase !== 'lobby') return callback({ success: false, error: 'Game already started' });
       if (room.players.length >= engine.MAX_PLAYERS) return callback({ success: false, error: 'Room is full' });
 
+      // Username validation — only for new joins (not reconnects)
+      const trimmedName = username?.trim() || '';
+      const isReconnect = !!(playerId && room.players.find(p => p.id === playerId));
+      if (!isReconnect) {
+        if (trimmedName.length < 4) {
+          return callback({ success: false, error: 'Username must be at least 4 characters' });
+        }
+        const nameTaken = room.players.some(
+          p => p.username.toLowerCase() === trimmedName.toLowerCase()
+        );
+        if (nameTaken) {
+          return callback({ success: false, error: 'That name is already taken. Choose another.' });
+        }
+      }
+
       let player = playerId ? room.players.find(p => p.id === playerId) : null;
 
       if (player) {
@@ -350,8 +365,13 @@ function registerSocketHandlers(io, socket) {
         console.log(`[Room ${code}] Online bluff: ${accuser?.username} called on ${accused?.username}, revealed ${revealedCard?.shape ?? 'nothing'}, correct=${bluffIsCorrect}. ${spinTarget.username} spins.`);
       } else {
         // Physical: host resolves manually
+        const callerPlayer = room.players.find(p => p.id === playerId);
         room.phase = 'bluff_resolution';
-        room.lastAction = { type: 'bluff_called', callerId: playerId };
+        room.lastAction = {
+          type: 'bluff_called',
+          callerId: playerId,
+          callerName: callerPlayer?.username || null,
+        };
       }
 
       await saveRoom(room);
@@ -374,7 +394,8 @@ function registerSocketHandlers(io, socket) {
       if (room.phase !== 'playing') return callback({ success: false, error: 'Cannot play card now' });
       if (room.mode !== engine.MODES.PHYSICAL) return callback({ success: false, error: 'Use play_card_online in online mode' });
 
-      room.lastAction = { type: 'card_played', playerId };
+      const physPlayer = room.players.find(p => p.id === playerId);
+      room.lastAction = { type: 'card_played', playerId, playerName: physPlayer?.username || null };
       room.cardPlayedThisTurn = true;
 
       await saveRoom(room);
@@ -406,9 +427,11 @@ function registerSocketHandlers(io, socket) {
         room.currentCardType = nominatedShape;
       }
 
+      const actingPlayer = room.players.find(p => p.id === playerId);
       room.lastAction = {
         type: 'card_played_online',
         playerId,
+        playerName: actingPlayer?.username || null,
         // Card details hidden from broadcast — only visible via spectate or bluff reveal
       };
 

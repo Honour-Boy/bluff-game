@@ -12,13 +12,21 @@ export function ActionLog({ lastAction }) {
       bluffCorrect
         ? `✅ Bluff was CORRECT — ${spinTargetName} spun, rolled ${roll}, ${eliminated ? 'ELIMINATED' : 'survived'}`
         : `❌ Bluff was WRONG — ${spinTargetName} (accuser) spun, rolled ${roll}, ${eliminated ? 'ELIMINATED' : 'survived'}`,
-    bluff_called: ({ callerId }) => `⚠️ Bluff called! Host: reveal the last card played.`,
+    bluff_called: ({ callerName, callerId }) => callerName
+      ? `⚠️ ${callerName} called bluff! Host: reveal the last card played.`
+      : `⚠️ Bluff called! Host: reveal the last card played.`,
     spin_result: ({ spinTargetName, eliminated, roll, riskLevelBefore }) =>
       eliminated
         ? `💀 ${spinTargetName} rolled ${roll} (risk ${riskLevelBefore}/6) — ELIMINATED`
         : `😮‍💨 ${spinTargetName} rolled ${roll} (risk ${riskLevelBefore}/6) — SURVIVED`,
-    card_played_online: ({ card }) =>
-      card ? `🃏 Card played (${card.shape === 'whot' ? 'WHOT' : card.shape} ${card.number})` : '🃏 Card played.',
+    card_played_online: ({ card, playerName }) => {
+      const who = playerName ? `${playerName} played` : 'Card played';
+      return card
+        ? `🃏 ${who} (${card.shape === 'whot' ? 'WHOT' : card.shape} ${card.number})`
+        : `🃏 ${who} a card.`;
+    },
+    card_played: ({ playerName }) =>
+      playerName ? `🃏 ${playerName} played a card face-down.` : '🃏 Card played face-down.',
     round_win: ({ winnerName }) => `🏆 ${winnerName} won the round! All players redealt.`,
     game_over: ({ winnerName }) => `🎉 GAME OVER — ${winnerName} is the last player standing!`,
     continued: ({ playerId }) => `→ Player continued their turn.`,
@@ -36,6 +44,7 @@ export function ActionLog({ lastAction }) {
     bluff_resolved: lastAction.bluffCorrect ? 'var(--alive)' : 'var(--accent2)',
     bluff_called: 'var(--warning)',
     card_played_online: 'var(--text-dim)',
+    card_played: 'var(--text-dim)',
     round_win: 'var(--accent)',
     game_over: 'var(--accent)',
     continued: 'var(--text-dim)',
