@@ -202,6 +202,7 @@ export function OnlinePlayerUI({
   myPlayer,
   isMyTurn,
   isHost = false,
+  startGame,
   playCardOnline,
   callBluff,
   endTurn,
@@ -421,12 +422,28 @@ export function OnlinePlayerUI({
       {/* ── Lobby state ── */}
       {isLobby && (
         <div className="card" style={{ textAlign: 'center' }}>
-          <div style={{ fontSize: 12, color: 'var(--text-dim)' }}>
-            Waiting for {isHost ? 'you to start the game...' : 'host to start the game...'}
+          <div style={{ fontSize: 10, color: 'var(--text-dim)', letterSpacing: '0.12em', marginBottom: 14 }}>
+            LOBBY — {alivePlayers.length} player{alivePlayers.length !== 1 ? 's' : ''} joined
           </div>
-          {isHost && (
-            <div style={{ fontSize: 10, color: 'var(--text-dim)', marginTop: 8 }}>
-              Use the host panel to start when all players have joined.
+          {isHost ? (
+            <>
+              <button
+                className="primary"
+                onClick={startGame}
+                disabled={alivePlayers.length < 2}
+                style={{ width: '100%', padding: '14px', fontSize: 13, marginBottom: 10 }}
+              >
+                ▶ Start Game ({alivePlayers.length} players)
+              </button>
+              {alivePlayers.length < 2 && (
+                <div style={{ fontSize: 11, color: 'var(--text-dim)' }}>
+                  Need at least 2 players to start.
+                </div>
+              )}
+            </>
+          ) : (
+            <div style={{ fontSize: 12, color: 'var(--text-dim)' }}>
+              Waiting for the host to start the game...
             </div>
           )}
         </div>

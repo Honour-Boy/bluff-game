@@ -51,6 +51,7 @@ export default function Home() {
           myPlayer={myPlayer}
           isMyTurn={isMyTurn}
           isHost={true}
+          startGame={startGame}
           playCardOnline={playCardOnline}
           callBluff={callBluff}
           endTurn={endTurn}
