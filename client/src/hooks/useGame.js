@@ -34,6 +34,15 @@ export function useGame(getAccessToken) {
     setRoomState(null);
   }, []);
 
+  // Persist session so page refresh can reconnect
+useEffect(() => {
+  if (roomCode) {
+    sessionStorage.setItem('bluff_session', JSON.stringify({ roomCode, isHost, playerId }));
+  } else {
+    sessionStorage.removeItem('bluff_session');
+  }
+}, [roomCode, isHost, playerId]);
+
   // ─── Authenticate socket with Supabase JWT ────────────────
   const authenticateSocket = useCallback(async () => {
     if (!getAccessToken) return;
@@ -44,18 +53,6 @@ export function useGame(getAccessToken) {
       else console.warn('[socket] auth failed:', res?.error);
     });
   }, [socket, getAccessToken]);
-
-  // ─── Warn before refresh/close whenever in a room ────────
-  useEffect(() => {
-    if (!roomCode) return;
-    const handleBeforeUnload = (e) => {
-      socket.emit('leave_room', { roomCode, playerId });
-      e.preventDefault();
-      e.returnValue = '';
-    };
-    window.addEventListener('beforeunload', handleBeforeUnload);
-    return () => window.removeEventListener('beforeunload', handleBeforeUnload);
-  }, [roomCode, playerId, socket]);
 
   // ─── Screen wake lock ─────────────────────────────────────
   useEffect(() => {
@@ -80,12 +77,38 @@ export function useGame(getAccessToken) {
 
   // ─── Socket event listeners ───────────────────────────────
   useEffect(() => {
-    const onConnect = () => {
-      setConnected(true);
-      setError(null);
-      // Re-authenticate on reconnect
-      authenticateSocket();
-    };
+    const onConnect = async () => {
+  setConnected(true);
+  setError(null);
+  await authenticateSocket();
+
+  // Try to restore session after reconnect
+  const saved = sessionStorage.getItem('bluff_session');
+  if (!saved) return;
+  const { roomCode: savedCode, isHost: savedHost, playerId: savedPlayerId } = JSON.parse(saved);
+
+  if (savedHost) {
+    socket.emit('host_reconnect', { roomCode: savedCode }, (res) => {
+      if (res?.success) {
+        setRoomCode(savedCode);
+        setIsHost(true);
+        setPlayerId(savedPlayerId || null);
+      } else {
+        sessionStorage.removeItem('bluff_session');
+      }
+    });
+  } else if (savedPlayerId) {
+    socket.emit('player_reconnect', { roomCode: savedCode }, (res) => {
+      if (res?.success) {
+        setRoomCode(savedCode);
+        setIsHost(false);
+        setPlayerId(savedPlayerId);
+      } else {
+        sessionStorage.removeItem('bluff_session');
+      }
+    });
+  }
+};
     const onDisconnect = () => {
       setConnected(false);
       setAuthenticated(false);
@@ -100,9 +123,10 @@ export function useGame(getAccessToken) {
       notify(`Host disconnected. Game ends in ${countdown ?? 10}s if they don't return.`, 'error');
     };
     const onGameEnded = ({ reason } = {}) => {
-      clearSession();
-      notify(reason || 'The game has ended.', 'error');
-    };
+  sessionStorage.removeItem('bluff_session');
+  clearSession();
+  notify(reason || 'The game has ended.', 'error');
+};
 
     socket.on('connect', onConnect);
     socket.on('disconnect', onDisconnect);
@@ -231,8 +255,10 @@ export function useGame(getAccessToken) {
   }, [socket, roomCode]);
 
   const leaveGame = useCallback(() => {
-    clearSession();
-  }, [clearSession]);
+  if (roomCode) socket.emit('leave_room', { roomCode, playerId });
+  sessionStorage.removeItem('bluff_session');
+  clearSession();
+}, [socket, roomCode, playerId, clearSession]);
 
   // Derived state
   const myPlayer      = roomState?.players?.find(p => p.id === playerId) || null;
