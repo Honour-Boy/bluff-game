@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import { HowToPlayModal } from './HowToPlayModal';
+import { ShapeIcon } from './ShapeIcon';
 
 export function LandingScreen({ onCreateRoom, onJoinRoom, error, setError, connected }) {
   const [mode, setMode] = useState(null); // null | 'host' | 'join'
@@ -14,16 +15,22 @@ export function LandingScreen({ onCreateRoom, onJoinRoom, error, setError, conne
   const handleJoin = (e) => {
     e.preventDefault();
     setError(null);
-    if (!username.trim()) return setError('Enter a username');
+    const name = username.trim();
+    if (!name) return setError('Enter a username');
+    if (name.length < 4) return setError('Username must be at least 4 characters');
     if (!roomCode.trim() || roomCode.trim().length < 4) return setError('Enter a valid room code');
-    onJoinRoom(roomCode.trim(), username.trim());
+    onJoinRoom(roomCode.trim(), name);
   };
 
   const handleCreate = (e) => {
     e.preventDefault();
     setError(null);
     if (!selectedGameMode) return setError('Select a game mode');
-    if (selectedGameMode === 'online' && !hostUsername.trim()) return setError('Enter your username');
+    if (selectedGameMode === 'online') {
+      const name = hostUsername.trim();
+      if (!name) return setError('Enter your username');
+      if (name.length < 4) return setError('Username must be at least 4 characters');
+    }
     onCreateRoom(selectedGameMode, hostUsername.trim());
   };
 
@@ -75,10 +82,10 @@ export function LandingScreen({ onCreateRoom, onJoinRoom, error, setError, conne
           <div style={{ color: 'var(--text-dim)', fontSize: 11, letterSpacing: '0.2em', marginTop: 8 }}>
             THE CARD GAME · UP TO 15 PLAYERS
           </div>
-          <div style={{ display: 'flex', justifyContent: 'center', gap: 12, marginTop: 20, opacity: 0.6 }}>
-            {['⬛', '⭕', '🔺', '✖️', '⭐'].map((s, i) => (
-              <div key={i} style={{ fontSize: 18, animation: `fadeIn 0.3s ease ${i * 0.08}s both`, filter: 'grayscale(0.5)' }}>
-                {s}
+          <div style={{ display: 'flex', justifyContent: 'center', gap: 12, marginTop: 20, opacity: 0.5 }}>
+            {['circle', 'square', 'triangle', 'cross', 'star'].map((shape, i) => (
+              <div key={shape} style={{ animation: `fadeIn 0.3s ease ${i * 0.08}s both` }}>
+                <ShapeIcon shape={shape} size={22} />
               </div>
             ))}
           </div>

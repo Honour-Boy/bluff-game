@@ -2,11 +2,10 @@
 
 import { useState, useEffect, useRef } from 'react';
 import { CardShape } from './CardShape';
+import { ShapeIcon } from './ShapeIcon';
 import { PlayerList } from './PlayerList';
 import { ActionLog } from './ActionLog';
 import { HowToPlayModal } from './HowToPlayModal';
-
-const CARD_ICONS = { square: '⬛', circle: '⭕', triangle: '🔺', cross: '✖️', star: '⭐' };
 
 // Seeded shuffle — same algorithm as PlayerUI for consistent chamber layout
 function seededShuffle(arr, seed) {
@@ -198,7 +197,8 @@ export function HostUI({
 
     const { roll, eliminated, spinTargetName, spinTargetId: targetId, riskLevelBefore } = action;
     const landingChamberIndex = (roll - 1) % 6;
-    const finalAngle = 10 * 360 + landingChamberIndex * 60;
+    // Correct formula: finalAngle = 10*360 - landingChamberIndex*60
+    const finalAngle = 10 * 360 - landingChamberIndex * 60;
     const safeRiskBefore = riskLevelBefore ?? 1;
     const shuffled = seededShuffle([0, 1, 2, 3, 4, 5], roll);
     const bulletChambers = new Set(shuffled.slice(0, safeRiskBefore));
@@ -218,6 +218,15 @@ export function HostUI({
     const timer = setTimeout(() => setSpinComplete(true), 8000);
     return () => clearTimeout(timer);
   }, [roomState?.lastAction]);
+
+  // 15s auto-advance — host clicks Continue, so auto-fire acknowledgeSpinResult if forgotten
+  useEffect(() => {
+    if (!spinComplete || !spinData) return;
+    const timer = setTimeout(() => {
+      acknowledgeSpinResult?.();
+    }, 15000);
+    return () => clearTimeout(timer);
+  }, [spinComplete]); // eslint-disable-line
 
   if (!roomState) {
     return (
@@ -386,7 +395,10 @@ export function HostUI({
         }}>
           <span>
             Player eliminated. New required card:&nbsp;
-            <strong>{CARD_ICONS[eliminationBanner]} {eliminationBanner}</strong>
+            <strong style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+              <ShapeIcon shape={eliminationBanner} size={14} />
+              {eliminationBanner}
+            </strong>
           </span>
           <button
             onClick={() => setEliminationBanner(null)}
@@ -433,7 +445,10 @@ export function HostUI({
                 }}>
                   <span>
                     Player eliminated. New required card:&nbsp;
-                    <strong>{CARD_ICONS[eliminationBanner]} {eliminationBanner}</strong>
+                    <strong style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+                      <ShapeIcon shape={eliminationBanner} size={14} />
+                      {eliminationBanner}
+                    </strong>
                   </span>
                   <button
                     onClick={() => setEliminationBanner(null)}

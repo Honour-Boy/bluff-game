@@ -58,13 +58,50 @@ export function useGame() {
     return () => window.removeEventListener('beforeunload', handleBeforeUnload);
   }, [roomCode, playerId, socket]);
 
+  // ─── Screen wake lock — keeps screen on while in a room ──────
+  // Prevents device from sleeping mid-game, which would cause disconnections.
+  useEffect(() => {
+    if (!roomCode) return;
+    let wakeLock = null;
+
+    const acquire = async () => {
+      try {
+        if (typeof navigator !== 'undefined' && navigator.wakeLock) {
+          wakeLock = await navigator.wakeLock.request('screen');
+        }
+      } catch (err) {
+        // Silently fail — wake lock is a progressive enhancement
+      }
+    };
+
+    acquire();
+
+    // Re-acquire after the user returns to the tab (visibility change releases the lock)
+    const onVisibilityChange = () => {
+      if (document.visibilityState === 'visible') acquire();
+    };
+    document.addEventListener('visibilitychange', onVisibilityChange);
+
+    return () => {
+      document.removeEventListener('visibilitychange', onVisibilityChange);
+      wakeLock?.release?.().catch(() => {});
+    };
+  }, [roomCode]);
+
   // ─── Socket event listeners ───────────────────────────────
   useEffect(() => {
     // Simple connect/disconnect tracking — no reconnect-on-reload logic.
     // If a player reloads they are cleared to the landing screen (see mount effect).
     const onConnect = () => { setConnected(true); setError(null); };
     const onDisconnect = () => setConnected(false);
-    const onRoomState = (state) => setRoomState(state);
+    const onRoomState = (state) => {
+      setRoomState(state);
+      // If a fresh spin_result just arrived, reset spinDismissed so the
+      // new overlay can be dismissed again (previous spin may have left it true).
+      if (state?.lastAction?.type === 'spin_result') {
+        setSpinDismissed(false);
+      }
+    };
     const onBluffCalled = () => notify('⚠️ Bluff called! Host: reveal the last card.', 'warning');
     const onSpinAcknowledged = () => setSpinDismissed(true);
 

@@ -1,7 +1,10 @@
 'use client';
 
+'use client';
+
 import { useState, useEffect, useRef } from 'react';
 import { CardShape } from './CardShape';
+import { ShapeIcon } from './ShapeIcon';
 import { RiskMeter } from './RiskMeter';
 import { ActionLog } from './ActionLog';
 import { HowToPlayModal } from './HowToPlayModal';
@@ -110,6 +113,88 @@ function CylinderSVG({ bulletChambers, landingChamberIndex, rotation, animating,
   );
 }
 
+// ─── Share button ─────────────────────────────────────────────
+function ShareButton({ roomCode, senderName }) {
+  const [showFallback, setShowFallback] = useState(false);
+  const message = senderName
+    ? `Join ${senderName}'s Bluff game! Room code: ${roomCode}`
+    : `Join my Bluff game! Room code: ${roomCode}`;
+  const url = typeof window !== 'undefined' ? `${window.location.origin}?ref=${roomCode}` : '';
+  const fullText = `${message}\n${url}`;
+
+  const handleShare = async () => {
+    if (typeof navigator !== 'undefined' && navigator.share) {
+      try {
+        await navigator.share({ title: 'Join my Bluff game!', text: message, url });
+        return;
+      } catch (e) {
+        if (e.name === 'AbortError') return;
+      }
+    }
+    setShowFallback(f => !f);
+  };
+
+  const enc = encodeURIComponent;
+  const links = [
+    { label: '💬 WhatsApp', href: `https://wa.me/?text=${enc(fullText)}` },
+    { label: '✈️ Telegram', href: `https://t.me/share/url?url=${enc(url)}&text=${enc(message)}` },
+    { label: '💬 SMS', href: `sms:?body=${enc(fullText)}` },
+    { label: '📧 Email', href: `mailto:?subject=${enc('Join my Bluff game!')}&body=${enc(fullText)}` },
+  ];
+
+  return (
+    <div style={{ position: 'relative', display: 'inline-block' }}>
+      <button
+        onClick={handleShare}
+        style={{
+          fontSize: 11, color: 'var(--accent)',
+          border: '1px solid var(--accent)',
+          background: 'rgba(232,255,74,0.04)',
+          padding: '5px 12px', borderRadius: 4, cursor: 'pointer',
+          letterSpacing: '0.06em',
+        }}
+      >
+        🔗 Share Room
+      </button>
+      {showFallback && (
+        <div style={{
+          position: 'absolute', top: 'calc(100% + 6px)', left: 0,
+          background: 'var(--surface2)', border: '1px solid var(--border)',
+          borderRadius: 6, padding: 8, zIndex: 2000,
+          display: 'flex', flexDirection: 'column', gap: 4, minWidth: 170,
+          boxShadow: '0 4px 20px rgba(0,0,0,0.4)',
+        }}>
+          {links.map(({ label, href }) => (
+            <a
+              key={label}
+              href={href}
+              target="_blank"
+              rel="noreferrer"
+              onClick={() => setShowFallback(false)}
+              style={{
+                display: 'block', padding: '7px 10px',
+                color: 'var(--text)', fontSize: 12,
+                textDecoration: 'none', borderRadius: 4,
+                background: 'transparent',
+              }}
+              onMouseEnter={e => e.currentTarget.style.background = 'var(--surface)'}
+              onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
+            >
+              {label}
+            </a>
+          ))}
+          <button
+            onClick={() => setShowFallback(false)}
+            style={{ marginTop: 2, padding: '5px', fontSize: 11, color: 'var(--text-dim)', background: 'none', border: 'none', cursor: 'pointer', textDecoration: 'underline' }}
+          >
+            Cancel
+          </button>
+        </div>
+      )}
+    </div>
+  );
+}
+
 export function PlayerUI({
   roomCode,
   roomState,
@@ -132,12 +217,36 @@ export function PlayerUI({
   const [cylinderRotation, setCylinderRotation] = useState(0);
   const [cylinderAnimating, setCylinderAnimating] = useState(false);
 
+  // Elimination popup state
+  const prevStatusRef = useRef(null);
+  const [justEliminated, setJustEliminated] = useState(false);
+
   // When spin target clicks Continue → spinDismissed fires → auto-close for all players
   useEffect(() => {
     if (spinDismissed && spinData) {
       setSpinData(null);
     }
   }, [spinDismissed]); // eslint-disable-line
+
+  // Detect transition from alive → eliminated
+  useEffect(() => {
+    const currentStatus = myPlayer?.status || null;
+    if (prevStatusRef.current === 'alive' && currentStatus === 'eliminated') {
+      setTimeout(() => setJustEliminated(true), 400);
+    }
+    prevStatusRef.current = currentStatus;
+  }, [myPlayer?.status]); // eslint-disable-line
+
+  // 15s auto-advance — dismiss overlay if spin target hasn't clicked Continue
+  useEffect(() => {
+    if (!spinComplete || !spinData) return;
+    const amTarget = spinData.spinTargetId === myPlayer?.id;
+    const timer = setTimeout(() => {
+      if (amTarget) acknowledgeSpinResult?.();
+      else setSpinData(null);
+    }, 15000);
+    return () => clearTimeout(timer);
+  }, [spinComplete]); // eslint-disable-line
 
   useEffect(() => {
     const action = roomState?.lastAction;
@@ -150,7 +259,8 @@ export function PlayerUI({
 
     const { roll, eliminated, spinTargetName, spinTargetId: targetId, riskLevelBefore } = action;
     const landingChamberIndex = (roll - 1) % 6;
-    const finalAngle = 10 * 360 + landingChamberIndex * 60;
+    // Correct formula: finalAngle = 10*360 - landingChamberIndex*60
+    const finalAngle = 10 * 360 - landingChamberIndex * 60;
 
     const safeRiskBefore = riskLevelBefore ?? 1;
     const shuffled = seededShuffle([0, 1, 2, 3, 4, 5], roll);
@@ -273,7 +383,12 @@ export function PlayerUI({
                 Waiting for <span style={{ color: 'var(--text)' }}>{currentPlayer.username}</span>
               </div>
             )}
-            {isLobby && <div style={{ fontSize: 12, color: 'var(--text-dim)' }}>Waiting for host to start...</div>}
+            {isLobby && (
+              <div>
+                <div style={{ fontSize: 12, color: 'var(--text-dim)', marginBottom: 10 }}>Waiting for host to start...</div>
+                <ShareButton roomCode={roomCode} senderName={myPlayer?.username} />
+              </div>
+            )}
             {isRoundEnd && <div style={{ fontSize: 12, color: 'var(--alive)' }}>Round ended. Waiting for next round...</div>}
             {isGameOver && (
               <div style={{ fontSize: 12, color: 'var(--accent)' }}>
@@ -551,6 +666,36 @@ export function PlayerUI({
               )}
             </div>
           )}
+        </div>
+      )}
+
+      {/* ── Elimination popup ── */}
+      {justEliminated && !spinData && (
+        <div style={{
+          position: 'fixed', inset: 0,
+          background: 'rgba(0,0,0,0.95)',
+          display: 'flex', flexDirection: 'column',
+          alignItems: 'center', justifyContent: 'center',
+          zIndex: 8800, padding: 24,
+        }}>
+          <div className="card fade-in" style={{ maxWidth: 360, width: '100%', textAlign: 'center', border: '1px solid var(--accent2)' }}>
+            <div style={{ fontFamily: "'Bebas Neue', sans-serif", fontSize: 56, color: 'var(--accent2)', marginBottom: 12 }}>
+              💀 ELIMINATED
+            </div>
+            <div style={{ fontSize: 14, color: 'var(--text)', marginBottom: 8 }}>
+              You&apos;ve been eliminated.
+            </div>
+            <div style={{ fontSize: 12, color: 'var(--text-dim)', marginBottom: 24, lineHeight: 1.6 }}>
+              The host will manage the rest of the game.
+            </div>
+            <button
+              className="primary"
+              onClick={() => setJustEliminated(false)}
+              style={{ padding: '10px 32px' }}
+            >
+              OK
+            </button>
+          </div>
         </div>
       )}
 
