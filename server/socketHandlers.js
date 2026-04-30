@@ -288,6 +288,7 @@ function registerSocketHandlers(io, socket) {
       if (!player) return callback({ success: false, error: 'Player not found' });
 
       const riskLevelBefore = player.riskLevel;
+      const chamberBefore = [...player.chamber]; // snapshot BEFORE spin mutates it
       const spinResult = engine.spinGun(player);
 
       if (spinResult.eliminated) {
