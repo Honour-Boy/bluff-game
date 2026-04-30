@@ -302,9 +302,9 @@ export function OnlinePlayerUI({
   const [cylinderAnimating, setCylinderAnimating] = useState(false);
 
  // Elimination popup state (separate from spin overlay — shows after overlay closes)
-const prevStatusRef = useRef(null);
-const pendingEliminatedRef = useRef(false);
-const [justEliminated, setJustEliminated] = useState(false);
+  const prevStatusRef = useRef(null);
+  const pendingEliminatedRef = useRef(false);
+  const [justEliminated, setJustEliminated] = useState(false);
 
   // Trigger spin overlay when a spin_result arrives
   useEffect(() => {
@@ -323,20 +323,20 @@ const [justEliminated, setJustEliminated] = useState(false);
       (chamber || []).map((v, i) => v === 'bullet' ? i : -1).filter(i => i !== -1)
     );
 
-    setCylinderRotation(0);
     setCylinderAnimating(false);
+    setCylinderRotation(0);
     setSpinComplete(false);
     setSpinData({ spinIndex: landingChamberIndex, eliminated, spinTargetName, spinTargetId: targetId, bulletChambers, landingChamberIndex, finalAngle });
 
-    requestAnimationFrame(() => {
-      requestAnimationFrame(() => {
-        setCylinderRotation(finalAngle);
-        setCylinderAnimating(true);
-      });
-    });
+    // 80ms timeout lets React commit the reset render before starting animation
+    // requestAnimationFrame was too fast — React batching swallowed the 0→finalAngle change
+    const startTimer = setTimeout(() => {
+      setCylinderAnimating(true);
+      setCylinderRotation(finalAngle);
+    }, 80);
 
-    const timer = setTimeout(() => setSpinComplete(true), 8000);
-    return () => clearTimeout(timer);
+    const completeTimer = setTimeout(() => setSpinComplete(true), 8080);
+    return () => { clearTimeout(startTimer); clearTimeout(completeTimer); };
   }, [roomState?.lastAction]);
 
   // When the spin target clicks Continue, spinDismissed fires for everyone → auto-close overlay
@@ -355,23 +355,22 @@ const [justEliminated, setJustEliminated] = useState(false);
     }
   }, [roomState?.lastAction]); // eslint-disable-line
 
-  // Detect when this player transitions from alive → eliminated
-useEffect(() => {
-  const currentStatus = myPlayer?.status || null;
-  if (prevStatusRef.current === 'alive' && currentStatus === 'eliminated') {
-    // Don't show popup yet — wait for spin overlay to dismiss first
-    pendingEliminatedRef.current = true;
-  }
-  prevStatusRef.current = currentStatus;
-}, [myPlayer?.status]); // eslint-disable-line
+  // Detect alive → eliminated, hold until spin overlay is dismissed
+  useEffect(() => {
+    const currentStatus = myPlayer?.status || null;
+    if (prevStatusRef.current === 'alive' && currentStatus === 'eliminated') {
+      pendingEliminatedRef.current = true;
+    }
+    prevStatusRef.current = currentStatus;
+  }, [myPlayer?.status]); // eslint-disable-line
 
-// Once spin overlay is dismissed, show elimination popup if it was pending
-useEffect(() => {
-  if (!spinData && pendingEliminatedRef.current) {
-    pendingEliminatedRef.current = false;
-    setTimeout(() => setJustEliminated(true), 300);
-  }
-}, [spinData]); // eslint-disable-line
+  // Once spin overlay clears (Continue clicked), show elimination popup if pending
+  useEffect(() => {
+    if (!spinData && pendingEliminatedRef.current) {
+      pendingEliminatedRef.current = false;
+      setTimeout(() => setJustEliminated(true), 300);
+    }
+  }, [spinData]); // eslint-disable-line
 
   // 15s auto-advance after spin result — dismiss overlay if spin target hasn't clicked Continue
   useEffect(() => {
