@@ -311,9 +311,10 @@ function registerSocketHandlers(io, socket) {
         type: 'spin_result',
         spinTargetId: player.id,
         spinTargetName: player.username,
-        spinIndex: spinResult.spinIndex,       // ← exact slot index 0-5
-        chamber: spinResult.chamber,           // ← full chamber layout
-        roll: spinResult.spinIndex,            // ← alias kept for ActionLog compat
+        spinIndex: spinResult.spinIndex,
+        chamber: chamberBefore,        // ← pre-spin chamber for animation
+        chamberAfter: spinResult.chamber, // ← post-spin chamber (has new bullet on survival)
+        roll: spinResult.spinIndex,
         eliminated: spinResult.eliminated,
         riskLevel: spinResult.riskLevel,
         riskLevelBefore,
