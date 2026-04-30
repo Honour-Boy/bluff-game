@@ -735,12 +735,15 @@ export function OnlinePlayerUI({
         )
       )}
 
-      <button
-        onClick={leaveGame}
-        style={{ alignSelf: 'flex-start', fontSize: 11, color: 'var(--text-dim)', border: 'none', background: 'none', padding: 0, textDecoration: 'underline', cursor: 'pointer', marginTop: 8 }}
-      >
-        Leave game
-      </button>
+      {/* Leave game — only available in lobby or after game ends */}
+      {(!phase || ['lobby', 'game_over'].includes(phase)) && (
+        <button
+          onClick={leaveGame}
+          style={{ alignSelf: 'flex-start', fontSize: 11, color: 'var(--text-dim)', border: 'none', background: 'none', padding: 0, textDecoration: 'underline', cursor: 'pointer', marginTop: 8 }}
+        >
+          Leave game
+        </button>
+      )}
 
       {/* ── Spin overlay ── */}
       {spinData && (
