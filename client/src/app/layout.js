@@ -1,8 +1,48 @@
 import './globals.css';
 
 export const metadata = {
-  title: 'BLUFF — The Card Game',
-  description: 'Real-time multiplayer bluff card game',
+  title: 'BLUFF - Real-Time Multiplayer Card Game',
+  description: 'Bluff, bet, and outwit your opponents in this fast-paced real-time multiplayer card game.',
+
+  // Favicon
+  icons: {
+    icon: '/images/favicon.png',
+    shortcut: '/images/favicon.png',
+    apple: '/images/favicon.png',
+  },
+
+  // Open Graph metadata for social sharing (WhatsApp, Telegram, Facebook, LinkedIn, etc.)
+  openGraph: {
+    title: 'BLUFF',
+    description: 'Real-Time Multiplayer Card Game',
+    images: [
+      {
+        url: '/images/og-preview.png',
+        width: 1200,
+        height: 630,
+        alt: 'BLUFF - Real-Time Multiplayer Card Game',
+        type: 'image/png',
+      },
+    ],
+    url: process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000',
+    type: 'website',
+    siteName: 'BLUFF',
+    locale: 'en_US',
+  },
+
+  // Twitter/X Card metadata
+  twitter: {
+    card: 'summary_large_image',
+    title: 'BLUFF',
+    description: 'Bluff, bet, and outwit your opponents',
+    image: '/images/og-preview.png',
+  },
+
+  // Telegram support
+  other: {
+    'telegram:title': 'BLUFF',
+    'telegram:description': 'Real-Time Multiplayer Card Game',
+  },
 };
 
 export default function RootLayout({ children }) {

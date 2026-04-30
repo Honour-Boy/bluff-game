@@ -1,0 +1,63 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg width="256" height="256" viewBox="0 0 256 256" xmlns="http://www.w3.org/2000/svg">
+  <!-- Background -->
+  <rect width="256" height="256" fill="#0a0a0b"/>
+  
+  <!-- Title: BLUFF using geometric shapes -->
+  <!-- B: Circle and shapes -->
+  <circle cx="40" cy="80" r="20" fill="none" stroke="#e8ff4a" stroke-width="2.5" opacity="0.9"/>
+  <circle cx="40" cy="160" r="20" fill="none" stroke="#e8ff4a" stroke-width="2.5" opacity="0.9"/>
+  <rect x="28" y="95" width="24" height="65" fill="#e8ff4a" opacity="0.15"/>
+  
+  <!-- L: Vertical line and horizontal -->
+  <line x1="70" y1="50" x2="70" y2="190" stroke="#ff4a6e" stroke-width="3" opacity="0.9"/>
+  <line x1="70" y1="190" x2="95" y2="190" stroke="#ff4a6e" stroke-width="3" opacity="0.9"/>
+  
+  <!-- U: Two vertical lines with curve -->
+  <line x1="120" y1="50" x2="120" y2="170" stroke="#4affdb" stroke-width="3" opacity="0.9"/>
+  <line x1="155" y1="50" x2="155" y2="170" stroke="#4affdb" stroke-width="3" opacity="0.9"/>
+  <path d="M 120 170 Q 137.5 185 155 170" fill="none" stroke="#4affdb" stroke-width="3" opacity="0.9"/>
+  
+  <!-- F: Vertical line with horizontal lines -->
+  <line x1="180" y1="50" x2="180" y2="190" stroke="#e8ff4a" stroke-width="3" opacity="0.9"/>
+  <line x1="180" y1="65" x2="210" y2="65" stroke="#e8ff4a" stroke-width="3" opacity="0.9"/>
+  <line x1="180" y1="120" x2="205" y2="120" stroke="#e8ff4a" stroke-width="3" opacity="0.9"/>
+  
+  <!-- F: Second F -->
+  <line x1="220" y1="50" x2="220" y2="190" stroke="#ff4a6e" stroke-width="3" opacity="0.9"/>
+  <line x1="220" y1="65" x2="250" y2="65" stroke="#ff4a6e" stroke-width="3" opacity="0.9"/>
+  <line x1="220" y1="120" x2="245" y2="120" stroke="#ff4a6e" stroke-width="3" opacity="0.9"/>
+  
+  <!-- Accent: Geometric shapes scattered -->
+  <!-- Star -->
+  <g opacity="0.6">
+    <polygon points="128,20 135,40 156,40 140,52 147,72 128,60 109,72 116,52 100,40 121,40" fill="#e8ff4a"/>
+  </g>
+  
+  <!-- Triangle -->
+  <g opacity="0.6">
+    <polygon points="30,220 50,270 10,270" fill="#ff4a6e"/>
+  </g>
+  
+  <!-- Cross -->
+  <g opacity="0.6">
+    <line x1="200" y1="210" x2="200" y2="250" stroke="#4affdb" stroke-width="2"/>
+    <line x1="180" y1="230" x2="220" y2="230" stroke="#4affdb" stroke-width="2"/>
+  </g>
+  
+  <!-- Glow effect -->
+  <defs>
+    <filter id="glow">
+      <feGaussianBlur stdDeviation="2" result="coloredBlur"/>
+      <feMerge>
+        <feMergeNode in="coloredBlur"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+  </defs>
+  
+  <!-- Center icon: Heart shape with bluff theme -->
+  <circle cx="128" cy="128" r="35" fill="none" stroke="#e8ff4a" stroke-width="1.5" opacity="0.3"/>
+  <path d="M 128 100 Q 115 90 105 100 Q 95 110 105 125 L 128 145 L 151 125 Q 161 110 151 100 Q 141 90 128 100 Z" 
+        fill="#e8ff4a" opacity="0.3" filter="url(#glow)"/>
+</svg>
