@@ -301,9 +301,10 @@ export function OnlinePlayerUI({
   const [cylinderRotation, setCylinderRotation] = useState(0);
   const [cylinderAnimating, setCylinderAnimating] = useState(false);
 
-  // Elimination popup state (separate from spin overlay — shows after overlay closes)
-  const prevStatusRef = useRef(null);
-  const [justEliminated, setJustEliminated] = useState(false);
+ // Elimination popup state (separate from spin overlay — shows after overlay closes)
+const prevStatusRef = useRef(null);
+const pendingEliminatedRef = useRef(false);
+const [justEliminated, setJustEliminated] = useState(false);
 
   // Trigger spin overlay when a spin_result arrives
   useEffect(() => {
@@ -354,22 +355,20 @@ export function OnlinePlayerUI({
     }
   }, [roomState?.lastAction]); // eslint-disable-line
 
-  // Detect when this player transitions from alive → eliminated.
-// Don't show the pop-up until AFTER the spin overlay is fully dismissed.
+  // Detect when this player transitions from alive → eliminated
 useEffect(() => {
   const currentStatus = myPlayer?.status || null;
   if (prevStatusRef.current === 'alive' && currentStatus === 'eliminated') {
-    // Mark that we need to show the popup, but wait for spinData to clear first
-    prevStatusRef.current = 'pending_eliminated';
-  } else {
-    prevStatusRef.current = currentStatus;
+    // Don't show popup yet — wait for spin overlay to dismiss first
+    pendingEliminatedRef.current = true;
   }
+  prevStatusRef.current = currentStatus;
 }, [myPlayer?.status]); // eslint-disable-line
 
-// Once spin overlay is dismissed (spinData = null), show elimination popup if pending
+// Once spin overlay is dismissed, show elimination popup if it was pending
 useEffect(() => {
-  if (!spinData && prevStatusRef.current === 'pending_eliminated') {
-    prevStatusRef.current = 'eliminated';
+  if (!spinData && pendingEliminatedRef.current) {
+    pendingEliminatedRef.current = false;
     setTimeout(() => setJustEliminated(true), 300);
   }
 }, [spinData]); // eslint-disable-line
