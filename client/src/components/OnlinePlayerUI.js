@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { CardShape } from './CardShape';
 import { ShapeIcon, SHAPE_COLORS } from './ShapeIcon';
-import { RiskMeter } from './RiskMeter';
+
 import { ActionLog } from './ActionLog';
 import { HowToPlayModal } from './HowToPlayModal';
 import { TurnActionModal, WaitingForPlayerBanner } from './TurnActionModal';
@@ -284,6 +284,7 @@ export function OnlinePlayerUI({
 }) {
   const [showHowToPlay, setShowHowToPlay] = useState(false);
   const [selectedCardId, setSelectedCardId] = useState(null);
+  const [pendingCard, setPendingCard] = useState(null);
   // Whot nomination: stores the cardId waiting for a shape to be picked
   const [whotPickerCard, setWhotPickerCard] = useState(null);
   // Turn action modal
@@ -438,21 +439,12 @@ export function OnlinePlayerUI({
   }
 
   const handleCardClick = (cardId) => {
-    if (!isMyTurn || !isPlaying || cardPlayedThisTurn) return;
-    if (selectedCardId === cardId) {
-      // Second tap — check if it's a Whot card
-      const card = myHand.find(c => c.id === cardId);
-      if (card?.shape === 'whot') {
-        // Show shape picker instead of playing immediately
-        setWhotPickerCard(cardId);
-      } else {
-        playCardOnline(cardId);
-        setSelectedCardId(null);
-      }
-    } else {
-      setSelectedCardId(cardId);
-    }
-  };
+  if (!isMyTurn || !isPlaying || cardPlayedThisTurn) return;
+  const card = myHand.find(c => c.id === cardId);
+  if (!card) return;
+  setSelectedCardId(cardId);
+  setPendingCard(card); // opens confirm dialog
+};
 
   const handleSpectatePlayer = (targetId) => {
     setSpectatingId(targetId);
@@ -602,17 +594,28 @@ export function OnlinePlayerUI({
       {/* ── Action log ── */}
       {lastAction && <ActionLog lastAction={lastAction} />}
 
-      {/* ── Risk meter ── */}
-      {!isEliminated && !isLobby && (
-        <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '8px 14px', background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 'var(--radius)' }}>
-          <div style={{ fontSize: 10, color: 'var(--text-dim)', letterSpacing: '0.1em', flexShrink: 0 }}>RISK</div>
-          <RiskMeter riskLevel={myPlayer.riskLevel} size="sm" />
-          <div style={{ fontSize: 10, color: 'var(--text-dim)' }}>
-            {myPlayer.riskLevel}/6
-            {myPlayer.riskLevel >= 5 && <span style={{ color: 'var(--accent2)', marginLeft: 6 }}>⚠️ High risk</span>}
-          </div>
-        </div>
-      )}
+      {/* ── Chamber bullet count ── */}
+{!isEliminated && !isLobby && (
+  <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '8px 14px', background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 'var(--radius)' }}>
+    <div style={{ fontSize: 10, color: 'var(--text-dim)', letterSpacing: '0.1em', flexShrink: 0 }}>CHAMBER</div>
+    <div style={{ display: 'flex', gap: 5 }}>
+      {Array.from({ length: 6 }).map((_, i) => {
+        const isBullet = myPlayer.chamber?.[i] === 'bullet';
+        return (
+          <div key={i} style={{
+            width: 14, height: 14, borderRadius: '50%',
+            background: isBullet ? 'var(--accent2)' : 'var(--surface2)',
+            border: `1.5px solid ${isBullet ? 'var(--accent2)' : 'var(--border)'}`,
+            boxShadow: isBullet ? '0 0 6px rgba(255,74,110,0.5)' : 'none',
+          }} />
+        );
+      })}
+    </div>
+    <div style={{ fontSize: 10, color: 'var(--text-dim)', marginLeft: 2 }}>
+      {myPlayer.chamber?.filter(s => s === 'bullet').length ?? 1}/6
+    </div>
+  </div>
+)}
 
       {/* ── My turn actions ── */}
       {isMyTurn && isPlaying && !isEliminated && (
@@ -822,11 +825,6 @@ export function OnlinePlayerUI({
               <span>YOUR HAND</span>
               <span>{myHand.length} card{myHand.length !== 1 ? 's' : ''}</span>
             </div>
-            {isMyTurn && isPlaying && !cardPlayedThisTurn && selectedCardId && (
-              <div style={{ fontSize: 11, color: 'var(--warning)', marginBottom: 6, textAlign: 'center' }}>
-                Tap again to play · Whot card will ask for a shape
-              </div>
-            )}
             <CardHand
               hand={myHand}
               selectedCardId={isMyTurn && isPlaying && !cardPlayedThisTurn ? selectedCardId : null}
@@ -908,6 +906,71 @@ export function OnlinePlayerUI({
         </div>
       )}
 
+      {/* ── Card confirm dialog ── */}
+{pendingCard && (
+  <div style={{
+    position: 'fixed', inset: 0,
+    background: 'rgba(0,0,0,0.85)',
+    display: 'flex', alignItems: 'center', justifyContent: 'center',
+    zIndex: 8600, padding: 24,
+  }}>
+    <div className="card fade-in" style={{ maxWidth: 320, width: '100%', textAlign: 'center', padding: '28px 24px' }}>
+      <div style={{ fontSize: 10, color: 'var(--warning)', letterSpacing: '0.15em', marginBottom: 16 }}>
+        PLAY THIS CARD?
+      </div>
+      <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 18 }}>
+        <div style={{
+          width: 72, height: 100,
+          background: 'var(--surface2)',
+          border: '2px solid var(--accent)',
+          borderRadius: 8,
+          display: 'flex', flexDirection: 'column',
+          alignItems: 'center', justifyContent: 'center',
+          gap: 8,
+          boxShadow: '0 0 20px rgba(232,255,74,0.2)',
+        }}>
+          <ShapeIcon shape={pendingCard.shape} size={32} />
+          <div style={{ fontSize: 18, fontWeight: 700, color: 'var(--text)', fontFamily: "'Bebas Neue', sans-serif" }}>
+            {pendingCard.number}
+          </div>
+        </div>
+      </div>
+      <div style={{ fontSize: 13, color: 'var(--text)', marginBottom: 20, textTransform: 'capitalize' }}>
+        {pendingCard.shape === 'whot' ? 'Whot (wild card)' : `${pendingCard.shape} ${pendingCard.number}`}
+      </div>
+      <div style={{ display: 'flex', gap: 10 }}>
+        <button
+          className="primary"
+          style={{ flex: 1, padding: '12px' }}
+          onClick={() => {
+            if (pendingCard.shape === 'whot') {
+              setWhotPickerCard(pendingCard.id);
+            } else {
+              playCardOnline(pendingCard.id);
+              setSelectedCardId(null);
+            }
+            setPendingCard(null);
+          }}
+        >
+          ▶ Play
+        </button>
+        <button
+          style={{
+            flex: 1, padding: '12px',
+            background: 'var(--surface2)',
+            border: '1px solid var(--border)',
+            borderRadius: 'var(--radius)',
+            color: 'var(--text-dim)',
+            cursor: 'pointer', fontSize: 13,
+          }}
+          onClick={() => { setPendingCard(null); setSelectedCardId(null); }}
+        >
+          Cancel
+        </button>
+      </div>
+    </div>
+  </div>
+)}
       {/* ── Whot shape picker overlay ── */}
       {whotPickerCard && (
         <div style={{
