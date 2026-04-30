@@ -46,6 +46,9 @@ async function broadcastRoomState(io, roomCode) {
 
 // ─── Register all handlers ────────────────────────────────────
 
+// Track host disconnect timers per room: roomCode → timeoutId
+const hostDisconnectTimers = new Map();
+
 function registerSocketHandlers(io, socket) {
   const disconnectTimers = new Map();
 
@@ -105,6 +108,13 @@ function registerSocketHandlers(io, socket) {
       const code = roomCode?.toUpperCase();
       const room = await getRoom(code);
       if (!room) return callback({ success: false, error: 'Room not found' });
+
+      // Cancel any pending host-disconnect game-over timer
+      if (hostDisconnectTimers.has(code)) {
+        clearTimeout(hostDisconnectTimers.get(code));
+        hostDisconnectTimers.delete(code);
+        console.log(`[Room ${code}] Host reconnected — game-over timer cancelled`);
+      }
 
       room.hostSocketId = socket.id;
       await saveRoom(room);
@@ -487,20 +497,81 @@ function registerSocketHandlers(io, socket) {
     }
   });
 
+  // ─── PLAYER: Intentional leave ───────────────────────────
+  // Emitted by the client on beforeunload so the server cleans up immediately
+  // without waiting for the 30-second grace period.
+  socket.on('leave_room', async ({ roomCode, playerId } = {}) => {
+    try {
+      const code = roomCode?.toUpperCase();
+      const room = await getRoom(code);
+      if (!room) return;
+
+      // Cancel any pending grace-period timer for this socket
+      if (disconnectTimers.has(socket.id)) {
+        clearTimeout(disconnectTimers.get(socket.id));
+        disconnectTimers.delete(socket.id);
+      }
+
+      // Remove player from players array entirely (not just mark eliminated)
+      const idx = room.players.findIndex(p => p.id === playerId);
+      if (idx !== -1) {
+        const player = room.players[idx];
+        room.players.splice(idx, 1);
+        engine.eliminateFromTurnOrder(room, playerId);
+        console.log(`[Room ${code}] Player ${player.username} left intentionally`);
+
+        const gameOverWinner = engine.checkGameOver(room);
+        if (gameOverWinner) {
+          room.phase = 'game_over';
+          room.lastAction = { type: 'game_over', winnerId: gameOverWinner.id, winnerName: gameOverWinner.username };
+        }
+
+        await saveRoom(room);
+        socket.leave(code);
+        await broadcastRoomState(io, code);
+      }
+    } catch (err) {
+      console.error('[leave_room] error:', err.message);
+    }
+  });
+
   // ─── DISCONNECT ──────────────────────────────────────────
   socket.on('disconnect', async () => {
     console.log(`[Socket] Disconnected: ${socket.id}`);
 
     for (const [code, room] of rooms.entries()) {
+      // ── Host disconnected ──
       if (room.hostSocketId === socket.id) {
-        io.to(code).emit('host_disconnected');
+        console.log(`[Room ${code}] Host disconnected — 10s grace period before game ends`);
+        io.to(code).emit('host_disconnecting', { countdown: 10 });
+
+        const timer = setTimeout(() => {
+          // Host never reconnected — end the game for everyone
+          io.to(code).emit('game_ended', { reason: 'The host left the game.' });
+          rooms.delete(code);
+          hostDisconnectTimers.delete(code);
+          console.log(`[Room ${code}] Host grace period expired — room deleted`);
+        }, 10000);
+
+        hostDisconnectTimers.set(code, timer);
         continue;
       }
 
       const player = room.players.find(p => p.socketId === socket.id);
       if (!player || player.status === 'eliminated') continue;
 
-      if (room.phase === 'playing' || room.phase === 'bluff_resolution') {
+      // ── Player disconnected in lobby — remove immediately, no grace period ──
+      if (room.phase === 'lobby') {
+        const idx = room.players.findIndex(p => p.id === player.id);
+        if (idx !== -1) room.players.splice(idx, 1);
+        console.log(`[Room ${code}] Player ${player.username} disconnected from lobby — removed`);
+        await saveRoom(room);
+        await broadcastRoomState(io, code);
+        continue;
+      }
+
+      // ── Player disconnected mid-game — 30s grace period ──
+      if (room.phase === 'playing' || room.phase === 'bluff_resolution' || room.phase === 'spin_pending') {
         console.log(`[Room ${code}] Player ${player.username} disconnected — starting 30s grace period`);
 
         io.to(code).emit('player_disconnecting', { playerId: player.id, playerName: player.username });

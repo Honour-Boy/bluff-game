@@ -28,19 +28,33 @@ export function useGame() {
     setTimeout(() => setNotification(null), 3500);
   }, []);
 
+  const clearSession = useCallback(() => {
+    localStorage.removeItem(LS_ROOM_CODE);
+    localStorage.removeItem(LS_PLAYER_ID);
+    localStorage.removeItem(LS_IS_HOST);
+    setRoomCode(null);
+    setPlayerId(null);
+    setIsHost(false);
+    setRoomState(null);
+  }, []);
+
   // ─── Warn before refresh/close whenever in a room ────────
-  // Covers all phases — lobby, playing, spin_pending, game_over, etc.
+  // On beforeunload: show browser dialog AND notify server immediately so
+  // the player is removed from the room without waiting for the grace period.
+  // This prevents duplicate player entries when they rejoin after reloading.
   useEffect(() => {
     if (!roomCode) return;
 
     const handleBeforeUnload = (e) => {
+      // Tell the server we're leaving intentionally so it can clean up now
+      socket.emit('leave_room', { roomCode, playerId });
       e.preventDefault();
       e.returnValue = '';
     };
 
     window.addEventListener('beforeunload', handleBeforeUnload);
     return () => window.removeEventListener('beforeunload', handleBeforeUnload);
-  }, [roomCode]);
+  }, [roomCode, playerId, socket]);
 
   // ─── Socket event listeners ───────────────────────────────
   useEffect(() => {
@@ -49,23 +63,35 @@ export function useGame() {
     const onConnect = () => { setConnected(true); setError(null); };
     const onDisconnect = () => setConnected(false);
     const onRoomState = (state) => setRoomState(state);
-    const onHostDisconnected = () => notify('Host disconnected. Game paused.', 'error');
     const onBluffCalled = () => notify('⚠️ Bluff called! Host: reveal the last card.', 'warning');
+
+    // Host lost connection — show countdown warning to all players
+    const onHostDisconnecting = ({ countdown } = {}) => {
+      notify(`Host disconnected. Game ends in ${countdown ?? 10}s if they don't return.`, 'error');
+    };
+
+    // Host never returned — end the game for all clients
+    const onGameEnded = ({ reason } = {}) => {
+      clearSession();
+      notify(reason || 'The game has ended.', 'error');
+    };
 
     socket.on('connect', onConnect);
     socket.on('disconnect', onDisconnect);
     socket.on('room_state', onRoomState);
-    socket.on('host_disconnected', onHostDisconnected);
     socket.on('bluff_called', onBluffCalled);
+    socket.on('host_disconnecting', onHostDisconnecting);
+    socket.on('game_ended', onGameEnded);
 
     return () => {
       socket.off('connect', onConnect);
       socket.off('disconnect', onDisconnect);
       socket.off('room_state', onRoomState);
-      socket.off('host_disconnected', onHostDisconnected);
       socket.off('bluff_called', onBluffCalled);
+      socket.off('host_disconnecting', onHostDisconnecting);
+      socket.off('game_ended', onGameEnded);
     };
-  }, [socket, notify]);
+  }, [socket, notify, clearSession]);
 
   // ─── On mount: clear any stale session from a previous page load ───
   // Reload = disconnect. No reconnect attempt. Player returns to landing screen.
@@ -79,16 +105,6 @@ export function useGame() {
       // State is already null/false from initial useState — nothing to reset.
     }
   }, []); // eslint-disable-line
-
-  const clearSession = () => {
-    localStorage.removeItem(LS_ROOM_CODE);
-    localStorage.removeItem(LS_PLAYER_ID);
-    localStorage.removeItem(LS_IS_HOST);
-    setRoomCode(null);
-    setPlayerId(null);
-    setIsHost(false);
-    setRoomState(null);
-  };
 
   // ─── Actions ──────────────────────────────────────────────
 
