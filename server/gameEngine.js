@@ -203,12 +203,13 @@ function startGame(room) {
 // ─── Online-mode card play ─────────────────────────────────────
 
 /**
- * Validate and play a card from a player's hand.
- * A card is valid if its shape matches currentCardType OR it is a Whot card.
- * Whot cards let the player nominate the next shape (passed as nominatedShape).
+ * Play any card from a player's hand face-down.
+ * No shape validation — this is a bluffing game. Any card can be played.
+ * The card is recorded as lastPlayedCard so bluff resolution can check it.
+ * currentCardType does NOT change when a card is played — only on elimination.
  * Returns { ok: boolean, error?: string, card?: object }
  */
-function validateAndPlayCard(room, playerId, cardId, nominatedShape = null) {
+function validateAndPlayCard(room, playerId, cardId) {
   if (room.mode !== MODES.ONLINE) return { ok: false, error: 'Not in online mode' };
 
   const hand = room.hands.get(playerId);
@@ -218,29 +219,12 @@ function validateAndPlayCard(room, playerId, cardId, nominatedShape = null) {
   if (cardIdx === -1) return { ok: false, error: 'Card not in hand' };
 
   const card = hand[cardIdx];
-  const isWhot = card.shape === 'whot';
-  const matchesShape = card.shape === room.currentCardType;
 
-  if (!isWhot && !matchesShape) {
-    return { ok: false, error: 'Card does not match required shape' };
-  }
-
-  // Remove from hand
+  // Remove from hand and add to played pile
   hand.splice(cardIdx, 1);
-
-  // Add to played pile
   room.playedPile.push(card);
   room.lastPlayedCard = card;
   room.cardPlayedThisTurn = true;
-
-  // Update current shape
-  if (isWhot && nominatedShape && SHAPES.includes(nominatedShape)) {
-    room.currentCardType = nominatedShape;
-    room.currentCard = { ...card, nominatedShape };
-  } else if (!isWhot) {
-    room.currentCard = card;
-    room.currentCardType = card.shape;
-  }
 
   return { ok: true, card };
 }
@@ -274,33 +258,37 @@ function drawCardForPlayer(room, playerId) {
 // ─── Bluff resolution ──────────────────────────────────────────
 
 /**
- * Online mode: server auto-resolves bluff by checking if lastPlayedCard was valid.
- * Returns { bluffIsCorrect: boolean, spinTarget: player }
+ * Online mode: server auto-resolves bluff by checking if lastPlayedCard actually
+ * matched the required shape. The bluff call is CORRECT if the previous player lied.
+ * Returns { bluffIsCorrect, spinTarget, revealedCard, accuser, accused }
  */
 function resolveBluffOnline(room) {
-  const currentPlayerId = room.turnOrder[room.currentTurnIndex];
-  const currentPlayer = room.players.find(p => p.id === currentPlayerId);
+  // Current player in the turn order is the one CALLING the bluff (accuser)
+  const accuserId = room.turnOrder[room.currentTurnIndex];
+  const accuser = room.players.find(p => p.id === accuserId);
 
+  // Previous player is the one whose card is being challenged (accused)
   const prevIdx = (room.currentTurnIndex - 1 + room.turnOrder.length) % room.turnOrder.length;
-  const prevPlayerId = room.turnOrder[prevIdx];
-  const prevPlayer = room.players.find(p => p.id === prevPlayerId);
+  const accusedId = room.turnOrder[prevIdx];
+  const accused = room.players.find(p => p.id === accusedId);
 
-  // Check if the previous player's card was actually valid
-  // (we check against the shape required before that card was played)
-  // lastPlayedCard is the card played by prevPlayer
-  const card = room.lastPlayedCard;
-  let bluffIsCorrect = false;
+  const revealedCard = room.lastPlayedCard;
 
-  if (!card) {
-    // No card was played → previous player bluffed
+  let bluffIsCorrect;
+  if (!revealedCard) {
+    // No card played at all — accused definitely lied
     bluffIsCorrect = true;
   } else {
-    // Whot is always valid; otherwise must match
-    bluffIsCorrect = false; // they played a real card that was validated server-side
+    // Whot card is always valid (always matches). Any other card must match currentCardType.
+    const isWhot = revealedCard.shape === 'whot';
+    const matchesRequired = revealedCard.shape === room.currentCardType;
+    bluffIsCorrect = !isWhot && !matchesRequired;
   }
 
-  const spinTarget = bluffIsCorrect ? prevPlayer : currentPlayer;
-  return { bluffIsCorrect, spinTarget };
+  // Correct bluff → accused (the liar) spins; wrong bluff → accuser spins
+  const spinTarget = bluffIsCorrect ? accused : accuser;
+
+  return { bluffIsCorrect, spinTarget, revealedCard, accuser, accused };
 }
 
 /**
