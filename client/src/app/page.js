@@ -1,6 +1,10 @@
 'use client';
 
+import { useEffect, useState } from 'react';
+import { useSearchParams } from 'next/navigation';
+import { useAuth } from '../hooks/useAuth';
 import { useGame } from '../hooks/useGame';
+import { AuthScreen } from '../components/AuthScreen';
 import { LandingScreen } from '../components/LandingScreen';
 import { HostUI } from '../components/HostUI';
 import { PlayerUI } from '../components/PlayerUI';
@@ -8,7 +12,17 @@ import { OnlinePlayerUI } from '../components/OnlinePlayerUI';
 import { Notification } from '../components/Notification';
 
 export default function Home() {
-  const game = useGame();
+  const searchParams = useSearchParams();
+  const initialJoinCode = searchParams.get('join') || null;
+
+  const {
+    user, profile, loading, authError, setAuthError,
+    signIn, signUp, signInWithGoogle, signOut,
+    updateUsername, updatePassword,
+    getAccessToken, username,
+  } = useAuth();
+
+  const game = useGame(getAccessToken);
 
   const {
     roomCode, isHost, playerId,
@@ -23,6 +37,40 @@ export default function Home() {
     leaveGame, setError,
   } = game;
 
+  // ─── Loading splash ────────────────────────────────────────
+  if (loading) {
+    return (
+      <div style={{
+        minHeight: '100vh', display: 'flex',
+        alignItems: 'center', justifyContent: 'center',
+        flexDirection: 'column', gap: 16,
+      }}>
+        <div style={{
+          fontFamily: "'Bebas Neue', sans-serif",
+          fontSize: 64, color: 'var(--accent)', lineHeight: 1,
+        }}>
+          BLUFF
+        </div>
+        <div style={{ fontSize: 11, color: 'var(--text-dim)', letterSpacing: '0.15em' }}>
+          Loading...
+        </div>
+      </div>
+    );
+  }
+
+  // ─── Auth gate ─────────────────────────────────────────────
+  if (!user) {
+    return (
+      <AuthScreen
+        onSignIn={signIn}
+        onSignUp={signUp}
+        onGoogleSignIn={signInWithGoogle}
+        error={authError}
+        setError={setAuthError}
+      />
+    );
+  }
+
   const wrap = (children) => (
     <div style={{ minHeight: '100vh', padding: '24px 16px' }}>
       <Notification notification={notification} />
@@ -30,11 +78,17 @@ export default function Home() {
     </div>
   );
 
+  // ─── Landing ────────────────────────────────────────────────
   if (!roomCode) {
     return wrap(
       <LandingScreen
+        username={username}
         onCreateRoom={createRoom}
         onJoinRoom={joinRoom}
+        onSignOut={signOut}
+        onUpdateUsername={updateUsername}
+        onUpdatePassword={updatePassword}
+        initialJoinCode={initialJoinCode}
         error={error}
         setError={setError}
         connected={connected}
@@ -42,7 +96,7 @@ export default function Home() {
     );
   }
 
-  // In a room as host
+  // ─── In a room as host ─────────────────────────────────────
   if (isHost) {
     if (gameMode === 'online') {
       return wrap(
@@ -80,7 +134,7 @@ export default function Home() {
     );
   }
 
-  // In a room as player
+  // ─── In a room as player ───────────────────────────────────
   if (playerId) {
     if (gameMode === 'online') {
       return wrap(

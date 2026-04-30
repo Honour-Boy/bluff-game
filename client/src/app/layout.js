@@ -10,9 +10,9 @@ export const metadata = {
     'Challenge your friends in BLUFF — a fast-paced real-time multiplayer card game of deception, strategy, and nerve.',
 
   icons: {
-    icon: '/images/favicon.png',
-    shortcut: '/images/favicon.png',
-    apple: '/images/favicon.png',
+    icon: '/images/logo.png',
+    shortcut: '/images/logo.png',
+    apple: '/images/logo.png',
   },
 
   openGraph: {
