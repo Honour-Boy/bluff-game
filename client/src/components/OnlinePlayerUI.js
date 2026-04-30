@@ -6,7 +6,9 @@ import { RiskMeter } from './RiskMeter';
 import { ActionLog } from './ActionLog';
 import { HowToPlayModal } from './HowToPlayModal';
 
-// ─── Shape icons ──────────────────────────────────────────────
+// ─── Constants ────────────────────────────────────────────────
+const SHAPES = ['circle', 'triangle', 'cross', 'square', 'star'];
+
 const SHAPE_ICONS = {
   circle: '⭕',
   triangle: '🔺',
@@ -28,7 +30,7 @@ function seededShuffle(arr, seed) {
   return a;
 }
 
-// ─── Cylinder SVG (matches PlayerUI/HostUI exactly) ──────────
+// ─── Cylinder SVG ────────────────────────────────────────────
 const CYL = 200, CX = 100, CY = 100, ORBIT = 58, CHAM_R = 20;
 
 function CylinderSVG({ bulletChambers, landingChamberIndex, rotation, animating, spinComplete }) {
@@ -83,7 +85,7 @@ function CylinderSVG({ bulletChambers, landingChamberIndex, rotation, animating,
   );
 }
 
-// ─── Face-down card stack visual ──────────────────────────────
+// ─── Face-down card stack ─────────────────────────────────────
 function FaceDownStack({ count, label, warning = false }) {
   const layers = Math.min(count, 3);
   return (
@@ -117,7 +119,9 @@ function FaceDownStack({ count, label, warning = false }) {
   );
 }
 
-// ─── Fanned card hand ─────────────────────────────────────────
+// ─── Flat horizontal card hand ────────────────────────────────
+// Cards are left-aligned so the scroll area always starts at the first card.
+// No rotation/fan — eliminates left-side clipping on small screens.
 function CardHand({ hand, selectedCardId, onCardClick, interactive = true }) {
   const n = hand.length;
   if (n === 0) {
@@ -128,59 +132,50 @@ function CardHand({ hand, selectedCardId, onCardClick, interactive = true }) {
     );
   }
 
-  const maxAngle = Math.min(30, n * 4);
-  const overlap = n > 1 ? Math.max(-32, -56 + Math.floor(320 / n)) : 0;
-
   return (
-    // Outer div scrolls horizontally when cards overflow the screen width
     <div style={{ overflowX: 'auto', WebkitOverflowScrolling: 'touch', paddingBottom: 4 }}>
       <div style={{
-        display: 'inline-flex',    // shrink-wraps to card content width
-        minWidth: '100%',          // but fills full width when cards are few (enables centering)
-        justifyContent: 'center',
+        display: 'flex',
+        flexDirection: 'row',
         alignItems: 'flex-end',
-        height: 130,
-        paddingBottom: 8,
+        gap: 6,
         paddingLeft: 8,
         paddingRight: 8,
+        paddingTop: 22,          // headroom for the lift animation on selected card
+        minWidth: 'max-content', // content drives width — enables proper left-to-right scroll
       }}>
         {hand.map((card, i) => {
-          const t = n > 1 ? (i - (n - 1) / 2) / ((n - 1) / 2) : 0;
-          const rotation = t * maxAngle;
           const isSelected = selectedCardId === card.id;
           const isWhot = card.shape === 'whot';
-
           return (
             <div
               key={card.id}
               onClick={() => interactive && onCardClick && onCardClick(card.id)}
               style={{
-                width: 56,
-                height: 80,
+                width: 58,
+                height: 82,
                 flexShrink: 0,
-                marginRight: i < n - 1 ? overlap : 0,
-                transform: `rotate(${rotation}deg)${isSelected ? ' translateY(-16px) scale(1.05)' : ''}`,
-                transformOrigin: 'center 200px',
+                transform: isSelected ? 'translateY(-16px) scale(1.05)' : 'none',
                 zIndex: isSelected ? 100 : i + 1,
                 cursor: interactive ? 'pointer' : 'default',
                 transition: 'transform 0.15s ease',
                 background: 'var(--surface2)',
                 border: `2px solid ${isWhot ? 'var(--accent)' : isSelected ? 'var(--accent)' : 'var(--border)'}`,
-                borderRadius: 6,
+                borderRadius: 8,
                 display: 'flex',
                 flexDirection: 'column',
                 alignItems: 'center',
                 justifyContent: 'center',
-                gap: 3,
+                gap: 4,
                 boxShadow: isSelected
-                  ? '0 4px 16px rgba(0,0,0,0.6)'
+                  ? '0 6px 20px rgba(0,0,0,0.6)'
                   : isWhot
-                    ? '0 0 8px rgba(232,255,74,0.25)'
+                    ? '0 0 8px rgba(232,255,74,0.3)'
                     : 'none',
                 userSelect: 'none',
               }}
             >
-              <div style={{ fontSize: 20, lineHeight: 1 }}>
+              <div style={{ fontSize: 22, lineHeight: 1 }}>
                 {isWhot ? '🃏' : SHAPE_ICONS[card.shape]}
               </div>
               <div style={{
@@ -195,6 +190,92 @@ function CardHand({ hand, selectedCardId, onCardClick, interactive = true }) {
           );
         })}
       </div>
+    </div>
+  );
+}
+
+// ─── Share button ─────────────────────────────────────────────
+function ShareButton({ roomCode, senderName }) {
+  const [showFallback, setShowFallback] = useState(false);
+
+  const message = `Join ${senderName}'s Bluff game! Room code: ${roomCode}`;
+  const url = typeof window !== 'undefined' ? `${window.location.origin}?ref=${roomCode}` : '';
+  const fullText = `${message}\n${url}`;
+
+  const handleShare = async () => {
+    if (typeof navigator !== 'undefined' && navigator.share) {
+      try {
+        await navigator.share({ title: 'Join my Bluff game!', text: message, url });
+        return;
+      } catch (e) {
+        // User dismissed or share failed — fall through to fallback
+        if (e.name === 'AbortError') return;
+      }
+    }
+    setShowFallback(f => !f);
+  };
+
+  const enc = encodeURIComponent;
+  const links = [
+    { label: '💬 WhatsApp', href: `https://wa.me/?text=${enc(fullText)}` },
+    { label: '✈️ Telegram', href: `https://t.me/share/url?url=${enc(url)}&text=${enc(message)}` },
+    { label: '💬 SMS', href: `sms:?body=${enc(fullText)}` },
+    { label: '📧 Email', href: `mailto:?subject=${enc('Join my Bluff game!')}&body=${enc(fullText)}` },
+  ];
+
+  return (
+    <div style={{ position: 'relative', display: 'inline-block' }}>
+      <button
+        onClick={handleShare}
+        style={{
+          fontSize: 11, color: 'var(--accent)',
+          border: '1px solid var(--accent)',
+          background: 'rgba(232,255,74,0.04)',
+          padding: '5px 12px', borderRadius: 4, cursor: 'pointer',
+          letterSpacing: '0.06em',
+        }}
+      >
+        🔗 Share Room
+      </button>
+      {showFallback && (
+        <div style={{
+          position: 'absolute', top: 'calc(100% + 6px)', left: 0,
+          background: 'var(--surface2)', border: '1px solid var(--border)',
+          borderRadius: 6, padding: 8, zIndex: 2000,
+          display: 'flex', flexDirection: 'column', gap: 4, minWidth: 170,
+          boxShadow: '0 4px 20px rgba(0,0,0,0.4)',
+        }}>
+          {links.map(({ label, href }) => (
+            <a
+              key={label}
+              href={href}
+              target="_blank"
+              rel="noreferrer"
+              onClick={() => setShowFallback(false)}
+              style={{
+                display: 'block', padding: '7px 10px',
+                color: 'var(--text)', fontSize: 12,
+                textDecoration: 'none', borderRadius: 4,
+                background: 'transparent',
+              }}
+              onMouseEnter={e => e.currentTarget.style.background = 'var(--surface)'}
+              onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
+            >
+              {label}
+            </a>
+          ))}
+          <button
+            onClick={() => setShowFallback(false)}
+            style={{
+              marginTop: 2, padding: '5px', fontSize: 11,
+              color: 'var(--text-dim)', background: 'none',
+              border: 'none', cursor: 'pointer', textDecoration: 'underline',
+            }}
+          >
+            Cancel
+          </button>
+        </div>
+      )}
     </div>
   );
 }
@@ -215,9 +296,13 @@ export function OnlinePlayerUI({
   startNextRound,
   spectatePlayer,
   leaveGame,
+  acknowledgeSpinResult,
+  spinDismissed,
 }) {
   const [showHowToPlay, setShowHowToPlay] = useState(false);
   const [selectedCardId, setSelectedCardId] = useState(null);
+  // Whot nomination: stores the cardId waiting for a shape to be picked
+  const [whotPickerCard, setWhotPickerCard] = useState(null);
 
   // Spectator state
   const [spectatingId, setSpectatingId] = useState(null);
@@ -261,6 +346,13 @@ export function OnlinePlayerUI({
     const timer = setTimeout(() => setSpinComplete(true), 8000);
     return () => clearTimeout(timer);
   }, [roomState?.lastAction]);
+
+  // When the spin target clicks Continue, spinDismissed fires for everyone → auto-close overlay
+  useEffect(() => {
+    if (spinDismissed && spinData) {
+      setSpinData(null);
+    }
+  }, [spinDismissed]); // eslint-disable-line
 
   // Auto-refresh spectated hand when action changes
   useEffect(() => {
@@ -320,8 +412,15 @@ export function OnlinePlayerUI({
   const handleCardClick = (cardId) => {
     if (!isMyTurn || !isPlaying || cardPlayedThisTurn) return;
     if (selectedCardId === cardId) {
-      playCardOnline(cardId);
-      setSelectedCardId(null);
+      // Second tap — check if it's a Whot card
+      const card = myHand.find(c => c.id === cardId);
+      if (card?.shape === 'whot') {
+        // Show shape picker instead of playing immediately
+        setWhotPickerCard(cardId);
+      } else {
+        playCardOnline(cardId);
+        setSelectedCardId(null);
+      }
     } else {
       setSelectedCardId(cardId);
     }
@@ -350,16 +449,12 @@ export function OnlinePlayerUI({
             onClick={() => navigator.clipboard?.writeText(roomCode)}
             style={{
               fontFamily: "'Bebas Neue', sans-serif",
-              fontSize: 30,
-              letterSpacing: '0.2em',
+              fontSize: 30, letterSpacing: '0.2em',
               color: 'var(--accent)',
               border: '1px solid var(--accent)',
-              padding: '4px 12px',
-              borderRadius: 'var(--radius)',
+              padding: '4px 12px', borderRadius: 'var(--radius)',
               background: 'rgba(232,255,74,0.04)',
-              cursor: 'pointer',
-              display: 'inline-block',
-              lineHeight: 1.2,
+              cursor: 'pointer', display: 'inline-block', lineHeight: 1.2,
             }}
           >
             {roomCode}
@@ -367,6 +462,12 @@ export function OnlinePlayerUI({
           <div style={{ fontSize: 9, color: 'var(--text-dim)', marginTop: 4, letterSpacing: '0.08em' }}>
             Round {roundNumber} · tap to copy
           </div>
+          {/* Share button — available in lobby */}
+          {isLobby && myPlayer && (
+            <div style={{ marginTop: 8 }}>
+              <ShareButton roomCode={roomCode} senderName={myPlayer.username} />
+            </div>
+          )}
         </div>
         <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 5 }}>
           <div style={{ fontFamily: "'Bebas Neue', sans-serif", fontSize: 20, color: isEliminated ? 'var(--accent2)' : 'var(--text)', lineHeight: 1 }}>
@@ -428,10 +529,7 @@ export function OnlinePlayerUI({
       {/* ── Central hub ── */}
       {(isPlaying || isSpinPending || isRoundEnd) && (
         <div className="card" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-around', gap: 16, padding: '20px 16px' }}>
-          {/* Draw pile */}
           <FaceDownStack count={deckSize} label="DRAW" warning={deckSize < 5 && deckSize > 0} />
-
-          {/* Required shape */}
           <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6 }}>
             <div style={{ fontSize: 9, color: 'var(--text-dim)', letterSpacing: '0.12em' }}>REQUIRED</div>
             <CardShape type={currentCardType} size="md" />
@@ -439,8 +537,6 @@ export function OnlinePlayerUI({
               {currentCardType?.toUpperCase()}
             </div>
           </div>
-
-          {/* Played pile */}
           <FaceDownStack count={playedPileSize} label="PLAYED" />
         </div>
       )}
@@ -478,7 +574,7 @@ export function OnlinePlayerUI({
       {/* ── Action log ── */}
       {lastAction && <ActionLog lastAction={lastAction} />}
 
-      {/* ── Risk meter (when alive, not lobby) ── */}
+      {/* ── Risk meter ── */}
       {!isEliminated && !isLobby && (
         <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '8px 14px', background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 'var(--radius)' }}>
           <div style={{ fontSize: 10, color: 'var(--text-dim)', letterSpacing: '0.1em', flexShrink: 0 }}>RISK</div>
@@ -490,9 +586,7 @@ export function OnlinePlayerUI({
         </div>
       )}
 
-      {/* ── Player actions (context sensitive) ── */}
-
-      {/* My turn — playing phase */}
+      {/* ── My turn actions ── */}
       {isMyTurn && isPlaying && !isEliminated && (
         <div className="card" style={{ border: '1px solid var(--warning)' }}>
           <div style={{ fontSize: 10, color: 'var(--warning)', letterSpacing: '0.12em', marginBottom: 14 }}>
@@ -527,24 +621,22 @@ export function OnlinePlayerUI({
         </div>
       )}
 
-      {/* Waiting for someone else */}
+      {/* Waiting for someone else's turn */}
       {!isMyTurn && isPlaying && currentPlayer && !isEliminated && (
         <div style={{
-          padding: '12px 14px',
-          background: 'var(--surface)',
-          border: '1px solid var(--border)',
-          borderRadius: 'var(--radius)',
+          padding: '12px 14px', background: 'var(--surface)',
+          border: '1px solid var(--border)', borderRadius: 'var(--radius)',
           fontSize: 12, color: 'var(--text-dim)',
         }}>
           Waiting for <span style={{ color: 'var(--text)', fontWeight: 700 }}>{currentPlayer.username}</span> to play...
         </div>
       )}
 
-      {/* Spin pending — bluff reveal + spin prompt */}
+      {/* ── Spin pending ── */}
       {isSpinPending && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
 
-          {/* Bluff reveal panel (online auto-resolved bluffs) */}
+          {/* Bluff reveal panel */}
           {lastAction?.autoResolved && lastAction?.accuserName && (
             <div className="card fade-in" style={{
               border: `1px solid ${lastAction.bluffCorrect ? 'var(--alive)' : 'var(--accent2)'}`,
@@ -559,7 +651,6 @@ export function OnlinePlayerUI({
                 <strong style={{ color: 'var(--text)' }}>{lastAction.accusedName}</strong>
               </div>
 
-              {/* Revealed card */}
               {lastAction.revealedCard ? (
                 <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 10 }}>
                   <div style={{ fontSize: 9, color: 'var(--text-dim)', letterSpacing: '0.1em', flexShrink: 0 }}>
@@ -567,10 +658,8 @@ export function OnlinePlayerUI({
                   </div>
                   <div style={{
                     display: 'flex', alignItems: 'center', gap: 6,
-                    padding: '6px 10px',
-                    background: 'var(--surface2)',
-                    border: '1px solid var(--border)',
-                    borderRadius: 4,
+                    padding: '6px 10px', background: 'var(--surface2)',
+                    border: '1px solid var(--border)', borderRadius: 4,
                     fontSize: 13, fontWeight: 700,
                   }}>
                     <span>{lastAction.revealedCard.shape === 'whot' ? '🃏' : SHAPE_ICONS[lastAction.revealedCard.shape]}</span>
@@ -586,7 +675,6 @@ export function OnlinePlayerUI({
                 </div>
               )}
 
-              {/* Verdict */}
               <div style={{
                 fontFamily: "'Bebas Neue', sans-serif",
                 fontSize: 18, letterSpacing: '0.08em',
@@ -625,12 +713,9 @@ export function OnlinePlayerUI({
           {/* Waiting for someone else to spin */}
           {!isMySpinTurn && spinTargetPlayer && (
             <div style={{
-              padding: '14px 16px',
-              background: 'rgba(255,74,110,0.05)',
-              border: '1px solid var(--accent2)',
-              borderRadius: 'var(--radius)',
-              fontSize: 12, color: 'var(--accent2)',
-              textAlign: 'center',
+              padding: '14px 16px', background: 'rgba(255,74,110,0.05)',
+              border: '1px solid var(--accent2)', borderRadius: 'var(--radius)',
+              fontSize: 12, color: 'var(--accent2)', textAlign: 'center',
               animation: 'pulse 1.5s ease-in-out infinite',
             }}>
               🔫 Waiting for <strong>{spinTargetPlayer.username}</strong> to pull the trigger...
@@ -639,7 +724,7 @@ export function OnlinePlayerUI({
         </div>
       )}
 
-      {/* Round end */}
+      {/* ── Round end ── */}
       {isRoundEnd && (
         <div className="card" style={{ textAlign: 'center', border: '1px solid var(--alive)' }}>
           <div style={{ fontFamily: "'Bebas Neue', sans-serif", fontSize: 32, color: 'var(--alive)', marginBottom: 8 }}>
@@ -658,22 +743,19 @@ export function OnlinePlayerUI({
         </div>
       )}
 
-      {/* Game over */}
+      {/* ── Game over ── */}
       {isGameOver && (
         <div className="card" style={{ textAlign: 'center', border: '1px solid var(--accent)' }}>
           <div style={{ fontFamily: "'Bebas Neue', sans-serif", fontSize: 36, color: 'var(--accent)', marginBottom: 8 }}>
             {lastAction?.winnerId === myPlayer.id ? '🎉 You Win!' : `${lastAction?.winnerName ?? '?'} Wins!`}
           </div>
           <div style={{ fontSize: 12, color: 'var(--text-dim)', marginBottom: 16 }}>Game over.</div>
-          <button className="primary" onClick={leaveGame}>
-            🔄 New Game
-          </button>
+          <button className="primary" onClick={leaveGame}>🔄 New Game</button>
         </div>
       )}
 
       {/* ── Card hand or spectator view ── */}
       {showSpectatorView ? (
-        // ── Spectator view ──
         <div className="card">
           <div style={{ fontSize: 10, color: 'var(--text-dim)', letterSpacing: '0.12em', marginBottom: 14 }}>
             👁 SPECTATING
@@ -707,13 +789,10 @@ export function OnlinePlayerUI({
             <div style={{ fontSize: 11, color: 'var(--text-dim)' }}>No cards to show.</div>
           )}
           {!spectatingId && (
-            <div style={{ fontSize: 11, color: 'var(--text-dim)' }}>
-              Select a player above to see their hand.
-            </div>
+            <div style={{ fontSize: 11, color: 'var(--text-dim)' }}>Select a player above to see their hand.</div>
           )}
         </div>
       ) : (
-        // ── Active player hand ──
         !isLobby && !isGameOver && (
           <div>
             <div style={{ fontSize: 10, color: 'var(--text-dim)', letterSpacing: '0.12em', marginBottom: 8, display: 'flex', justifyContent: 'space-between' }}>
@@ -722,7 +801,7 @@ export function OnlinePlayerUI({
             </div>
             {isMyTurn && isPlaying && !cardPlayedThisTurn && selectedCardId && (
               <div style={{ fontSize: 11, color: 'var(--warning)', marginBottom: 6, textAlign: 'center' }}>
-                Tap again to play this card
+                Tap again to play · Whot card will ask for a shape
               </div>
             )}
             <CardHand
@@ -735,7 +814,7 @@ export function OnlinePlayerUI({
         )
       )}
 
-      {/* Leave game — only available in lobby or after game ends */}
+      {/* Leave game — only in lobby or game_over */}
       {(!phase || ['lobby', 'game_over'].includes(phase)) && (
         <button
           onClick={leaveGame}
@@ -786,19 +865,78 @@ export function OnlinePlayerUI({
               <div style={{ fontSize: 12, color: 'var(--text-dim)', marginBottom: 28 }}>
                 Rolled {spinData.roll} — Risk was {spinData.riskLevelBefore}/6
               </div>
-              <button
-                className={isSpinTarget ? 'primary' : undefined}
-                onClick={() => setSpinData(null)}
-                style={!isSpinTarget ? {
-                  fontSize: 12, color: 'var(--text-dim)',
-                  border: '1px solid var(--border)', background: 'none',
-                  padding: '8px 20px', borderRadius: 4, cursor: 'pointer',
-                } : { padding: '10px 32px', fontSize: 14 }}
-              >
-                {isSpinTarget ? 'Continue' : 'Got it'}
-              </button>
+              {isSpinTarget ? (
+                /* Spin target: clicking Continue dismisses everyone's overlay */
+                <button
+                  className="primary"
+                  onClick={acknowledgeSpinResult}
+                  style={{ padding: '10px 32px', fontSize: 14 }}
+                >
+                  Continue
+                </button>
+              ) : (
+                /* All other players: auto-dismissed when spin target clicks Continue */
+                <div style={{ fontSize: 12, color: 'var(--text-dim)', fontStyle: 'italic' }}>
+                  Waiting for {spinData.spinTargetName} to continue...
+                </div>
+              )}
             </div>
           )}
+        </div>
+      )}
+
+      {/* ── Whot shape picker overlay ── */}
+      {whotPickerCard && (
+        <div style={{
+          position: 'fixed', inset: 0,
+          background: 'rgba(0,0,0,0.88)',
+          display: 'flex', flexDirection: 'column',
+          alignItems: 'center', justifyContent: 'center',
+          zIndex: 8500, padding: 24,
+        }}>
+          <div className="card" style={{ maxWidth: 340, width: '100%', textAlign: 'center' }}>
+            <div style={{
+              fontFamily: "'Bebas Neue', sans-serif",
+              fontSize: 22, letterSpacing: '0.12em',
+              color: 'var(--accent)', marginBottom: 6,
+            }}>
+              🃏 WHOT CARD
+            </div>
+            <div style={{ fontSize: 12, color: 'var(--text-dim)', marginBottom: 18 }}>
+              Choose the next required shape:
+            </div>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 10, marginBottom: 16 }}>
+              {SHAPES.map(shape => (
+                <button
+                  key={shape}
+                  onClick={() => {
+                    playCardOnline(whotPickerCard, shape);
+                    setWhotPickerCard(null);
+                    setSelectedCardId(null);
+                  }}
+                  style={{
+                    display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6,
+                    padding: '14px 8px',
+                    background: 'var(--surface2)',
+                    border: '1px solid var(--border)',
+                    borderRadius: 8, cursor: 'pointer', color: 'var(--text)',
+                    transition: 'border-color 0.1s',
+                  }}
+                  onMouseEnter={e => e.currentTarget.style.borderColor = 'var(--accent)'}
+                  onMouseLeave={e => e.currentTarget.style.borderColor = 'var(--border)'}
+                >
+                  <span style={{ fontSize: 26 }}>{SHAPE_ICONS[shape]}</span>
+                  <span style={{ fontSize: 10, letterSpacing: '0.08em', textTransform: 'uppercase', color: 'var(--text-dim)' }}>{shape}</span>
+                </button>
+              ))}
+            </div>
+            <button
+              onClick={() => { setWhotPickerCard(null); setSelectedCardId(null); }}
+              style={{ fontSize: 12, color: 'var(--text-dim)', background: 'none', border: 'none', cursor: 'pointer', textDecoration: 'underline' }}
+            >
+              Cancel
+            </button>
+          </div>
         </div>
       )}
 

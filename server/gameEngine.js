@@ -157,7 +157,9 @@ function advanceTurn(room) {
   room.bluffUsedThisTurn = false;
   room.cardPlayedThisTurn = false;
   room.isFirstTurn = false;
-  room.lastPlayedCard = null;
+  // Do NOT clear lastPlayedCard here — it must persist so the next player can
+  // call bluff on the previous player's card (including Whot cards).
+  // lastPlayedCard is naturally overwritten when the next player plays their card.
   return room;
 }
 
@@ -348,7 +350,9 @@ function resetRoundOnline(room) {
   room.lastPlayedCard = null;
   room.bluffUsedThisTurn = false;
   room.cardPlayedThisTurn = false;
-  room.roundNumber++;
+  // roundNumber was already incremented by declareRoundWinner — do NOT increment again
+  // isFirstTurn must be reset so players cannot call bluff before anyone has played a card
+  room.isFirstTurn = true;
 
   return room;
 }
@@ -356,7 +360,13 @@ function resetRoundOnline(room) {
 // ─── Gun spin ──────────────────────────────────────────────────
 
 function spinGun(player) {
-  const roll = Math.floor(Math.random() * 6) + 1;
+  const r1 = Math.floor(Math.random() * 6) + 1;
+  // At risk ≥ 2 roll a second die and take the lower value — biases the outcome
+  // toward elimination without dramatically changing the feel of risk level 1.
+  const roll = player.riskLevel >= 2
+    ? Math.min(r1, Math.floor(Math.random() * 6) + 1)
+    : r1;
+
   const eliminated = roll <= player.riskLevel;
 
   if (eliminated) {

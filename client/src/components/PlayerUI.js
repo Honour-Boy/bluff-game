@@ -120,6 +120,8 @@ export function PlayerUI({
   endTurn,
   playerSpin,
   leaveGame,
+  acknowledgeSpinResult,
+  spinDismissed,
 }) {
   const [showHowToPlay, setShowHowToPlay] = useState(false);
 
@@ -129,6 +131,13 @@ export function PlayerUI({
   const [spinComplete, setSpinComplete] = useState(false);
   const [cylinderRotation, setCylinderRotation] = useState(0);
   const [cylinderAnimating, setCylinderAnimating] = useState(false);
+
+  // When spin target clicks Continue → spinDismissed fires → auto-close for all players
+  useEffect(() => {
+    if (spinDismissed && spinData) {
+      setSpinData(null);
+    }
+  }, [spinDismissed]); // eslint-disable-line
 
   useEffect(() => {
     const action = roomState?.lastAction;
@@ -525,17 +534,21 @@ export function PlayerUI({
               <div style={{ fontSize: 12, color: 'var(--text-dim)', marginBottom: 28 }}>
                 Rolled {spinData.roll} — Risk was {spinData.riskLevelBefore}/6
               </div>
-              <button
-                className={isSpinTarget ? 'primary' : undefined}
-                onClick={() => setSpinData(null)}
-                style={!isSpinTarget ? {
-                  fontSize: 12, color: 'var(--text-dim)',
-                  border: '1px solid var(--border)', background: 'none',
-                  padding: '8px 20px', borderRadius: 4, cursor: 'pointer',
-                } : { padding: '10px 32px', fontSize: 14 }}
-              >
-                {isSpinTarget ? 'Continue' : 'Got it'}
-              </button>
+              {isSpinTarget ? (
+                /* Spin target: clicking Continue broadcasts dismiss to all players */
+                <button
+                  className="primary"
+                  onClick={acknowledgeSpinResult}
+                  style={{ padding: '10px 32px', fontSize: 14 }}
+                >
+                  Continue
+                </button>
+              ) : (
+                /* Everyone else: auto-dismissed when the spin target clicks Continue */
+                <div style={{ fontSize: 12, color: 'var(--text-dim)', fontStyle: 'italic' }}>
+                  Waiting for {spinData.spinTargetName} to continue...
+                </div>
+              )}
             </div>
           )}
         </div>

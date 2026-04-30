@@ -21,6 +21,8 @@ export function useGame() {
   const [error, setError] = useState(null);
   const [connected, setConnected] = useState(socket.connected);
   const [notification, setNotification] = useState(null);
+  // Shared spin-overlay dismiss signal — set true when spin target acknowledges result
+  const [spinDismissed, setSpinDismissed] = useState(false);
 
   // ─── Show transient notification ──────────────────────────
   const notify = useCallback((msg, type = 'info') => {
@@ -64,6 +66,7 @@ export function useGame() {
     const onDisconnect = () => setConnected(false);
     const onRoomState = (state) => setRoomState(state);
     const onBluffCalled = () => notify('⚠️ Bluff called! Host: reveal the last card.', 'warning');
+    const onSpinAcknowledged = () => setSpinDismissed(true);
 
     // Host lost connection — show countdown warning to all players
     const onHostDisconnecting = ({ countdown } = {}) => {
@@ -80,6 +83,7 @@ export function useGame() {
     socket.on('disconnect', onDisconnect);
     socket.on('room_state', onRoomState);
     socket.on('bluff_called', onBluffCalled);
+    socket.on('spin_acknowledged', onSpinAcknowledged);
     socket.on('host_disconnecting', onHostDisconnecting);
     socket.on('game_ended', onGameEnded);
 
@@ -88,6 +92,7 @@ export function useGame() {
       socket.off('disconnect', onDisconnect);
       socket.off('room_state', onRoomState);
       socket.off('bluff_called', onBluffCalled);
+      socket.off('spin_acknowledged', onSpinAcknowledged);
       socket.off('host_disconnecting', onHostDisconnecting);
       socket.off('game_ended', onGameEnded);
     };
@@ -182,10 +187,17 @@ export function useGame() {
   }, [socket, roomCode, playerId]);
 
   const playerSpin = useCallback(() => {
+    setSpinDismissed(false); // reset dismiss state before a new spin
     socket.emit('player_spin', { roomCode, playerId }, (res) => {
       if (!res.success) setError(res.error);
     });
   }, [socket, roomCode, playerId]);
+
+  // Spin target calls this after clicking Continue — dismisses overlay for all clients
+  const acknowledgeSpinResult = useCallback(() => {
+    socket.emit('spin_acknowledged', { roomCode });
+    setSpinDismissed(true);
+  }, [socket, roomCode]);
 
   const declareRoundWin = useCallback((winnerPlayerId) => {
     socket.emit('round_win', { roomCode, playerId: winnerPlayerId }, (res) => {
@@ -241,6 +253,7 @@ export function useGame() {
     error,
     connected,
     notification,
+    spinDismissed,
     // Actions
     createRoom,
     joinRoom,
@@ -250,6 +263,7 @@ export function useGame() {
     playCard,
     endTurn,
     playerSpin,
+    acknowledgeSpinResult,
     declareRoundWin,
     callBluff,
     playCardOnline,

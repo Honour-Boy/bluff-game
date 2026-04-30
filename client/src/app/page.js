@@ -19,6 +19,7 @@ export default function Home() {
     playCard, endTurn, playerSpin,
     declareRoundWin, callBluff,
     playCardOnline, startNextRound, spectatePlayer,
+    acknowledgeSpinResult, spinDismissed,
     leaveGame, setError,
   } = game;
 
@@ -59,6 +60,8 @@ export default function Home() {
           startNextRound={startNextRound}
           spectatePlayer={spectatePlayer}
           leaveGame={leaveGame}
+          acknowledgeSpinResult={acknowledgeSpinResult}
+          spinDismissed={spinDismissed}
         />
       );
     }
@@ -71,6 +74,8 @@ export default function Home() {
         resolveBluff={resolveBluff}
         declareRoundWin={declareRoundWin}
         leaveGame={leaveGame}
+        acknowledgeSpinResult={acknowledgeSpinResult}
+        spinDismissed={spinDismissed}
       />
     );
   }
@@ -91,6 +96,8 @@ export default function Home() {
           startNextRound={startNextRound}
           spectatePlayer={spectatePlayer}
           leaveGame={leaveGame}
+          acknowledgeSpinResult={acknowledgeSpinResult}
+          spinDismissed={spinDismissed}
         />
       );
     }
@@ -105,6 +112,8 @@ export default function Home() {
         endTurn={endTurn}
         playerSpin={playerSpin}
         leaveGame={leaveGame}
+        acknowledgeSpinResult={acknowledgeSpinResult}
+        spinDismissed={spinDismissed}
       />
     );
   }
