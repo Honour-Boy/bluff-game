@@ -4,17 +4,14 @@ export const metadata = {
   metadataBase: new URL(
     process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'
   ),
-
   title: 'BLUFF - Real-Time Multiplayer Card Game',
   description:
     'Challenge your friends in BLUFF — a fast-paced real-time multiplayer card game of deception, strategy, and nerve.',
-
   icons: {
     icon: '/images/logo.png',
     shortcut: '/images/logo.png',
     apple: '/images/logo.png',
   },
-
   openGraph: {
     title: 'BLUFF — Bluff, Bet, Survive',
     description:
@@ -33,3 +30,12 @@ export const metadata = {
     type: 'website',
   },
 };
+
+// ✅ This was missing — required by Next.js App Router
+export default function RootLayout({ children }) {
+  return (
+    <html lang="en">
+      <body>{children}</body>
+    </html>
+  );
+}
