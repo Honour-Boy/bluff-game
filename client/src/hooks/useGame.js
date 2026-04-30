@@ -22,7 +22,6 @@ export function useGame() {
   const [connected, setConnected] = useState(socket.connected);
   const [notification, setNotification] = useState(null);
 
-  // Track if we've attempted reconnect this session
   const reconnectAttempted = useRef(false);
 
   // ─── Show transient notification ──────────────────────────
@@ -51,13 +50,11 @@ export function useGame() {
       setConnected(true);
       setError(null);
 
-      // Attempt reconnect on re-connect events
       if (!reconnectAttempted.current) {
         reconnectAttempted.current = true;
-        return; // first connect — skip reconnect logic
+        return;
       }
 
-      // Re-connection after drop: restore state
       const savedCode = localStorage.getItem(LS_ROOM_CODE);
       const savedPlayerId = localStorage.getItem(LS_PLAYER_ID);
       const savedIsHost = localStorage.getItem(LS_IS_HOST) === 'true';
@@ -74,17 +71,9 @@ export function useGame() {
     };
 
     const onDisconnect = () => setConnected(false);
-
     const onRoomState = (state) => setRoomState(state);
-
-    const onHostDisconnected = () => {
-      notify('Host disconnected. Game paused.', 'error');
-    };
-
-    const onBluffCalled = ({ callerId }) => {
-      // Only relevant for host — but broadcast so everyone sees
-      notify('⚠️ Bluff called! Host: reveal the last 3 cards.', 'warning');
-    };
+    const onHostDisconnected = () => notify('Host disconnected. Game paused.', 'error');
+    const onBluffCalled = () => notify('⚠️ Bluff called! Host: reveal the last card.', 'warning');
 
     socket.on('connect', onConnect);
     socket.on('disconnect', onDisconnect);
@@ -115,10 +104,7 @@ export function useGame() {
       if (socket.connected) {
         if (savedIsHost) {
           socket.emit('host_reconnect', { roomCode: savedCode }, (res) => {
-            if (!res.success) {
-              // Room expired, clear storage
-              clearSession();
-            }
+            if (!res.success) clearSession();
           });
         } else if (savedPlayerId) {
           socket.emit('player_reconnect', { roomCode: savedCode, playerId: savedPlayerId }, (res) => {
@@ -141,14 +127,27 @@ export function useGame() {
 
   // ─── Actions ──────────────────────────────────────────────
 
-  const createRoom = useCallback(() => {
-    socket.emit('create_room', {}, (res) => {
+  /**
+   * Create a room. In online mode, also joins as a player so the host has a playerId.
+   */
+  const createRoom = useCallback((mode = 'physical', username = '') => {
+    socket.emit('create_room', { mode }, (res) => {
       if (res.success) {
         setRoomCode(res.roomCode);
         setIsHost(true);
         localStorage.setItem(LS_ROOM_CODE, res.roomCode);
         localStorage.setItem(LS_IS_HOST, 'true');
         localStorage.removeItem(LS_PLAYER_ID);
+
+        // Online: also join as a player so the host participates in the game
+        if (mode === 'online' && username.trim()) {
+          socket.emit('join_room', { roomCode: res.roomCode, username: username.trim() }, (joinRes) => {
+            if (joinRes.success) {
+              setPlayerId(joinRes.playerId);
+              localStorage.setItem(LS_PLAYER_ID, joinRes.playerId);
+            }
+          });
+        }
       } else {
         setError(res.error);
       }
@@ -219,14 +218,34 @@ export function useGame() {
     });
   }, [socket, roomCode, playerId]);
 
+  const playCardOnline = useCallback((cardId, nominatedShape) => {
+    socket.emit('play_card_online', { roomCode, playerId, cardId, nominatedShape }, (res) => {
+      if (!res.success) setError(res.error);
+    });
+  }, [socket, roomCode, playerId]);
+
+  const startNextRound = useCallback(() => {
+    socket.emit('start_next_round', { roomCode }, (res) => {
+      if (!res.success) setError(res.error);
+    });
+  }, [socket, roomCode]);
+
+  const spectatePlayer = useCallback((targetPlayerId, callback) => {
+    socket.emit('spectate_player', { roomCode, targetPlayerId }, (res) => {
+      if (res.success) callback(res);
+      else setError(res.error);
+    });
+  }, [socket, roomCode]);
+
   const leaveGame = useCallback(() => {
     clearSession();
   }, []);
 
-  // Derived: my player object
+  // Derived state
   const myPlayer = roomState?.players?.find(p => p.id === playerId) || null;
   const isMyTurn = roomState?.currentPlayerId === playerId;
   const currentPlayer = roomState?.players?.find(p => p.id === roomState?.currentPlayerId) || null;
+  const gameMode = roomState?.mode || null;
 
   return {
     // State
@@ -237,6 +256,7 @@ export function useGame() {
     myPlayer,
     isMyTurn,
     currentPlayer,
+    gameMode,
     error,
     connected,
     notification,
@@ -251,6 +271,9 @@ export function useGame() {
     playerSpin,
     declareRoundWin,
     callBluff,
+    playCardOnline,
+    startNextRound,
+    spectatePlayer,
     leaveGame,
     setError,
   };

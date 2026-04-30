@@ -12,8 +12,14 @@ export function ActionLog({ lastAction }) {
       bluffCorrect
         ? `✅ Bluff was CORRECT — ${spinTargetName} spun, rolled ${roll}, ${eliminated ? 'ELIMINATED' : 'survived'}`
         : `❌ Bluff was WRONG — ${spinTargetName} (accuser) spun, rolled ${roll}, ${eliminated ? 'ELIMINATED' : 'survived'}`,
-    bluff_called: ({ callerId }) => `⚠️ Bluff called! Host: reveal the last 3 cards physically.`,
-    round_win: ({ winnerName }) => `🏆 ${winnerName} finished all 5 cards — Round Winner! Others reshuffle.`,
+    bluff_called: ({ callerId }) => `⚠️ Bluff called! Host: reveal the last card played.`,
+    spin_result: ({ spinTargetName, eliminated, roll, riskLevelBefore }) =>
+      eliminated
+        ? `💀 ${spinTargetName} rolled ${roll} (risk ${riskLevelBefore}/6) — ELIMINATED`
+        : `😮‍💨 ${spinTargetName} rolled ${roll} (risk ${riskLevelBefore}/6) — SURVIVED`,
+    card_played_online: ({ card }) =>
+      card ? `🃏 Card played (${card.shape === 'whot' ? 'WHOT' : card.shape} ${card.number})` : '🃏 Card played.',
+    round_win: ({ winnerName }) => `🏆 ${winnerName} won the round! All players redealt.`,
     game_over: ({ winnerName }) => `🎉 GAME OVER — ${winnerName} is the last player standing!`,
     continued: ({ playerId }) => `→ Player continued their turn.`,
     disconnected: ({ playerName }) => `🔌 ${playerName} disconnected — eliminated.`,
@@ -26,8 +32,10 @@ export function ActionLog({ lastAction }) {
 
   const colors = {
     spin: lastAction.eliminated ? 'var(--accent2)' : 'var(--alive)',
+    spin_result: lastAction.eliminated ? 'var(--accent2)' : 'var(--alive)',
     bluff_resolved: lastAction.bluffCorrect ? 'var(--alive)' : 'var(--accent2)',
     bluff_called: 'var(--warning)',
+    card_played_online: 'var(--text-dim)',
     round_win: 'var(--accent)',
     game_over: 'var(--accent)',
     continued: 'var(--text-dim)',

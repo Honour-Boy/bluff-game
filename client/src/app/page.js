@@ -4,6 +4,7 @@ import { useGame } from '../hooks/useGame';
 import { LandingScreen } from '../components/LandingScreen';
 import { HostUI } from '../components/HostUI';
 import { PlayerUI } from '../components/PlayerUI';
+import { OnlinePlayerUI } from '../components/OnlinePlayerUI';
 import { Notification } from '../components/Notification';
 
 export default function Home() {
@@ -12,15 +13,15 @@ export default function Home() {
   const {
     roomCode, isHost, playerId,
     roomState, myPlayer, isMyTurn, currentPlayer,
-    error, connected, notification,
+    gameMode, error, connected, notification,
     createRoom, joinRoom, startGame,
     nextTurn, resolveBluff,
     playCard, endTurn, playerSpin,
     declareRoundWin, callBluff,
+    playCardOnline, startNextRound, spectatePlayer,
     leaveGame, setError,
   } = game;
 
-  // Wrapper for layout
   const wrap = (children) => (
     <div style={{ minHeight: '100vh', padding: '24px 16px' }}>
       <Notification notification={notification} />
@@ -28,7 +29,6 @@ export default function Home() {
     </div>
   );
 
-  // Not in a room yet → landing
   if (!roomCode) {
     return wrap(
       <LandingScreen
@@ -43,6 +43,24 @@ export default function Home() {
 
   // In a room as host
   if (isHost) {
+    if (gameMode === 'online') {
+      return wrap(
+        <OnlinePlayerUI
+          roomCode={roomCode}
+          roomState={roomState}
+          myPlayer={myPlayer}
+          isMyTurn={isMyTurn}
+          isHost={true}
+          playCardOnline={playCardOnline}
+          callBluff={callBluff}
+          endTurn={endTurn}
+          playerSpin={playerSpin}
+          startNextRound={startNextRound}
+          spectatePlayer={spectatePlayer}
+          leaveGame={leaveGame}
+        />
+      );
+    }
     return wrap(
       <HostUI
         roomCode={roomCode}
@@ -58,6 +76,23 @@ export default function Home() {
 
   // In a room as player
   if (playerId) {
+    if (gameMode === 'online') {
+      return wrap(
+        <OnlinePlayerUI
+          roomCode={roomCode}
+          roomState={roomState}
+          myPlayer={myPlayer}
+          isMyTurn={isMyTurn}
+          playCardOnline={playCardOnline}
+          callBluff={callBluff}
+          endTurn={endTurn}
+          playerSpin={playerSpin}
+          startNextRound={startNextRound}
+          spectatePlayer={spectatePlayer}
+          leaveGame={leaveGame}
+        />
+      );
+    }
     return wrap(
       <PlayerUI
         roomCode={roomCode}
@@ -73,7 +108,6 @@ export default function Home() {
     );
   }
 
-  // Fallback: loading state
   return wrap(
     <div style={{ textAlign: 'center', padding: 60, color: 'var(--text-dim)' }}>
       Loading...
