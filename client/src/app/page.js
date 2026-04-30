@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { Suspense } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { useAuth } from '../hooks/useAuth';
 import { useGame } from '../hooks/useGame';
@@ -11,7 +11,8 @@ import { PlayerUI } from '../components/PlayerUI';
 import { OnlinePlayerUI } from '../components/OnlinePlayerUI';
 import { Notification } from '../components/Notification';
 
-export default function Home() {
+// Inner component that safely calls useSearchParams inside a Suspense boundary
+function HomeContent() {
   const searchParams = useSearchParams();
   const initialJoinCode = searchParams.get('join') || null;
 
@@ -176,5 +177,29 @@ export default function Home() {
     <div style={{ textAlign: 'center', padding: 60, color: 'var(--text-dim)' }}>
       Loading...
     </div>
+  );
+}
+
+// Loading fallback shown while useSearchParams resolves
+function PageLoading() {
+  return (
+    <div style={{
+      minHeight: '100vh', display: 'flex',
+      alignItems: 'center', justifyContent: 'center',
+      flexDirection: 'column', gap: 16,
+    }}>
+      <div style={{ fontFamily: "'Bebas Neue', sans-serif", fontSize: 64, color: 'var(--accent)', lineHeight: 1 }}>
+        BLUFF
+      </div>
+      <div style={{ fontSize: 11, color: 'var(--text-dim)', letterSpacing: '0.15em' }}>Loading...</div>
+    </div>
+  );
+}
+
+export default function Home() {
+  return (
+    <Suspense fallback={<PageLoading />}>
+      <HomeContent />
+    </Suspense>
   );
 }

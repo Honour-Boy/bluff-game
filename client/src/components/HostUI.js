@@ -7,18 +7,6 @@ import { PlayerList } from './PlayerList';
 import { ActionLog } from './ActionLog';
 import { HowToPlayModal } from './HowToPlayModal';
 
-// Seeded shuffle — same algorithm as PlayerUI for consistent chamber layout
-function seededShuffle(arr, seed) {
-  const a = [...arr];
-  let s = seed;
-  for (let i = a.length - 1; i > 0; i--) {
-    s = (s * 1664525 + 1013904223) & 0xffffffff;
-    const j = Math.abs(s) % (i + 1);
-    [a[i], a[j]] = [a[j], a[i]];
-  }
-  return a;
-}
-
 const CYL = 200, CX = 100, CY = 100, ORBIT = 58, CHAM_R = 20;
 
 function CylinderSVG({ bulletChambers, landingChamberIndex, rotation, animating, spinComplete }) {
@@ -76,7 +64,7 @@ function CylinderSVG({ bulletChambers, landingChamberIndex, rotation, animating,
 function ShareButton({ roomCode }) {
   const [showFallback, setShowFallback] = useState(false);
   const message = `Join my Bluff game! Room code: ${roomCode}`;
-  const url = typeof window !== 'undefined' ? `${window.location.origin}?ref=${roomCode}` : '';
+  const url = typeof window !== 'undefined' ? `${window.location.origin}?join=${roomCode}` : '';
   const fullText = `${message}\n${url}`;
 
   const handleShare = async () => {
@@ -191,22 +179,22 @@ export function HostUI({
     }
 
     if (action.type !== 'spin_result') return;
-    const actionKey = `${action.spinTargetId}:${action.roll}`;
+    const actionKey = `${action.spinTargetId}:${JSON.stringify(action.chamber)}`;
     if (lastSpinKeyRef.current === actionKey) return;
     lastSpinKeyRef.current = actionKey;
 
-    const { roll, eliminated, spinTargetName, spinTargetId: targetId, riskLevelBefore } = action;
-    const landingChamberIndex = (roll - 1) % 6;
-    // Correct formula: finalAngle = 10*360 - landingChamberIndex*60
+    const { spinIndex, eliminated, spinTargetName, spinTargetId: targetId, chamber } = action;
+    const landingChamberIndex = spinIndex ?? 0;
+    // Chamber i starts at (i*60 - 90)°. To land at top pointer: finalAngle = 10*360 - spinIndex*60
     const finalAngle = 10 * 360 - landingChamberIndex * 60;
-    const safeRiskBefore = riskLevelBefore ?? 1;
-    const shuffled = seededShuffle([0, 1, 2, 3, 4, 5], roll);
-    const bulletChambers = new Set(shuffled.slice(0, safeRiskBefore));
+    const bulletChambers = new Set(
+      (chamber || []).map((v, i) => v === 'bullet' ? i : -1).filter(i => i !== -1)
+    );
 
     setCylinderRotation(0);
     setCylinderAnimating(false);
     setSpinComplete(false);
-    setSpinData({ roll, eliminated, spinTargetName, spinTargetId: targetId, riskLevelBefore: safeRiskBefore, bulletChambers, landingChamberIndex, finalAngle });
+    setSpinData({ spinIndex: landingChamberIndex, eliminated, spinTargetName, spinTargetId: targetId, bulletChambers, landingChamberIndex, finalAngle });
 
     requestAnimationFrame(() => {
       requestAnimationFrame(() => {
@@ -628,7 +616,7 @@ export function HostUI({
                 {spinData.eliminated ? '💀 ELIMINATED' : '😮‍💨 SURVIVED'}
               </div>
               <div style={{ fontSize: 12, color: 'var(--text-dim)', marginBottom: 28 }}>
-                Rolled {spinData.roll} — Risk was {spinData.riskLevelBefore}/6
+                Chamber {spinData.landingChamberIndex + 1} · {spinData.eliminated ? 'bullet found' : 'empty'}
               </div>
               {/* Host clicks Continue → broadcasts overlay dismiss to all players */}
               <button
