@@ -5,7 +5,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { CardShape } from './CardShape';
 import { ShapeIcon } from './ShapeIcon';
-import { RiskMeter } from './RiskMeter';
+
 import { ActionLog } from './ActionLog';
 import { HowToPlayModal } from './HowToPlayModal';
 
@@ -386,21 +386,28 @@ export function PlayerUI({
           </div>
 
           {!isEliminated && (
-            <div>
-              <div style={{ fontSize: 10, color: 'var(--text-dim)', letterSpacing: '0.12em', marginBottom: 8 }}>
-                RISK LEVEL
-              </div>
-              <RiskMeter riskLevel={myPlayer.riskLevel} size="md" />
-              <div style={{ fontSize: 10, color: 'var(--text-dim)', marginTop: 6 }}>
-                {myPlayer.riskLevel === 1 && 'Low risk'}
-                {myPlayer.riskLevel === 2 && 'Building up...'}
-                {myPlayer.riskLevel === 3 && 'Getting risky'}
-                {myPlayer.riskLevel === 4 && 'High stakes!'}
-                {myPlayer.riskLevel === 5 && '⚠️ Danger zone!'}
-                {myPlayer.riskLevel === 6 && '💀 Maximum risk!'}
-              </div>
-            </div>
-          )}
+  <div>
+    <div style={{ fontSize: 10, color: 'var(--text-dim)', letterSpacing: '0.12em', marginBottom: 8 }}>
+      CHAMBER
+    </div>
+    <div style={{ display: 'flex', gap: 5, marginBottom: 6 }}>
+      {Array.from({ length: 6 }).map((_, i) => {
+        const isBullet = myPlayer.chamber?.[i] === 'bullet';
+        return (
+          <div key={i} style={{
+            width: 16, height: 16, borderRadius: '50%',
+            background: isBullet ? 'var(--accent2)' : 'var(--surface2)',
+            border: `1.5px solid ${isBullet ? 'var(--accent2)' : 'var(--border)'}`,
+            boxShadow: isBullet ? '0 0 6px rgba(255,74,110,0.5)' : 'none',
+          }} />
+        );
+      })}
+    </div>
+    <div style={{ fontSize: 10, color: 'var(--text-dim)' }}>
+      {myPlayer.chamber?.filter(s => s === 'bullet').length ?? 1}/6 bullets loaded
+    </div>
+  </div>
+)}
         </div>
       </div>
 
@@ -571,11 +578,22 @@ export function PlayerUI({
                   )}
                 </div>
                 <div style={{ flexShrink: 0 }}>
-                  {alive
-                    ? <RiskMeter riskLevel={p.riskLevel} size="sm" />
-                    : <span style={{ fontSize: 9, color: 'var(--accent2)', letterSpacing: '0.1em' }}>OUT</span>
-                  }
-                </div>
+  {alive
+    ? <div style={{ display: 'flex', gap: 3 }}>
+        {Array.from({ length: 6 }).map((_, i) => {
+          const isBullet = p.chamber?.[i] === 'bullet';
+          return (
+            <div key={i} style={{
+              width: 8, height: 8, borderRadius: '50%',
+              background: isBullet ? 'var(--accent2)' : 'var(--surface2)',
+              border: `1px solid ${isBullet ? 'var(--accent2)' : 'var(--border)'}`,
+            }} />
+          );
+        })}
+      </div>
+    : <span style={{ fontSize: 9, color: 'var(--accent2)', letterSpacing: '0.1em' }}>OUT</span>
+  }
+</div>
               </div>
             );
           })}
