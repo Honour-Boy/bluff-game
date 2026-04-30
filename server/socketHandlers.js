@@ -318,8 +318,8 @@ function registerSocketHandlers(io, socket) {
       room.bluffUsedThisTurn = true;
 
       if (room.mode === engine.MODES.ONLINE) {
-        // Auto-resolve: server checks if the last card played was valid
-        const { bluffIsCorrect, spinTarget } = engine.resolveBluffOnline(room);
+        // Auto-resolve: server reveals the card and decides who spins
+        const { bluffIsCorrect, spinTarget, revealedCard, accuser, accused } = engine.resolveBluffOnline(room);
 
         room.phase = 'spin_pending';
         room.spinTargetId = spinTarget.id;
@@ -329,9 +329,15 @@ function registerSocketHandlers(io, socket) {
           spinTargetName: spinTarget.username,
           bluffCorrect: bluffIsCorrect,
           autoResolved: true,
+          // Full bluff reveal context so clients can show the result
+          accuserId: accuser?.id,
+          accuserName: accuser?.username,
+          accusedId: accused?.id,
+          accusedName: accused?.username,
+          revealedCard: revealedCard || null,
         };
 
-        console.log(`[Room ${code}] Online bluff auto-resolved. ${spinTarget.username} must spin.`);
+        console.log(`[Room ${code}] Online bluff: ${accuser?.username} called on ${accused?.username}, revealed ${revealedCard?.shape ?? 'nothing'}, correct=${bluffIsCorrect}. ${spinTarget.username} spins.`);
       } else {
         // Physical: host resolves manually
         room.phase = 'bluff_resolution';
@@ -381,14 +387,13 @@ function registerSocketHandlers(io, socket) {
       if (playerId !== currentPlayerId) return callback({ success: false, error: 'Not your turn' });
       if (room.phase !== 'playing') return callback({ success: false, error: 'Cannot play card now' });
 
-      const result = engine.validateAndPlayCard(room, playerId, cardId, nominatedShape);
+      const result = engine.validateAndPlayCard(room, playerId, cardId);
       if (!result.ok) return callback({ success: false, error: result.error });
 
       room.lastAction = {
         type: 'card_played_online',
         playerId,
-        card: result.card,
-        newCardType: room.currentCardType,
+        // Card details hidden from broadcast — only visible via spectate or bluff reveal
       };
 
       await saveRoom(room);
@@ -507,6 +512,14 @@ function registerSocketHandlers(io, socket) {
             if (eliminated) {
               console.log(`[Room ${code}] Player ${eliminated.username} grace period expired → eliminated`);
               room.lastAction = { type: 'disconnected', playerId: eliminated.id, playerName: eliminated.username };
+
+              // Auto-end game if only one player remains after disconnect
+              const gameOverWinner = engine.checkGameOver(room);
+              if (gameOverWinner) {
+                room.phase = 'game_over';
+                room.lastAction = { type: 'game_over', winnerId: gameOverWinner.id, winnerName: gameOverWinner.username };
+              }
+
               await saveRoom(room);
               await broadcastRoomState(io, code);
             }

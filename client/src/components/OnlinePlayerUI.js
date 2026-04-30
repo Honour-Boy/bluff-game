@@ -132,64 +132,69 @@ function CardHand({ hand, selectedCardId, onCardClick, interactive = true }) {
   const overlap = n > 1 ? Math.max(-32, -56 + Math.floor(320 / n)) : 0;
 
   return (
-    <div style={{
-      display: 'flex',
-      justifyContent: 'center',
-      alignItems: 'flex-end',
-      height: 130,
-      paddingBottom: 8,
-      overflow: 'hidden',
-    }}>
-      {hand.map((card, i) => {
-        const t = n > 1 ? (i - (n - 1) / 2) / ((n - 1) / 2) : 0;
-        const rotation = t * maxAngle;
-        const isSelected = selectedCardId === card.id;
-        const isWhot = card.shape === 'whot';
+    // Outer div scrolls horizontally when cards overflow the screen width
+    <div style={{ overflowX: 'auto', WebkitOverflowScrolling: 'touch', paddingBottom: 4 }}>
+      <div style={{
+        display: 'inline-flex',    // shrink-wraps to card content width
+        minWidth: '100%',          // but fills full width when cards are few (enables centering)
+        justifyContent: 'center',
+        alignItems: 'flex-end',
+        height: 130,
+        paddingBottom: 8,
+        paddingLeft: 8,
+        paddingRight: 8,
+      }}>
+        {hand.map((card, i) => {
+          const t = n > 1 ? (i - (n - 1) / 2) / ((n - 1) / 2) : 0;
+          const rotation = t * maxAngle;
+          const isSelected = selectedCardId === card.id;
+          const isWhot = card.shape === 'whot';
 
-        return (
-          <div
-            key={card.id}
-            onClick={() => interactive && onCardClick && onCardClick(card.id)}
-            style={{
-              width: 56,
-              height: 80,
-              flexShrink: 0,
-              marginRight: i < n - 1 ? overlap : 0,
-              transform: `rotate(${rotation}deg)${isSelected ? ' translateY(-16px) scale(1.05)' : ''}`,
-              transformOrigin: 'center 200px',
-              zIndex: isSelected ? 100 : i + 1,
-              cursor: interactive ? 'pointer' : 'default',
-              transition: 'transform 0.15s ease',
-              background: 'var(--surface2)',
-              border: `2px solid ${isWhot ? 'var(--accent)' : isSelected ? 'var(--accent)' : 'var(--border)'}`,
-              borderRadius: 6,
-              display: 'flex',
-              flexDirection: 'column',
-              alignItems: 'center',
-              justifyContent: 'center',
-              gap: 3,
-              boxShadow: isSelected
-                ? '0 4px 16px rgba(0,0,0,0.6)'
-                : isWhot
-                  ? '0 0 8px rgba(232,255,74,0.25)'
-                  : 'none',
-              userSelect: 'none',
-            }}
-          >
-            <div style={{ fontSize: 20, lineHeight: 1 }}>
-              {isWhot ? '🃏' : SHAPE_ICONS[card.shape]}
+          return (
+            <div
+              key={card.id}
+              onClick={() => interactive && onCardClick && onCardClick(card.id)}
+              style={{
+                width: 56,
+                height: 80,
+                flexShrink: 0,
+                marginRight: i < n - 1 ? overlap : 0,
+                transform: `rotate(${rotation}deg)${isSelected ? ' translateY(-16px) scale(1.05)' : ''}`,
+                transformOrigin: 'center 200px',
+                zIndex: isSelected ? 100 : i + 1,
+                cursor: interactive ? 'pointer' : 'default',
+                transition: 'transform 0.15s ease',
+                background: 'var(--surface2)',
+                border: `2px solid ${isWhot ? 'var(--accent)' : isSelected ? 'var(--accent)' : 'var(--border)'}`,
+                borderRadius: 6,
+                display: 'flex',
+                flexDirection: 'column',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: 3,
+                boxShadow: isSelected
+                  ? '0 4px 16px rgba(0,0,0,0.6)'
+                  : isWhot
+                    ? '0 0 8px rgba(232,255,74,0.25)'
+                    : 'none',
+                userSelect: 'none',
+              }}
+            >
+              <div style={{ fontSize: 20, lineHeight: 1 }}>
+                {isWhot ? '🃏' : SHAPE_ICONS[card.shape]}
+              </div>
+              <div style={{
+                fontSize: 10,
+                color: isWhot ? 'var(--accent)' : 'var(--text-dim)',
+                fontWeight: 700,
+                letterSpacing: '0.05em',
+              }}>
+                {isWhot ? 'WHOT' : card.number}
+              </div>
             </div>
-            <div style={{
-              fontSize: 10,
-              color: isWhot ? 'var(--accent)' : 'var(--text-dim)',
-              fontWeight: 700,
-              letterSpacing: '0.05em',
-            }}>
-              {isWhot ? 'WHOT' : card.number}
-            </div>
-          </div>
-        );
-      })}
+          );
+        })}
+      </div>
     </div>
   );
 }
@@ -535,37 +540,102 @@ export function OnlinePlayerUI({
         </div>
       )}
 
-      {/* Spin pending — my spin */}
-      {isMySpinTurn && !isEliminated && (
-        <div className="card" style={{ border: '1px solid var(--accent2)', textAlign: 'center' }}>
-          <div style={{ fontSize: 10, color: 'var(--accent2)', letterSpacing: '0.12em', marginBottom: 14 }}>
-            YOUR FATE AWAITS
-          </div>
-          <button
-            className="danger"
-            onClick={playerSpin}
-            style={{ width: '100%', fontSize: 16, padding: '14px' }}
-          >
-            🔫 Pull the Trigger
-          </button>
-          <div style={{ fontSize: 11, color: 'var(--text-dim)', marginTop: 12 }}>
-            You must spin. Tap to reveal your fate.
-          </div>
-        </div>
-      )}
+      {/* Spin pending — bluff reveal + spin prompt */}
+      {isSpinPending && (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
 
-      {/* Spin pending — waiting for someone else */}
-      {isSpinPending && !isMySpinTurn && spinTargetPlayer && (
-        <div style={{
-          padding: '14px 16px',
-          background: 'rgba(255,74,110,0.05)',
-          border: '1px solid var(--accent2)',
-          borderRadius: 'var(--radius)',
-          fontSize: 12, color: 'var(--accent2)',
-          textAlign: 'center',
-          animation: 'pulse 1.5s ease-in-out infinite',
-        }}>
-          🔫 Waiting for <strong>{spinTargetPlayer.username}</strong> to pull the trigger...
+          {/* Bluff reveal panel (online auto-resolved bluffs) */}
+          {lastAction?.autoResolved && lastAction?.accuserName && (
+            <div className="card fade-in" style={{
+              border: `1px solid ${lastAction.bluffCorrect ? 'var(--alive)' : 'var(--accent2)'}`,
+              background: lastAction.bluffCorrect ? 'rgba(74,255,128,0.04)' : 'rgba(255,74,110,0.04)',
+            }}>
+              <div style={{ fontSize: 10, color: 'var(--text-dim)', letterSpacing: '0.12em', marginBottom: 10 }}>
+                BLUFF CALLED
+              </div>
+              <div style={{ fontSize: 13, marginBottom: 8 }}>
+                <strong style={{ color: 'var(--text)' }}>{lastAction.accuserName}</strong>
+                {' '}called bluff on{' '}
+                <strong style={{ color: 'var(--text)' }}>{lastAction.accusedName}</strong>
+              </div>
+
+              {/* Revealed card */}
+              {lastAction.revealedCard ? (
+                <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 10 }}>
+                  <div style={{ fontSize: 9, color: 'var(--text-dim)', letterSpacing: '0.1em', flexShrink: 0 }}>
+                    CARD REVEALED:
+                  </div>
+                  <div style={{
+                    display: 'flex', alignItems: 'center', gap: 6,
+                    padding: '6px 10px',
+                    background: 'var(--surface2)',
+                    border: '1px solid var(--border)',
+                    borderRadius: 4,
+                    fontSize: 13, fontWeight: 700,
+                  }}>
+                    <span>{lastAction.revealedCard.shape === 'whot' ? '🃏' : SHAPE_ICONS[lastAction.revealedCard.shape]}</span>
+                    <span style={{ color: 'var(--text)', textTransform: 'capitalize' }}>
+                      {lastAction.revealedCard.shape === 'whot' ? 'WHOT' : lastAction.revealedCard.shape}
+                    </span>
+                    <span style={{ color: 'var(--text-dim)', fontSize: 11 }}>{lastAction.revealedCard.number}</span>
+                  </div>
+                </div>
+              ) : (
+                <div style={{ fontSize: 12, color: 'var(--text-dim)', marginBottom: 10 }}>
+                  No card was played.
+                </div>
+              )}
+
+              {/* Verdict */}
+              <div style={{
+                fontFamily: "'Bebas Neue', sans-serif",
+                fontSize: 18, letterSpacing: '0.08em',
+                color: lastAction.bluffCorrect ? 'var(--alive)' : 'var(--accent2)',
+                marginBottom: 4,
+              }}>
+                {lastAction.bluffCorrect
+                  ? `✓ Bluff correct — ${lastAction.accusedName} was lying!`
+                  : `✗ Bluff wrong — ${lastAction.accusedName} told the truth!`}
+              </div>
+              <div style={{ fontSize: 11, color: 'var(--text-dim)' }}>
+                → <strong>{lastAction.spinTargetName}</strong> must spin.
+              </div>
+            </div>
+          )}
+
+          {/* My spin button */}
+          {isMySpinTurn && !isEliminated && (
+            <div className="card" style={{ border: '1px solid var(--accent2)', textAlign: 'center' }}>
+              <div style={{ fontSize: 10, color: 'var(--accent2)', letterSpacing: '0.12em', marginBottom: 14 }}>
+                YOUR FATE AWAITS
+              </div>
+              <button
+                className="danger"
+                onClick={playerSpin}
+                style={{ width: '100%', fontSize: 16, padding: '14px' }}
+              >
+                🔫 Pull the Trigger
+              </button>
+              <div style={{ fontSize: 11, color: 'var(--text-dim)', marginTop: 12 }}>
+                You must spin. Tap to reveal your fate.
+              </div>
+            </div>
+          )}
+
+          {/* Waiting for someone else to spin */}
+          {!isMySpinTurn && spinTargetPlayer && (
+            <div style={{
+              padding: '14px 16px',
+              background: 'rgba(255,74,110,0.05)',
+              border: '1px solid var(--accent2)',
+              borderRadius: 'var(--radius)',
+              fontSize: 12, color: 'var(--accent2)',
+              textAlign: 'center',
+              animation: 'pulse 1.5s ease-in-out infinite',
+            }}>
+              🔫 Waiting for <strong>{spinTargetPlayer.username}</strong> to pull the trigger...
+            </div>
+          )}
         </div>
       )}
 
