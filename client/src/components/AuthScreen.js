@@ -187,7 +187,7 @@ export function AuthScreen({ onSignIn, onSignUp, onGoogleSignIn, error, setError
                 color: 'var(--alive)',
                 fontSize: 12, marginBottom: 16, lineHeight: 1.6,
               }}>
-                ✅ Account created! Check your email to verify your address, then sign in.
+                ✅ Account created! You can now sign in.
               </div>
             )}
 
@@ -277,6 +277,9 @@ export function AuthScreen({ onSignIn, onSignUp, onGoogleSignIn, error, setError
                     required
                     style={INPUT_STYLE}
                   />
+                  <div style={{ fontSize: 11, color: 'var(--text-dim)', marginTop: 6, lineHeight: 1.5 }}>
+                    ⚠️ Don't use a password you use elsewhere — email addresses are not verified on this app.
+                  </div>
                 </div>
                 <button type="submit" className="primary" style={{ padding: '12px', marginTop: 4 }}>
                   Create Account →
