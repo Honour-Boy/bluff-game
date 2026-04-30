@@ -22,18 +22,16 @@ export function useGame() {
   const [connected, setConnected] = useState(socket.connected);
   const [notification, setNotification] = useState(null);
 
-  const reconnectAttempted = useRef(false);
-
   // ─── Show transient notification ──────────────────────────
   const notify = useCallback((msg, type = 'info') => {
     setNotification({ msg, type, id: Date.now() });
     setTimeout(() => setNotification(null), 3500);
   }, []);
 
-  // ─── Warn before refresh/close during active game ────────
+  // ─── Warn before refresh/close whenever in a room ────────
+  // Covers all phases — lobby, playing, spin_pending, game_over, etc.
   useEffect(() => {
-    const activePhases = ['playing', 'bluff_resolution', 'spin_pending'];
-    if (!roomCode || !activePhases.includes(roomState?.phase)) return;
+    if (!roomCode) return;
 
     const handleBeforeUnload = (e) => {
       e.preventDefault();
@@ -42,34 +40,13 @@ export function useGame() {
 
     window.addEventListener('beforeunload', handleBeforeUnload);
     return () => window.removeEventListener('beforeunload', handleBeforeUnload);
-  }, [roomCode, roomState?.phase]);
+  }, [roomCode]);
 
   // ─── Socket event listeners ───────────────────────────────
   useEffect(() => {
-    const onConnect = () => {
-      setConnected(true);
-      setError(null);
-
-      if (!reconnectAttempted.current) {
-        reconnectAttempted.current = true;
-        return;
-      }
-
-      const savedCode = localStorage.getItem(LS_ROOM_CODE);
-      const savedPlayerId = localStorage.getItem(LS_PLAYER_ID);
-      const savedIsHost = localStorage.getItem(LS_IS_HOST) === 'true';
-
-      if (savedCode && savedIsHost) {
-        socket.emit('host_reconnect', { roomCode: savedCode }, (res) => {
-          if (!res.success) notify('Could not reconnect as host: ' + res.error, 'error');
-        });
-      } else if (savedCode && savedPlayerId) {
-        socket.emit('player_reconnect', { roomCode: savedCode, playerId: savedPlayerId }, (res) => {
-          if (!res.success) notify('Could not reconnect: ' + res.error, 'error');
-        });
-      }
-    };
-
+    // Simple connect/disconnect tracking — no reconnect-on-reload logic.
+    // If a player reloads they are cleared to the landing screen (see mount effect).
+    const onConnect = () => { setConnected(true); setError(null); };
     const onDisconnect = () => setConnected(false);
     const onRoomState = (state) => setRoomState(state);
     const onHostDisconnected = () => notify('Host disconnected. Game paused.', 'error');
@@ -90,28 +67,16 @@ export function useGame() {
     };
   }, [socket, notify]);
 
-  // ─── On mount: try restoring session from localStorage ───
+  // ─── On mount: clear any stale session from a previous page load ───
+  // Reload = disconnect. No reconnect attempt. Player returns to landing screen.
   useEffect(() => {
     const savedCode = localStorage.getItem(LS_ROOM_CODE);
-    const savedPlayerId = localStorage.getItem(LS_PLAYER_ID);
-    const savedIsHost = localStorage.getItem(LS_IS_HOST) === 'true';
-
     if (savedCode) {
-      setRoomCode(savedCode);
-      setIsHost(savedIsHost);
-      if (savedPlayerId) setPlayerId(savedPlayerId);
-
-      if (socket.connected) {
-        if (savedIsHost) {
-          socket.emit('host_reconnect', { roomCode: savedCode }, (res) => {
-            if (!res.success) clearSession();
-          });
-        } else if (savedPlayerId) {
-          socket.emit('player_reconnect', { roomCode: savedCode, playerId: savedPlayerId }, (res) => {
-            if (!res.success) clearSession();
-          });
-        }
-      }
+      // Stale session from a previous tab or reload — clear it immediately.
+      localStorage.removeItem(LS_ROOM_CODE);
+      localStorage.removeItem(LS_PLAYER_ID);
+      localStorage.removeItem(LS_IS_HOST);
+      // State is already null/false from initial useState — nothing to reset.
     }
   }, []); // eslint-disable-line
 
