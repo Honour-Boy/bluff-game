@@ -52,18 +52,22 @@ export function useAuth() {
 
   // ─── Sign up ───────────────────────────────────────────────
   const signUp = useCallback(async ({ email, password, username }) => {
-    setAuthError(null);
-    const { error } = await supabase.auth.signUp({
-      email,
-      password,
-      options: {
-        data: { username },
-        emailRedirectTo: `${window.location.origin}`,
-      },
-    });
-    if (error) { setAuthError(error.message); return false; }
-    return true; // user needs to verify email
-  }, []);
+  setAuthError(null);
+  const { data, error } = await supabase.auth.signUp({
+    email,
+    password,
+    options: { data: { username } }, // removed emailRedirectTo
+  });
+  if (error) { setAuthError(error.message); return false; }
+
+  // With email confirmation OFF, Supabase auto-signs the user in.
+  // If the session is null here, it means the email already exists.
+  if (!data.session) {
+    setAuthError('This email is already registered. Please sign in instead.');
+    return false;
+  }
+  return true;
+}, []);
 
   // ─── Sign in ───────────────────────────────────────────────
   const signIn = useCallback(async ({ email, password }) => {
