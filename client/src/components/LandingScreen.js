@@ -8,6 +8,8 @@ export function LandingScreen({ onCreateRoom, onJoinRoom, error, setError, conne
   const [showHowToPlay, setShowHowToPlay] = useState(false);
   const [username, setUsername] = useState('');
   const [roomCode, setRoomCode] = useState('');
+  const [selectedGameMode, setSelectedGameMode] = useState(null); // null | 'physical' | 'online'
+  const [hostUsername, setHostUsername] = useState('');
 
   const handleJoin = (e) => {
     e.preventDefault();
@@ -20,7 +22,16 @@ export function LandingScreen({ onCreateRoom, onJoinRoom, error, setError, conne
   const handleCreate = (e) => {
     e.preventDefault();
     setError(null);
-    onCreateRoom();
+    if (!selectedGameMode) return setError('Select a game mode');
+    if (selectedGameMode === 'online' && !hostUsername.trim()) return setError('Enter your username');
+    onCreateRoom(selectedGameMode, hostUsername.trim());
+  };
+
+  const handleBackFromHost = () => {
+    setMode(null);
+    setSelectedGameMode(null);
+    setHostUsername('');
+    setError(null);
   };
 
   return (
@@ -36,8 +47,7 @@ export function LandingScreen({ onCreateRoom, onJoinRoom, error, setError, conne
     }}>
       {/* Background grid */}
       <div style={{
-        position: 'fixed',
-        inset: 0,
+        position: 'fixed', inset: 0,
         backgroundImage: `
           linear-gradient(rgba(232,255,74,0.03) 1px, transparent 1px),
           linear-gradient(90deg, rgba(232,255,74,0.03) 1px, transparent 1px)
@@ -52,42 +62,32 @@ export function LandingScreen({ onCreateRoom, onJoinRoom, error, setError, conne
       <div style={{ position: 'fixed', bottom: 20, left: 20, width: 60, height: 60, borderBottom: '2px solid var(--accent)', borderLeft: '2px solid var(--accent)', opacity: 0.3 }} />
       <div style={{ position: 'fixed', bottom: 20, right: 20, width: 60, height: 60, borderBottom: '2px solid var(--accent)', borderRight: '2px solid var(--accent)', opacity: 0.3 }} />
 
-      <div className="fade-in" style={{ width: '100%', maxWidth: 440, position: 'relative', zIndex: 1 }}>
+      <div className="fade-in" style={{ width: '100%', maxWidth: 480, position: 'relative', zIndex: 1 }}>
         {/* Logo */}
         <div style={{ textAlign: 'center', marginBottom: 40 }}>
           <h1 className="glitch" style={{
             fontFamily: "'Bebas Neue', sans-serif",
-            fontSize: 96,
-            color: 'var(--accent)',
-            lineHeight: 0.9,
-            letterSpacing: '0.06em',
+            fontSize: 96, color: 'var(--accent)',
+            lineHeight: 0.9, letterSpacing: '0.06em',
           }}>
             BLUFF
           </h1>
           <div style={{ color: 'var(--text-dim)', fontSize: 11, letterSpacing: '0.2em', marginTop: 8 }}>
             THE CARD GAME · UP TO 15 PLAYERS
           </div>
-
-          {/* Card shape decorations */}
           <div style={{ display: 'flex', justifyContent: 'center', gap: 12, marginTop: 20, opacity: 0.6 }}>
             {['⬛', '⭕', '🔺', '✖️', '⭐'].map((s, i) => (
-              <div key={i} style={{
-                fontSize: 18,
-                animation: `fadeIn 0.3s ease ${i * 0.08}s both`,
-                filter: 'grayscale(0.5)',
-              }}>{s}</div>
+              <div key={i} style={{ fontSize: 18, animation: `fadeIn 0.3s ease ${i * 0.08}s both`, filter: 'grayscale(0.5)' }}>
+                {s}
+              </div>
             ))}
           </div>
         </div>
 
         {/* Connection status */}
         <div style={{
-          display: 'flex',
-          alignItems: 'center',
-          gap: 6,
-          justifyContent: 'center',
-          marginBottom: 28,
-          fontSize: 10,
+          display: 'flex', alignItems: 'center', gap: 6, justifyContent: 'center',
+          marginBottom: 28, fontSize: 10,
           color: connected ? 'var(--alive)' : 'var(--accent2)',
           letterSpacing: '0.1em',
         }}>
@@ -107,14 +107,13 @@ export function LandingScreen({ onCreateRoom, onJoinRoom, error, setError, conne
             border: '1px solid var(--accent2)',
             borderRadius: 'var(--radius)',
             color: 'var(--accent2)',
-            fontSize: 12,
-            marginBottom: 16,
+            fontSize: 12, marginBottom: 16,
           }}>
             {error}
           </div>
         )}
 
-        {/* Mode selection */}
+        {/* Landing: main buttons */}
         {!mode && (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
             <button
@@ -141,18 +140,94 @@ export function LandingScreen({ onCreateRoom, onJoinRoom, error, setError, conne
           </div>
         )}
 
-        {showHowToPlay && <HowToPlayModal onClose={() => setShowHowToPlay(false)} />}
-
-        {/* Host: create room */}
+        {/* Host: mode selection then create */}
         {mode === 'host' && (
-          <form onSubmit={handleCreate} style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
-            <div style={{ fontSize: 10, color: 'var(--text-dim)', letterSpacing: '0.15em', marginBottom: 4 }}>
-              HOST MODE — You manage the game, not a player
+          <form onSubmit={handleCreate} style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+            <div style={{ fontSize: 10, color: 'var(--text-dim)', letterSpacing: '0.15em' }}>
+              SELECT GAME MODE
             </div>
-            <button type="submit" className="primary" style={{ padding: '16px', fontSize: 13 }}>
+
+            {/* Mode cards */}
+            <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
+              {[
+                {
+                  key: 'physical',
+                  icon: '🃏',
+                  title: 'PHYSICAL',
+                  desc: 'Play with real Whot card decks. The app manages turns, bluffs, and eliminations. You are the game master — not a player.',
+                },
+                {
+                  key: 'online',
+                  icon: '💻',
+                  title: 'ONLINE',
+                  desc: 'Fully digital. Cards are dealt automatically. You play as a regular player. The game manages itself.',
+                },
+              ].map(({ key, icon, title, desc }) => {
+                const selected = selectedGameMode === key;
+                return (
+                  <div
+                    key={key}
+                    onClick={() => setSelectedGameMode(key)}
+                    style={{
+                      flex: '1 1 180px',
+                      padding: '16px',
+                      background: selected ? 'rgba(232,255,74,0.05)' : 'var(--surface)',
+                      border: `2px solid ${selected ? 'var(--accent)' : 'var(--border)'}`,
+                      borderRadius: 'var(--radius)',
+                      cursor: 'pointer',
+                      transition: 'border-color 0.15s, background 0.15s',
+                      opacity: selected ? 1 : 0.7,
+                    }}
+                  >
+                    <div style={{ fontSize: 28, marginBottom: 8 }}>{icon}</div>
+                    <div style={{
+                      fontFamily: "'Bebas Neue', sans-serif",
+                      fontSize: 20, letterSpacing: '0.1em',
+                      color: selected ? 'var(--accent)' : 'var(--text)',
+                      marginBottom: 8,
+                    }}>
+                      {title}
+                    </div>
+                    <div style={{ fontSize: 11, color: 'var(--text-dim)', lineHeight: 1.7 }}>
+                      {desc}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+
+            {/* Online: username field */}
+            {selectedGameMode === 'online' && (
+              <div>
+                <label style={{ fontSize: 10, color: 'var(--text-dim)', letterSpacing: '0.1em', display: 'block', marginBottom: 6 }}>
+                  YOUR USERNAME
+                </label>
+                <input
+                  value={hostUsername}
+                  onChange={e => setHostUsername(e.target.value)}
+                  placeholder="Enter your name"
+                  maxLength={20}
+                  autoFocus
+                />
+              </div>
+            )}
+
+            {/* Physical: host role note */}
+            {selectedGameMode === 'physical' && (
+              <div style={{ fontSize: 10, color: 'var(--text-dim)', letterSpacing: '0.12em', padding: '8px 12px', background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 'var(--radius)' }}>
+                HOST MODE — You manage the game as Game Master, not a player
+              </div>
+            )}
+
+            <button
+              type="submit"
+              className="primary"
+              style={{ padding: '16px', fontSize: 13, opacity: !selectedGameMode ? 0.5 : 1 }}
+              disabled={!selectedGameMode || (selectedGameMode === 'online' && !hostUsername.trim())}
+            >
               ▶ Create Room
             </button>
-            <button type="button" style={{ fontSize: 11 }} onClick={() => { setMode(null); setError(null); }}>
+            <button type="button" style={{ fontSize: 11 }} onClick={handleBackFromHost}>
               ← Back
             </button>
           </form>
@@ -197,6 +272,8 @@ export function LandingScreen({ onCreateRoom, onJoinRoom, error, setError, conne
           </form>
         )}
       </div>
+
+      {showHowToPlay && <HowToPlayModal onClose={() => setShowHowToPlay(false)} />}
     </div>
   );
 }
