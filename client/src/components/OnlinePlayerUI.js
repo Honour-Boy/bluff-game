@@ -202,6 +202,7 @@ export function OnlinePlayerUI({
   myPlayer,
   isMyTurn,
   isHost = false,
+  startGame,
   playCardOnline,
   callBluff,
   endTurn,
@@ -332,13 +333,34 @@ export function OnlinePlayerUI({
     <div style={{ display: 'flex', flexDirection: 'column', gap: 16, maxWidth: 500, margin: '0 auto', paddingBottom: 180 }}>
 
       {/* ── Header ── */}
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+      <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap' }}>
         <div>
-          <h1 style={{ fontSize: 32, color: isEliminated ? 'var(--accent2)' : 'var(--accent)', lineHeight: 1, fontFamily: "'Bebas Neue', sans-serif" }}>
+          <h1 style={{ fontSize: 28, color: isEliminated ? 'var(--accent2)' : 'var(--accent)', lineHeight: 1, fontFamily: "'Bebas Neue', sans-serif", marginBottom: 8 }}>
             BLUFF
           </h1>
-          <div style={{ fontSize: 10, color: 'var(--text-dim)', letterSpacing: '0.15em' }}>
-            ROOM: {roomCode} · ROUND {roundNumber}
+          {/* Room code — large, bordered, copyable */}
+          <div style={{ fontSize: 9, color: 'var(--text-dim)', letterSpacing: '0.12em', marginBottom: 4 }}>ROOM CODE</div>
+          <div
+            title="Click to copy"
+            onClick={() => navigator.clipboard?.writeText(roomCode)}
+            style={{
+              fontFamily: "'Bebas Neue', sans-serif",
+              fontSize: 30,
+              letterSpacing: '0.2em',
+              color: 'var(--accent)',
+              border: '1px solid var(--accent)',
+              padding: '4px 12px',
+              borderRadius: 'var(--radius)',
+              background: 'rgba(232,255,74,0.04)',
+              cursor: 'pointer',
+              display: 'inline-block',
+              lineHeight: 1.2,
+            }}
+          >
+            {roomCode}
+          </div>
+          <div style={{ fontSize: 9, color: 'var(--text-dim)', marginTop: 4, letterSpacing: '0.08em' }}>
+            Round {roundNumber} · tap to copy
           </div>
         </div>
         <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 5 }}>
@@ -421,12 +443,28 @@ export function OnlinePlayerUI({
       {/* ── Lobby state ── */}
       {isLobby && (
         <div className="card" style={{ textAlign: 'center' }}>
-          <div style={{ fontSize: 12, color: 'var(--text-dim)' }}>
-            Waiting for {isHost ? 'you to start the game...' : 'host to start the game...'}
+          <div style={{ fontSize: 10, color: 'var(--text-dim)', letterSpacing: '0.12em', marginBottom: 14 }}>
+            LOBBY — {alivePlayers.length} player{alivePlayers.length !== 1 ? 's' : ''} joined
           </div>
-          {isHost && (
-            <div style={{ fontSize: 10, color: 'var(--text-dim)', marginTop: 8 }}>
-              Use the host panel to start when all players have joined.
+          {isHost ? (
+            <>
+              <button
+                className="primary"
+                onClick={startGame}
+                disabled={alivePlayers.length < 2}
+                style={{ width: '100%', padding: '14px', fontSize: 13, marginBottom: 10 }}
+              >
+                ▶ Start Game ({alivePlayers.length} players)
+              </button>
+              {alivePlayers.length < 2 && (
+                <div style={{ fontSize: 11, color: 'var(--text-dim)' }}>
+                  Need at least 2 players to start.
+                </div>
+              )}
+            </>
+          ) : (
+            <div style={{ fontSize: 12, color: 'var(--text-dim)' }}>
+              Waiting for the host to start the game...
             </div>
           )}
         </div>
