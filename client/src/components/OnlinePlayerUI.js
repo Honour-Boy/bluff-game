@@ -354,15 +354,25 @@ export function OnlinePlayerUI({
     }
   }, [roomState?.lastAction]); // eslint-disable-line
 
-  // Detect when this player transitions from alive → eliminated, show popup after overlay
-  useEffect(() => {
-    const currentStatus = myPlayer?.status || null;
-    if (prevStatusRef.current === 'alive' && currentStatus === 'eliminated') {
-      // Show elimination popup after a brief delay so spin overlay dismisses first
-      setTimeout(() => setJustEliminated(true), 400);
-    }
+  // Detect when this player transitions from alive → eliminated.
+// Don't show the pop-up until AFTER the spin overlay is fully dismissed.
+useEffect(() => {
+  const currentStatus = myPlayer?.status || null;
+  if (prevStatusRef.current === 'alive' && currentStatus === 'eliminated') {
+    // Mark that we need to show the popup, but wait for spinData to clear first
+    prevStatusRef.current = 'pending_eliminated';
+  } else {
     prevStatusRef.current = currentStatus;
-  }, [myPlayer?.status]); // eslint-disable-line
+  }
+}, [myPlayer?.status]); // eslint-disable-line
+
+// Once spin overlay is dismissed (spinData = null), show elimination popup if pending
+useEffect(() => {
+  if (!spinData && prevStatusRef.current === 'pending_eliminated') {
+    prevStatusRef.current = 'eliminated';
+    setTimeout(() => setJustEliminated(true), 300);
+  }
+}, [spinData]); // eslint-disable-line
 
   // 15s auto-advance after spin result — dismiss overlay if spin target hasn't clicked Continue
   useEffect(() => {
