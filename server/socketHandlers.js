@@ -242,6 +242,12 @@ function registerSocketHandlers(io, socket) {
       const room = await getRoom(roomCode);
       if (!room) return callback({ success: false, error: 'Room not found' });
       if (room.hostSocketId !== socket.id) return callback({ success: false, error: 'Not the host' });
+      // Physical-mode only: online uses end_turn / start_next_round
+      if (room.mode !== engine.MODES.PHYSICAL) return callback({ success: false, error: 'Use end_turn / start_next_round in online mode' });
+      // Only valid from these phases — playing or round_end
+      if (!['playing', 'round_end'].includes(room.phase)) {
+        return callback({ success: false, error: `Cannot advance turn from phase '${room.phase}'` });
+      }
 
       engine.advanceTurn(room);
 
@@ -456,10 +462,20 @@ function registerSocketHandlers(io, socket) {
       if (room.turnOrder[room.currentTurnIndex] !== playerId) return callback({ success: false, error: 'Not your turn' });
       if (room.phase !== 'playing') return callback({ success: false, error: 'Cannot play card now' });
 
+      // Whot is wild — caller MUST nominate a valid shape. Without
+      // this, currentCardType silently held the previous shape and
+      // the next player's hand was misvalidated.
+      const cardPreview = room.hands?.get(playerId)?.find(c => c.id === cardId);
+      if (cardPreview?.shape === 'whot') {
+        if (!nominatedShape || !engine.SHAPES.includes(nominatedShape)) {
+          return callback({ success: false, error: 'Whot card must nominate a shape' });
+        }
+      }
+
       const result = engine.validateAndPlayCard(room, playerId, cardId);
       if (!result.ok) return callback({ success: false, error: result.error });
 
-      if (result.card.shape === 'whot' && nominatedShape && engine.SHAPES.includes(nominatedShape)) {
+      if (result.card.shape === 'whot') {
         room.currentCardType = nominatedShape;
       }
 
@@ -724,10 +740,23 @@ function registerSocketHandlers(io, socket) {
       if (!player || player.status === 'eliminated') continue;
 
       if (room.phase === 'lobby') {
-        const idx = room.players.findIndex(p => p.id === player.id);
-        if (idx !== -1) room.players.splice(idx, 1);
-        await saveRoom(room);
-        await broadcastRoomState(io, code);
+        // 10s grace in lobby too — hitting refresh in the lobby used
+        // to drop you instantly and risk a "name taken" race if
+        // someone else joined fast. Same per-(roomCode,playerId)
+        // timer mechanism as the in-game grace.
+        const key = dcKey(code, player.id);
+        const capturedSocketId = socket.id;
+        const timer = setTimeout(async () => {
+          const still = room.players.find(p => p.id === player.id && p.socketId === capturedSocketId);
+          if (still) {
+            const idx = room.players.findIndex(p => p.id === still.id);
+            if (idx !== -1) room.players.splice(idx, 1);
+            await saveRoom(room);
+            await broadcastRoomState(io, code);
+          }
+          playerDisconnectTimers.delete(key);
+        }, 10000);
+        playerDisconnectTimers.set(key, timer);
         continue;
       }
 

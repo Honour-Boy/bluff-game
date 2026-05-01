@@ -265,15 +265,15 @@ export function PlayerUI({
     setSpinComplete(false);
     setSpinData({ spinIndex: landingChamberIndex, eliminated, spinTargetName, spinTargetId: targetId, bulletChambers, landingChamberIndex, finalAngle });
 
-    requestAnimationFrame(() => {
-      requestAnimationFrame(() => {
-        setCylinderRotation(finalAngle);
-        setCylinderAnimating(true);
-      });
-    });
-
-    const timer = setTimeout(() => setSpinComplete(true), 8000);
-    return () => clearTimeout(timer);
+    // 80ms timeout (not double rAF) — rAF was occasionally swallowed
+    // by React batching on older devices, leaving the cylinder static.
+    // Matches the timing OnlinePlayerUI already uses.
+    const startTimer = setTimeout(() => {
+      setCylinderRotation(finalAngle);
+      setCylinderAnimating(true);
+    }, 80);
+    const completeTimer = setTimeout(() => setSpinComplete(true), 8080);
+    return () => { clearTimeout(startTimer); clearTimeout(completeTimer); };
   }, [roomState?.lastAction]);
 
   if (!roomState || !myPlayer) {
