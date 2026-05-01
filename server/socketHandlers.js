@@ -51,8 +51,13 @@ async function broadcastRoomState(io, roomCode) {
 
 const hostDisconnectTimers = new Map();
 
+// Player disconnect timers must be visible across socket connections —
+// reconnect arrives on a NEW socket and needs to cancel the OLD socket's
+// elimination timer. Key: `${roomCode}:${playerId}`.
+const playerDisconnectTimers = new Map();
+const dcKey = (code, playerId) => `${code}:${playerId}`;
+
 function registerSocketHandlers(io, socket) {
-  const disconnectTimers = new Map();
 
   // ─── AUTHENTICATE socket with Supabase JWT ───────────────
   // Must be called once after connecting, before any game events.
@@ -157,9 +162,19 @@ function registerSocketHandlers(io, socket) {
   // ─── HOST: Reconnect after refresh ──────────────────────
   socket.on('host_reconnect', async ({ roomCode } = {}, callback) => {
     try {
+      if (!socket.userId) return callback({ success: false, error: 'Not authenticated' });
+
       const code = roomCode?.toUpperCase();
       const room = await getRoom(code);
       if (!room) return callback({ success: false, error: 'Room not found' });
+
+      // Only the original host may reseize the host seat. Without
+      // this check, anyone with the 6-char room code could call
+      // host_reconnect and gain host-only privileges (start_game,
+      // resolve_bluff, spectate_player, ...).
+      if (room.hostUserId && room.hostUserId !== socket.userId) {
+        return callback({ success: false, error: 'Not the host of this room' });
+      }
 
       if (hostDisconnectTimers.has(code)) {
         clearTimeout(hostDisconnectTimers.get(code));
@@ -188,10 +203,10 @@ function registerSocketHandlers(io, socket) {
       const player = room.players.find(p => p.id === socket.userId);
       if (!player) return callback({ success: false, error: 'Player not found' });
 
-      const oldSocketId = player.socketId;
-      if (disconnectTimers.has(oldSocketId)) {
-        clearTimeout(disconnectTimers.get(oldSocketId));
-        disconnectTimers.delete(oldSocketId);
+      const key = dcKey(code, socket.userId);
+      if (playerDisconnectTimers.has(key)) {
+        clearTimeout(playerDisconnectTimers.get(key));
+        playerDisconnectTimers.delete(key);
       }
 
       engine.reconnectPlayer(room, socket.userId, socket.id);
@@ -321,10 +336,14 @@ function registerSocketHandlers(io, socket) {
         ...(spinResult.eliminated ? { newCardType: room.currentCardType } : {}),
       };
 
+      // If this spin ended the game, hold the transition until the
+      // overlay is acknowledged — overwriting lastAction here would
+      // hide the spin animation from clients (they gate the overlay
+      // on lastAction.type === 'spin_result'). The transition runs
+      // in the spin_acknowledged handler.
       const gameOverWinner = engine.checkGameOver(room);
       if (gameOverWinner) {
-        room.phase = 'game_over';
-        room.lastAction = { type: 'game_over', winnerId: gameOverWinner.id, winnerName: gameOverWinner.username };
+        room.pendingGameOver = { id: gameOverWinner.id, name: gameOverWinner.username };
       }
 
       await saveRoom(room);
@@ -536,9 +555,26 @@ function registerSocketHandlers(io, socket) {
   });
 
   // ─── Spin result acknowledgement (synced overlay dismiss) ─
+  // Also where a game-ending spin transitions into the game_over
+  // phase — we hold that transition in player_spin so clients get
+  // to see the eliminating spin animation first.
   socket.on('spin_acknowledged', async ({ roomCode } = {}) => {
     const code = roomCode?.toUpperCase();
-    if (code) io.to(code).emit('spin_acknowledged');
+    if (!code) return;
+
+    const room = await getRoom(code);
+    if (room?.pendingGameOver) {
+      const { id, name } = room.pendingGameOver;
+      room.phase = 'game_over';
+      room.lastAction = { type: 'game_over', winnerId: id, winnerName: name };
+      delete room.pendingGameOver;
+      await saveRoom(room);
+      io.to(code).emit('spin_acknowledged');
+      await broadcastRoomState(io, code);
+      return;
+    }
+
+    io.to(code).emit('spin_acknowledged');
   });
 
   // ─── Intentional leave ───────────────────────────────────
@@ -548,9 +584,12 @@ function registerSocketHandlers(io, socket) {
       const room = await getRoom(code);
       if (!room) return;
 
-      if (disconnectTimers.has(socket.id)) {
-        clearTimeout(disconnectTimers.get(socket.id));
-        disconnectTimers.delete(socket.id);
+      if (playerId) {
+        const key = dcKey(code, playerId);
+        if (playerDisconnectTimers.has(key)) {
+          clearTimeout(playerDisconnectTimers.get(key));
+          playerDisconnectTimers.delete(key);
+        }
       }
 
       const idx = room.players.findIndex(p => p.id === playerId);
@@ -605,10 +644,16 @@ function registerSocketHandlers(io, socket) {
       if (['playing', 'bluff_resolution', 'spin_pending'].includes(room.phase)) {
         io.to(code).emit('player_disconnecting', { playerId: player.id, playerName: player.username });
 
+        const key = dcKey(code, player.id);
+        const capturedSocketId = socket.id;
+
         const timer = setTimeout(async () => {
-          const still = room.players.find(p => p.id === player.id && p.socketId === socket.id);
+          // Re-check against the captured socket id — if the player
+          // reconnected on a new socket, room.players[i].socketId will
+          // have changed and we should NOT eliminate.
+          const still = room.players.find(p => p.id === player.id && p.socketId === capturedSocketId);
           if (still?.status === 'alive') {
-            const eliminated = engine.handleDisconnect(room, socket.id);
+            const eliminated = engine.handleDisconnect(room, capturedSocketId);
             if (eliminated) {
               room.lastAction = { type: 'disconnected', playerId: eliminated.id, playerName: eliminated.username };
               const winner = engine.checkGameOver(room);
@@ -620,10 +665,10 @@ function registerSocketHandlers(io, socket) {
               await broadcastRoomState(io, code);
             }
           }
-          disconnectTimers.delete(socket.id);
+          playerDisconnectTimers.delete(key);
         }, 30000);
 
-        disconnectTimers.set(socket.id, timer);
+        playerDisconnectTimers.set(key, timer);
       }
     }
   });

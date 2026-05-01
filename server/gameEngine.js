@@ -350,7 +350,10 @@ function eliminateFromTurnOrder(room, playerId) {
   const idx = room.turnOrder.indexOf(playerId);
   if (idx === -1) return;
   room.turnOrder.splice(idx, 1);
-  if (idx <= room.currentTurnIndex && room.currentTurnIndex > 0) {
+  // Splice already advanced the position for idx === currentTurnIndex
+  // (the next player slid into the eliminated player's slot). Only
+  // decrement when an earlier-positioned player was removed.
+  if (idx < room.currentTurnIndex) {
     room.currentTurnIndex--;
   }
   if (room.turnOrder.length > 0) {

@@ -339,12 +339,16 @@ export function OnlinePlayerUI({
     return () => { clearTimeout(startTimer); clearTimeout(completeTimer); };
   }, [roomState?.lastAction]);
 
-  // When the spin target clicks Continue, spinDismissed fires for everyone → auto-close overlay
+  // Spin target clicks Continue → spinDismissed fires for everyone.
+  // Defer the dismiss until the local cylinder animation has completed,
+  // so slow clients still see the verdict instead of the overlay vanishing
+  // mid-spin.
   useEffect(() => {
-    if (spinDismissed && spinData) {
+    if (spinDismissed && spinData && spinComplete) {
       setSpinData(null);
+      setSpinComplete(false);
     }
-  }, [spinDismissed]); // eslint-disable-line
+  }, [spinDismissed, spinComplete]); // eslint-disable-line
 
   // Auto-refresh spectated hand when action changes
   useEffect(() => {
