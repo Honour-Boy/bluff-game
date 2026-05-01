@@ -18,7 +18,7 @@ function HomeContent() {
 
   const {
     user, profile, loading, authError, setAuthError,
-    signIn, signUp, signInWithGoogle, signOut,
+    signIn, sendEmailOtp, verifyEmailOtp, signInWithGoogle, signOut,
     updateUsername, updatePassword,
     getAccessToken, username,
   } = useAuth();
@@ -64,7 +64,8 @@ function HomeContent() {
     return (
       <AuthScreen
         onSignIn={signIn}
-        onSignUp={signUp}
+        onSendEmailOtp={sendEmailOtp}
+        onVerifyEmailOtp={verifyEmailOtp}
         onGoogleSignIn={signInWithGoogle}
         error={authError}
         setError={setAuthError}
