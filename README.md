@@ -97,15 +97,19 @@ bluff-game/
    - **Bluff Wrong** — the accuser spins the gun
 
 ### Gun Spin Mechanic
-- Each player has `riskLevel` starting at 1
-- On spin: roll random 1–6
-- If `roll ≤ riskLevel` → **ELIMINATED**
-- Else → **SURVIVE**, `riskLevel += 1` (max 6)
+Each player has a 6-slot revolver chamber. The chamber starts with **1 bullet** placed at a random position. Bullets are placed by the backend only — the frontend renders exactly what the backend returns.
+
+- On spin: server picks a random slot index (0–5)
+- If that slot has a bullet → **ELIMINATED**
+- Otherwise → **SURVIVE**, and a new bullet is added to a random empty slot for next time
+
+So the more spins you survive, the more loaded your chamber gets. After 5 survivals you're at 5 bullets / 6 slots — basically guaranteed dead next spin.
 
 ### Round End
-- When a player physically plays their last (5th) card, host clicks **🏆 Win** on their row
-- That player is declared round winner; others reshuffle their physical cards
-- Host clicks **Next Turn** to continue
+- When a player plays their last card (online: empties their hand; physical: host clicks **🏆 Win** on their row), they're the round winner.
+- The deck reshuffles and a new round begins with all surviving players.
+- **Chamber state persists across rounds.** A player who survived 4 spins in round 1 enters round 2 with 5 bullets in their chamber. This is intentional — tension is supposed to escalate as the game runs long.
+- Host clicks **Next Turn** (physical) or **Start Next Round** (online) to continue.
 
 ### Winning
 - Players are eliminated one by one via gun spins
