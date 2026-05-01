@@ -7,6 +7,7 @@ import { ShapeIcon, SHAPE_COLORS } from './ShapeIcon';
 import { ActionLog } from './ActionLog';
 import { HowToPlayModal } from './HowToPlayModal';
 import { TurnActionModal, WaitingForPlayerBanner } from './TurnActionModal';
+import { VoicePanel, VoiceIndicator } from './VoicePanel';
 
 // ─── Constants ────────────────────────────────────────────────
 const SHAPES = ['circle', 'triangle', 'cross', 'square', 'star'];
@@ -281,6 +282,7 @@ export function OnlinePlayerUI({
   leaveGame,
   acknowledgeSpinResult,
   spinDismissed,
+  voice,
 }) {
   const [showHowToPlay, setShowHowToPlay] = useState(false);
   const [selectedCardId, setSelectedCardId] = useState(null);
@@ -500,6 +502,11 @@ export function OnlinePlayerUI({
               <ShareButton roomCode={roomCode} senderName={myPlayer.username} />
             </div>
           )}
+          {voice && (
+            <div style={{ marginTop: 8 }}>
+              <VoicePanel {...voice} />
+            </div>
+          )}
         </div>
         <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 5 }}>
           <div style={{ fontFamily: "'Bebas Neue', sans-serif", fontSize: 20, color: isEliminated ? 'var(--accent2)' : 'var(--text)', lineHeight: 1 }}>
@@ -542,7 +549,9 @@ export function OnlinePlayerUI({
                     color: isCurrentTurnPlayer && alive ? 'var(--warning)' : 'var(--text)',
                     overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
                     textDecoration: !alive ? 'line-through' : 'none',
+                    display: 'flex', alignItems: 'center', gap: 4,
                   }}>
+                    <VoiceIndicator playerId={p.id} speakingIds={voice?.speakingIds} voiceConnected={voice?.isConnected} size={8} />
                     {p.username}
                   </div>
                   <div style={{ fontSize: 9, color: 'var(--text-dim)', marginTop: 3 }}>

@@ -8,6 +8,7 @@ import { ShapeIcon } from './ShapeIcon';
 
 import { ActionLog } from './ActionLog';
 import { HowToPlayModal } from './HowToPlayModal';
+import { VoicePanel } from './VoicePanel';
 
 // SVG cylinder constants
 const CYL = 200;          // SVG viewBox size
@@ -195,6 +196,7 @@ export function PlayerUI({
   leaveGame,
   acknowledgeSpinResult,
   spinDismissed,
+  voice,
 }) {
   const [showHowToPlay, setShowHowToPlay] = useState(false);
 
@@ -378,6 +380,11 @@ export function PlayerUI({
               <div>
                 <div style={{ fontSize: 12, color: 'var(--text-dim)', marginBottom: 10 }}>Waiting for host to start...</div>
                 <ShareButton roomCode={roomCode} senderName={myPlayer?.username} />
+              </div>
+            )}
+            {voice && (
+              <div style={{ marginTop: 12 }}>
+                <VoicePanel {...voice} />
               </div>
             )}
             {isRoundEnd && <div style={{ fontSize: 12, color: 'var(--alive)' }}>Round ended. Waiting for next round...</div>}

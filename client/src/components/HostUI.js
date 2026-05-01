@@ -6,6 +6,7 @@ import { ShapeIcon } from './ShapeIcon';
 import { PlayerList } from './PlayerList';
 import { ActionLog } from './ActionLog';
 import { HowToPlayModal } from './HowToPlayModal';
+import { VoicePanel } from './VoicePanel';
 
 const CYL = 200, CX = 100, CY = 100, ORBIT = 58, CHAM_R = 20;
 
@@ -150,6 +151,7 @@ export function HostUI({
   leaveGame,
   acknowledgeSpinResult,
   spinDismissed,
+  voice,
 }) {
   const [confirmAction, setConfirmAction] = useState(null);
   const [showHowToPlay, setShowHowToPlay] = useState(false);
@@ -297,6 +299,11 @@ export function HostUI({
             <div style={{ marginTop: 8 }}>
               <ShareButton roomCode={roomCode} />
             </div>
+            {voice && (
+              <div style={{ marginTop: 8 }}>
+                <VoicePanel {...voice} />
+              </div>
+            )}
           </div>
           <button
             onClick={() => setShowHowToPlay(true)}
@@ -541,6 +548,8 @@ export function HostUI({
           currentPlayerId={currentPlayerId}
           isHost={true}
           phase={phase}
+          speakingIds={voice?.speakingIds}
+          voiceConnected={voice?.isConnected}
         />
       </div>
 
