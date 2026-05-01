@@ -29,6 +29,14 @@ export function useGame(getAccessToken) {
   const chatOpenRef = useRef(false);
   useEffect(() => { chatOpenRef.current = chatOpen; }, [chatOpen]);
 
+  // ─── v2 Phase C — power-card trigger events ───────────────
+  // The server emits `power_card_triggered` whenever a power-card
+  // effect fires (Freeze landing, Shield blocking a bluff, ...). The
+  // payload shape varies by `kind`. UI consumers display a banner and
+  // then call `clearPowerCardEvent()` to dismiss.
+  const [powerCardEvent, setPowerCardEvent] = useState(null);
+  const clearPowerCardEvent = useCallback(() => setPowerCardEvent(null), []);
+
   // ─── Show transient notification ──────────────────────────
   // Use a ref-tracked timer so back-to-back notifications don't
   // wipe each other (older setTimeout firing on the newer message).
@@ -180,6 +188,13 @@ export function useGame(getAccessToken) {
   clearSession();
   notify(reason || 'The game has ended.', 'error');
 };
+    // Each emission gets a fresh id so back-to-back triggers (e.g.
+    // freeze followed by another power) re-mount the banner instead
+    // of being swallowed by React state-equality checks.
+    const onPowerCardTriggered = (payload) => {
+      if (!payload?.kind) return;
+      setPowerCardEvent({ ...payload, _id: Date.now() + Math.random() });
+    };
 
     socket.on('connect', onConnect);
     socket.on('disconnect', onDisconnect);
@@ -189,6 +204,7 @@ export function useGame(getAccessToken) {
     socket.on('spin_acknowledged', onSpinAcknowledged);
     socket.on('host_disconnecting', onHostDisconnecting);
     socket.on('game_ended', onGameEnded);
+    socket.on('power_card_triggered', onPowerCardTriggered);
 
     return () => {
       socket.off('connect', onConnect);
@@ -199,6 +215,7 @@ export function useGame(getAccessToken) {
       socket.off('spin_acknowledged', onSpinAcknowledged);
       socket.off('host_disconnecting', onHostDisconnecting);
       socket.off('game_ended', onGameEnded);
+      socket.off('power_card_triggered', onPowerCardTriggered);
     };
   }, [socket, notify, clearSession, authenticateSocket]);
 
@@ -391,6 +408,8 @@ export function useGame(getAccessToken) {
     closeChat,
     leaveGame,
     activatePowerCard,
+    powerCardEvent,
+    clearPowerCardEvent,
     setError,
   };
 }
