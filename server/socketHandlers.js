@@ -157,9 +157,19 @@ function registerSocketHandlers(io, socket) {
   // ─── HOST: Reconnect after refresh ──────────────────────
   socket.on('host_reconnect', async ({ roomCode } = {}, callback) => {
     try {
+      if (!socket.userId) return callback({ success: false, error: 'Not authenticated' });
+
       const code = roomCode?.toUpperCase();
       const room = await getRoom(code);
       if (!room) return callback({ success: false, error: 'Room not found' });
+
+      // Only the original host may reseize the host seat. Without
+      // this check, anyone with the 6-char room code could call
+      // host_reconnect and gain host-only privileges (start_game,
+      // resolve_bluff, spectate_player, ...).
+      if (room.hostUserId && room.hostUserId !== socket.userId) {
+        return callback({ success: false, error: 'Not the host of this room' });
+      }
 
       if (hostDisconnectTimers.has(code)) {
         clearTimeout(hostDisconnectTimers.get(code));
