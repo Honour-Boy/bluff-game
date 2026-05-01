@@ -3,3 +3,9 @@ client/node_modules/
 server/node_modules/
 .next/
 .env
+.env.local
+
+# Supabase local dev artifacts (migrations are committed; local state isn't)
+supabase/.branches/
+supabase/.temp/
+supabase/.env
