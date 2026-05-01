@@ -92,12 +92,13 @@ function registerSocketHandlers(io, socket) {
   });
 
   // ─── HOST: Create a new room ─────────────────────────────
-  socket.on('create_room', async ({ mode } = {}, callback) => {
+  socket.on('create_room', async ({ mode, config } = {}, callback) => {
     if (!socket.userId) return callback({ success: false, error: 'Not authenticated' });
 
     try {
       const roomMode = mode === engine.MODES.ONLINE ? engine.MODES.ONLINE : engine.MODES.PHYSICAL;
-      const room = engine.createRoom(socket.id, roomMode);
+      // engine.createRoom normalises the config; safe defaults when omitted.
+      const room = engine.createRoom(socket.id, roomMode, config || null);
       room.hostUserId = socket.userId;
       room.cardPlayedThisTurn = false;
       room.bluffUsedThisTurn = false;
