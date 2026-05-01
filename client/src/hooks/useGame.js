@@ -44,13 +44,24 @@ useEffect(() => {
 }, [roomCode, isHost, playerId]);
 
   // ─── Authenticate socket with Supabase JWT ────────────────
-  const authenticateSocket = useCallback(async () => {
-    if (!getAccessToken) return;
-    const token = await getAccessToken();
-    if (!token) return;
-    socket.emit('authenticate', { token }, (res) => {
-      if (res?.success) setAuthenticated(true);
-      else console.warn('[socket] auth failed:', res?.error);
+  // Returns Promise<boolean> that resolves once the server has
+  // accepted (or rejected) the token. Reconnect must await this so
+  // host_reconnect / player_reconnect don't race the server's
+  // socket.userId stamping.
+  const authenticateSocket = useCallback(() => {
+    return new Promise(async (resolve) => {
+      if (!getAccessToken) return resolve(false);
+      const token = await getAccessToken();
+      if (!token) return resolve(false);
+      socket.emit('authenticate', { token }, (res) => {
+        if (res?.success) {
+          setAuthenticated(true);
+          resolve(true);
+        } else {
+          console.warn('[socket] auth failed:', res?.error);
+          resolve(false);
+        }
+      });
     });
   }, [socket, getAccessToken]);
 
@@ -78,37 +89,39 @@ useEffect(() => {
   // ─── Socket event listeners ───────────────────────────────
   useEffect(() => {
     const onConnect = async () => {
-  setConnected(true);
-  setError(null);
-  await authenticateSocket();
+      setConnected(true);
+      setError(null);
 
-  // Try to restore session after reconnect
-  const saved = sessionStorage.getItem('bluff_session');
-  if (!saved) return;
-  const { roomCode: savedCode, isHost: savedHost, playerId: savedPlayerId } = JSON.parse(saved);
+      const authed = await authenticateSocket();
+      if (!authed) return; // transient auth failure — keep the session, retry on next connect
 
-  if (savedHost) {
-    socket.emit('host_reconnect', { roomCode: savedCode }, (res) => {
-      if (res?.success) {
-        setRoomCode(savedCode);
-        setIsHost(true);
-        setPlayerId(savedPlayerId || null);
-      } else {
-        sessionStorage.removeItem('bluff_session');
+      const saved = sessionStorage.getItem('bluff_session');
+      if (!saved) return;
+      const { roomCode: savedCode, isHost: savedHost, playerId: savedPlayerId } = JSON.parse(saved);
+
+      if (savedHost) {
+        socket.emit('host_reconnect', { roomCode: savedCode }, (res) => {
+          if (res?.success) {
+            setRoomCode(savedCode);
+            setIsHost(true);
+            setPlayerId(savedPlayerId || null);
+          } else {
+            // Room genuinely gone (server restart, expired) — clear stale session
+            sessionStorage.removeItem('bluff_session');
+          }
+        });
+      } else if (savedPlayerId) {
+        socket.emit('player_reconnect', { roomCode: savedCode }, (res) => {
+          if (res?.success) {
+            setRoomCode(savedCode);
+            setIsHost(false);
+            setPlayerId(savedPlayerId);
+          } else {
+            sessionStorage.removeItem('bluff_session');
+          }
+        });
       }
-    });
-  } else if (savedPlayerId) {
-    socket.emit('player_reconnect', { roomCode: savedCode }, (res) => {
-      if (res?.success) {
-        setRoomCode(savedCode);
-        setIsHost(false);
-        setPlayerId(savedPlayerId);
-      } else {
-        sessionStorage.removeItem('bluff_session');
-      }
-    });
-  }
-};
+    };
     const onDisconnect = () => {
       setConnected(false);
       setAuthenticated(false);
