@@ -11,7 +11,6 @@ export function LandingScreen({
   onJoinRoom,
   onSignOut,
   onUpdateUsername,
-  onUpdatePassword,
   initialJoinCode,   // ?join=CODE — auto-opens join form with code locked
   error,
   setError,
@@ -335,7 +334,6 @@ export function LandingScreen({
         <UserProfile
           username={username}
           onUpdateUsername={onUpdateUsername}
-          onUpdatePassword={onUpdatePassword}
           onClose={() => setShowProfile(false)}
         />
       )}

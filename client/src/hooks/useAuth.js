@@ -88,14 +88,6 @@ export function useAuth() {
     return true;
   }, []);
 
-  // ─── Sign in (password) — kept for existing users ─────────
-  const signIn = useCallback(async ({ email, password }) => {
-    setAuthError(null);
-    const { error } = await supabase.auth.signInWithPassword({ email, password });
-    if (error) { setAuthError(error.message); return false; }
-    return true;
-  }, []);
-
   // ─── Google OAuth ──────────────────────────────────────────
   const signInWithGoogle = useCallback(async () => {
     setAuthError(null);
@@ -130,14 +122,6 @@ export function useAuth() {
     return { error: null };
   }, [user]);
 
-  // ─── Update password ───────────────────────────────────────
-  const updatePassword = useCallback(async (newPassword) => {
-    if (!user) return { error: 'Not signed in' };
-    const { error } = await supabase.auth.updateUser({ password: newPassword });
-    if (error) return { error: error.message };
-    return { error: null };
-  }, [user]);
-
   // ─── Get current access token (for Socket.IO auth) ────────
   const getAccessToken = useCallback(async () => {
     const { data: { session } } = await supabase.auth.getSession();
@@ -152,11 +136,9 @@ export function useAuth() {
     setAuthError,
     sendEmailOtp,
     verifyEmailOtp,
-    signIn,
     signInWithGoogle,
     signOut,
     updateUsername,
-    updatePassword,
     getAccessToken,
     // convenience
     isAuthenticated: !!user,
