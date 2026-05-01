@@ -56,11 +56,21 @@ export function useAuth() {
   // emails a code. If the address is invalid, the user never
   // receives a code and the verification step fails — no more
   // false-positive "confirmation sent" claims for typo'd emails.
+  //
+  // emailRedirectTo: the magic link in the email is honored by
+  // Supabase only if the URL is on the project's redirect allowlist.
+  // Sending the current origin means staging clients get staging-
+  // bound links and production clients get production-bound links,
+  // even though both are served by the same Supabase project.
   const sendEmailOtp = useCallback(async ({ email }) => {
     setAuthError(null);
+    const redirectTo = typeof window !== 'undefined' ? window.location.origin : undefined;
     const { error } = await supabase.auth.signInWithOtp({
       email,
-      options: { shouldCreateUser: true },
+      options: {
+        shouldCreateUser: true,
+        emailRedirectTo: redirectTo,
+      },
     });
     if (error) { setAuthError(error.message); return false; }
     return true;
