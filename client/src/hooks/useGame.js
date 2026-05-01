@@ -52,14 +52,19 @@ export function useGame(getAccessToken) {
     setChatOpen(false);
   }, []);
 
-  // Persist session so page refresh can reconnect
-useEffect(() => {
-  if (roomCode) {
-    sessionStorage.setItem('bluff_session', JSON.stringify({ roomCode, isHost, playerId }));
-  } else {
-    sessionStorage.removeItem('bluff_session');
-  }
-}, [roomCode, isHost, playerId]);
+  // Persist session so page refresh can reconnect.
+  //
+  // CRITICAL: only WRITE here. Don't clear on mount — roomCode starts
+  // null on a refresh, and an else-branch removeItem would wipe the
+  // saved session before onConnect's reconnect logic can read it,
+  // which is exactly the bug "refresh throws me out of the room"
+  // came from. Every legitimate exit path (leaveGame, onGameEnded,
+  // reconnect-failure callbacks) clears sessionStorage explicitly.
+  useEffect(() => {
+    if (roomCode) {
+      sessionStorage.setItem('bluff_session', JSON.stringify({ roomCode, isHost, playerId }));
+    }
+  }, [roomCode, isHost, playerId]);
 
   // ─── Authenticate socket with Supabase JWT ────────────────
   // Returns Promise<boolean> that resolves once the server has
@@ -168,7 +173,7 @@ useEffect(() => {
     const onBluffCalled = () => notify('⚠️ Bluff called! Host: reveal the last card.', 'warning');
     const onSpinAcknowledged = () => setSpinDismissed(true);
     const onHostDisconnecting = ({ countdown } = {}) => {
-      notify(`Host disconnected. Game ends in ${countdown ?? 10}s if they don't return.`, 'error');
+      notify(`Host disconnected. Game ends in ${countdown ?? 30}s if they don't return.`, 'error');
     };
     const onGameEnded = ({ reason } = {}) => {
   sessionStorage.removeItem('bluff_session');

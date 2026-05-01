@@ -706,12 +706,16 @@ function registerSocketHandlers(io, socket) {
 
     for (const [code, room] of rooms.entries()) {
       if (room.hostSocketId === socket.id) {
-        io.to(code).emit('host_disconnecting', { countdown: 10 });
+        // 30s host grace — was 10s, but a normal browser refresh
+        // (page load + JS + socket connect + auth + host_reconnect)
+        // can take 5–8s on a cold cache, and 10s killed real games
+        // when the host just hit refresh. Matches the player timer.
+        io.to(code).emit('host_disconnecting', { countdown: 30 });
         const timer = setTimeout(() => {
           io.to(code).emit('game_ended', { reason: 'The host left the game.' });
           rooms.delete(code);
           hostDisconnectTimers.delete(code);
-        }, 10000);
+        }, 30000);
         hostDisconnectTimers.set(code, timer);
         continue;
       }
