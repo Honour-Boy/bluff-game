@@ -321,10 +321,14 @@ function registerSocketHandlers(io, socket) {
         ...(spinResult.eliminated ? { newCardType: room.currentCardType } : {}),
       };
 
+      // If this spin ended the game, hold the transition until the
+      // overlay is acknowledged — overwriting lastAction here would
+      // hide the spin animation from clients (they gate the overlay
+      // on lastAction.type === 'spin_result'). The transition runs
+      // in the spin_acknowledged handler.
       const gameOverWinner = engine.checkGameOver(room);
       if (gameOverWinner) {
-        room.phase = 'game_over';
-        room.lastAction = { type: 'game_over', winnerId: gameOverWinner.id, winnerName: gameOverWinner.username };
+        room.pendingGameOver = { id: gameOverWinner.id, name: gameOverWinner.username };
       }
 
       await saveRoom(room);
@@ -536,9 +540,26 @@ function registerSocketHandlers(io, socket) {
   });
 
   // ─── Spin result acknowledgement (synced overlay dismiss) ─
+  // Also where a game-ending spin transitions into the game_over
+  // phase — we hold that transition in player_spin so clients get
+  // to see the eliminating spin animation first.
   socket.on('spin_acknowledged', async ({ roomCode } = {}) => {
     const code = roomCode?.toUpperCase();
-    if (code) io.to(code).emit('spin_acknowledged');
+    if (!code) return;
+
+    const room = await getRoom(code);
+    if (room?.pendingGameOver) {
+      const { id, name } = room.pendingGameOver;
+      room.phase = 'game_over';
+      room.lastAction = { type: 'game_over', winnerId: id, winnerName: name };
+      delete room.pendingGameOver;
+      await saveRoom(room);
+      io.to(code).emit('spin_acknowledged');
+      await broadcastRoomState(io, code);
+      return;
+    }
+
+    io.to(code).emit('spin_acknowledged');
   });
 
   // ─── Intentional leave ───────────────────────────────────
