@@ -1,8 +1,9 @@
 'use client';
 
 import { RiskMeter } from './RiskMeter';
+import { VoiceIndicator } from './VoicePanel';
 
-export function PlayerList({ players, turnOrder, currentPlayerId, isHost, phase }) {
+export function PlayerList({ players, turnOrder, currentPlayerId, isHost, phase, speakingIds, voiceConnected }) {
   if (!players || players.length === 0) {
     return (
       <div style={{ color: 'var(--text-dim)', fontSize: 12, padding: '20px 0', textAlign: 'center' }}>
@@ -69,7 +70,11 @@ export function PlayerList({ players, turnOrder, currentPlayerId, isHost, phase 
                 whiteSpace: 'nowrap',
                 overflow: 'hidden',
                 textOverflow: 'ellipsis',
+                display: 'flex',
+                alignItems: 'center',
+                gap: 6,
               }}>
+                <VoiceIndicator playerId={player.id} speakingIds={speakingIds} voiceConnected={voiceConnected} />
                 {player.username}
                 {isCurrent && isAlive && (
                   <span style={{

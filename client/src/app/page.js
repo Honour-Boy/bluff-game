@@ -4,6 +4,7 @@ import { Suspense } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { useAuth } from '../hooks/useAuth';
 import { useGame } from '../hooks/useGame';
+import { useVoice } from '../hooks/useVoice';
 import { AuthScreen } from '../components/AuthScreen';
 import { LandingScreen } from '../components/LandingScreen';
 import { HostUI } from '../components/HostUI';
@@ -28,7 +29,7 @@ function HomeContent() {
   const {
     roomCode, isHost, playerId,
     roomState, myPlayer, isMyTurn, currentPlayer,
-    gameMode, error, connected, notification,
+    gameMode, error, connected, authenticated, notification,
     createRoom, joinRoom, startGame,
     nextTurn, resolveBluff,
     playCard, endTurn, playerSpin,
@@ -37,6 +38,9 @@ function HomeContent() {
     acknowledgeSpinResult, spinDismissed,
     leaveGame, setError,
   } = game;
+
+  // Voice — opt-in via Join Voice button. Hook tears down on roomCode change.
+  const voice = useVoice({ roomCode, isAuthenticated: authenticated });
 
   // ─── Loading splash ────────────────────────────────────────
   if (loading) {
@@ -115,6 +119,7 @@ function HomeContent() {
           leaveGame={leaveGame}
           acknowledgeSpinResult={acknowledgeSpinResult}
           spinDismissed={spinDismissed}
+          voice={voice}
         />
       );
     }
@@ -129,6 +134,7 @@ function HomeContent() {
         leaveGame={leaveGame}
         acknowledgeSpinResult={acknowledgeSpinResult}
         spinDismissed={spinDismissed}
+        voice={voice}
       />
     );
   }
@@ -151,6 +157,7 @@ function HomeContent() {
           leaveGame={leaveGame}
           acknowledgeSpinResult={acknowledgeSpinResult}
           spinDismissed={spinDismissed}
+          voice={voice}
         />
       );
     }
@@ -167,6 +174,7 @@ function HomeContent() {
         leaveGame={leaveGame}
         acknowledgeSpinResult={acknowledgeSpinResult}
         spinDismissed={spinDismissed}
+        voice={voice}
       />
     );
   }
