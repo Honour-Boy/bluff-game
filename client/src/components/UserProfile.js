@@ -2,14 +2,10 @@
 
 import { useState } from 'react';
 
-export function UserProfile({ username, onUpdateUsername, onUpdatePassword, onClose }) {
+export function UserProfile({ username, onUpdateUsername, onClose }) {
   const [newUsername, setNewUsername] = useState(username || '');
-  const [newPassword, setNewPassword] = useState('');
-  const [confirmPassword, setConfirmPassword] = useState('');
   const [usernameMsg, setUsernameMsg] = useState(null); // { text, ok }
-  const [passwordMsg, setPasswordMsg] = useState(null);
   const [savingUsername, setSavingUsername] = useState(false);
-  const [savingPassword, setSavingPassword] = useState(false);
 
   const handleUsernameSubmit = async (e) => {
     e.preventDefault();
@@ -18,23 +14,6 @@ export function UserProfile({ username, onUpdateUsername, onUpdatePassword, onCl
     const { error } = await onUpdateUsername(newUsername);
     setSavingUsername(false);
     setUsernameMsg(error ? { text: error, ok: false } : { text: 'Username updated!', ok: true });
-  };
-
-  const handlePasswordSubmit = async (e) => {
-    e.preventDefault();
-    setPasswordMsg(null);
-    if (newPassword.length < 6) return setPasswordMsg({ text: 'Password must be at least 6 characters', ok: false });
-    if (newPassword !== confirmPassword) return setPasswordMsg({ text: 'Passwords do not match', ok: false });
-    setSavingPassword(true);
-    const { error } = await onUpdatePassword(newPassword);
-    setSavingPassword(false);
-    if (error) {
-      setPasswordMsg({ text: error, ok: false });
-    } else {
-      setPasswordMsg({ text: 'Password updated!', ok: true });
-      setNewPassword('');
-      setConfirmPassword('');
-    }
   };
 
   const MSG = ({ msg }) => msg ? (
@@ -76,8 +55,7 @@ export function UserProfile({ username, onUpdateUsername, onUpdatePassword, onCl
           Profile Settings
         </div>
 
-        {/* Username */}
-        <form onSubmit={handleUsernameSubmit} style={{ marginBottom: 28 }}>
+        <form onSubmit={handleUsernameSubmit}>
           <div style={{ fontSize: 10, color: 'var(--text-dim)', letterSpacing: '0.12em', marginBottom: 8 }}>
             DISPLAY NAME
           </div>
@@ -97,37 +75,6 @@ export function UserProfile({ username, onUpdateUsername, onUpdatePassword, onCl
             {savingUsername ? 'Saving...' : 'Save Name'}
           </button>
           <MSG msg={usernameMsg} />
-        </form>
-
-        <div style={{ height: 1, background: 'var(--border)', marginBottom: 24 }} />
-
-        {/* Password */}
-        <form onSubmit={handlePasswordSubmit}>
-          <div style={{ fontSize: 10, color: 'var(--text-dim)', letterSpacing: '0.12em', marginBottom: 8 }}>
-            CHANGE PASSWORD
-          </div>
-          <input
-            type="password"
-            value={newPassword}
-            onChange={e => setNewPassword(e.target.value)}
-            placeholder="New password (min 6 chars)"
-            style={{ marginBottom: 8 }}
-          />
-          <input
-            type="password"
-            value={confirmPassword}
-            onChange={e => setConfirmPassword(e.target.value)}
-            placeholder="Confirm new password"
-            style={{ marginBottom: 8 }}
-          />
-          <button
-            type="submit"
-            disabled={savingPassword || !newPassword}
-            style={{ padding: '9px 20px', fontSize: 12 }}
-          >
-            {savingPassword ? 'Saving...' : 'Change Password'}
-          </button>
-          <MSG msg={passwordMsg} />
         </form>
       </div>
     </div>

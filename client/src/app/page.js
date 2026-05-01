@@ -18,8 +18,8 @@ function HomeContent() {
 
   const {
     user, profile, loading, authError, setAuthError,
-    signIn, sendEmailOtp, verifyEmailOtp, signInWithGoogle, signOut,
-    updateUsername, updatePassword,
+    sendEmailOtp, verifyEmailOtp, signInWithGoogle, signOut,
+    updateUsername,
     getAccessToken, username,
   } = useAuth();
 
@@ -63,7 +63,6 @@ function HomeContent() {
   if (!user) {
     return (
       <AuthScreen
-        onSignIn={signIn}
         onSendEmailOtp={sendEmailOtp}
         onVerifyEmailOtp={verifyEmailOtp}
         onGoogleSignIn={signInWithGoogle}
@@ -89,7 +88,6 @@ function HomeContent() {
         onJoinRoom={joinRoom}
         onSignOut={signOut}
         onUpdateUsername={updateUsername}
-        onUpdatePassword={updatePassword}
         initialJoinCode={initialJoinCode}
         error={error}
         setError={setError}

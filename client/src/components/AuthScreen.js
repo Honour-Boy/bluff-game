@@ -40,7 +40,6 @@ function GoogleButton({ onClick, label = 'Continue with Google' }) {
       onMouseEnter={e => e.currentTarget.style.borderColor = 'var(--accent)'}
       onMouseLeave={e => e.currentTarget.style.borderColor = 'var(--border)'}
     >
-      {/* Google G icon */}
       <svg width="18" height="18" viewBox="0 0 48 48">
         <path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z" />
         <path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z" />
@@ -52,7 +51,6 @@ function GoogleButton({ onClick, label = 'Continue with Google' }) {
   );
 }
 
-// ─── Divider ──────────────────────────────────────────────────
 function Divider() {
   return (
     <div style={{ display: 'flex', alignItems: 'center', gap: 12, margin: '4px 0' }}>
@@ -63,68 +61,35 @@ function Divider() {
   );
 }
 
-// ─── AuthScreen ───────────────────────────────────────────────
-export function AuthScreen({ onSignIn, onSendEmailOtp, onVerifyEmailOtp, onGoogleSignIn, error, setError }) {
-  const [tab, setTab] = useState('sign-in'); // 'sign-in' | 'sign-up'
+// ─── AuthScreen — passwordless ────────────────────────────────
+// Single email field. signInWithOtp creates the user if new and
+// signs in if existing — there's no need for a separate "create
+// account" tab. Google OAuth lives alongside as an alternative.
+export function AuthScreen({ onSendEmailOtp, onVerifyEmailOtp, onGoogleSignIn, error, setError }) {
   const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
   const [otpCode, setOtpCode] = useState('');
-  const [otpStage, setOtpStage] = useState('email'); // 'email' | 'code'
-  const [otpSubmitting, setOtpSubmitting] = useState(false);
-
-  const handleSignIn = async (e) => {
-    e.preventDefault();
-    setError(null);
-    if (!email.trim() || !password) return setError('Enter email and password');
-    await onSignIn({ email: email.trim(), password });
-  };
+  const [stage, setStage] = useState('email'); // 'email' | 'code'
+  const [submitting, setSubmitting] = useState(false);
 
   const handleSendOtp = async (e) => {
     e.preventDefault();
     setError(null);
     if (!email.trim()) return setError('Enter your email');
-    setOtpSubmitting(true);
+    setSubmitting(true);
     const ok = await onSendEmailOtp({ email: email.trim() });
-    setOtpSubmitting(false);
-    if (ok) setOtpStage('code');
+    setSubmitting(false);
+    if (ok) setStage('code');
   };
 
   const handleVerifyOtp = async (e) => {
     e.preventDefault();
     setError(null);
     if (otpCode.trim().length < 6) return setError('Enter the 6-digit code from your email');
-    setOtpSubmitting(true);
-    const ok = await onVerifyEmailOtp({ email: email.trim(), token: otpCode });
-    setOtpSubmitting(false);
+    setSubmitting(true);
+    await onVerifyEmailOtp({ email: email.trim(), token: otpCode });
+    setSubmitting(false);
     // Successful verification triggers onAuthStateChange — page transitions automatically.
-    if (!ok) return; // error already set by hook
   };
-
-  const TAB = (key, label) => (
-    <button
-      type="button"
-      onClick={() => {
-        setTab(key);
-        setError(null);
-        setOtpStage('email');
-        setOtpCode('');
-      }}
-      style={{
-        flex: 1,
-        padding: '10px 0',
-        background: tab === key ? 'rgba(232,255,74,0.06)' : 'transparent',
-        border: 'none',
-        borderBottom: `2px solid ${tab === key ? 'var(--accent)' : 'transparent'}`,
-        color: tab === key ? 'var(--accent)' : 'var(--text-dim)',
-        fontSize: 11,
-        letterSpacing: '0.12em',
-        cursor: 'pointer',
-        transition: 'color 0.15s',
-      }}
-    >
-      {label}
-    </button>
-  );
 
   return (
     <div style={{
@@ -135,7 +100,6 @@ export function AuthScreen({ onSignIn, onSendEmailOtp, onVerifyEmailOtp, onGoogl
       justifyContent: 'center',
       padding: 24,
     }}>
-      {/* Background grid */}
       <div style={{
         position: 'fixed', inset: 0,
         backgroundImage: `
@@ -147,8 +111,6 @@ export function AuthScreen({ onSignIn, onSendEmailOtp, onVerifyEmailOtp, onGoogl
       }} />
 
       <div className="fade-in" style={{ width: '100%', maxWidth: 420, position: 'relative', zIndex: 1 }}>
-
-        {/* Logo */}
         <div style={{ textAlign: 'center', marginBottom: 36 }}>
           <h1 style={{
             fontFamily: "'Bebas Neue', sans-serif",
@@ -168,139 +130,85 @@ export function AuthScreen({ onSignIn, onSendEmailOtp, onVerifyEmailOtp, onGoogl
           </div>
         </div>
 
-        {/* Card */}
-        <div className="card" style={{ padding: '0' }}>
+        <div className="card" style={{ padding: '24px 20px' }}>
+          {error && (
+            <div style={{
+              padding: '10px 14px',
+              background: 'rgba(255,74,110,0.08)',
+              border: '1px solid var(--accent2)',
+              borderRadius: 'var(--radius)',
+              color: 'var(--accent2)',
+              fontSize: 12, marginBottom: 16,
+            }}>
+              {error}
+            </div>
+          )}
 
-          {/* Tabs */}
-          <div style={{ display: 'flex', borderBottom: '1px solid var(--border)' }}>
-            {TAB('sign-in', 'SIGN IN')}
-            {TAB('sign-up', 'CREATE ACCOUNT')}
-          </div>
+          <GoogleButton onClick={onGoogleSignIn} />
+          <Divider />
 
-          <div style={{ padding: '24px 20px' }}>
-
-            {/* Error */}
-            {error && (
-              <div style={{
-                padding: '10px 14px',
-                background: 'rgba(255,74,110,0.08)',
-                border: '1px solid var(--accent2)',
-                borderRadius: 'var(--radius)',
-                color: 'var(--accent2)',
-                fontSize: 12, marginBottom: 16,
-              }}>
-                {error}
+          {stage === 'email' && (
+            <form onSubmit={handleSendOtp} style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+              <div>
+                <label style={{ fontSize: 10, color: 'var(--text-dim)', letterSpacing: '0.1em', display: 'block', marginBottom: 5 }}>
+                  EMAIL
+                </label>
+                <input
+                  type="email"
+                  value={email}
+                  onChange={e => setEmail(e.target.value)}
+                  placeholder="you@example.com"
+                  autoComplete="email"
+                  autoFocus
+                  required
+                  style={INPUT_STYLE}
+                />
+                <div style={{ fontSize: 11, color: 'var(--text-dim)', marginTop: 6, lineHeight: 1.5 }}>
+                  We'll send a 6-digit code. No password required — same flow whether you've played before or not.
+                </div>
               </div>
-            )}
+              <button type="submit" className="primary" style={{ padding: '12px', marginTop: 4 }} disabled={submitting}>
+                {submitting ? 'Sending…' : 'Continue →'}
+              </button>
+            </form>
+          )}
 
-            {/* Google */}
-            <GoogleButton onClick={onGoogleSignIn} />
-            <Divider />
-
-            {/* Sign in form */}
-            {tab === 'sign-in' && (
-              <form onSubmit={handleSignIn} style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-                <div>
-                  <label style={{ fontSize: 10, color: 'var(--text-dim)', letterSpacing: '0.1em', display: 'block', marginBottom: 5 }}>
-                    EMAIL
-                  </label>
-                  <input
-                    type="email"
-                    value={email}
-                    onChange={e => setEmail(e.target.value)}
-                    placeholder="you@example.com"
-                    autoComplete="email"
-                    required
-                    style={INPUT_STYLE}
-                  />
-                </div>
-                <div>
-                  <label style={{ fontSize: 10, color: 'var(--text-dim)', letterSpacing: '0.1em', display: 'block', marginBottom: 5 }}>
-                    PASSWORD
-                  </label>
-                  <input
-                    type="password"
-                    value={password}
-                    onChange={e => setPassword(e.target.value)}
-                    placeholder="••••••••"
-                    autoComplete="current-password"
-                    required
-                    style={INPUT_STYLE}
-                  />
-                </div>
-                <button type="submit" className="primary" style={{ padding: '12px', marginTop: 4 }}>
-                  Sign In →
-                </button>
-              </form>
-            )}
-
-            {/* Sign up form — email OTP only. No password = no false-positive
-                "confirmation sent" claims. If the address is invalid the user
-                never gets a code and verification will fail at the next step. */}
-            {tab === 'sign-up' && otpStage === 'email' && (
-              <form onSubmit={handleSendOtp} style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-                <div>
-                  <label style={{ fontSize: 10, color: 'var(--text-dim)', letterSpacing: '0.1em', display: 'block', marginBottom: 5 }}>
-                    EMAIL
-                  </label>
-                  <input
-                    type="email"
-                    value={email}
-                    onChange={e => setEmail(e.target.value)}
-                    placeholder="you@example.com"
-                    autoComplete="email"
-                    autoFocus
-                    required
-                    style={INPUT_STYLE}
-                  />
-                  <div style={{ fontSize: 11, color: 'var(--text-dim)', marginTop: 6, lineHeight: 1.5 }}>
-                    We'll send a 6-digit code. No password required.
-                  </div>
-                </div>
-                <button type="submit" className="primary" style={{ padding: '12px', marginTop: 4 }} disabled={otpSubmitting}>
-                  {otpSubmitting ? 'Sending…' : 'Send Code →'}
-                </button>
-              </form>
-            )}
-
-            {tab === 'sign-up' && otpStage === 'code' && (
-              <form onSubmit={handleVerifyOtp} style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-                <div style={{ fontSize: 12, color: 'var(--text-dim)', lineHeight: 1.6 }}>
-                  Code sent to <strong style={{ color: 'var(--text)' }}>{email}</strong>. Check your inbox (and spam).
-                  If you don't receive one in a minute, the address may be wrong.
-                </div>
-                <div>
-                  <label style={{ fontSize: 10, color: 'var(--text-dim)', letterSpacing: '0.1em', display: 'block', marginBottom: 5 }}>
-                    6-DIGIT CODE
-                  </label>
-                  <input
-                    type="text"
-                    inputMode="numeric"
-                    pattern="[0-9]*"
-                    value={otpCode}
-                    onChange={e => setOtpCode(e.target.value.replace(/\D/g, '').slice(0, 6))}
-                    placeholder="123456"
-                    maxLength={6}
-                    autoComplete="one-time-code"
-                    autoFocus
-                    required
-                    style={{ ...INPUT_STYLE, letterSpacing: '0.4em', fontSize: 18, fontWeight: 700, textAlign: 'center' }}
-                  />
-                </div>
-                <button type="submit" className="primary" style={{ padding: '12px', marginTop: 4 }} disabled={otpSubmitting || otpCode.length < 6}>
-                  {otpSubmitting ? 'Verifying…' : 'Verify & Sign In →'}
-                </button>
-                <button
-                  type="button"
-                  onClick={() => { setOtpStage('email'); setOtpCode(''); setError(null); }}
-                  style={{ fontSize: 11, padding: '8px', background: 'none', border: 'none', color: 'var(--text-dim)', cursor: 'pointer' }}
-                >
-                  ← Use a different email
-                </button>
-              </form>
-            )}
-
-          </div>
+          {stage === 'code' && (
+            <form onSubmit={handleVerifyOtp} style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+              <div style={{ fontSize: 12, color: 'var(--text-dim)', lineHeight: 1.6 }}>
+                Code sent to <strong style={{ color: 'var(--text)' }}>{email}</strong>. Check your inbox (and spam).
+                If you don't receive one in a minute, the address may be wrong.
+              </div>
+              <div>
+                <label style={{ fontSize: 10, color: 'var(--text-dim)', letterSpacing: '0.1em', display: 'block', marginBottom: 5 }}>
+                  6-DIGIT CODE
+                </label>
+                <input
+                  type="text"
+                  inputMode="numeric"
+                  pattern="[0-9]*"
+                  value={otpCode}
+                  onChange={e => setOtpCode(e.target.value.replace(/\D/g, '').slice(0, 6))}
+                  placeholder="123456"
+                  maxLength={6}
+                  autoComplete="one-time-code"
+                  autoFocus
+                  required
+                  style={{ ...INPUT_STYLE, letterSpacing: '0.4em', fontSize: 18, fontWeight: 700, textAlign: 'center' }}
+                />
+              </div>
+              <button type="submit" className="primary" style={{ padding: '12px', marginTop: 4 }} disabled={submitting || otpCode.length < 6}>
+                {submitting ? 'Verifying…' : 'Sign In →'}
+              </button>
+              <button
+                type="button"
+                onClick={() => { setStage('email'); setOtpCode(''); setError(null); }}
+                style={{ fontSize: 11, padding: '8px', background: 'none', border: 'none', color: 'var(--text-dim)', cursor: 'pointer' }}
+              >
+                ← Use a different email
+              </button>
+            </form>
+          )}
         </div>
       </div>
     </div>
