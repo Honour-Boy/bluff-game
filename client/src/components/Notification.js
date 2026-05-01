@@ -1,13 +1,13 @@
-'use client';
+"use client";
 
 export function Notification({ notification }) {
   if (!notification) return null;
 
   const colors = {
-    info: 'var(--accent3)',
-    warning: 'var(--warning)',
-    error: 'var(--accent2)',
-    success: 'var(--alive)',
+    info: "var(--accent3)",
+    warning: "var(--warning)",
+    error: "var(--accent2)",
+    success: "var(--alive)",
   };
 
   const color = colors[notification.type] || colors.info;
@@ -16,20 +16,20 @@ export function Notification({ notification }) {
     <div
       className="notification"
       style={{
-        position: 'fixed',
+        position: "fixed",
         top: 20,
         right: 20,
         zIndex: 9000,
-        background: 'var(--surface)',
+        background: "var(--surface)",
         border: `1px solid ${color}`,
         borderLeft: `4px solid ${color}`,
-        borderRadius: 'var(--radius)',
-        padding: '12px 16px',
+        borderRadius: "var(--radius)",
+        padding: "12px 16px",
         maxWidth: 320,
         color: color,
         fontSize: 12,
         fontFamily: "'Space Mono', monospace",
-        letterSpacing: '0.05em',
+        letterSpacing: "0.05em",
         boxShadow: `0 4px 24px rgba(0,0,0,0.5), 0 0 0 1px ${color}22`,
       }}
     >
