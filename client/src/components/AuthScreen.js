@@ -64,12 +64,13 @@ function Divider() {
 }
 
 // ─── AuthScreen ───────────────────────────────────────────────
-export function AuthScreen({ onSignIn, onSignUp, onGoogleSignIn, error, setError }) {
+export function AuthScreen({ onSignIn, onSendEmailOtp, onVerifyEmailOtp, onGoogleSignIn, error, setError }) {
   const [tab, setTab] = useState('sign-in'); // 'sign-in' | 'sign-up'
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [username, setUsername] = useState('');
-  const [signUpSent, setSignUpSent] = useState(false);
+  const [otpCode, setOtpCode] = useState('');
+  const [otpStage, setOtpStage] = useState('email'); // 'email' | 'code'
+  const [otpSubmitting, setOtpSubmitting] = useState(false);
 
   const handleSignIn = async (e) => {
     e.preventDefault();
@@ -78,21 +79,36 @@ export function AuthScreen({ onSignIn, onSignUp, onGoogleSignIn, error, setError
     await onSignIn({ email: email.trim(), password });
   };
 
-  const handleSignUp = async (e) => {
+  const handleSendOtp = async (e) => {
     e.preventDefault();
     setError(null);
-    if (username.trim().length < 4) return setError('Username must be at least 4 characters');
-    if (username.trim().length > 20) return setError('Username must be 20 characters or fewer');
     if (!email.trim()) return setError('Enter your email');
-    if (password.length < 6) return setError('Password must be at least 6 characters');
-    const ok = await onSignUp({ email: email.trim(), password, username: username.trim() });
-    if (ok) setSignUpSent(true);
+    setOtpSubmitting(true);
+    const ok = await onSendEmailOtp({ email: email.trim() });
+    setOtpSubmitting(false);
+    if (ok) setOtpStage('code');
+  };
+
+  const handleVerifyOtp = async (e) => {
+    e.preventDefault();
+    setError(null);
+    if (otpCode.trim().length < 6) return setError('Enter the 6-digit code from your email');
+    setOtpSubmitting(true);
+    const ok = await onVerifyEmailOtp({ email: email.trim(), token: otpCode });
+    setOtpSubmitting(false);
+    // Successful verification triggers onAuthStateChange — page transitions automatically.
+    if (!ok) return; // error already set by hook
   };
 
   const TAB = (key, label) => (
     <button
       type="button"
-      onClick={() => { setTab(key); setError(null); setSignUpSent(false); }}
+      onClick={() => {
+        setTab(key);
+        setError(null);
+        setOtpStage('email');
+        setOtpCode('');
+      }}
       style={{
         flex: 1,
         padding: '10px 0',
@@ -177,20 +193,6 @@ export function AuthScreen({ onSignIn, onSignUp, onGoogleSignIn, error, setError
               </div>
             )}
 
-            {/* Sign-up success */}
-            {signUpSent && (
-              <div style={{
-                padding: '12px 14px',
-                background: 'rgba(74,255,128,0.06)',
-                border: '1px solid var(--alive)',
-                borderRadius: 'var(--radius)',
-                color: 'var(--alive)',
-                fontSize: 12, marginBottom: 16, lineHeight: 1.6,
-              }}>
-                ✅ Account created! You can now sign in.
-              </div>
-            )}
-
             {/* Google */}
             <GoogleButton onClick={onGoogleSignIn} />
             <Divider />
@@ -232,23 +234,11 @@ export function AuthScreen({ onSignIn, onSignUp, onGoogleSignIn, error, setError
               </form>
             )}
 
-            {/* Sign up form */}
-            {tab === 'sign-up' && !signUpSent && (
-              <form onSubmit={handleSignUp} style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-                <div>
-                  <label style={{ fontSize: 10, color: 'var(--text-dim)', letterSpacing: '0.1em', display: 'block', marginBottom: 5 }}>
-                    DISPLAY NAME
-                  </label>
-                  <input
-                    type="text"
-                    value={username}
-                    onChange={e => setUsername(e.target.value)}
-                    placeholder="4–20 characters"
-                    maxLength={20}
-                    autoFocus
-                    style={INPUT_STYLE}
-                  />
-                </div>
+            {/* Sign up form — email OTP only. No password = no false-positive
+                "confirmation sent" claims. If the address is invalid the user
+                never gets a code and verification will fail at the next step. */}
+            {tab === 'sign-up' && otpStage === 'email' && (
+              <form onSubmit={handleSendOtp} style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
                 <div>
                   <label style={{ fontSize: 10, color: 'var(--text-dim)', letterSpacing: '0.1em', display: 'block', marginBottom: 5 }}>
                     EMAIL
@@ -259,30 +249,53 @@ export function AuthScreen({ onSignIn, onSignUp, onGoogleSignIn, error, setError
                     onChange={e => setEmail(e.target.value)}
                     placeholder="you@example.com"
                     autoComplete="email"
-                    required
-                    style={INPUT_STYLE}
-                  />
-                </div>
-                <div>
-                  <label style={{ fontSize: 10, color: 'var(--text-dim)', letterSpacing: '0.1em', display: 'block', marginBottom: 5 }}>
-                    PASSWORD
-                  </label>
-                  <input
-                    type="password"
-                    value={password}
-                    onChange={e => setPassword(e.target.value)}
-                    placeholder="At least 6 characters"
-                    autoComplete="new-password"
-                    minLength={6}
+                    autoFocus
                     required
                     style={INPUT_STYLE}
                   />
                   <div style={{ fontSize: 11, color: 'var(--text-dim)', marginTop: 6, lineHeight: 1.5 }}>
-                    ⚠️ Don't use a password you use elsewhere — email addresses are not verified on this app.
+                    We'll send a 6-digit code. No password required.
                   </div>
                 </div>
-                <button type="submit" className="primary" style={{ padding: '12px', marginTop: 4 }}>
-                  Create Account →
+                <button type="submit" className="primary" style={{ padding: '12px', marginTop: 4 }} disabled={otpSubmitting}>
+                  {otpSubmitting ? 'Sending…' : 'Send Code →'}
+                </button>
+              </form>
+            )}
+
+            {tab === 'sign-up' && otpStage === 'code' && (
+              <form onSubmit={handleVerifyOtp} style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+                <div style={{ fontSize: 12, color: 'var(--text-dim)', lineHeight: 1.6 }}>
+                  Code sent to <strong style={{ color: 'var(--text)' }}>{email}</strong>. Check your inbox (and spam).
+                  If you don't receive one in a minute, the address may be wrong.
+                </div>
+                <div>
+                  <label style={{ fontSize: 10, color: 'var(--text-dim)', letterSpacing: '0.1em', display: 'block', marginBottom: 5 }}>
+                    6-DIGIT CODE
+                  </label>
+                  <input
+                    type="text"
+                    inputMode="numeric"
+                    pattern="[0-9]*"
+                    value={otpCode}
+                    onChange={e => setOtpCode(e.target.value.replace(/\D/g, '').slice(0, 6))}
+                    placeholder="123456"
+                    maxLength={6}
+                    autoComplete="one-time-code"
+                    autoFocus
+                    required
+                    style={{ ...INPUT_STYLE, letterSpacing: '0.4em', fontSize: 18, fontWeight: 700, textAlign: 'center' }}
+                  />
+                </div>
+                <button type="submit" className="primary" style={{ padding: '12px', marginTop: 4 }} disabled={otpSubmitting || otpCode.length < 6}>
+                  {otpSubmitting ? 'Verifying…' : 'Verify & Sign In →'}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => { setOtpStage('email'); setOtpCode(''); setError(null); }}
+                  style={{ fontSize: 11, padding: '8px', background: 'none', border: 'none', color: 'var(--text-dim)', cursor: 'pointer' }}
+                >
+                  ← Use a different email
                 </button>
               </form>
             )}

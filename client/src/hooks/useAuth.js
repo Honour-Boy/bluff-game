@@ -50,26 +50,35 @@ export function useAuth() {
     };
   }, []); // eslint-disable-line
 
-  // ─── Sign up ───────────────────────────────────────────────
-  const signUp = useCallback(async ({ email, password, username }) => {
-  setAuthError(null);
-  const { data, error } = await supabase.auth.signUp({
-    email,
-    password,
-    options: { data: { username } }, // removed emailRedirectTo
-  });
-  if (error) { setAuthError(error.message); return false; }
+  // ─── Send a 6-digit OTP code to the email ─────────────────
+  // Replaces password signup. Supabase's signInWithOtp creates the
+  // user if they don't exist (shouldCreateUser default true) and
+  // emails a code. If the address is invalid, the user never
+  // receives a code and the verification step fails — no more
+  // false-positive "confirmation sent" claims for typo'd emails.
+  const sendEmailOtp = useCallback(async ({ email }) => {
+    setAuthError(null);
+    const { error } = await supabase.auth.signInWithOtp({
+      email,
+      options: { shouldCreateUser: true },
+    });
+    if (error) { setAuthError(error.message); return false; }
+    return true;
+  }, []);
 
-  // With email confirmation OFF, Supabase auto-signs the user in.
-  // If the session is null here, it means the email already exists.
-  if (!data.session) {
-    setAuthError('This email is already registered. Please sign in instead.');
-    return false;
-  }
-  return true;
-}, []);
+  // ─── Verify the OTP code from the user's email ────────────
+  const verifyEmailOtp = useCallback(async ({ email, token }) => {
+    setAuthError(null);
+    const { error } = await supabase.auth.verifyOtp({
+      email,
+      token: token.trim(),
+      type: 'email',
+    });
+    if (error) { setAuthError(error.message); return false; }
+    return true;
+  }, []);
 
-  // ─── Sign in ───────────────────────────────────────────────
+  // ─── Sign in (password) — kept for existing users ─────────
   const signIn = useCallback(async ({ email, password }) => {
     setAuthError(null);
     const { error } = await supabase.auth.signInWithPassword({ email, password });
@@ -131,7 +140,8 @@ export function useAuth() {
     loading,
     authError,
     setAuthError,
-    signUp,
+    sendEmailOtp,
+    verifyEmailOtp,
     signIn,
     signInWithGoogle,
     signOut,
