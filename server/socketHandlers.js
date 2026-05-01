@@ -242,6 +242,12 @@ function registerSocketHandlers(io, socket) {
       const room = await getRoom(roomCode);
       if (!room) return callback({ success: false, error: 'Room not found' });
       if (room.hostSocketId !== socket.id) return callback({ success: false, error: 'Not the host' });
+      // Physical-mode only: online uses end_turn / start_next_round
+      if (room.mode !== engine.MODES.PHYSICAL) return callback({ success: false, error: 'Use end_turn / start_next_round in online mode' });
+      // Only valid from these phases — playing or round_end
+      if (!['playing', 'round_end'].includes(room.phase)) {
+        return callback({ success: false, error: `Cannot advance turn from phase '${room.phase}'` });
+      }
 
       engine.advanceTurn(room);
 
