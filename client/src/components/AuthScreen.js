@@ -61,34 +61,25 @@ function Divider() {
   );
 }
 
-// ─── AuthScreen — passwordless ────────────────────────────────
+// ─── AuthScreen — passwordless, magic-link only ───────────────
 // Single email field. signInWithOtp creates the user if new and
-// signs in if existing — there's no need for a separate "create
-// account" tab. Google OAuth lives alongside as an alternative.
-export function AuthScreen({ onSendEmailOtp, onVerifyEmailOtp, onGoogleSignIn, error, setError }) {
+// signs in if existing — same flow either way. The email contains
+// a magic link; clicking it opens an authenticated session. We don't
+// ask for the OTP code separately because the link makes that step
+// redundant.
+export function AuthScreen({ onSendEmailOtp, onGoogleSignIn, error, setError }) {
   const [email, setEmail] = useState('');
-  const [otpCode, setOtpCode] = useState('');
-  const [stage, setStage] = useState('email'); // 'email' | 'code'
+  const [stage, setStage] = useState('email'); // 'email' | 'sent'
   const [submitting, setSubmitting] = useState(false);
 
-  const handleSendOtp = async (e) => {
+  const handleSendLink = async (e) => {
     e.preventDefault();
     setError(null);
     if (!email.trim()) return setError('Enter your email');
     setSubmitting(true);
     const ok = await onSendEmailOtp({ email: email.trim() });
     setSubmitting(false);
-    if (ok) setStage('code');
-  };
-
-  const handleVerifyOtp = async (e) => {
-    e.preventDefault();
-    setError(null);
-    if (otpCode.trim().length < 6) return setError('Enter the 6-digit code from your email');
-    setSubmitting(true);
-    await onVerifyEmailOtp({ email: email.trim(), token: otpCode });
-    setSubmitting(false);
-    // Successful verification triggers onAuthStateChange — page transitions automatically.
+    if (ok) setStage('sent');
   };
 
   return (
@@ -148,7 +139,7 @@ export function AuthScreen({ onSendEmailOtp, onVerifyEmailOtp, onGoogleSignIn, e
           <Divider />
 
           {stage === 'email' && (
-            <form onSubmit={handleSendOtp} style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+            <form onSubmit={handleSendLink} style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
               <div>
                 <label style={{ fontSize: 10, color: 'var(--text-dim)', letterSpacing: '0.1em', display: 'block', marginBottom: 5 }}>
                   EMAIL
@@ -164,7 +155,7 @@ export function AuthScreen({ onSendEmailOtp, onVerifyEmailOtp, onGoogleSignIn, e
                   style={INPUT_STYLE}
                 />
                 <div style={{ fontSize: 11, color: 'var(--text-dim)', marginTop: 6, lineHeight: 1.5 }}>
-                  We'll send a 6-digit code. No password required — same flow whether you've played before or not.
+                  We'll email a sign-in link. No password required — same flow whether you've played before or not.
                 </div>
               </div>
               <button type="submit" className="primary" style={{ padding: '12px', marginTop: 4 }} disabled={submitting}>
@@ -173,41 +164,25 @@ export function AuthScreen({ onSendEmailOtp, onVerifyEmailOtp, onGoogleSignIn, e
             </form>
           )}
 
-          {stage === 'code' && (
-            <form onSubmit={handleVerifyOtp} style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-              <div style={{ fontSize: 12, color: 'var(--text-dim)', lineHeight: 1.6 }}>
-                Code sent to <strong style={{ color: 'var(--text)' }}>{email}</strong>. Check your inbox (and spam).
-                If you don't receive one in a minute, the address may be wrong.
+          {stage === 'sent' && (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 14, textAlign: 'center' }}>
+              <div style={{ fontSize: 32, lineHeight: 1, marginTop: 4 }}>📬</div>
+              <div style={{ fontSize: 14, color: 'var(--text)', lineHeight: 1.6 }}>
+                Sign-in link sent to<br />
+                <strong style={{ color: 'var(--accent)' }}>{email}</strong>
               </div>
-              <div>
-                <label style={{ fontSize: 10, color: 'var(--text-dim)', letterSpacing: '0.1em', display: 'block', marginBottom: 5 }}>
-                  6-DIGIT CODE
-                </label>
-                <input
-                  type="text"
-                  inputMode="numeric"
-                  pattern="[0-9]*"
-                  value={otpCode}
-                  onChange={e => setOtpCode(e.target.value.replace(/\D/g, '').slice(0, 6))}
-                  placeholder="123456"
-                  maxLength={6}
-                  autoComplete="one-time-code"
-                  autoFocus
-                  required
-                  style={{ ...INPUT_STYLE, letterSpacing: '0.4em', fontSize: 18, fontWeight: 700, textAlign: 'center' }}
-                />
+              <div style={{ fontSize: 11, color: 'var(--text-dim)', lineHeight: 1.6 }}>
+                Open the email and click the link to sign in.<br />
+                Check spam if it doesn't arrive within a minute — the address might be wrong.
               </div>
-              <button type="submit" className="primary" style={{ padding: '12px', marginTop: 4 }} disabled={submitting || otpCode.length < 6}>
-                {submitting ? 'Verifying…' : 'Sign In →'}
-              </button>
               <button
                 type="button"
-                onClick={() => { setStage('email'); setOtpCode(''); setError(null); }}
-                style={{ fontSize: 11, padding: '8px', background: 'none', border: 'none', color: 'var(--text-dim)', cursor: 'pointer' }}
+                onClick={() => { setStage('email'); setError(null); }}
+                style={{ fontSize: 11, padding: '8px', background: 'none', border: 'none', color: 'var(--text-dim)', cursor: 'pointer', marginTop: 4 }}
               >
                 ← Use a different email
               </button>
-            </form>
+            </div>
           )}
         </div>
       </div>
