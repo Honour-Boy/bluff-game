@@ -313,6 +313,21 @@ export function useGame(getAccessToken) {
     });
   }, [socket, roomCode]);
 
+  // ─── v2 Phase B — power-card activation ──────────────────
+  // Emits the activate_power_card event with the active room code.
+  // Returns a Promise<{ success, power, consumed, peekedCard?, ...
+  // error? }> so the caller (UI) can decide what to render — Peek
+  // returns a privately-known peekedCard, every other power just
+  // arms the player and the UI flips on the next room_state.
+  const activatePowerCard = useCallback(() => {
+    return new Promise((resolve) => {
+      socket.emit('activate_power_card', { roomCode }, (res) => {
+        if (!res?.success) setError(res?.error || 'Could not activate');
+        resolve(res);
+      });
+    });
+  }, [socket, roomCode]);
+
   const sendChatMessage = useCallback((text) => {
     if (!roomCode || !text?.trim()) return;
     socket.emit('send_chat_message', { roomCode, text: text.trim() }, (res) => {
@@ -375,6 +390,7 @@ export function useGame(getAccessToken) {
     openChat,
     closeChat,
     leaveGame,
+    activatePowerCard,
     setError,
   };
 }
