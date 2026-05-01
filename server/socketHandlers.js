@@ -322,6 +322,11 @@ function registerSocketHandlers(io, socket) {
           const currentPlayerId = room.turnOrder[room.currentTurnIndex];
           if (currentPlayerId) engine.drawCardForPlayer(room, currentPlayerId);
         }
+      } else if (room.mode === engine.MODES.ONLINE) {
+        // v2 Section 7: surviving a spin in online mode discards the
+        // hand and deals 6 fresh cards. Redemption Spin survivors get
+        // 3 instead — that path will plug in here in Phase E1.
+        engine.resetHandOnSurvival(room, player.id, 6);
       }
 
       room.phase = 'playing';
@@ -492,6 +497,50 @@ function registerSocketHandlers(io, socket) {
       callback({ success: true, card: result.card });
     } catch (err) {
       callback({ success: false, error: err.message });
+    }
+  });
+
+  // ─── PLAYER: Activate a power card (v2 Phase B) ──────────
+  // Activation happens at TURN START — before any card play or
+  // bluff call. Most powers ARM (effect resolves later, Phase C);
+  // Peek is consumed-on-use and reveals the lastPlayedCard privately
+  // to the activator.
+  socket.on('activate_power_card', async ({ roomCode } = {}, callback) => {
+    try {
+      if (!socket.userId) return callback?.({ success: false, error: 'Not authenticated' });
+
+      const code = roomCode?.toUpperCase();
+      const room = await getRoom(code);
+      if (!room) return callback?.({ success: false, error: 'Room not found' });
+
+      const result = engine.activatePowerCard(room, socket.userId);
+      if (!result.ok) return callback?.({ success: false, error: result.error });
+
+      await saveRoom(room);
+      await broadcastRoomState(io, code);
+
+      // Peek is the only power that returns a private payload right
+      // now — the peeked card. Other powers respond success-only and
+      // the holder's UI flips to "armed" via the room_state update.
+      if (result.power === 'peek') {
+        return callback?.({
+          success: true,
+          power: 'peek',
+          consumed: true,
+          peekedCard: result.peekedCard || null,
+          cardId: result.cardId,
+        });
+      }
+
+      return callback?.({
+        success: true,
+        power: result.power,
+        consumed: false,
+        cardId: result.cardId,
+      });
+    } catch (err) {
+      console.error('[activate_power_card]', err);
+      callback?.({ success: false, error: err.message });
     }
   });
 
