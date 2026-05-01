@@ -21,6 +21,14 @@ export function useGame(getAccessToken) {
   // Shared spin-overlay dismiss signal
   const [spinDismissed, setSpinDismissed] = useState(false);
 
+  // Chat — local mirror of room.chatLog plus live-arrival messages.
+  // We dedupe by id so room_state replays (on reconnect) don't double-add.
+  const [chatMessages, setChatMessages] = useState([]);
+  const [chatUnread, setChatUnread] = useState(0);
+  const [chatOpen, setChatOpen] = useState(false);
+  const chatOpenRef = useRef(false);
+  useEffect(() => { chatOpenRef.current = chatOpen; }, [chatOpen]);
+
   // ─── Show transient notification ──────────────────────────
   // Use a ref-tracked timer so back-to-back notifications don't
   // wipe each other (older setTimeout firing on the newer message).
@@ -39,6 +47,9 @@ export function useGame(getAccessToken) {
     setPlayerId(null);
     setIsHost(false);
     setRoomState(null);
+    setChatMessages([]);
+    setChatUnread(0);
+    setChatOpen(false);
   }, []);
 
   // Persist session so page refresh can reconnect
@@ -136,6 +147,23 @@ useEffect(() => {
     const onRoomState = (state) => {
       setRoomState(state);
       if (state?.lastAction?.type === 'spin_result') setSpinDismissed(false);
+      // Sync chat history on (re)connect — dedupe by id so the live
+      // chat_message handler and the room_state replay don't fight.
+      if (Array.isArray(state?.chatLog)) {
+        setChatMessages((prev) => {
+          const seen = new Set(prev.map(m => m.id));
+          const additions = state.chatLog.filter(m => !seen.has(m.id));
+          return additions.length ? [...prev, ...additions] : prev;
+        });
+      }
+    };
+    const onChatMessage = (msg) => {
+      if (!msg?.id) return;
+      setChatMessages((prev) => {
+        if (prev.some(m => m.id === msg.id)) return prev;
+        return [...prev, msg];
+      });
+      if (!chatOpenRef.current) setChatUnread((n) => n + 1);
     };
     const onBluffCalled = () => notify('⚠️ Bluff called! Host: reveal the last card.', 'warning');
     const onSpinAcknowledged = () => setSpinDismissed(true);
@@ -151,6 +179,7 @@ useEffect(() => {
     socket.on('connect', onConnect);
     socket.on('disconnect', onDisconnect);
     socket.on('room_state', onRoomState);
+    socket.on('chat_message', onChatMessage);
     socket.on('bluff_called', onBluffCalled);
     socket.on('spin_acknowledged', onSpinAcknowledged);
     socket.on('host_disconnecting', onHostDisconnecting);
@@ -160,6 +189,7 @@ useEffect(() => {
       socket.off('connect', onConnect);
       socket.off('disconnect', onDisconnect);
       socket.off('room_state', onRoomState);
+      socket.off('chat_message', onChatMessage);
       socket.off('bluff_called', onBluffCalled);
       socket.off('spin_acknowledged', onSpinAcknowledged);
       socket.off('host_disconnecting', onHostDisconnecting);
@@ -274,6 +304,19 @@ useEffect(() => {
     });
   }, [socket, roomCode]);
 
+  const sendChatMessage = useCallback((text) => {
+    if (!roomCode || !text?.trim()) return;
+    socket.emit('send_chat_message', { roomCode, text: text.trim() }, (res) => {
+      if (!res?.success) setError(res?.error || 'Failed to send');
+    });
+  }, [socket, roomCode]);
+
+  const openChat = useCallback(() => {
+    setChatOpen(true);
+    setChatUnread(0);
+  }, []);
+  const closeChat = useCallback(() => setChatOpen(false), []);
+
   const leaveGame = useCallback(() => {
   if (roomCode) socket.emit('leave_room', { roomCode, playerId });
   sessionStorage.removeItem('bluff_session');
@@ -301,6 +344,9 @@ useEffect(() => {
     authenticated,
     notification,
     spinDismissed,
+    chatMessages,
+    chatUnread,
+    chatOpen,
     // Actions
     createRoom,
     joinRoom,
@@ -316,6 +362,9 @@ useEffect(() => {
     playCardOnline,
     startNextRound,
     spectatePlayer,
+    sendChatMessage,
+    openChat,
+    closeChat,
     leaveGame,
     setError,
   };

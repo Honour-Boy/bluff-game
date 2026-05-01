@@ -121,7 +121,29 @@ function createRoom(hostSocketId, mode = MODES.PHYSICAL) {
     hands: null,
     currentCard: null,
     lastPlayedCard: null,
+    chatLog: [],   // [{ id, userId, username, text, ts }] — capped at CHAT_LOG_MAX
   };
+}
+
+const CHAT_LOG_MAX = 50;
+const CHAT_TEXT_MAX = 500;
+
+function appendChatMessage(room, { userId, username, text }) {
+  if (!room.chatLog) room.chatLog = [];
+  const trimmed = String(text || '').slice(0, CHAT_TEXT_MAX).trim();
+  if (!trimmed) return null;
+  const msg = {
+    id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+    userId,
+    username,
+    text: trimmed,
+    ts: Date.now(),
+  };
+  room.chatLog.push(msg);
+  if (room.chatLog.length > CHAT_LOG_MAX) {
+    room.chatLog.splice(0, room.chatLog.length - CHAT_LOG_MAX);
+  }
+  return msg;
 }
 
 /**
@@ -430,6 +452,7 @@ function serializeRoom(room, requestingPlayerId = null) {
     myHand: isOnline && requestingPlayerId && room.hands
       ? (room.hands.get(requestingPlayerId) || [])
       : undefined,
+    chatLog: room.chatLog || [],
   };
 }
 
@@ -468,4 +491,6 @@ module.exports = {
   resetRoundOnline,
   serializeRoom,
   getCurrentPlayer,
+  appendChatMessage,
+  CHAT_TEXT_MAX,
 };

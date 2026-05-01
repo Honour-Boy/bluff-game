@@ -11,6 +11,7 @@ import { HostUI } from '../components/HostUI';
 import { PlayerUI } from '../components/PlayerUI';
 import { OnlinePlayerUI } from '../components/OnlinePlayerUI';
 import { Notification } from '../components/Notification';
+import { ChatPanel } from '../components/ChatPanel';
 
 // Inner component that safely calls useSearchParams inside a Suspense boundary
 function HomeContent() {
@@ -36,6 +37,8 @@ function HomeContent() {
     declareRoundWin, callBluff,
     playCardOnline, startNextRound, spectatePlayer,
     acknowledgeSpinResult, spinDismissed,
+    chatMessages, chatUnread, chatOpen,
+    sendChatMessage, openChat, closeChat,
     leaveGame, setError,
   } = game;
 
@@ -79,6 +82,17 @@ function HomeContent() {
     <div style={{ minHeight: '100vh', padding: '24px 16px' }}>
       <Notification notification={notification} />
       {children}
+      {roomCode && (
+        <ChatPanel
+          messages={chatMessages}
+          unread={chatUnread}
+          open={chatOpen}
+          onOpen={openChat}
+          onClose={closeChat}
+          onSend={sendChatMessage}
+          myUserId={user?.id}
+        />
+      )}
     </div>
   );
 
