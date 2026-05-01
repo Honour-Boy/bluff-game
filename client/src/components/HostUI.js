@@ -162,12 +162,16 @@ export function HostUI({
   const [cylinderRotation, setCylinderRotation] = useState(0);
   const [cylinderAnimating, setCylinderAnimating] = useState(false);
 
-  // When spin target clicks Continue → spinDismissed fires → auto-close overlay for host too
+  // Spin target clicks Continue → spinDismissed fires for everyone.
+  // Defer the dismiss until the local cylinder animation has completed,
+  // so slow clients still see the verdict instead of the overlay vanishing
+  // mid-spin.
   useEffect(() => {
-    if (spinDismissed && spinData) {
+    if (spinDismissed && spinData && spinComplete) {
       setSpinData(null);
+      setSpinComplete(false);
     }
-  }, [spinDismissed]); // eslint-disable-line
+  }, [spinDismissed, spinComplete]); // eslint-disable-line
 
   useEffect(() => {
     const action = roomState?.lastAction;
