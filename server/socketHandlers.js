@@ -740,10 +740,23 @@ function registerSocketHandlers(io, socket) {
       if (!player || player.status === 'eliminated') continue;
 
       if (room.phase === 'lobby') {
-        const idx = room.players.findIndex(p => p.id === player.id);
-        if (idx !== -1) room.players.splice(idx, 1);
-        await saveRoom(room);
-        await broadcastRoomState(io, code);
+        // 10s grace in lobby too — hitting refresh in the lobby used
+        // to drop you instantly and risk a "name taken" race if
+        // someone else joined fast. Same per-(roomCode,playerId)
+        // timer mechanism as the in-game grace.
+        const key = dcKey(code, player.id);
+        const capturedSocketId = socket.id;
+        const timer = setTimeout(async () => {
+          const still = room.players.find(p => p.id === player.id && p.socketId === capturedSocketId);
+          if (still) {
+            const idx = room.players.findIndex(p => p.id === still.id);
+            if (idx !== -1) room.players.splice(idx, 1);
+            await saveRoom(room);
+            await broadcastRoomState(io, code);
+          }
+          playerDisconnectTimers.delete(key);
+        }, 10000);
+        playerDisconnectTimers.set(key, timer);
         continue;
       }
 
