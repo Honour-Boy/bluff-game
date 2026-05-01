@@ -40,6 +40,7 @@ function HomeContent() {
     chatMessages, chatUnread, chatOpen,
     sendChatMessage, openChat, closeChat,
     leaveGame, setError,
+    activatePowerCard,
   } = game;
 
   // Voice — opt-in via Join Voice button. Hook tears down on roomCode change.
@@ -133,6 +134,7 @@ function HomeContent() {
           leaveGame={leaveGame}
           acknowledgeSpinResult={acknowledgeSpinResult}
           spinDismissed={spinDismissed}
+          activatePowerCard={activatePowerCard}
           voice={voice}
         />
       );
@@ -171,6 +173,7 @@ function HomeContent() {
           leaveGame={leaveGame}
           acknowledgeSpinResult={acknowledgeSpinResult}
           spinDismissed={spinDismissed}
+          activatePowerCard={activatePowerCard}
           voice={voice}
         />
       );

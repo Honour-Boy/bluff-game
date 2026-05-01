@@ -8,6 +8,7 @@ import { ActionLog } from './ActionLog';
 import { HowToPlayModal } from './HowToPlayModal';
 import { TurnActionModal, WaitingForPlayerBanner } from './TurnActionModal';
 import { VoicePanel, VoiceIndicator } from './VoicePanel';
+import { PowerCard, POWER_META } from './PowerCard';
 
 // ─── Constants ────────────────────────────────────────────────
 const SHAPES = ['circle', 'triangle', 'cross', 'square', 'star'];
@@ -282,6 +283,7 @@ export function OnlinePlayerUI({
   leaveGame,
   acknowledgeSpinResult,
   spinDismissed,
+  activatePowerCard,
   voice,
 }) {
   const [showHowToPlay, setShowHowToPlay] = useState(false);
@@ -307,6 +309,18 @@ export function OnlinePlayerUI({
   const prevStatusRef = useRef(null);
   const pendingEliminatedRef = useRef(false);
   const [justEliminated, setJustEliminated] = useState(false);
+
+  // ─── v2 Phase B — power card activation prompt ──────────
+  // Shown at the START of the local player's turn when they hold a
+  // power card and haven't yet decided whether to activate. Dismissed
+  // (skipped or activated) for the duration of this turn — we tag
+  // the dismissal with a turn key so a fresh turn re-prompts.
+  // peekedCard is the privately-revealed card on Peek activation; it
+  // displays for ~3 seconds then auto-dismisses.
+  const [powerPromptTurnKey, setPowerPromptTurnKey] = useState(null);
+  const [powerPromptDismissedFor, setPowerPromptDismissedFor] = useState(null);
+  const [peekedCard, setPeekedCard] = useState(null);
+  const [activating, setActivating] = useState(false);
 
   // Trigger spin overlay when a spin_result arrives
   useEffect(() => {
@@ -399,6 +413,21 @@ export function OnlinePlayerUI({
     }
   }, [isMyTurn, roomState?.phase, roomState?.cardPlayedThisTurn]); // eslint-disable-line
 
+  // ─── v2 Phase B — auto-dismiss the peeked card preview ──
+  useEffect(() => {
+    if (!peekedCard) return;
+    const t = setTimeout(() => setPeekedCard(null), 3000);
+    return () => clearTimeout(t);
+  }, [peekedCard]);
+
+  // ─── v2 Phase B — track the current turn key ────────────
+  // When the active turn key changes, reset the prompt-dismissed
+  // flag so a brand-new turn shows the prompt again.
+  useEffect(() => {
+    if (!isMyTurn) return;
+    setPowerPromptTurnKey(myTurnKey);
+  }, [myTurnKey, isMyTurn]);
+
   if (!roomState || !myPlayer) {
     return (
       <div style={{ color: 'var(--text-dim)', textAlign: 'center', padding: 40 }}>
@@ -417,6 +446,16 @@ export function OnlinePlayerUI({
   const isEliminated = myPlayer.status === 'eliminated';
   const isSpectator = myPlayer.isSpectator;
   const showSpectatorView = isEliminated || isSpectator;
+
+  // ─── Derive: do we have a power card to activate? ────────
+  // The held power card is whatever power-typed card is currently
+  // in myHand. There's at most one (hand cap = 1).
+  const heldPowerCard = (roomState?.myHand || []).find(c => c?.type === 'power') || null;
+  const armedPowerCard = myPlayer?.armedPowerCard || null;
+  // Build a turn key that changes whenever a fresh turn for me starts.
+  // We key on (currentPlayerId, turnIndex, roundNumber) so a re-deal
+  // during the same turn doesn't re-trigger the prompt.
+  const myTurnKey = `${roomState?.currentPlayerId || ''}:${roomState?.currentTurnIndex || 0}:${roomState?.roundNumber || 0}`;
 
   const isPlaying = phase === 'playing';
   const isSpinPending = phase === 'spin_pending';
@@ -465,6 +504,51 @@ export function OnlinePlayerUI({
     spectatePlayer(targetId, (res) => {
       setSpectatedHand(res.hand || []);
     });
+  };
+
+  // ─── v2 Phase B — power card activation prompt visibility ─
+  // Only show when:
+  //  - it's my turn AND we're in 'playing'
+  //  - I'm alive (not eliminated/spectator)
+  //  - I haven't already played a card or used bluff this turn
+  //  - I hold a power card
+  //  - I haven't already armed something this turn
+  //  - I haven't dismissed the prompt for this exact turn
+  //  - the previous spin overlay isn't still up
+  const showPowerPrompt =
+    isMyTurn &&
+    !isEliminated &&
+    !showSpectatorView &&
+    roomState?.phase === 'playing' &&
+    !roomState?.cardPlayedThisTurn &&
+    !roomState?.bluffUsedThisTurn &&
+    !!heldPowerCard &&
+    !armedPowerCard &&
+    powerPromptDismissedFor !== powerPromptTurnKey &&
+    !spinData &&
+    !justEliminated;
+
+  const handleActivatePower = async () => {
+    if (!activatePowerCard || activating) return;
+    setActivating(true);
+    try {
+      const res = await activatePowerCard();
+      // Always dismiss the prompt for this turn so we don't loop on
+      // an error.
+      setPowerPromptDismissedFor(powerPromptTurnKey);
+      if (res?.success && res?.power === 'peek') {
+        // Show the peeked card briefly. lastPlayedCard may be null
+        // (no card has been played yet this round) — render that
+        // explicitly rather than crash.
+        setPeekedCard(res.peekedCard || { _empty: true });
+      }
+    } finally {
+      setActivating(false);
+    }
+  };
+
+  const handleSkipPower = () => {
+    setPowerPromptDismissedFor(powerPromptTurnKey);
   };
 
   return (
@@ -1080,9 +1164,11 @@ export function OnlinePlayerUI({
       {/* How to Play modal */}
       {showHowToPlay && <HowToPlayModal onClose={() => setShowHowToPlay(false)} initialTab="online" />}
 
-      {/* Turn action modal — shown to active player at turn start */}
+      {/* Turn action modal — shown to active player at turn start.
+          Suppressed while the power-card prompt is up so the player
+          decides activation FIRST (per spec). */}
       <TurnActionModal
-        visible={showTurnModal && !isEliminated}
+        visible={showTurnModal && !isEliminated && !showPowerPrompt && !peekedCard}
         isFirstTurn={isFirstTurn}
         bluffUsed={bluffUsedThisTurn}
         cardPlayed={cardPlayedThisTurn}
@@ -1090,6 +1176,122 @@ export function OnlinePlayerUI({
         onCallBluff={() => { callBluff(); setShowTurnModal(false); }}
         onClose={() => setShowTurnModal(false)}
       />
+
+      {/* ── v2 Phase B — Power-card activation prompt ── */}
+      {showPowerPrompt && heldPowerCard && (
+        <div style={{
+          position: 'fixed', inset: 0,
+          background: 'rgba(0,0,0,0.85)',
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          zIndex: 8400, padding: 24,
+        }}>
+          <div className="card fade-in" style={{
+            maxWidth: 360, width: '100%', textAlign: 'center',
+            padding: '28px 24px',
+            border: `1px solid ${POWER_META[heldPowerCard.power]?.color || 'var(--accent)'}`,
+          }}>
+            <div style={{
+              fontSize: 10, color: 'var(--text-dim)',
+              letterSpacing: '0.15em', marginBottom: 14,
+            }}>
+              POWER CARD
+            </div>
+            <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 18 }}>
+              <PowerCard type={heldPowerCard.power} size="md" />
+            </div>
+            <div style={{
+              fontFamily: "'Bebas Neue', sans-serif",
+              fontSize: 22, letterSpacing: '0.08em',
+              color: POWER_META[heldPowerCard.power]?.color || 'var(--accent)',
+              marginBottom: 8,
+            }}>
+              Activate {POWER_META[heldPowerCard.power]?.label || heldPowerCard.power}?
+            </div>
+            <div style={{ fontSize: 12, color: 'var(--text-dim)', marginBottom: 20, lineHeight: 1.5 }}>
+              {POWER_META[heldPowerCard.power]?.flavor || ''}
+            </div>
+            <div style={{ display: 'flex', gap: 10 }}>
+              <button
+                className="primary"
+                onClick={handleActivatePower}
+                disabled={activating}
+                style={{ flex: 1, padding: '12px' }}
+              >
+                {activating ? '…' : '⚡ Activate'}
+              </button>
+              <button
+                onClick={handleSkipPower}
+                style={{
+                  flex: 1, padding: '12px',
+                  background: 'var(--surface2)',
+                  border: '1px solid var(--border)',
+                  borderRadius: 'var(--radius)',
+                  color: 'var(--text-dim)',
+                  cursor: 'pointer', fontSize: 13,
+                }}
+              >
+                Skip
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── v2 Phase B — Peek result reveal (private, ~3s) ── */}
+      {peekedCard && (
+        <div style={{
+          position: 'fixed', inset: 0,
+          background: 'rgba(0,0,0,0.92)',
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          zIndex: 8500, padding: 24,
+        }}>
+          <div className="card fade-in" style={{
+            maxWidth: 320, width: '100%', textAlign: 'center',
+            padding: '28px 24px',
+            border: `1px solid ${POWER_META.peek.color}`,
+          }}>
+            <div style={{
+              fontSize: 10, color: POWER_META.peek.color,
+              letterSpacing: '0.15em', marginBottom: 14,
+            }}>
+              PEEK · LAST PLAYED
+            </div>
+            {peekedCard?._empty || !peekedCard?.shape ? (
+              <div style={{ fontSize: 14, color: 'var(--text-dim)', padding: '20px 0' }}>
+                No card has been played yet this round.
+              </div>
+            ) : (
+              <div style={{
+                display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 10,
+                padding: '12px 0',
+              }}>
+                <div style={{
+                  width: 80, height: 112,
+                  background: 'var(--surface2)',
+                  border: '2px solid var(--accent)',
+                  borderRadius: 8,
+                  display: 'flex', flexDirection: 'column',
+                  alignItems: 'center', justifyContent: 'center',
+                  gap: 8,
+                  boxShadow: '0 0 20px rgba(232,255,74,0.2)',
+                  animation: 'cardFlipIn 0.5s ease-out',
+                }}>
+                  <ShapeIcon shape={peekedCard.shape} size={36} />
+                  <div style={{ fontSize: 20, fontWeight: 700, color: 'var(--text)', fontFamily: "'Bebas Neue', sans-serif" }}>
+                    {peekedCard.shape === 'whot' ? 'WHOT' : peekedCard.number}
+                  </div>
+                </div>
+                <div style={{ fontSize: 12, color: 'var(--text-dim)', textTransform: 'capitalize' }}>
+                  {peekedCard.shape === 'whot' ? 'Whot (wild)' : `${peekedCard.shape} ${peekedCard.number}`}
+                </div>
+              </div>
+            )}
+            <div style={{ fontSize: 11, color: 'var(--text-dim)', marginTop: 16, fontStyle: 'italic' }}>
+              Only you can see this. Closing in a moment...
+            </div>
+          </div>
+        </div>
+      )}
 
       <style>{`
         @keyframes pulse {
