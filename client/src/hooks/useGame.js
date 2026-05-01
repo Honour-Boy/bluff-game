@@ -211,9 +211,13 @@ export function useGame(getAccessToken) {
 
   /**
    * Create a room. In online mode, host is also auto-joined as a player on the server.
+   * `config` is the v2 settings object (host-only toggles); when omitted the
+   * server falls back to its safe defaults. Pure plumbing for now — nothing
+   * reads it yet.
    */
-  const createRoom = useCallback((mode = 'physical') => {
-    socket.emit('create_room', { mode }, (res) => {
+  const createRoom = useCallback((mode = 'physical', config) => {
+    const payload = config ? { mode, config } : { mode };
+    socket.emit('create_room', payload, (res) => {
       if (res.success) {
         setRoomCode(res.roomCode);
         setIsHost(true);
