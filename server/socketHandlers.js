@@ -51,8 +51,13 @@ async function broadcastRoomState(io, roomCode) {
 
 const hostDisconnectTimers = new Map();
 
+// Player disconnect timers must be visible across socket connections —
+// reconnect arrives on a NEW socket and needs to cancel the OLD socket's
+// elimination timer. Key: `${roomCode}:${playerId}`.
+const playerDisconnectTimers = new Map();
+const dcKey = (code, playerId) => `${code}:${playerId}`;
+
 function registerSocketHandlers(io, socket) {
-  const disconnectTimers = new Map();
 
   // ─── AUTHENTICATE socket with Supabase JWT ───────────────
   // Must be called once after connecting, before any game events.
@@ -198,10 +203,10 @@ function registerSocketHandlers(io, socket) {
       const player = room.players.find(p => p.id === socket.userId);
       if (!player) return callback({ success: false, error: 'Player not found' });
 
-      const oldSocketId = player.socketId;
-      if (disconnectTimers.has(oldSocketId)) {
-        clearTimeout(disconnectTimers.get(oldSocketId));
-        disconnectTimers.delete(oldSocketId);
+      const key = dcKey(code, socket.userId);
+      if (playerDisconnectTimers.has(key)) {
+        clearTimeout(playerDisconnectTimers.get(key));
+        playerDisconnectTimers.delete(key);
       }
 
       engine.reconnectPlayer(room, socket.userId, socket.id);
@@ -579,9 +584,12 @@ function registerSocketHandlers(io, socket) {
       const room = await getRoom(code);
       if (!room) return;
 
-      if (disconnectTimers.has(socket.id)) {
-        clearTimeout(disconnectTimers.get(socket.id));
-        disconnectTimers.delete(socket.id);
+      if (playerId) {
+        const key = dcKey(code, playerId);
+        if (playerDisconnectTimers.has(key)) {
+          clearTimeout(playerDisconnectTimers.get(key));
+          playerDisconnectTimers.delete(key);
+        }
       }
 
       const idx = room.players.findIndex(p => p.id === playerId);
@@ -636,10 +644,16 @@ function registerSocketHandlers(io, socket) {
       if (['playing', 'bluff_resolution', 'spin_pending'].includes(room.phase)) {
         io.to(code).emit('player_disconnecting', { playerId: player.id, playerName: player.username });
 
+        const key = dcKey(code, player.id);
+        const capturedSocketId = socket.id;
+
         const timer = setTimeout(async () => {
-          const still = room.players.find(p => p.id === player.id && p.socketId === socket.id);
+          // Re-check against the captured socket id — if the player
+          // reconnected on a new socket, room.players[i].socketId will
+          // have changed and we should NOT eliminate.
+          const still = room.players.find(p => p.id === player.id && p.socketId === capturedSocketId);
           if (still?.status === 'alive') {
-            const eliminated = engine.handleDisconnect(room, socket.id);
+            const eliminated = engine.handleDisconnect(room, capturedSocketId);
             if (eliminated) {
               room.lastAction = { type: 'disconnected', playerId: eliminated.id, playerName: eliminated.username };
               const winner = engine.checkGameOver(room);
@@ -651,10 +665,10 @@ function registerSocketHandlers(io, socket) {
               await broadcastRoomState(io, code);
             }
           }
-          disconnectTimers.delete(socket.id);
+          playerDisconnectTimers.delete(key);
         }, 30000);
 
-        disconnectTimers.set(socket.id, timer);
+        playerDisconnectTimers.set(key, timer);
       }
     }
   });
