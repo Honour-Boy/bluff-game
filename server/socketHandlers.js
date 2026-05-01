@@ -398,6 +398,13 @@ function registerSocketHandlers(io, socket) {
       if (playerId !== currentPlayerId) return callback({ success: false, error: 'Not your turn' });
       if (room.bluffUsedThisTurn) return callback({ success: false, error: 'Bluff already called this turn' });
       if (room.isFirstTurn) return callback({ success: false, error: 'Cannot call bluff on the first turn' });
+      // Phase C — Freeze: the previous "turn" was skipped, so there's
+      // no card on the table to challenge. Set in advanceTurn after a
+      // freeze fires; cleared on the next end_turn (when this turn's
+      // own advanceTurn resets the flag).
+      if (room.bluffBlockedThisTurn) {
+        return callback({ success: false, error: 'No card to challenge — last turn was frozen' });
+      }
 
       room.bluffUsedThisTurn = true;
       const callerPlayer = room.players.find(p => p.id === playerId);
@@ -563,6 +570,16 @@ function registerSocketHandlers(io, socket) {
         }
       }
 
+      // ─── v2 Phase C — Freeze trigger ────────────────────
+      // Fire BEFORE advanceTurn so the engine sees the armed freeze
+      // and can stamp room.skipNextPlayer = true. advanceTurn then
+      // burns the extra step and sets bluffBlockedThisTurn for the
+      // player who actually inherits the next turn.
+      let freezeTrigger = null;
+      if (room.mode === engine.MODES.ONLINE) {
+        freezeTrigger = engine.consumeFreezeOnTurnEnd(room, playerId);
+      }
+
       room.cardPlayedThisTurn = false;
       room.bluffUsedThisTurn = false;
       engine.advanceTurn(room);
@@ -575,6 +592,13 @@ function registerSocketHandlers(io, socket) {
 
       await saveRoom(room);
       await broadcastRoomState(io, code);
+
+      // Announce the freeze AFTER the room_state broadcast so clients
+      // already see the new currentPlayerId when the banner fires.
+      if (freezeTrigger) {
+        io.to(code).emit('power_card_triggered', freezeTrigger);
+      }
+
       callback({ success: true });
     } catch (err) {
       callback({ success: false, error: err.message });
