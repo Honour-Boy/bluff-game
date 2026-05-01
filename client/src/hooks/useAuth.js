@@ -76,18 +76,6 @@ export function useAuth() {
     return true;
   }, []);
 
-  // ─── Verify the OTP code from the user's email ────────────
-  const verifyEmailOtp = useCallback(async ({ email, token }) => {
-    setAuthError(null);
-    const { error } = await supabase.auth.verifyOtp({
-      email,
-      token: token.trim(),
-      type: 'email',
-    });
-    if (error) { setAuthError(error.message); return false; }
-    return true;
-  }, []);
-
   // ─── Google OAuth ──────────────────────────────────────────
   const signInWithGoogle = useCallback(async () => {
     setAuthError(null);
@@ -135,7 +123,6 @@ export function useAuth() {
     authError,
     setAuthError,
     sendEmailOtp,
-    verifyEmailOtp,
     signInWithGoogle,
     signOut,
     updateUsername,
