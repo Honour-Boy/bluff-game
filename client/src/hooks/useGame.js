@@ -22,9 +22,16 @@ export function useGame(getAccessToken) {
   const [spinDismissed, setSpinDismissed] = useState(false);
 
   // ─── Show transient notification ──────────────────────────
+  // Use a ref-tracked timer so back-to-back notifications don't
+  // wipe each other (older setTimeout firing on the newer message).
+  const notifyTimerRef = useRef(null);
   const notify = useCallback((msg, type = 'info') => {
+    if (notifyTimerRef.current) clearTimeout(notifyTimerRef.current);
     setNotification({ msg, type, id: Date.now() });
-    setTimeout(() => setNotification(null), 3500);
+    notifyTimerRef.current = setTimeout(() => {
+      setNotification(null);
+      notifyTimerRef.current = null;
+    }, 3500);
   }, []);
 
   const clearSession = useCallback(() => {
