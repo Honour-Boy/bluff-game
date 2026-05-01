@@ -7,6 +7,16 @@ const SHAPES = ['circle', 'triangle', 'cross', 'square', 'star'];
 const MAX_PLAYERS = 15;
 const CHAMBER_SIZE = 6;
 
+// ─── v2 power-card vocabulary ─────────────────────────────────
+// Card.type discriminator: existing shape/whot cards = 'shape'.
+// Power cards = 'power' and additionally carry a `power` slug.
+// Phase B is pure plumbing — actual EFFECTS land in Phase C.
+const CARD_TYPES_DISCRIMINATOR = {
+  SHAPE: 'shape',
+  POWER: 'power',
+};
+const POWER_TYPES = ['shield', 'mirror', 'swap', 'peek', 'freeze', 'assassin'];
+
 const MODES = {
   PHYSICAL: 'physical',
   ONLINE: 'online',
@@ -93,10 +103,10 @@ function generateDeck() {
   let idCounter = 0;
   for (const shape of SHAPES) {
     for (let num = 1; num <= 14; num++) {
-      cards.push({ id: `${shape}-${num}-${idCounter++}`, shape, number: num });
+      cards.push({ id: `${shape}-${num}-${idCounter++}`, type: 'shape', shape, number: num });
     }
   }
-  cards.push({ id: `whot-20-${idCounter++}`, shape: 'whot', number: 20 });
+  cards.push({ id: `whot-20-${idCounter++}`, type: 'shape', shape: 'whot', number: 20 });
   return cards;
 }
 
@@ -109,10 +119,49 @@ function shuffleDeck(cards) {
   return a;
 }
 
-function buildDeck(playerCount) {
+// ─── Power card construction ──────────────────────────────────
+// Power cards have NO shape and NO number — they are a wholly
+// distinct card kind. The `power` slug identifies which effect the
+// card carries; effects themselves arrive in Phase C.
+//
+// Spec note (locked): copiesPerDeck SCALES with double deck.
+// If copiesPerDeck=1 and the table is double-deck (>10 players),
+// each enabled power type gets 2 copies, not 1. If copiesPerDeck=2
+// in a double deck, each enabled type gets 4. This matches "one copy
+// per deck and two copies in a double-deck game" reading literally.
+let _powerIdCounter = 0;
+function _nextPowerId(power) {
+  return `power-${power}-${Date.now().toString(36)}-${(_powerIdCounter++).toString(36)}`;
+}
+
+function buildPowerCards(config, playerCount) {
+  if (!config || !config.powerCards || !config.powerCards.enabled) return [];
+  const enabled = config.powerCards.enabled;
+  const baseCopies = Number.isFinite(config.powerCards.copiesPerDeck)
+    ? Math.max(1, Math.min(2, Math.floor(config.powerCards.copiesPerDeck)))
+    : 1;
+  const deckMultiplier = playerCount > 10 ? 2 : 1;
+  const totalCopies = baseCopies * deckMultiplier;
+
+  const cards = [];
+  for (const power of POWER_TYPES) {
+    if (!enabled[power]) continue;
+    for (let i = 0; i < totalCopies; i++) {
+      cards.push({
+        id: _nextPowerId(power),
+        type: 'power',
+        power,
+      });
+    }
+  }
+  return cards;
+}
+
+function buildDeck(playerCount, config = null) {
   const base = generateDeck();
   const full = playerCount > 10 ? [...base, ...generateDeck()] : base;
-  return shuffleDeck(full);
+  const powers = buildPowerCards(config, playerCount);
+  return shuffleDeck([...full, ...powers]);
 }
 
 function dealCards(deck, orderedPlayerIds, cardsPerPlayer = 6) {
@@ -200,6 +249,11 @@ function createRoom(hostSocketId, mode = MODES.PHYSICAL, config = null) {
     // Always normalised so unknown keys / bad types from clients
     // can't corrupt room state.
     config: normalizeRoomConfig(config),
+    // v2 power-card discard pile — over-cap power cards from the
+    // initial deal/draw land here. Initialised on demand to keep
+    // physical-mode rooms lean, but startGame/resetRoundOnline
+    // create it eagerly anyway.
+    discardPile: [],
   };
 }
 
@@ -227,6 +281,12 @@ function appendChatMessage(room, { userId, username, text }) {
 /**
  * Create a new player.
  * chamber is always initialised here (backend only — never on client).
+ *
+ * v2 fields (Phase B):
+ *   armedPowerCard — null | { power, cardId, activatedAtTurn }.
+ *     null = not armed. When set, the player has activated a power
+ *     at start-of-turn and the trigger logic in Phase C will look
+ *     here to decide whether the effect fires.
  */
 function createPlayer(id, username, socketId) {
   return {
@@ -238,6 +298,7 @@ function createPlayer(id, username, socketId) {
     riskLevel: 1,                // = bullet count; kept for RiskMeter display
     isSpectator: false,
     connectedAt: Date.now(),
+    armedPowerCard: null,        // v2 — Phase B plumbing, no triggers yet
   };
 }
 
@@ -268,6 +329,12 @@ function getCurrentPlayer(room) {
 
 function advanceTurn(room) {
   if (!room.turnOrder.length) return room;
+
+  // Capture which player is finishing their turn BEFORE we advance;
+  // their id is what we credit for Swap "they took a turn" tracking.
+  const finishingPlayerId = room.turnOrder[room.currentTurnIndex] || null;
+  if (finishingPlayerId) _creditSwapTurnFor(room, finishingPlayerId);
+
   room.currentTurnIndex = (room.currentTurnIndex + 1) % room.turnOrder.length;
   room.lastAction = null;
   room.phase = 'playing';
@@ -275,6 +342,41 @@ function advanceTurn(room) {
   room.cardPlayedThisTurn = false;
   room.isFirstTurn = false;
   return room;
+}
+
+/**
+ * Walk every Swap card in every hand and remove `playerId` from its
+ * pending-set (the set of "alive players who must still take a turn
+ * before this Swap is activatable"). When the set empties, the Swap
+ * is activatable. Called when a player ends their turn.
+ */
+function _creditSwapTurnFor(room, playerId) {
+  if (!room.hands) return;
+  for (const hand of room.hands.values()) {
+    if (!hand) continue;
+    for (const card of hand) {
+      if (card?.type === 'power' && card.power === 'swap' && Array.isArray(card.swapPendingPlayerIds)) {
+        card.swapPendingPlayerIds = card.swapPendingPlayerIds.filter(id => id !== playerId);
+      }
+    }
+  }
+}
+
+/**
+ * Eliminations remove a player from every Swap snapshot WITHOUT
+ * crediting (locked decision — eliminating someone shouldn't unlock
+ * a Swap mechanically). Called from elimination paths.
+ */
+function _removePlayerFromSwapSnapshots(room, playerId) {
+  if (!room.hands) return;
+  for (const hand of room.hands.values()) {
+    if (!hand) continue;
+    for (const card of hand) {
+      if (card?.type === 'power' && card.power === 'swap' && Array.isArray(card.swapPendingPlayerIds)) {
+        card.swapPendingPlayerIds = card.swapPendingPlayerIds.filter(id => id !== playerId);
+      }
+    }
+  }
 }
 
 // ─── Game start ────────────────────────────────────────────────
@@ -291,19 +393,33 @@ function startGame(room) {
   room.lastAction = null;
   room.isFirstTurn = true;
   room.lastPlayedCard = null;
+  room.discardPile = room.discardPile || [];
 
   if (room.mode === MODES.ONLINE) {
-    const deck = buildDeck(alivePlayers.length);
+    const deck = buildDeck(alivePlayers.length, room.config);
     const { hands, remainingDeck } = dealCards(deck, room.turnOrder, 6);
     room.hands = hands;
     room.deck = remainingDeck;
     room.playedPile = [];
 
-    let startIdx = room.deck.findIndex(c => c.shape !== 'whot');
+    // Power-card hand-cap normalisation: a player may hold at most
+    // ONE power card. (Collector role lifts this in Phase D — until
+    // then, 1 is the universal cap.) Any extras from the initial
+    // deal go to discardPile, replaced with shape cards drawn from
+    // the top of the remaining deck (option (b) in the Phase B spec).
+    _normalisePowerCardHandCap(room);
+
+    // Snapshot Swap "every alive player took a turn since the card
+    // entered the hand" tracker on every Swap that landed in a hand.
+    _snapshotSwapHolders(room);
+
+    // Start card must be a shape card (not Whot wild, not power).
+    let startIdx = room.deck.findIndex(c => c.type === 'shape' && c.shape !== 'whot');
+    if (startIdx === -1) startIdx = room.deck.findIndex(c => c.type === 'shape');
     if (startIdx === -1) startIdx = 0;
     const [startCard] = room.deck.splice(startIdx, 1);
     room.currentCard = startCard;
-    room.currentCardType = startCard.shape;
+    room.currentCardType = startCard?.shape || null;
   } else {
     room.currentCardType = randomCardType();
     room.deck = null;
@@ -313,6 +429,99 @@ function startGame(room) {
   }
 
   return room;
+}
+
+// ─── Power-card hand bookkeeping ──────────────────────────────
+
+function _countPowerCardsInHand(hand) {
+  if (!hand) return 0;
+  let n = 0;
+  for (const c of hand) if (c?.type === 'power') n++;
+  return n;
+}
+
+function _hasPowerCardInHand(hand) {
+  return _countPowerCardsInHand(hand) > 0;
+}
+
+/**
+ * After an initial deal, walk every player's hand and move any
+ * extras over the 1-power-card cap into room.discardPile, replacing
+ * them with shape cards taken from the top of room.deck. If the
+ * deck runs dry of shape cards, the slot stays empty (caller can
+ * decide what to do — in practice the deck is always large enough).
+ */
+function _normalisePowerCardHandCap(room) {
+  if (!room.discardPile) room.discardPile = [];
+  const cap = 1; // Phase D Collector will override per-player.
+
+  for (const [pid, hand] of room.hands.entries()) {
+    if (!hand) continue;
+    let powerCount = _countPowerCardsInHand(hand);
+    while (powerCount > cap) {
+      // Find an extra power card, push to discard, replace with shape.
+      const extraIdx = hand.findIndex(c => c?.type === 'power');
+      // Re-find from the END to peel off the most-recently-placed
+      // duplicate; equivalent for correctness, just a touch tidier.
+      const tailIdx = (() => {
+        for (let i = hand.length - 1; i >= 0; i--) if (hand[i]?.type === 'power') return i;
+        return extraIdx;
+      })();
+      // Skip the FIRST power card (the one we keep) by finding the
+      // second-from-front, falling back to the tail.
+      let removeIdx = -1;
+      let seen = 0;
+      for (let i = 0; i < hand.length; i++) {
+        if (hand[i]?.type === 'power') {
+          seen++;
+          if (seen > cap) { removeIdx = i; break; }
+        }
+      }
+      if (removeIdx === -1) removeIdx = tailIdx;
+
+      const [extra] = hand.splice(removeIdx, 1);
+      room.discardPile.push(extra);
+
+      // Replace from deck — must be a shape card.
+      const shapeIdx = room.deck.findIndex(c => c?.type === 'shape');
+      if (shapeIdx === -1) {
+        // No shape replacement available — leave hand short. In
+        // practice the deck is always >> hand size, so this branch
+        // should be unreachable in a real game. Surface a warning.
+        console.warn('[engine] _normalisePowerCardHandCap: no shape card available for replacement');
+        break;
+      }
+      const [shape] = room.deck.splice(shapeIdx, 1);
+      hand.push(shape);
+      powerCount = _countPowerCardsInHand(hand);
+    }
+  }
+}
+
+/**
+ * For every alive player, look at the Swap cards in their hand and
+ * stamp the "alive playerIds who must take a turn before this Swap
+ * is activatable" snapshot. Idempotent — won't overwrite an existing
+ * snapshot. Decision: eliminations remove from the set without
+ * crediting (locked, see roadmap).
+ *
+ * Stored as an array (not a Set) so it round-trips through JSON
+ * cleanly — myHand is sent over the wire to the holding player.
+ */
+function _snapshotSwapHolders(room) {
+  if (!room.hands) return;
+  const aliveIds = room.players.filter(p => p.status === 'alive').map(p => p.id);
+  for (const [pid, hand] of room.hands.entries()) {
+    if (!hand) continue;
+    for (const card of hand) {
+      if (card?.type === 'power' && card.power === 'swap' && !card.swapPendingPlayerIds) {
+        // Per-Swap-card tracking. Snapshot at the moment it lands.
+        // Player who holds the card is excluded (they obviously can't
+        // gate themselves — the rule is "every OTHER alive player").
+        card.swapPendingPlayerIds = aliveIds.filter(id => id !== pid);
+      }
+    }
+  }
 }
 
 // ─── Online-mode card play ─────────────────────────────────────
@@ -343,13 +552,156 @@ function ensureDrawPile(room) {
   room.playedPile = [topCard];
 }
 
+/**
+ * Draw a card for a player, honouring the v2 power-card hand cap.
+ *
+ * Rule (Phase B, locked): a player may hold at most ONE power card.
+ * If the next card off the deck is a power card and the player is
+ * already holding one, the would-be-drawn card is moved to
+ * room.discardPile and we try again. This loops until either a
+ * shape card lands in the hand or the deck is exhausted of viable
+ * cards.
+ *
+ * Edge case: if no eligible card can be dealt (deck empty, OR every
+ * remaining card is a power card and the player is capped), returns
+ * null and logs a warning. In practice this should not happen.
+ *
+ * Returns the card actually placed in the player's hand, or null.
+ */
 function drawCardForPlayer(room, playerId) {
-  ensureDrawPile(room);
-  if (room.deck.length === 0) return null;
-  const card = room.deck.shift();
-  const hand = room.hands.get(playerId);
-  if (hand) hand.push(card);
-  return card;
+  if (!room.discardPile) room.discardPile = [];
+  const hand = room.hands?.get(playerId);
+  if (!hand) return null;
+
+  // Loop with a safety bound — at worst we'd churn the entire deck,
+  // so cap iterations at deck size + played pile size + 1 to never
+  // spin forever even if state is corrupted.
+  let safety = (room.deck?.length || 0) + (room.playedPile?.length || 0) + 4;
+  while (safety-- > 0) {
+    ensureDrawPile(room);
+    if (!room.deck || room.deck.length === 0) {
+      console.warn('[engine] drawCardForPlayer: deck exhausted with no eligible card');
+      return null;
+    }
+    const card = room.deck.shift();
+
+    if (card?.type === 'power' && _hasPowerCardInHand(hand)) {
+      // Hand-cap collision — discard and try again.
+      room.discardPile.push(card);
+      continue;
+    }
+
+    hand.push(card);
+
+    // If we just placed a Swap into this hand, snapshot the alive
+    // playerIds at this moment for activation gating.
+    if (card?.type === 'power' && card.power === 'swap' && !card.swapPendingPlayerIds) {
+      const aliveIds = room.players.filter(p => p.status === 'alive').map(p => p.id);
+      card.swapPendingPlayerIds = aliveIds.filter(id => id !== playerId);
+    }
+
+    return card;
+  }
+  console.warn('[engine] drawCardForPlayer: safety bound exceeded');
+  return null;
+}
+
+// ─── Power card activation (Phase B) ──────────────────────────
+// Pure plumbing — actual EFFECTS arrive in Phase C. This fn is the
+// engine-side validator + state mutator for the activate_power_card
+// socket event. Returns { ok, ...detail } so the caller can decide
+// what to broadcast.
+//
+// Special cases:
+//   - peek: consumed-on-use. Card moves to discardPile, the caller
+//     gets `peekedCard` (the room.lastPlayedCard at activation time,
+//     or null). armedPowerCard stays null because the effect already
+//     resolved at activation.
+//   - all others: card stays in hand but is marked `armed = true` so
+//     it can never accidentally be played as if it were a shape card.
+//     player.armedPowerCard records { power, cardId, activatedAtTurn }
+//     so Phase C trigger logic can find it.
+
+function _findPowerCardInHand(hand) {
+  if (!hand) return null;
+  for (const card of hand) {
+    if (card?.type === 'power') return card;
+  }
+  return null;
+}
+
+/**
+ * Is the given Swap card eligible to be activated right now?
+ * Swap requires that every alive player at the time the card landed
+ * has since taken at least one turn.
+ */
+function isSwapActivatable(card) {
+  if (!card || card.power !== 'swap') return false;
+  if (!Array.isArray(card.swapPendingPlayerIds)) return true; // no snapshot = no gate
+  return card.swapPendingPlayerIds.length === 0;
+}
+
+function activatePowerCard(room, playerId) {
+  if (room.mode !== MODES.ONLINE) return { ok: false, error: 'Online mode only' };
+  if (room.phase !== 'playing') return { ok: false, error: 'Wrong phase' };
+
+  const currentPlayerId = room.turnOrder[room.currentTurnIndex];
+  if (currentPlayerId !== playerId) return { ok: false, error: 'Not your turn' };
+
+  if (room.cardPlayedThisTurn) return { ok: false, error: 'Card already played this turn' };
+  if (room.bluffUsedThisTurn)  return { ok: false, error: 'Bluff already called this turn' };
+
+  const player = room.players.find(p => p.id === playerId);
+  if (!player) return { ok: false, error: 'Player not found' };
+  if (player.status !== 'alive') return { ok: false, error: 'Player not alive' };
+  if (player.armedPowerCard)    return { ok: false, error: 'Already armed' };
+
+  const hand = room.hands?.get(playerId);
+  const powerCard = _findPowerCardInHand(hand);
+  if (!powerCard) return { ok: false, error: 'No power card in hand' };
+
+  // Swap activatability gate.
+  if (powerCard.power === 'swap' && !isSwapActivatable(powerCard)) {
+    return { ok: false, error: 'Swap not yet activatable — every alive player must take a turn first' };
+  }
+
+  if (!room.discardPile) room.discardPile = [];
+
+  // Peek: consumed-on-use. The card leaves the hand immediately,
+  // armedPowerCard stays null.
+  if (powerCard.power === 'peek') {
+    const idx = hand.indexOf(powerCard);
+    if (idx !== -1) hand.splice(idx, 1);
+    room.discardPile.push(powerCard);
+    const peekedCard = room.lastPlayedCard || null;
+    return {
+      ok: true,
+      power: 'peek',
+      consumed: true,
+      peekedCard,
+      cardId: powerCard.id,
+    };
+  }
+
+  // All other powers: arm the player and mark the card as armed in
+  // the hand. The card itself stays in the hand and is consumed on
+  // trigger (Phase C). Marking it armed is defensive — power cards
+  // already aren't playable as shape cards because they have no
+  // shape, but armed makes the intent explicit and gives Phase C a
+  // simple flag to gate "is this Shield ready to fire".
+  powerCard.armed = true;
+  player.armedPowerCard = {
+    power: powerCard.power,
+    cardId: powerCard.id,
+    activatedAtTurn: room.currentTurnIndex, // turn index when armed
+  };
+
+  return {
+    ok: true,
+    power: powerCard.power,
+    consumed: false,
+    cardId: powerCard.id,
+  };
 }
 
 // ─── Bluff resolution ──────────────────────────────────────────
@@ -410,19 +762,30 @@ function resolveBluff(room, bluffIsCorrect) {
 
 function resetRoundOnline(room) {
   const alivePlayers = room.players.filter(p => p.status === 'alive');
-  const deck = buildDeck(alivePlayers.length);
+  const deck = buildDeck(alivePlayers.length, room.config);
   const aliveIds = alivePlayers.map(p => p.id);
 
   const { hands, remainingDeck } = dealCards(deck, aliveIds, 6);
   room.hands = hands;
   room.deck = remainingDeck;
   room.playedPile = [];
+  room.discardPile = room.discardPile || [];
 
-  let startIdx = room.deck.findIndex(c => c.shape !== 'whot');
+  // Same hand-cap normalisation as startGame — power cards never
+  // stack, even on round reset.
+  _normalisePowerCardHandCap(room);
+  _snapshotSwapHolders(room);
+
+  // Round reset clears any armed power cards — armed state does not
+  // carry across rounds.
+  for (const p of alivePlayers) p.armedPowerCard = null;
+
+  let startIdx = room.deck.findIndex(c => c.type === 'shape' && c.shape !== 'whot');
+  if (startIdx === -1) startIdx = room.deck.findIndex(c => c.type === 'shape');
   if (startIdx === -1) startIdx = 0;
   const [startCard] = room.deck.splice(startIdx, 1);
   room.currentCard = startCard;
-  room.currentCardType = startCard.shape;
+  room.currentCardType = startCard?.shape || null;
 
   room.phase = 'playing';
   room.lastAction = null;
@@ -449,6 +812,55 @@ function spinGun(player) {
   return { eliminated, spinIndex, chamber, riskLevel: bulletCount };
 }
 
+/**
+ * Survive-and-reset (Section 7 of v2 spec, locked):
+ *   When an online-mode player SURVIVES a spin, their existing hand
+ *   is discarded and they are dealt a fresh batch of cards.
+ *
+ *   - Normal spin survival → 6 fresh cards.
+ *   - Redemption Spin survival → 3 fresh cards. (Redemption Spin
+ *     itself ships in Phase E1; this fn accepts a `cardsToDeal`
+ *     parameter so the Phase E plug-in is a one-liner.)
+ *
+ *   Hand-cap rule applies during the fresh deal — `drawCardForPlayer`
+ *   already discards over-cap power cards onto room.discardPile and
+ *   reaches for shapes instead.
+ *
+ *   Armed power card is cleared on survival (the card was held in
+ *   the now-discarded hand and the spec says hand reset is total).
+ *
+ *   Returns the array of fresh cards dealt (caller can broadcast).
+ */
+function resetHandOnSurvival(room, playerId, cardsToDeal = 6) {
+  if (room.mode !== MODES.ONLINE) return [];
+  if (!room.hands) return [];
+
+  const player = room.players.find(p => p.id === playerId);
+  if (!player) return [];
+  if (player.status !== 'alive') return [];
+
+  if (!room.discardPile) room.discardPile = [];
+
+  const oldHand = room.hands.get(playerId) || [];
+  // Surface any power cards the player had into the discard pile too.
+  // The spec is "discard the existing hand" — power cards included.
+  for (const card of oldHand) {
+    room.discardPile.push(card);
+  }
+  room.hands.set(playerId, []);
+
+  // Armed power state is cleared: the card vanished with the hand.
+  player.armedPowerCard = null;
+
+  const dealt = [];
+  for (let i = 0; i < cardsToDeal; i++) {
+    const card = drawCardForPlayer(room, playerId);
+    if (card) dealt.push(card);
+    else break;
+  }
+  return dealt;
+}
+
 // ─── Utilities ─────────────────────────────────────────────────
 
 function eliminateFromTurnOrder(room, playerId) {
@@ -464,6 +876,10 @@ function eliminateFromTurnOrder(room, playerId) {
   if (room.turnOrder.length > 0) {
     room.currentTurnIndex = room.currentTurnIndex % room.turnOrder.length;
   }
+  // Eliminations remove from Swap pending sets WITHOUT crediting —
+  // a Swap shouldn't suddenly unlock just because someone died. The
+  // alive-set snapshot still mirrors the live alive set this way.
+  _removePlayerFromSwapSnapshots(room, playerId);
 }
 
 function handleDisconnect(room, socketId) {
@@ -512,6 +928,12 @@ function serializeRoom(room, requestingPlayerId = null) {
       chamber: p.chamber,            // ← full chamber exposed to all clients
       isSpectator: p.isSpectator,
       handSize: isOnline && room.hands ? (room.hands.get(p.id) || []).length : undefined,
+      // armedPowerCard is exposed publicly so UI can hint that this
+      // player has a power ready (e.g. "armed: shield"). Phase B
+      // ships the field; effects + announce banners come in Phase C.
+      armedPowerCard: p.armedPowerCard
+        ? { power: p.armedPowerCard.power }
+        : null,
     })),
     turnOrder: room.turnOrder,
     currentTurnIndex: room.currentTurnIndex,
@@ -527,6 +949,7 @@ function serializeRoom(room, requestingPlayerId = null) {
     isFirstTurn: room.isFirstTurn || false,
     deckSize: isOnline && room.deck ? room.deck.length : undefined,
     playedPileSize: isOnline && room.playedPile ? room.playedPile.length : undefined,
+    discardPileSize: isOnline && room.discardPile ? room.discardPile.length : undefined,
     myHand: isOnline && requestingPlayerId && room.hands
       ? (room.hands.get(requestingPlayerId) || [])
       : undefined,
@@ -539,6 +962,7 @@ module.exports = {
   MODES,
   CARD_TYPES,
   SHAPES,
+  POWER_TYPES,
   MAX_PLAYERS,
   CHAMBER_SIZE,
   generateRoomCode,
@@ -549,6 +973,7 @@ module.exports = {
   generateDeck,
   shuffleDeck,
   buildDeck,
+  buildPowerCards,
   dealCards,
   initChamber,
   addBulletToChamber,
@@ -559,6 +984,7 @@ module.exports = {
   advanceTurn,
   newCardType,
   spinGun,
+  resetHandOnSurvival,
   resolveBluff,
   resolveBluffOnline,
   eliminateFromTurnOrder,
@@ -570,6 +996,8 @@ module.exports = {
   ensureDrawPile,
   drawCardForPlayer,
   resetRoundOnline,
+  activatePowerCard,
+  isSwapActivatable,
   serializeRoom,
   getCurrentPlayer,
   appendChatMessage,
