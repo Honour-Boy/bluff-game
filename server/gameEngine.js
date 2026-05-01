@@ -121,7 +121,29 @@ function createRoom(hostSocketId, mode = MODES.PHYSICAL) {
     hands: null,
     currentCard: null,
     lastPlayedCard: null,
+    chatLog: [],   // [{ id, userId, username, text, ts }] — capped at CHAT_LOG_MAX
   };
+}
+
+const CHAT_LOG_MAX = 50;
+const CHAT_TEXT_MAX = 500;
+
+function appendChatMessage(room, { userId, username, text }) {
+  if (!room.chatLog) room.chatLog = [];
+  const trimmed = String(text || '').slice(0, CHAT_TEXT_MAX).trim();
+  if (!trimmed) return null;
+  const msg = {
+    id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+    userId,
+    username,
+    text: trimmed,
+    ts: Date.now(),
+  };
+  room.chatLog.push(msg);
+  if (room.chatLog.length > CHAT_LOG_MAX) {
+    room.chatLog.splice(0, room.chatLog.length - CHAT_LOG_MAX);
+  }
+  return msg;
 }
 
 /**
@@ -302,6 +324,11 @@ function resolveBluff(room, bluffIsCorrect) {
 }
 
 // ─── Online round reset ────────────────────────────────────────
+// NOTE: chamber state is intentionally preserved across rounds.
+// Bullets accumulated in earlier rounds carry into the next so that
+// tension escalates the longer the game runs — surviving 5 spins is
+// supposed to feel earned. To reset chambers between rounds, clear
+// player.chamber + riskLevel before the resumed turn.
 
 function resetRoundOnline(room) {
   const alivePlayers = room.players.filter(p => p.status === 'alive');
@@ -350,7 +377,10 @@ function eliminateFromTurnOrder(room, playerId) {
   const idx = room.turnOrder.indexOf(playerId);
   if (idx === -1) return;
   room.turnOrder.splice(idx, 1);
-  if (idx <= room.currentTurnIndex && room.currentTurnIndex > 0) {
+  // Splice already advanced the position for idx === currentTurnIndex
+  // (the next player slid into the eliminated player's slot). Only
+  // decrement when an earlier-positioned player was removed.
+  if (idx < room.currentTurnIndex) {
     room.currentTurnIndex--;
   }
   if (room.turnOrder.length > 0) {
@@ -422,6 +452,7 @@ function serializeRoom(room, requestingPlayerId = null) {
     myHand: isOnline && requestingPlayerId && room.hands
       ? (room.hands.get(requestingPlayerId) || [])
       : undefined,
+    chatLog: room.chatLog || [],
   };
 }
 
@@ -460,4 +491,6 @@ module.exports = {
   resetRoundOnline,
   serializeRoom,
   getCurrentPlayer,
+  appendChatMessage,
+  CHAT_TEXT_MAX,
 };

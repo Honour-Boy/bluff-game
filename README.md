@@ -31,12 +31,28 @@ Open `http://localhost:3000` in your browser. One person opens it as **Host**, o
 
 ## Environment Variables
 
+**Server** — create `server/.env`:
+```
+PORT=3001
+CLIENT_URL=http://localhost:3000          # Required in production; comma-separated allowed
+SUPABASE_URL=https://<project>.supabase.co
+SUPABASE_SERVICE_ROLE_KEY=<service-role>  # NEVER expose to the browser
+LIVEKIT_URL=wss://<project>.livekit.cloud # Voice chat
+LIVEKIT_API_KEY=...
+LIVEKIT_API_SECRET=...
+NODE_ENV=production                        # Hard-fails boot if CLIENT_URL is unset in prod
+```
+
 **Client** — create `client/.env.local`:
 ```
 NEXT_PUBLIC_SERVER_URL=http://localhost:3001
+NEXT_PUBLIC_SUPABASE_URL=https://<project>.supabase.co
+NEXT_PUBLIC_SUPABASE_ANON_KEY=<anon-key>
+NEXT_PUBLIC_LIVEKIT_URL=wss://<project>.livekit.cloud
+NEXT_PUBLIC_APP_URL=http://localhost:3000
 ```
 
-For production, set this to your deployed server URL.
+The `.env.example` files in each directory ship default values for local dev — defaults assume the server on `:3001` and the client on `:3000`. Keep both files aligned.
 
 ---
 
@@ -97,15 +113,19 @@ bluff-game/
    - **Bluff Wrong** — the accuser spins the gun
 
 ### Gun Spin Mechanic
-- Each player has `riskLevel` starting at 1
-- On spin: roll random 1–6
-- If `roll ≤ riskLevel` → **ELIMINATED**
-- Else → **SURVIVE**, `riskLevel += 1` (max 6)
+Each player has a 6-slot revolver chamber. The chamber starts with **1 bullet** placed at a random position. Bullets are placed by the backend only — the frontend renders exactly what the backend returns.
+
+- On spin: server picks a random slot index (0–5)
+- If that slot has a bullet → **ELIMINATED**
+- Otherwise → **SURVIVE**, and a new bullet is added to a random empty slot for next time
+
+So the more spins you survive, the more loaded your chamber gets. After 5 survivals you're at 5 bullets / 6 slots — basically guaranteed dead next spin.
 
 ### Round End
-- When a player physically plays their last (5th) card, host clicks **🏆 Win** on their row
-- That player is declared round winner; others reshuffle their physical cards
-- Host clicks **Next Turn** to continue
+- When a player plays their last card (online: empties their hand; physical: host clicks **🏆 Win** on their row), they're the round winner.
+- The deck reshuffles and a new round begins with all surviving players.
+- **Chamber state persists across rounds.** A player who survived 4 spins in round 1 enters round 2 with 5 bullets in their chamber. This is intentional — tension is supposed to escalate as the game runs long.
+- Host clicks **Next Turn** (physical) or **Start Next Round** (online) to continue.
 
 ### Winning
 - Players are eliminated one by one via gun spins
@@ -115,13 +135,21 @@ bluff-game/
 
 ## Reconnection
 
-Session data is stored in `localStorage`:
-- `bluff_roomCode` — the room code
-- `bluff_playerId` — the player's UUID
-- `bluff_isHost` — whether this client is the host
+Session data is stored in `sessionStorage` under a single key `bluff_session`:
+```json
+{ "roomCode": "ABCDEF", "isHost": false, "playerId": "<supabase-user-id>" }
+```
 
-On page refresh, the client automatically reconnects and restores state.
-If the room no longer exists (server restarted), storage is cleared.
+On page refresh, the client emits `host_reconnect` or `player_reconnect` once the socket has been authenticated with Supabase. If the room no longer exists (server restarted, host left for >30s), the failure callback clears the saved session and the user lands back at the lobby.
+
+`sessionStorage` clears when the tab closes — restore-after-tab-close is intentionally not supported.
+
+Server-side disconnect timers (in `socketHandlers.js`):
+- **Lobby** — 10s grace before a disconnected player is removed from the room
+- **In-game player** — 30s grace before auto-elimination
+- **Host** — 30s grace before the room is killed and `game_ended` broadcasts to all players
+
+Timers are keyed by `${roomCode}:${playerId}` and cleared on reconnect.
 
 ---
 

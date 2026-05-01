@@ -3,6 +3,7 @@
 // ============================================================
 
 const { createClient } = require('@supabase/supabase-js');
+const { AccessToken } = require('livekit-server-sdk');
 const engine = require('./gameEngine');
 
 // ─── Supabase admin client (server-side only) ─────────────────
@@ -51,8 +52,13 @@ async function broadcastRoomState(io, roomCode) {
 
 const hostDisconnectTimers = new Map();
 
+// Player disconnect timers must be visible across socket connections —
+// reconnect arrives on a NEW socket and needs to cancel the OLD socket's
+// elimination timer. Key: `${roomCode}:${playerId}`.
+const playerDisconnectTimers = new Map();
+const dcKey = (code, playerId) => `${code}:${playerId}`;
+
 function registerSocketHandlers(io, socket) {
-  const disconnectTimers = new Map();
 
   // ─── AUTHENTICATE socket with Supabase JWT ───────────────
   // Must be called once after connecting, before any game events.
@@ -157,9 +163,19 @@ function registerSocketHandlers(io, socket) {
   // ─── HOST: Reconnect after refresh ──────────────────────
   socket.on('host_reconnect', async ({ roomCode } = {}, callback) => {
     try {
+      if (!socket.userId) return callback({ success: false, error: 'Not authenticated' });
+
       const code = roomCode?.toUpperCase();
       const room = await getRoom(code);
       if (!room) return callback({ success: false, error: 'Room not found' });
+
+      // Only the original host may reseize the host seat. Without
+      // this check, anyone with the 6-char room code could call
+      // host_reconnect and gain host-only privileges (start_game,
+      // resolve_bluff, spectate_player, ...).
+      if (room.hostUserId && room.hostUserId !== socket.userId) {
+        return callback({ success: false, error: 'Not the host of this room' });
+      }
 
       if (hostDisconnectTimers.has(code)) {
         clearTimeout(hostDisconnectTimers.get(code));
@@ -188,10 +204,10 @@ function registerSocketHandlers(io, socket) {
       const player = room.players.find(p => p.id === socket.userId);
       if (!player) return callback({ success: false, error: 'Player not found' });
 
-      const oldSocketId = player.socketId;
-      if (disconnectTimers.has(oldSocketId)) {
-        clearTimeout(disconnectTimers.get(oldSocketId));
-        disconnectTimers.delete(oldSocketId);
+      const key = dcKey(code, socket.userId);
+      if (playerDisconnectTimers.has(key)) {
+        clearTimeout(playerDisconnectTimers.get(key));
+        playerDisconnectTimers.delete(key);
       }
 
       engine.reconnectPlayer(room, socket.userId, socket.id);
@@ -226,6 +242,12 @@ function registerSocketHandlers(io, socket) {
       const room = await getRoom(roomCode);
       if (!room) return callback({ success: false, error: 'Room not found' });
       if (room.hostSocketId !== socket.id) return callback({ success: false, error: 'Not the host' });
+      // Physical-mode only: online uses end_turn / start_next_round
+      if (room.mode !== engine.MODES.PHYSICAL) return callback({ success: false, error: 'Use end_turn / start_next_round in online mode' });
+      // Only valid from these phases — playing or round_end
+      if (!['playing', 'round_end'].includes(room.phase)) {
+        return callback({ success: false, error: `Cannot advance turn from phase '${room.phase}'` });
+      }
 
       engine.advanceTurn(room);
 
@@ -321,10 +343,14 @@ function registerSocketHandlers(io, socket) {
         ...(spinResult.eliminated ? { newCardType: room.currentCardType } : {}),
       };
 
+      // If this spin ended the game, hold the transition until the
+      // overlay is acknowledged — overwriting lastAction here would
+      // hide the spin animation from clients (they gate the overlay
+      // on lastAction.type === 'spin_result'). The transition runs
+      // in the spin_acknowledged handler.
       const gameOverWinner = engine.checkGameOver(room);
       if (gameOverWinner) {
-        room.phase = 'game_over';
-        room.lastAction = { type: 'game_over', winnerId: gameOverWinner.id, winnerName: gameOverWinner.username };
+        room.pendingGameOver = { id: gameOverWinner.id, name: gameOverWinner.username };
       }
 
       await saveRoom(room);
@@ -436,10 +462,20 @@ function registerSocketHandlers(io, socket) {
       if (room.turnOrder[room.currentTurnIndex] !== playerId) return callback({ success: false, error: 'Not your turn' });
       if (room.phase !== 'playing') return callback({ success: false, error: 'Cannot play card now' });
 
+      // Whot is wild — caller MUST nominate a valid shape. Without
+      // this, currentCardType silently held the previous shape and
+      // the next player's hand was misvalidated.
+      const cardPreview = room.hands?.get(playerId)?.find(c => c.id === cardId);
+      if (cardPreview?.shape === 'whot') {
+        if (!nominatedShape || !engine.SHAPES.includes(nominatedShape)) {
+          return callback({ success: false, error: 'Whot card must nominate a shape' });
+        }
+      }
+
       const result = engine.validateAndPlayCard(room, playerId, cardId);
       if (!result.ok) return callback({ success: false, error: result.error });
 
-      if (result.card.shape === 'whot' && nominatedShape && engine.SHAPES.includes(nominatedShape)) {
+      if (result.card.shape === 'whot') {
         room.currentCardType = nominatedShape;
       }
 
@@ -536,9 +572,111 @@ function registerSocketHandlers(io, socket) {
   });
 
   // ─── Spin result acknowledgement (synced overlay dismiss) ─
+  // Also where a game-ending spin transitions into the game_over
+  // phase — we hold that transition in player_spin so clients get
+  // to see the eliminating spin animation first.
   socket.on('spin_acknowledged', async ({ roomCode } = {}) => {
     const code = roomCode?.toUpperCase();
-    if (code) io.to(code).emit('spin_acknowledged');
+    if (!code) return;
+
+    const room = await getRoom(code);
+    if (room?.pendingGameOver) {
+      const { id, name } = room.pendingGameOver;
+      room.phase = 'game_over';
+      room.lastAction = { type: 'game_over', winnerId: id, winnerName: name };
+      delete room.pendingGameOver;
+      await saveRoom(room);
+      io.to(code).emit('spin_acknowledged');
+      await broadcastRoomState(io, code);
+      return;
+    }
+
+    io.to(code).emit('spin_acknowledged');
+  });
+
+  // ─── Chat: send a message ────────────────────────────────
+  // Rate-limited to 5 messages / 3s per socket. Stored in
+  // room.chatLog (capped at 50, broadcast in room_state for
+  // reconnect history) and emitted live via 'chat_message'.
+  socket.on('send_chat_message', async ({ roomCode, text } = {}, callback) => {
+    try {
+      if (!socket.userId) return callback?.({ success: false, error: 'Not authenticated' });
+
+      const code = roomCode?.toUpperCase();
+      const room = await getRoom(code);
+      if (!room) return callback?.({ success: false, error: 'Room not found' });
+
+      const isMember = room.players.some(p => p.id === socket.userId) || room.hostUserId === socket.userId;
+      if (!isMember) return callback?.({ success: false, error: 'Not a member of this room' });
+
+      // Rate limit: rolling 3-second window, max 5 messages
+      const now = Date.now();
+      socket.chatTimestamps = (socket.chatTimestamps || []).filter(t => now - t < 3000);
+      if (socket.chatTimestamps.length >= 5) {
+        return callback?.({ success: false, error: 'Sending too fast — slow down' });
+      }
+      socket.chatTimestamps.push(now);
+
+      const msg = engine.appendChatMessage(room, {
+        userId: socket.userId,
+        username: socket.username || 'Player',
+        text,
+      });
+      if (!msg) return callback?.({ success: false, error: 'Empty message' });
+
+      await saveRoom(room);
+      io.to(code).emit('chat_message', msg);
+      callback?.({ success: true, message: msg });
+    } catch (err) {
+      console.error('[send_chat_message]', err);
+      callback?.({ success: false, error: err.message });
+    }
+  });
+
+  // ─── Voice: mint a LiveKit access token ──────────────────
+  // Returns a JWT scoped to the LiveKit room `bluff:<roomCode>`.
+  // The caller must already be authenticated AND a member of the
+  // game room — we don't allow speculative voice access.
+  socket.on('request_voice_token', async ({ roomCode } = {}, callback) => {
+    try {
+      if (!socket.userId) return callback?.({ success: false, error: 'Not authenticated' });
+
+      const apiKey = process.env.LIVEKIT_API_KEY;
+      const apiSecret = process.env.LIVEKIT_API_SECRET;
+      if (!apiKey || !apiSecret) {
+        return callback?.({ success: false, error: 'Voice not configured on server' });
+      }
+
+      const code = roomCode?.toUpperCase();
+      const room = await getRoom(code);
+      if (!room) return callback?.({ success: false, error: 'Room not found' });
+
+      const isPlayer = room.players.some(p => p.id === socket.userId);
+      const isHost = room.hostUserId === socket.userId;
+      if (!isPlayer && !isHost) {
+        return callback?.({ success: false, error: 'Not a member of this room' });
+      }
+
+      const livekitRoom = `bluff:${code}`;
+      const at = new AccessToken(apiKey, apiSecret, {
+        identity: socket.userId,
+        name: socket.username || 'Player',
+        ttl: 60 * 60, // 1 hour — room sessions are short
+      });
+      at.addGrant({
+        room: livekitRoom,
+        roomJoin: true,
+        canPublish: true,
+        canSubscribe: true,
+        canPublishData: false,
+      });
+
+      const token = await at.toJwt();
+      callback?.({ success: true, token, livekitRoom });
+    } catch (err) {
+      console.error('[request_voice_token]', err);
+      callback?.({ success: false, error: err.message });
+    }
   });
 
   // ─── Intentional leave ───────────────────────────────────
@@ -548,9 +686,12 @@ function registerSocketHandlers(io, socket) {
       const room = await getRoom(code);
       if (!room) return;
 
-      if (disconnectTimers.has(socket.id)) {
-        clearTimeout(disconnectTimers.get(socket.id));
-        disconnectTimers.delete(socket.id);
+      if (playerId) {
+        const key = dcKey(code, playerId);
+        if (playerDisconnectTimers.has(key)) {
+          clearTimeout(playerDisconnectTimers.get(key));
+          playerDisconnectTimers.delete(key);
+        }
       }
 
       const idx = room.players.findIndex(p => p.id === playerId);
@@ -581,12 +722,16 @@ function registerSocketHandlers(io, socket) {
 
     for (const [code, room] of rooms.entries()) {
       if (room.hostSocketId === socket.id) {
-        io.to(code).emit('host_disconnecting', { countdown: 10 });
+        // 30s host grace — was 10s, but a normal browser refresh
+        // (page load + JS + socket connect + auth + host_reconnect)
+        // can take 5–8s on a cold cache, and 10s killed real games
+        // when the host just hit refresh. Matches the player timer.
+        io.to(code).emit('host_disconnecting', { countdown: 30 });
         const timer = setTimeout(() => {
           io.to(code).emit('game_ended', { reason: 'The host left the game.' });
           rooms.delete(code);
           hostDisconnectTimers.delete(code);
-        }, 10000);
+        }, 30000);
         hostDisconnectTimers.set(code, timer);
         continue;
       }
@@ -595,20 +740,39 @@ function registerSocketHandlers(io, socket) {
       if (!player || player.status === 'eliminated') continue;
 
       if (room.phase === 'lobby') {
-        const idx = room.players.findIndex(p => p.id === player.id);
-        if (idx !== -1) room.players.splice(idx, 1);
-        await saveRoom(room);
-        await broadcastRoomState(io, code);
+        // 10s grace in lobby too — hitting refresh in the lobby used
+        // to drop you instantly and risk a "name taken" race if
+        // someone else joined fast. Same per-(roomCode,playerId)
+        // timer mechanism as the in-game grace.
+        const key = dcKey(code, player.id);
+        const capturedSocketId = socket.id;
+        const timer = setTimeout(async () => {
+          const still = room.players.find(p => p.id === player.id && p.socketId === capturedSocketId);
+          if (still) {
+            const idx = room.players.findIndex(p => p.id === still.id);
+            if (idx !== -1) room.players.splice(idx, 1);
+            await saveRoom(room);
+            await broadcastRoomState(io, code);
+          }
+          playerDisconnectTimers.delete(key);
+        }, 10000);
+        playerDisconnectTimers.set(key, timer);
         continue;
       }
 
       if (['playing', 'bluff_resolution', 'spin_pending'].includes(room.phase)) {
         io.to(code).emit('player_disconnecting', { playerId: player.id, playerName: player.username });
 
+        const key = dcKey(code, player.id);
+        const capturedSocketId = socket.id;
+
         const timer = setTimeout(async () => {
-          const still = room.players.find(p => p.id === player.id && p.socketId === socket.id);
+          // Re-check against the captured socket id — if the player
+          // reconnected on a new socket, room.players[i].socketId will
+          // have changed and we should NOT eliminate.
+          const still = room.players.find(p => p.id === player.id && p.socketId === capturedSocketId);
           if (still?.status === 'alive') {
-            const eliminated = engine.handleDisconnect(room, socket.id);
+            const eliminated = engine.handleDisconnect(room, capturedSocketId);
             if (eliminated) {
               room.lastAction = { type: 'disconnected', playerId: eliminated.id, playerName: eliminated.username };
               const winner = engine.checkGameOver(room);
@@ -620,10 +784,10 @@ function registerSocketHandlers(io, socket) {
               await broadcastRoomState(io, code);
             }
           }
-          disconnectTimers.delete(socket.id);
+          playerDisconnectTimers.delete(key);
         }, 30000);
 
-        disconnectTimers.set(socket.id, timer);
+        playerDisconnectTimers.set(key, timer);
       }
     }
   });
