@@ -2,15 +2,39 @@
 
 // ─── ChatPanel — floating button + slide-in panel ─────────────
 //
-// Floating 💬 button bottom-right with unread badge. Click → opens
-// a panel: full-screen overlay on phones, side dock on desktop.
-// History is mirrored from room.chatLog (last 50 messages, in-memory
-// on the server). Plain text only, 500 char cap, server-side rate
-// limit at 5 msgs / 3 s.
+// Mobile-first. iOS safe-area aware. 16px font on inputs to prevent
+// iOS auto-zoom on focus. 44×44 minimum touch targets.
+//
+// Bubbles: left-aligned (theirs) vs right-aligned (mine), subtle
+// accent stripe on the sender side instead of a hard border. Name +
+// timestamp shown only on the first message of a run from the same
+// sender within 60 seconds. Plain backgrounds use the existing
+// surface tokens; radius pinned to the design-system 4px.
 
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 
 const TEXT_MAX = 500;
+const GROUP_WINDOW_MS = 60_000;
+
+// "12:34" — small, dim timestamp shown above first message in a run
+function formatTime(ts) {
+  try {
+    return new Date(ts).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+  } catch {
+    return '';
+  }
+}
+
+// Group consecutive messages from the same author within 60s.
+// Each entry gets `showHeader: boolean` so we don't repeat name+time.
+function annotateGrouping(messages) {
+  return messages.map((m, i) => {
+    const prev = messages[i - 1];
+    const sameAuthor = prev && prev.userId === m.userId;
+    const closeInTime = prev && (m.ts - prev.ts) < GROUP_WINDOW_MS;
+    return { ...m, showHeader: !(sameAuthor && closeInTime) };
+  });
+}
 
 export function ChatPanel({
   messages,
@@ -24,13 +48,15 @@ export function ChatPanel({
   const [draft, setDraft] = useState('');
   const listRef = useRef(null);
 
-  // Auto-scroll to bottom on new message or first open
+  const grouped = useMemo(() => annotateGrouping(messages), [messages]);
+
+  // Autoscroll on new messages or first open
   useEffect(() => {
     if (!open) return;
     const el = listRef.current;
     if (!el) return;
     el.scrollTop = el.scrollHeight;
-  }, [messages, open]);
+  }, [grouped, open]);
 
   const handleSubmit = (e) => {
     e.preventDefault();
@@ -42,27 +68,28 @@ export function ChatPanel({
 
   return (
     <>
-      {/* Floating button — always rendered while in a room */}
+      {/* Floating button */}
       {!open && (
         <button
           type="button"
           onClick={onOpen}
-          aria-label="Open chat"
+          aria-label={unread > 0 ? `Open chat — ${unread} new` : 'Open chat'}
           style={{
             position: 'fixed',
-            right: 20,
-            bottom: 20,
+            right: 'max(16px, env(safe-area-inset-right))',
+            bottom: 'max(16px, env(safe-area-inset-bottom))',
             zIndex: 9000,
-            width: 52,
-            height: 52,
+            width: 56,
+            height: 56,
             borderRadius: '50%',
             background: 'var(--surface2)',
             border: '1px solid var(--border)',
             color: 'var(--text)',
             fontSize: 22,
             cursor: 'pointer',
-            boxShadow: '0 6px 20px rgba(0,0,0,0.35)',
+            boxShadow: '0 8px 24px rgba(0,0,0,0.45)',
             transition: 'transform 0.15s, border-color 0.15s',
+            WebkitTapHighlightColor: 'transparent',
           }}
           onMouseEnter={e => { e.currentTarget.style.transform = 'translateY(-2px)'; e.currentTarget.style.borderColor = 'var(--accent)'; }}
           onMouseLeave={e => { e.currentTarget.style.transform = 'none'; e.currentTarget.style.borderColor = 'var(--border)'; }}
@@ -93,6 +120,22 @@ export function ChatPanel({
         </button>
       )}
 
+      {/* Mobile backdrop — taps outside the panel close it. Hidden on
+          desktop where the dock layout doesn't need it. */}
+      {open && (
+        <div
+          onClick={onClose}
+          aria-hidden="true"
+          style={{
+            position: 'fixed',
+            inset: 0,
+            background: 'rgba(0,0,0,0.45)',
+            zIndex: 9099,
+          }}
+        />
+      )}
+
+      {/* Panel — full width on mobile, 380px dock on desktop */}
       {open && (
         <div
           aria-modal="true"
@@ -113,13 +156,15 @@ export function ChatPanel({
             boxShadow: '-12px 0 40px rgba(0,0,0,0.5)',
           }}
         >
-          {/* Header */}
+          {/* Header — safe-area aware so it sits below iOS notch */}
           <div style={{
-            padding: '14px 16px',
+            padding: '14px 14px 12px',
+            paddingTop: 'calc(14px + env(safe-area-inset-top))',
             borderBottom: '1px solid var(--border)',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'space-between',
+            flexShrink: 0,
           }}>
             <div style={{
               fontFamily: "'Bebas Neue', sans-serif",
@@ -128,6 +173,17 @@ export function ChatPanel({
               color: 'var(--accent)',
             }}>
               ROOM CHAT
+              {messages.length > 0 && (
+                <span style={{
+                  marginLeft: 8,
+                  fontSize: 10,
+                  color: 'var(--text-dim)',
+                  letterSpacing: '0.1em',
+                  fontFamily: "'Space Mono', monospace",
+                }}>
+                  {messages.length}
+                </span>
+              )}
             </div>
             <button
               type="button"
@@ -139,7 +195,13 @@ export function ChatPanel({
                 color: 'var(--text-dim)',
                 fontSize: 18,
                 cursor: 'pointer',
-                padding: '4px 8px',
+                width: 44,
+                height: 44,
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                marginRight: -8,
+                WebkitTapHighlightColor: 'transparent',
               }}
             >✕</button>
           </div>
@@ -150,49 +212,76 @@ export function ChatPanel({
             style={{
               flex: 1,
               overflowY: 'auto',
-              padding: '12px 16px',
+              padding: '12px 12px 8px',
               display: 'flex',
               flexDirection: 'column',
-              gap: 10,
+              gap: 2,
+              WebkitOverflowScrolling: 'touch',
             }}
           >
-            {messages.length === 0 && (
+            {grouped.length === 0 && (
               <div style={{
                 color: 'var(--text-dim)',
                 fontSize: 12,
                 textAlign: 'center',
-                marginTop: 20,
-                lineHeight: 1.6,
+                marginTop: 32,
+                lineHeight: 1.7,
+                padding: '0 24px',
               }}>
-                No messages yet.<br />Say hi to your room.
+                <div style={{ fontSize: 28, opacity: 0.5, marginBottom: 8 }}>💬</div>
+                No messages yet.<br />
+                <span style={{ opacity: 0.7 }}>Say hi to your room.</span>
               </div>
             )}
-            {messages.map((m) => {
+
+            {grouped.map((m) => {
               const mine = m.userId === myUserId;
               return (
-                <div key={m.id} style={{
-                  display: 'flex',
-                  flexDirection: 'column',
-                  alignItems: mine ? 'flex-end' : 'flex-start',
-                }}>
+                <div
+                  key={m.id}
+                  style={{
+                    display: 'flex',
+                    flexDirection: 'column',
+                    alignItems: mine ? 'flex-end' : 'flex-start',
+                    marginTop: m.showHeader ? 10 : 1,
+                  }}
+                >
+                  {m.showHeader && (
+                    <div style={{
+                      fontSize: 10,
+                      color: 'var(--text-dim)',
+                      letterSpacing: '0.08em',
+                      marginBottom: 3,
+                      padding: mine ? '0 4px 0 0' : '0 0 0 4px',
+                      display: 'flex',
+                      gap: 6,
+                      alignItems: 'baseline',
+                    }}>
+                      <span style={{
+                        textTransform: 'uppercase',
+                        color: mine ? 'var(--accent)' : 'var(--text)',
+                        fontWeight: 700,
+                      }}>
+                        {mine ? 'You' : m.username}
+                      </span>
+                      <span style={{ opacity: 0.6 }}>{formatTime(m.ts)}</span>
+                    </div>
+                  )}
                   <div style={{
-                    fontSize: 10,
-                    color: 'var(--text-dim)',
-                    letterSpacing: '0.06em',
-                    marginBottom: 3,
-                  }}>
-                    {mine ? 'You' : m.username}
-                  </div>
-                  <div style={{
-                    maxWidth: '85%',
-                    padding: '8px 11px',
-                    background: mine ? 'rgba(232,255,74,0.08)' : 'var(--surface2)',
-                    border: `1px solid ${mine ? 'var(--accent)' : 'var(--border)'}`,
-                    borderRadius: 8,
-                    fontSize: 13,
+                    maxWidth: '82%',
+                    padding: '8px 12px',
+                    background: mine ? 'var(--surface2)' : 'var(--surface)',
+                    border: '1px solid var(--border)',
+                    borderRadius: 'var(--radius)',
+                    // Subtle sender stripe: lime accent on mine (right edge),
+                    // dim border-token stripe on theirs (left edge). Avoids the
+                    // hard "everything's outlined in yellow" look.
+                    borderRight: mine ? '3px solid var(--accent)' : '1px solid var(--border)',
+                    borderLeft: !mine ? '3px solid var(--text-dim)' : '1px solid var(--border)',
+                    fontSize: 14,
                     color: 'var(--text)',
                     wordBreak: 'break-word',
-                    lineHeight: 1.5,
+                    lineHeight: 1.45,
                     whiteSpace: 'pre-wrap',
                   }}>
                     {m.text}
@@ -202,15 +291,20 @@ export function ChatPanel({
             })}
           </div>
 
-          {/* Composer */}
+          {/* Composer — sticks to bottom, safe-area padded.
+              fontSize 16px on the textarea is non-negotiable: anything
+              smaller triggers iOS Safari's auto-zoom on focus. */}
           <form
             onSubmit={handleSubmit}
             style={{
-              padding: '10px 12px',
+              padding: '10px 10px',
+              paddingBottom: 'calc(10px + env(safe-area-inset-bottom))',
               borderTop: '1px solid var(--border)',
+              background: 'var(--surface)',
               display: 'flex',
               gap: 8,
               alignItems: 'flex-end',
+              flexShrink: 0,
             }}
           >
             <textarea
@@ -227,26 +321,31 @@ export function ChatPanel({
               style={{
                 flex: 1,
                 resize: 'none',
-                padding: '9px 11px',
+                padding: '11px 12px',
                 background: 'var(--surface2)',
                 border: '1px solid var(--border)',
                 borderRadius: 'var(--radius)',
                 color: 'var(--text)',
-                fontSize: 13,
+                fontSize: 16,
                 fontFamily: 'inherit',
                 outline: 'none',
-                minHeight: 36,
-                maxHeight: 120,
+                minHeight: 44,
+                maxHeight: 140,
+                lineHeight: 1.4,
               }}
             />
             <button
               type="submit"
               disabled={!draft.trim()}
               className="primary"
+              aria-label="Send message"
               style={{
-                padding: '9px 14px',
-                fontSize: 12,
+                padding: '0 16px',
+                fontSize: 13,
+                minHeight: 44,
+                minWidth: 64,
                 opacity: draft.trim() ? 1 : 0.4,
+                WebkitTapHighlightColor: 'transparent',
               }}
             >
               Send
