@@ -10,7 +10,8 @@ npm-debug.log
 .git
 .gitignore
 Dockerfile
-.dockerignore
+client.Dockerfile
+*.dockerignore
 tasks/
 supabase/
 .claude/
