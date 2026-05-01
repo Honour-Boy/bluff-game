@@ -302,6 +302,11 @@ function resolveBluff(room, bluffIsCorrect) {
 }
 
 // ─── Online round reset ────────────────────────────────────────
+// NOTE: chamber state is intentionally preserved across rounds.
+// Bullets accumulated in earlier rounds carry into the next so that
+// tension escalates the longer the game runs — surviving 5 spins is
+// supposed to feel earned. To reset chambers between rounds, clear
+// player.chamber + riskLevel before the resumed turn.
 
 function resetRoundOnline(room) {
   const alivePlayers = room.players.filter(p => p.status === 'alive');
