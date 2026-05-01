@@ -456,10 +456,20 @@ function registerSocketHandlers(io, socket) {
       if (room.turnOrder[room.currentTurnIndex] !== playerId) return callback({ success: false, error: 'Not your turn' });
       if (room.phase !== 'playing') return callback({ success: false, error: 'Cannot play card now' });
 
+      // Whot is wild — caller MUST nominate a valid shape. Without
+      // this, currentCardType silently held the previous shape and
+      // the next player's hand was misvalidated.
+      const cardPreview = room.hands?.get(playerId)?.find(c => c.id === cardId);
+      if (cardPreview?.shape === 'whot') {
+        if (!nominatedShape || !engine.SHAPES.includes(nominatedShape)) {
+          return callback({ success: false, error: 'Whot card must nominate a shape' });
+        }
+      }
+
       const result = engine.validateAndPlayCard(room, playerId, cardId);
       if (!result.ok) return callback({ success: false, error: result.error });
 
-      if (result.card.shape === 'whot' && nominatedShape && engine.SHAPES.includes(nominatedShape)) {
+      if (result.card.shape === 'whot') {
         room.currentCardType = nominatedShape;
       }
 
