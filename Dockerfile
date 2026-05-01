@@ -2,12 +2,14 @@ FROM node:20-alpine
 
 WORKDIR /app
 
-# Install only production deps. The lockfile pins versions; use --omit=dev
-# rather than --only=production for compatibility with newer npm.
-COPY package*.json ./
+# Build context is the repo root (so the Dockerfile sits at the top
+# level where Coolify expects it), but only the server tree ends up
+# in the image. .dockerignore excludes the client tree to keep the
+# build context small.
+COPY server/package*.json ./
 RUN npm ci --omit=dev
 
-COPY . .
+COPY server/ ./
 
 # Document the default port — actual binding comes from process.env.PORT.
 EXPOSE 3001
