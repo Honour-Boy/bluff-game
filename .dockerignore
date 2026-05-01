@@ -1,0 +1,18 @@
+# Build context is the repo root, but the image only contains the
+# server tree. Exclude everything that isn't server code.
+client/
+.next/
+node_modules/
+**/node_modules/
+npm-debug.log
+.env
+.env.*
+.git
+.gitignore
+Dockerfile
+.dockerignore
+tasks/
+supabase/
+.claude/
+README.md
+CLAUDE.md
