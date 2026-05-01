@@ -12,6 +12,80 @@ const MODES = {
   ONLINE: 'online',
 };
 
+// ─── v2 config defaults ───────────────────────────────────────
+// Shape mirrors client/src/components/PreGameSettingsPanel.js
+// DEFAULT_V2_CONFIG. All toggles default OFF, copiesPerDeck = 1.
+// secretRoles is intentionally NOT a host toggle — the spec says
+// it auto-activates at alive count >= 9. Kept off the config.
+//
+// Phase A2 = pure plumbing. Nothing reads room.config yet.
+
+function defaultRoomConfig() {
+  return {
+    powerCards: {
+      enabled: {
+        shield: false,
+        mirror: false,
+        swap: false,
+        peek: false,
+        freeze: false,
+        assassin: false,
+      },
+      copiesPerDeck: 1,
+    },
+    riskModifiers: {
+      doubleBarrel: false,
+      russianRoulette: false,
+      hotPotato: false,
+      redemptionSpin: false,
+    },
+    roomModifiers: {
+      speedMode: false,
+      suddenDeath: false,
+      mirrorMatch: false,
+    },
+    systems: {
+      bounty: false,
+      betting: false,
+      deadMansHand: false,
+      lastStand: false,
+    },
+  };
+}
+
+// Merge an untrusted incoming config from the client over the
+// known-good default shape. Prevents unknown keys from polluting
+// room state and clamps copiesPerDeck to [1, 2]. Booleans only
+// for toggle fields.
+function normalizeRoomConfig(input) {
+  const base = defaultRoomConfig();
+  if (!input || typeof input !== 'object') return base;
+
+  const pickBool = (val, fallback) => (typeof val === 'boolean' ? val : fallback);
+
+  if (input.powerCards && typeof input.powerCards === 'object') {
+    const inEnabled = input.powerCards.enabled || {};
+    Object.keys(base.powerCards.enabled).forEach((k) => {
+      base.powerCards.enabled[k] = pickBool(inEnabled[k], base.powerCards.enabled[k]);
+    });
+    const copies = Number(input.powerCards.copiesPerDeck);
+    if (Number.isFinite(copies)) {
+      base.powerCards.copiesPerDeck = Math.max(1, Math.min(2, Math.floor(copies)));
+    }
+  }
+
+  ['riskModifiers', 'roomModifiers', 'systems'].forEach((section) => {
+    const incoming = input[section];
+    if (incoming && typeof incoming === 'object') {
+      Object.keys(base[section]).forEach((k) => {
+        base[section][k] = pickBool(incoming[k], base[section][k]);
+      });
+    }
+  });
+
+  return base;
+}
+
 // ─── Deck helpers ─────────────────────────────────────────────
 
 function generateDeck() {
@@ -100,7 +174,7 @@ function generateRoomCode() {
   return code;
 }
 
-function createRoom(hostSocketId, mode = MODES.PHYSICAL) {
+function createRoom(hostSocketId, mode = MODES.PHYSICAL, config = null) {
   return {
     code: generateRoomCode(),
     hostSocketId,
@@ -122,6 +196,10 @@ function createRoom(hostSocketId, mode = MODES.PHYSICAL) {
     currentCard: null,
     lastPlayedCard: null,
     chatLog: [],   // [{ id, userId, username, text, ts }] — capped at CHAT_LOG_MAX
+    // v2 host-selected toggles. Pure plumbing — nothing reads it yet.
+    // Always normalised so unknown keys / bad types from clients
+    // can't corrupt room state.
+    config: normalizeRoomConfig(config),
   };
 }
 
@@ -453,6 +531,7 @@ function serializeRoom(room, requestingPlayerId = null) {
       ? (room.hands.get(requestingPlayerId) || [])
       : undefined,
     chatLog: room.chatLog || [],
+    config: room.config || null,
   };
 }
 
@@ -463,6 +542,8 @@ module.exports = {
   MAX_PLAYERS,
   CHAMBER_SIZE,
   generateRoomCode,
+  defaultRoomConfig,
+  normalizeRoomConfig,
   randomCardType,
   randomShape,
   generateDeck,

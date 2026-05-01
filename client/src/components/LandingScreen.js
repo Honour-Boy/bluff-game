@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import { HowToPlayModal } from './HowToPlayModal';
 import { UserProfile } from './UserProfile';
 import { ShapeIcon } from './ShapeIcon';
+import { PreGameSettingsPanel, DEFAULT_V2_CONFIG } from './PreGameSettingsPanel';
 
 export function LandingScreen({
   username,
@@ -22,6 +23,7 @@ export function LandingScreen({
   const [roomCode, setRoomCode] = useState('');
   const [selectedGameMode, setSelectedGameMode] = useState(null); // 'physical' | 'online'
   const [codeLocked, setCodeLocked] = useState(false); // true when code comes from URL
+  const [v2Config, setV2Config] = useState(DEFAULT_V2_CONFIG);
 
   // Auto-open join form when a ?join= code is in the URL
   useEffect(() => {
@@ -43,12 +45,15 @@ export function LandingScreen({
     e.preventDefault();
     setError(null);
     if (!selectedGameMode) return setError('Select a game mode');
-    onCreateRoom(selectedGameMode);
+    // Only forward v2 config when host picked online — physical mode ignores it.
+    const config = selectedGameMode === 'online' ? v2Config : undefined;
+    onCreateRoom(selectedGameMode, config);
   };
 
   const handleBackFromHost = () => {
     setMode(null);
     setSelectedGameMode(null);
+    setV2Config(DEFAULT_V2_CONFIG);
     setError(null);
   };
 
@@ -256,6 +261,10 @@ export function LandingScreen({
               <div style={{ fontSize: 11, color: 'var(--text-dim)', padding: '8px 12px', background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 'var(--radius)' }}>
                 Playing as: <strong style={{ color: 'var(--text)' }}>{username}</strong>
               </div>
+            )}
+
+            {selectedGameMode === 'online' && (
+              <PreGameSettingsPanel config={v2Config} onChange={setV2Config} />
             )}
 
             <button
