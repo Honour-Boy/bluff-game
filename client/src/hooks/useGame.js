@@ -7,7 +7,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { getSocket } from '../lib/socket';
 
-export function useGame(getAccessToken) {
+export function useGame(getAccessToken, getGuestAuth) {
   const socket = getSocket();
 
   const [roomCode, setRoomCode]       = useState(null);
@@ -89,27 +89,58 @@ export function useGame(getAccessToken) {
     }
   }, [roomCode, isHost, playerId]);
 
-  // ─── Authenticate socket with Supabase JWT ────────────────
+  // ─── Authenticate socket with Supabase JWT or guest ───────
   // Returns Promise<boolean> that resolves once the server has
-  // accepted (or rejected) the token. Reconnect must await this so
-  // host_reconnect / player_reconnect don't race the server's
-  // socket.userId stamping.
+  // accepted (or rejected) the credentials. Reconnect must await
+  // this so host_reconnect / player_reconnect don't race the
+  // server's socket.userId stamping.
+  //
+  // Two payloads:
+  //   - { token } — Supabase JWT (preferred when one exists).
+  //   - { guest: { username, guestId } } — anonymous play. The
+  //     guestId comes from sessionStorage so a refresh keeps the
+  //     same identity and the server's room.players entry still
+  //     matches on player_reconnect.
   const authenticateSocket = useCallback(() => {
     return new Promise(async (resolve) => {
-      if (!getAccessToken) return resolve(false);
-      const token = await getAccessToken();
-      if (!token) return resolve(false);
-      socket.emit('authenticate', { token }, (res) => {
-        if (res?.success) {
-          setAuthenticated(true);
-          resolve(true);
-        } else {
-          console.warn('[socket] auth failed:', res?.error);
-          resolve(false);
+      // Prefer real auth when both are present — a Supabase user
+      // shadows any stale guest entry. useAuth clears guest storage
+      // on sign-in but a race during the swap is still possible.
+      if (getAccessToken) {
+        const token = await getAccessToken();
+        if (token) {
+          socket.emit('authenticate', { token }, (res) => {
+            if (res?.success) {
+              setAuthenticated(true);
+              resolve(true);
+            } else {
+              console.warn('[socket] auth failed:', res?.error);
+              resolve(false);
+            }
+          });
+          return;
         }
-      });
+      }
+
+      if (getGuestAuth) {
+        const guest = getGuestAuth();
+        if (guest?.username) {
+          socket.emit('authenticate', { guest }, (res) => {
+            if (res?.success) {
+              setAuthenticated(true);
+              resolve(true);
+            } else {
+              console.warn('[socket] guest auth failed:', res?.error);
+              resolve(false);
+            }
+          });
+          return;
+        }
+      }
+
+      resolve(false);
     });
-  }, [socket, getAccessToken]);
+  }, [socket, getAccessToken, getGuestAuth]);
 
   // ─── Screen wake lock ─────────────────────────────────────
   useEffect(() => {
@@ -234,9 +265,12 @@ export function useGame(getAccessToken) {
   }, [socket, notify, clearSession, authenticateSocket]);
 
   // ─── On mount: authenticate if already connected ──────────
+  // Triggers on either auth source becoming available — a guest
+  // signing in mid-session needs to (re)authenticate the existing
+  // socket without waiting for a transport reconnect.
   useEffect(() => {
-    if (socket.connected && getAccessToken) authenticateSocket();
-  }, [getAccessToken]); // eslint-disable-line
+    if (socket.connected && (getAccessToken || getGuestAuth)) authenticateSocket();
+  }, [getAccessToken, getGuestAuth]); // eslint-disable-line
 
   // ─── Actions ──────────────────────────────────────────────
 
