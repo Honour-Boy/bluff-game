@@ -7,6 +7,31 @@ const SHAPES = ['circle', 'triangle', 'cross', 'square', 'star'];
 const MAX_PLAYERS = 15;
 const CHAMBER_SIZE = 6;
 
+// ─── v2 Phase D — Secret roles ───────────────────────────────
+// Roles auto-activate when alive count at startGame >= 9. Each
+// special role appears AT MOST ONCE per game (Sheriff, Medic,
+// Saboteur, Sniper, Collector). Gambler may appear 1-2 times.
+// Everyone else is Barehand.
+//
+// Role distribution function — picks a sensible random subset of
+// special roles to assign, scaling with player count, then fills
+// the remainder with Barehand.
+const ROLES = {
+  BAREHAND: 'barehand',
+  GAMBLER: 'gambler',
+  SHERIFF: 'sheriff',
+  MEDIC: 'medic',
+  SABOTEUR: 'saboteur',
+  SNIPER: 'sniper',
+  COLLECTOR: 'collector',
+};
+const ROLE_TYPES = Object.values(ROLES);
+const ROLES_AT_MIN_ALIVE = 9;
+// Role-specific hand caps for power cards. Only Collector is
+// allowed to hold up to 3 power cards; everyone else is gated to
+// 1 by `_powerCardCapForPlayer`.
+const COLLECTOR_POWER_CARD_CAP = 3;
+
 // ─── v2 power-card vocabulary ─────────────────────────────────
 // Card.type discriminator: existing shape/whot cards = 'shape'.
 // Power cards = 'power' and additionally carry a `power` slug.
@@ -306,6 +331,19 @@ function createPlayer(id, username, socketId) {
     isSpectator: false,
     connectedAt: Date.now(),
     armedPowerCard: null,        // v2 — Phase B plumbing, no triggers yet
+    // v2 Phase D — Secret roles. Default 'barehand' (no special
+    // ability). Real role is assigned by `assignRoles` at startGame
+    // when alive count >= 9. `serializeRoom` ONLY exposes a player's
+    // own role to themselves (privacy), with one exception: when a
+    // role activates publicly (Sheriff anti-Assassin banner, Sniper
+    // redirect banner, etc.) the trigger event carries the role
+    // name in its payload.
+    role: ROLES.BAREHAND,
+    // Once-per-game ability gates. true = ability still available.
+    // Reset is only at game start — survives round resets.
+    medicAbilityAvailable: true,
+    saboteurAbilityAvailable: true,
+    sniperAbilityAvailable: true,
   };
 }
 
@@ -440,6 +478,87 @@ function _removePlayerFromSwapSnapshots(room, playerId) {
   }
 }
 
+// ─── v2 Phase D — Role assignment ─────────────────────────────
+//
+// Spec (locked):
+//   - Roles activate ONLY when alive count >= 9. Below that
+//     threshold every player is Barehand.
+//   - Each "unique" special role (Sheriff, Medic, Saboteur, Sniper,
+//     Collector) appears AT MOST ONCE per game.
+//   - Gambler may appear 1-2 times.
+//   - Remaining players are Barehand.
+//
+// Distribution (sensible default — matches the task spec):
+//   • 9 players  → 5 special + 4 Barehand
+//   • 10        → 5 special + 5 Barehand
+//   • 11        → 6 special (incl. 2nd Gambler) + 5 Barehand
+//   • 12        → 6 special + 6 Barehand
+//   • 13        → 7 special (incl. 2nd Gambler) + 6 Barehand
+//   • 14        → 7 special + 7 Barehand
+//   • 15        → 7 special + 8 Barehand
+//
+// "Special" = exactly one of {Sheriff, Medic, Saboteur, Sniper,
+//              Collector, Gambler×1}, plus optionally a 2nd Gambler
+// for tables of 11+.
+//
+// Pure function — operates on `room.players` and mutates each
+// alive player's `role`. Returns the room for chaining.
+function _shuffle(arr) {
+  const a = [...arr];
+  for (let i = a.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [a[i], a[j]] = [a[j], a[i]];
+  }
+  return a;
+}
+
+function _roleAssignmentFor(aliveCount) {
+  if (aliveCount < ROLES_AT_MIN_ALIVE) {
+    return Array.from({ length: aliveCount }).map(() => ROLES.BAREHAND);
+  }
+  // Always include all five unique roles + 1 Gambler when threshold met.
+  const specials = [
+    ROLES.SHERIFF,
+    ROLES.MEDIC,
+    ROLES.SABOTEUR,
+    ROLES.SNIPER,
+    ROLES.COLLECTOR,
+    ROLES.GAMBLER,
+  ];
+  // Add a 2nd Gambler at 11+; add a 3rd-special slot escalates with size.
+  // Cap the special count so Barehand always remains a real cohort.
+  let extraGambler = aliveCount >= 11 ? 1 : 0;
+  const slots = [...specials, ...Array.from({ length: extraGambler }).map(() => ROLES.GAMBLER)];
+  while (slots.length < aliveCount) slots.push(ROLES.BAREHAND);
+  return _shuffle(slots);
+}
+
+function assignRoles(room) {
+  const alivePlayers = room.players.filter(p => p.status === 'alive');
+  const assignment = _roleAssignmentFor(alivePlayers.length);
+  const shuffledPlayers = _shuffle(alivePlayers);
+  for (let i = 0; i < shuffledPlayers.length; i++) {
+    shuffledPlayers[i].role = assignment[i] || ROLES.BAREHAND;
+  }
+  // Eliminated players (shouldn't be possible at startGame) stay barehand.
+  for (const p of room.players) {
+    if (p.status !== 'alive') p.role = ROLES.BAREHAND;
+  }
+  return room;
+}
+
+function getRole(room, playerId) {
+  const p = room.players.find(pp => pp.id === playerId);
+  return p?.role || ROLES.BAREHAND;
+}
+
+// Per-player power-card hand cap — Collector lifts to 3, everyone
+// else is gated at 1. Used by deal normalisation + drawCardForPlayer.
+function _powerCardCapForPlayer(player) {
+  if (!player) return 1;
+  return player.role === ROLES.COLLECTOR ? COLLECTOR_POWER_CARD_CAP : 1;
+}
+
 // ─── Game start ────────────────────────────────────────────────
 
 function startGame(room) {
@@ -455,6 +574,11 @@ function startGame(room) {
   room.isFirstTurn = true;
   room.lastPlayedCard = null;
   room.discardPile = room.discardPile || [];
+
+  // v2 Phase D — assign roles BEFORE the deal so the per-player
+  // power-card hand cap (Collector = 3, others = 1) is honoured
+  // by `_normalisePowerCardHandCap`.
+  assignRoles(room);
 
   if (room.mode === MODES.ONLINE) {
     const deck = buildDeck(alivePlayers.length, room.config);
@@ -514,10 +638,11 @@ function _hasPowerCardInHand(hand) {
  */
 function _normalisePowerCardHandCap(room) {
   if (!room.discardPile) room.discardPile = [];
-  const cap = 1; // Phase D Collector will override per-player.
 
   for (const [pid, hand] of room.hands.entries()) {
     if (!hand) continue;
+    const player = room.players.find(p => p.id === pid);
+    const cap = _powerCardCapForPlayer(player); // Collector → 3, default → 1
     let powerCount = _countPowerCardsInHand(hand);
     while (powerCount > cap) {
       // Find an extra power card, push to discard, replace with shape.
@@ -633,6 +758,8 @@ function drawCardForPlayer(room, playerId) {
   if (!room.discardPile) room.discardPile = [];
   const hand = room.hands?.get(playerId);
   if (!hand) return null;
+  const player = room.players.find(p => p.id === playerId);
+  const cap = _powerCardCapForPlayer(player); // Collector → 3, default → 1
 
   // Loop with a safety bound — at worst we'd churn the entire deck,
   // so cap iterations at deck size + played pile size + 1 to never
@@ -646,7 +773,7 @@ function drawCardForPlayer(room, playerId) {
     }
     const card = room.deck.shift();
 
-    if (card?.type === 'power' && _hasPowerCardInHand(hand)) {
+    if (card?.type === 'power' && _countPowerCardsInHand(hand) >= cap) {
       // Hand-cap collision — discard and try again.
       room.discardPile.push(card);
       continue;
@@ -736,6 +863,195 @@ function applyAssassinDeclinePenalty(room, playerId) {
     else break;
   }
   return { ok: true, dealt };
+}
+
+// ─── v2 Phase D — Role helpers ───────────────────────────────
+
+/**
+ * Return the alive Medic player who can still use their save
+ * ability AND has hand-room (< 6 cards), or null. Hand-room check
+ * uses the locked spec rule: ability is unavailable when Medic is
+ * already at 6+ cards at the moment of intervention.
+ */
+function findAvailableMedic(room) {
+  const medic = room.players.find(p =>
+    p.role === ROLES.MEDIC
+    && p.status === 'alive'
+    && p.medicAbilityAvailable
+  );
+  if (!medic) return null;
+  if (room.mode === MODES.ONLINE) {
+    const hand = room.hands?.get(medic.id) || [];
+    if (hand.length >= 6) return null;
+  }
+  return medic;
+}
+
+/**
+ * Return the alive Sniper who can still redirect, or null. Sniper
+ * has no hand-cap precondition.
+ */
+function findAvailableSniper(room) {
+  return room.players.find(p =>
+    p.role === ROLES.SNIPER
+    && p.status === 'alive'
+    && p.sniperAbilityAvailable
+  ) || null;
+}
+
+/**
+ * Apply a Medic save against an already-eliminated player. The
+ * elimination is reverted: status returns to 'alive', isSpectator
+ * cleared, and the player is restored to the turn order at the
+ * position they vacated (or appended if their slot is gone).
+ *
+ * Spec: "saved player survives with risk level still incremented
+ * normally". For spin eliminations the chamber is left at whatever
+ * pullTrigger returned (which on the elim path is the pre-spin
+ * chamber, since pullTrigger only adds a bullet on survival). To
+ * meet the "still incremented" rule we add ONE bullet after the
+ * revive. For Assassin saves there is no spin, so no extra bullet
+ * is added (risk wasn't being incremented in the first place).
+ *
+ * Cost: +2 shape cards to Medic's hand. Drawn via drawCardForPlayer
+ * so the per-player power-card cap is honoured (extras land in
+ * discardPile, replaced with shapes).
+ *
+ * Returns { ok, dealt: Card[], revivedPlayerId } | { ok:false, error }.
+ */
+function applyMedicSave(room, eliminatedPlayerId, source = 'spin') {
+  if (room.mode !== MODES.ONLINE) return { ok: false, error: 'Online mode only' };
+  const medic = findAvailableMedic(room);
+  if (!medic) return { ok: false, error: 'No Medic available' };
+  const target = room.players.find(p => p.id === eliminatedPlayerId);
+  if (!target) return { ok: false, error: 'Target not found' };
+  if (target.status !== 'eliminated') {
+    return { ok: false, error: 'Target is not eliminated' };
+  }
+
+  // Revive — set status back to alive and re-insert in turn order
+  // if they were already removed.
+  target.status = 'alive';
+  target.isSpectator = false;
+  if (!room.turnOrder.includes(target.id)) {
+    // Append to the end of the turn order. The next advanceTurn
+    // will land on whoever is *after* the current actor in the
+    // existing order, not the revived player — they take a turn
+    // when rotation reaches them.
+    room.turnOrder.push(target.id);
+  }
+
+  // For spin saves, bump risk by one (the bullet that hit them
+  // stayed in the chamber; on a regular survival a new bullet
+  // would have been added — that's the "still incremented" rule).
+  if (source === 'spin') {
+    target.chamber = addBulletToChamber(target.chamber);
+    target.riskLevel = target.chamber.filter(s => s === 'bullet').length;
+  }
+
+  // Cost: +2 shape cards to Medic. Loop drawCardForPlayer; if the
+  // top of the deck is a power card the per-player cap kicks in
+  // and discards it, eventually surfacing a shape.
+  const dealt = [];
+  for (let i = 0; i < 2; i++) {
+    const card = drawCardForPlayer(room, medic.id);
+    if (card) dealt.push(card);
+    else break;
+  }
+  medic.medicAbilityAvailable = false;
+
+  return { ok: true, dealt, revivedPlayerId: target.id, medicId: medic.id };
+}
+
+/**
+ * Saboteur: silently move ONE random card from holder's hand into
+ * a target player's hand. Validates: holder is alive Saboteur,
+ * ability available, hand size > 3, target alive and != holder.
+ *
+ * Returns { ok, movedCardId, targetPlayerId } | { ok:false, error }.
+ * No banner — the only thing the table sees is the recipient's
+ * handSize tick up by 1 in the next room_state.
+ */
+function applySaboteurTransfer(room, holderId, targetPlayerId) {
+  if (room.mode !== MODES.ONLINE) return { ok: false, error: 'Online mode only' };
+  const holder = room.players.find(p => p.id === holderId);
+  if (!holder) return { ok: false, error: 'Holder not found' };
+  if (holder.role !== ROLES.SABOTEUR) return { ok: false, error: 'Not the Saboteur' };
+  if (holder.status !== 'alive') return { ok: false, error: 'Saboteur not alive' };
+  if (!holder.saboteurAbilityAvailable) return { ok: false, error: 'Ability already used' };
+
+  const target = room.players.find(p => p.id === targetPlayerId);
+  if (!target) return { ok: false, error: 'Target not found' };
+  if (target.id === holder.id) return { ok: false, error: 'Cannot target self' };
+  if (target.status !== 'alive') return { ok: false, error: 'Target not alive' };
+
+  const holderHand = room.hands?.get(holder.id) || [];
+  if (holderHand.length <= 3) return { ok: false, error: 'Need more than 3 cards to use ability' };
+
+  const targetHand = room.hands?.get(target.id);
+  if (!targetHand) return { ok: false, error: 'Target has no hand' };
+
+  // Random card pick — power cards are eligible too. The recipient
+  // honours their per-player power-card cap; if the move would
+  // exceed it, we re-roll the random pick once. Failing that, we
+  // route the over-cap power card to discard and pull a shape
+  // replacement from the holder so the ability still resolves
+  // silently. (Edge case — in practice this is rare.)
+  function pickRandomIndex(hand) {
+    return Math.floor(Math.random() * hand.length);
+  }
+  let pickIdx = pickRandomIndex(holderHand);
+  let pickedCard = holderHand[pickIdx];
+
+  const targetCap = _powerCardCapForPlayer(target);
+  if (
+    pickedCard?.type === 'power'
+    && _countPowerCardsInHand(targetHand) >= targetCap
+  ) {
+    // Try one re-roll for a shape card if any exist.
+    const shapeIdx = holderHand.findIndex(c => c?.type === 'shape');
+    if (shapeIdx !== -1) {
+      pickIdx = shapeIdx;
+      pickedCard = holderHand[shapeIdx];
+    } else {
+      // All cards in holder hand are power cards & target is capped.
+      // Return error rather than violate the cap silently.
+      return { ok: false, error: 'Cannot transfer — recipient power-card cap reached' };
+    }
+  }
+
+  holderHand.splice(pickIdx, 1);
+  targetHand.push(pickedCard);
+  holder.saboteurAbilityAvailable = false;
+
+  return { ok: true, movedCardId: pickedCard.id, targetPlayerId: target.id };
+}
+
+/**
+ * Sniper: redirect a pending spin to a different alive player.
+ * Validates: redirector is alive Sniper, ability available, target
+ * alive and != Sniper, target is not the Mirror holder (anyone
+ * with armed Mirror).
+ *
+ * Returns { ok, newSpinTargetId } | { ok:false, error }.
+ */
+function applySniperRedirect(room, sniperId, newSpinTargetId) {
+  if (room.mode !== MODES.ONLINE) return { ok: false, error: 'Online mode only' };
+  const sniper = room.players.find(p => p.id === sniperId);
+  if (!sniper) return { ok: false, error: 'Sniper not found' };
+  if (sniper.role !== ROLES.SNIPER) return { ok: false, error: 'Not the Sniper' };
+  if (!sniper.sniperAbilityAvailable) return { ok: false, error: 'Ability already used' };
+
+  const target = room.players.find(p => p.id === newSpinTargetId);
+  if (!target) return { ok: false, error: 'Target not found' };
+  if (target.id === sniper.id) return { ok: false, error: 'Cannot redirect to self' };
+  if (target.status !== 'alive') return { ok: false, error: 'Target not alive' };
+  if (target.armedPowerCard?.power === 'mirror') {
+    return { ok: false, error: 'Cannot redirect to Mirror holder' };
+  }
+
+  sniper.sniperAbilityAvailable = false;
+  return { ok: true, newSpinTargetId: target.id };
 }
 
 /**
@@ -981,7 +1297,28 @@ function resetRoundOnline(room) {
 // Frontend receives { spinIndex, chamber } and animates to that exact slot.
 
 function spinGun(player) {
+  // v2 Phase D — Gambler role: risk level NEVER increases from
+  // surviving spins. We accomplish this by spinning normally to
+  // determine elimination, but on SURVIVAL we revert the chamber
+  // back to its pre-spin state (no extra bullet added). On
+  // elimination we still let `pullTrigger` return its result —
+  // chamber stays as-is in either case (pullTrigger only mutates
+  // it on survival anyway). Note: external modifiers like Sudden
+  // Death (Phase E2) are applied OUTSIDE this fn and can still
+  // bump Gambler's risk level — exactly per spec.
+  const isGambler = player.role === 'gambler';
+  const before = [...player.chamber];
+
   const { spinIndex, eliminated, chamber, bulletCount } = pullTrigger(player.chamber);
+
+  if (!eliminated && isGambler) {
+    // Skip the survival bullet add — Gambler's chamber is frozen
+    // at start-of-game state for survival outcomes.
+    player.chamber = before;
+    player.riskLevel = before.filter(s => s === 'bullet').length;
+    return { eliminated, spinIndex, chamber: player.chamber, riskLevel: player.riskLevel };
+  }
+
   player.chamber = chamber;
   player.riskLevel = bulletCount;   // bullet count is the new "risk level"
   if (eliminated) {
@@ -1113,6 +1450,15 @@ function serializeRoom(room, requestingPlayerId = null) {
       armedPowerCard: p.armedPowerCard
         ? { power: p.armedPowerCard.power }
         : null,
+      // v2 Phase D — role privacy. Only expose the requesting
+      // player's own role (or game_over reveal). Everyone else's
+      // role is `null` to keep the secret-roles game intact.
+      // Public role activation banners (Sheriff anti-Assassin,
+      // Sniper redirect) ride in `power_card_triggered` payloads.
+      role:
+        p.id === requestingPlayerId
+          ? (p.role || 'barehand')
+          : (room.phase === 'game_over' ? (p.role || 'barehand') : null),
     })),
     turnOrder: room.turnOrder,
     currentTurnIndex: room.currentTurnIndex,
@@ -1166,6 +1512,10 @@ module.exports = {
   CARD_TYPES,
   SHAPES,
   POWER_TYPES,
+  ROLES,
+  ROLE_TYPES,
+  ROLES_AT_MIN_ALIVE,
+  COLLECTOR_POWER_CARD_CAP,
   MAX_PLAYERS,
   CHAMBER_SIZE,
   generateRoomCode,
@@ -1208,4 +1558,12 @@ module.exports = {
   getCurrentPlayer,
   appendChatMessage,
   CHAT_TEXT_MAX,
+  // v2 Phase D — Secret roles
+  assignRoles,
+  getRole,
+  findAvailableMedic,
+  findAvailableSniper,
+  applyMedicSave,
+  applySaboteurTransfer,
+  applySniperRedirect,
 };
