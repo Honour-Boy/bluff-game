@@ -1504,6 +1504,38 @@ function serializeRoom(room, requestingPlayerId = null) {
       && Array.isArray(room.playedPile)
         ? room.playedPile.map(c => ({ id: c.id }))
         : undefined,
+    // v2 Phase D — Medic save pause. Public summary so every client
+    // can render "Medic is deciding..." while the privately-prompted
+    // Medic chooses save / decline. We don't leak the Medic's id to
+    // anyone except themselves (would defeat secret-roles).
+    pendingMedicSave: isOnline && room.pendingMedicSave
+      ? {
+          eliminatedPlayerId: room.pendingMedicSave.eliminatedPlayerId,
+          eliminatedPlayerName: room.pendingMedicSave.eliminatedPlayerName,
+          source: room.pendingMedicSave.source,
+          // Only the Medic sees the prompt directly; everyone else
+          // just sees "Medic deciding". The amTargetMedic flag is
+          // here so the Medic's UI knows to render the modal.
+          amTargetMedic: requestingPlayerId === room.pendingMedicSave.medicId,
+        }
+      : null,
+    // v2 Phase D — Sniper redirect pause. Public knows "someone is
+    // redirecting"; only the Sniper sees the target picker. The
+    // Sniper's eligibleTargetIds list is gated to them.
+    pendingSniperRedirect: isOnline && room.pendingSniperRedirect
+      ? {
+          // Public: original spin target so the table sees "Sniper
+          // is redirecting away from <X>".
+          originalSpinTargetId: room.pendingSniperRedirect.originalSpinTargetId,
+          originalSpinTargetName: room.pendingSniperRedirect.originalSpinTargetName,
+          amTargetSniper: requestingPlayerId === room.pendingSniperRedirect.sniperId,
+          // Eligible targets only sent to the Sniper.
+          eligibleTargetIds:
+            requestingPlayerId === room.pendingSniperRedirect.sniperId
+              ? room.pendingSniperRedirect.eligibleTargetIds
+              : undefined,
+        }
+      : null,
   };
 }
 
