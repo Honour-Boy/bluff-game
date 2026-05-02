@@ -53,6 +53,18 @@ export function useGame(getAccessToken) {
     }, 3500);
   }, []);
 
+  // Action-failure helper. Routes the server error into BOTH the
+  // setError state (for landing-screen banner) and the notification
+  // toast (for in-room screens that don't render the error state).
+  // Without this, errors like Mirror-Match-requires-even-count
+  // surface nowhere — host clicks Start Game and nothing visibly
+  // happens. https://github.com/Honour-Boy/bluff-game/issues/<n>
+  const failError = useCallback((res) => {
+    const msg = res?.error || 'Action failed';
+    setError(msg);
+    notify(msg, 'error');
+  }, [notify]);
+
   const clearSession = useCallback(() => {
     setRoomCode(null);
     setPlayerId(null);
@@ -261,38 +273,38 @@ export function useGame(getAccessToken) {
 
   const startGame = useCallback(() => {
     socket.emit('start_game', { roomCode }, (res) => {
-      if (!res.success) setError(res.error);
+      if (!res.success) failError(res);
     });
   }, [socket, roomCode]);
 
   const nextTurn = useCallback(() => {
     socket.emit('next_turn', { roomCode }, (res) => {
-      if (!res.success) setError(res.error);
+      if (!res.success) failError(res);
     });
   }, [socket, roomCode]);
 
   const resolveBluff = useCallback((bluffIsCorrect) => {
     socket.emit('resolve_bluff', { roomCode, bluffIsCorrect }, (res) => {
-      if (!res.success) setError(res.error);
+      if (!res.success) failError(res);
     });
   }, [socket, roomCode]);
 
   const playCard = useCallback(() => {
     socket.emit('play_card', { roomCode, playerId }, (res) => {
-      if (!res.success) setError(res.error);
+      if (!res.success) failError(res);
     });
   }, [socket, roomCode, playerId]);
 
   const endTurn = useCallback(() => {
     socket.emit('end_turn', { roomCode, playerId }, (res) => {
-      if (!res.success) setError(res.error);
+      if (!res.success) failError(res);
     });
   }, [socket, roomCode, playerId]);
 
   const playerSpin = useCallback(() => {
     setSpinDismissed(false);
     socket.emit('player_spin', { roomCode, playerId }, (res) => {
-      if (!res.success) setError(res.error);
+      if (!res.success) failError(res);
     });
   }, [socket, roomCode, playerId]);
 
@@ -303,25 +315,25 @@ export function useGame(getAccessToken) {
 
   const declareRoundWin = useCallback((winnerPlayerId) => {
     socket.emit('round_win', { roomCode, playerId: winnerPlayerId }, (res) => {
-      if (!res.success) setError(res.error);
+      if (!res.success) failError(res);
     });
   }, [socket, roomCode]);
 
   const callBluff = useCallback(() => {
     socket.emit('call_bluff', { roomCode, playerId }, (res) => {
-      if (!res.success) setError(res.error);
+      if (!res.success) failError(res);
     });
   }, [socket, roomCode, playerId]);
 
   const playCardOnline = useCallback((cardId, nominatedShape) => {
     socket.emit('play_card_online', { roomCode, playerId, cardId, nominatedShape }, (res) => {
-      if (!res.success) setError(res.error);
+      if (!res.success) failError(res);
     });
   }, [socket, roomCode, playerId]);
 
   const startNextRound = useCallback(() => {
     socket.emit('start_next_round', { roomCode }, (res) => {
-      if (!res.success) setError(res.error);
+      if (!res.success) failError(res);
     });
   }, [socket, roomCode]);
 
@@ -341,7 +353,7 @@ export function useGame(getAccessToken) {
   const activatePowerCard = useCallback(() => {
     return new Promise((resolve) => {
       socket.emit('activate_power_card', { roomCode }, (res) => {
-        if (!res?.success) setError(res?.error || 'Could not activate');
+        if (!res?.success) failError(res);
         resolve(res);
       });
     });
@@ -355,7 +367,7 @@ export function useGame(getAccessToken) {
   const swapPick = useCallback((cardId) => {
     return new Promise((resolve) => {
       socket.emit('swap_pick', { roomCode, cardId }, (res) => {
-        if (!res?.success) setError(res?.error || 'Swap failed');
+        if (!res?.success) failError(res);
         resolve(res);
       });
     });
@@ -367,7 +379,7 @@ export function useGame(getAccessToken) {
   const assassinDecision = useCallback((rearm) => {
     return new Promise((resolve) => {
       socket.emit('assassin_decision', { roomCode, rearm: !!rearm }, (res) => {
-        if (!res?.success) setError(res?.error || 'Assassin decision failed');
+        if (!res?.success) failError(res);
         resolve(res);
       });
     });
@@ -380,7 +392,7 @@ export function useGame(getAccessToken) {
   const medicDecide = useCallback((save) => {
     return new Promise((resolve) => {
       socket.emit('medic_decide', { roomCode, save: !!save }, (res) => {
-        if (!res?.success) setError(res?.error || 'Medic decision failed');
+        if (!res?.success) failError(res);
         resolve(res);
       });
     });
@@ -391,7 +403,7 @@ export function useGame(getAccessToken) {
   const saboteurTransfer = useCallback((targetPlayerId) => {
     return new Promise((resolve) => {
       socket.emit('saboteur_transfer', { roomCode, targetPlayerId }, (res) => {
-        if (!res?.success) setError(res?.error || 'Saboteur transfer failed');
+        if (!res?.success) failError(res);
         resolve(res);
       });
     });
@@ -403,7 +415,7 @@ export function useGame(getAccessToken) {
   const sniperRedirect = useCallback((newTargetId) => {
     return new Promise((resolve) => {
       socket.emit('sniper_redirect', { roomCode, newTargetId: newTargetId || null }, (res) => {
-        if (!res?.success) setError(res?.error || 'Sniper redirect failed');
+        if (!res?.success) failError(res);
         resolve(res);
       });
     });
@@ -443,7 +455,7 @@ export function useGame(getAccessToken) {
   const placeBet = useCallback((prediction) => {
     return new Promise((resolve) => {
       socket.emit('place_bet', { roomCode, prediction }, (res) => {
-        if (!res?.success) setError(res?.error || 'Bet failed');
+        if (!res?.success) failError(res);
         resolve(res);
       });
     });
@@ -453,7 +465,7 @@ export function useGame(getAccessToken) {
   const ghostVote = useCallback((option) => {
     return new Promise((resolve) => {
       socket.emit('ghost_vote', { roomCode, option }, (res) => {
-        if (!res?.success) setError(res?.error || 'Ghost vote failed');
+        if (!res?.success) failError(res);
         resolve(res);
       });
     });
@@ -463,7 +475,7 @@ export function useGame(getAccessToken) {
   const lastStandSpin = useCallback(() => {
     return new Promise((resolve) => {
       socket.emit('last_stand_spin', { roomCode }, (res) => {
-        if (!res?.success) setError(res?.error || 'Last stand spin failed');
+        if (!res?.success) failError(res);
         resolve(res);
       });
     });
@@ -472,7 +484,7 @@ export function useGame(getAccessToken) {
   const lastStandEndTurn = useCallback(() => {
     return new Promise((resolve) => {
       socket.emit('last_stand_end_turn', { roomCode }, (res) => {
-        if (!res?.success) setError(res?.error || 'Last stand end turn failed');
+        if (!res?.success) failError(res);
         resolve(res);
       });
     });
@@ -481,7 +493,7 @@ export function useGame(getAccessToken) {
   const sendChatMessage = useCallback((text) => {
     if (!roomCode || !text?.trim()) return;
     socket.emit('send_chat_message', { roomCode, text: text.trim() }, (res) => {
-      if (!res?.success) setError(res?.error || 'Failed to send');
+      if (!res?.success) failError(res);
     });
   }, [socket, roomCode]);
 
