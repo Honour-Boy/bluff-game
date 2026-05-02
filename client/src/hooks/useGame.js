@@ -373,6 +373,72 @@ export function useGame(getAccessToken) {
     });
   }, [socket, roomCode]);
 
+  // ─── v2 Phase D — Medic save / decline ────────────────────
+  // Server pauses an elimination flow (spin or Assassin) when an
+  // alive Medic with hand-room exists. The Medic resolves via this
+  // event with `save: true | false`.
+  const medicDecide = useCallback((save) => {
+    return new Promise((resolve) => {
+      socket.emit('medic_decide', { roomCode, save: !!save }, (res) => {
+        if (!res?.success) setError(res?.error || 'Medic decision failed');
+        resolve(res);
+      });
+    });
+  }, [socket, roomCode]);
+
+  // ─── v2 Phase D — Saboteur transfer ───────────────────────
+  // Once per game; silent. Random card from holder hand → target.
+  const saboteurTransfer = useCallback((targetPlayerId) => {
+    return new Promise((resolve) => {
+      socket.emit('saboteur_transfer', { roomCode, targetPlayerId }, (res) => {
+        if (!res?.success) setError(res?.error || 'Saboteur transfer failed');
+        resolve(res);
+      });
+    });
+  }, [socket, roomCode]);
+
+  // ─── v2 Phase D — Sniper redirect ─────────────────────────
+  // After bluff resolution picks a spin target, Sniper can redirect
+  // to any other alive non-Mirror player. Pass null to decline.
+  const sniperRedirect = useCallback((newTargetId) => {
+    return new Promise((resolve) => {
+      socket.emit('sniper_redirect', { roomCode, newTargetId: newTargetId || null }, (res) => {
+        if (!res?.success) setError(res?.error || 'Sniper redirect failed');
+        resolve(res);
+      });
+    });
+  }, [socket, roomCode]);
+
+  // ─── v2 Phase D — server-pushed prompts ──────────────────
+  // Track inbound `medic_save_pending` / `sniper_redirect_pending`
+  // privately-targeted events so the local UI can render the role
+  // prompt only on the right player. Cleared automatically when the
+  // pause resolves (room.phase moves off `medic_pending` /
+  // `sniper_pending` in the next room_state).
+  const [medicPrompt, setMedicPrompt] = useState(null);
+  const [sniperPrompt, setSniperPrompt] = useState(null);
+
+  useEffect(() => {
+    const onMedicSavePending = (payload) => {
+      setMedicPrompt(payload || null);
+    };
+    const onSniperRedirectPending = (payload) => {
+      setSniperPrompt(payload || null);
+    };
+    socket.on('medic_save_pending', onMedicSavePending);
+    socket.on('sniper_redirect_pending', onSniperRedirectPending);
+    return () => {
+      socket.off('medic_save_pending', onMedicSavePending);
+      socket.off('sniper_redirect_pending', onSniperRedirectPending);
+    };
+  }, [socket]);
+
+  // Auto-clear prompts when the server moves off the pending phase.
+  useEffect(() => {
+    if (roomState?.phase !== 'medic_pending' && medicPrompt) setMedicPrompt(null);
+    if (roomState?.phase !== 'sniper_pending' && sniperPrompt) setSniperPrompt(null);
+  }, [roomState?.phase]); // eslint-disable-line
+
   const sendChatMessage = useCallback((text) => {
     if (!roomCode || !text?.trim()) return;
     socket.emit('send_chat_message', { roomCode, text: text.trim() }, (res) => {
@@ -438,6 +504,11 @@ export function useGame(getAccessToken) {
     activatePowerCard,
     swapPick,
     assassinDecision,
+    medicDecide,
+    saboteurTransfer,
+    sniperRedirect,
+    medicPrompt,
+    sniperPrompt,
     powerEventQueue,
     consumePowerEvent,
     setError,
