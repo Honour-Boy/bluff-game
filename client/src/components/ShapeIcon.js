@@ -1,13 +1,13 @@
-'use client';
+"use client";
 
 // ─── Colour palette (one accent per shape) ────────────────────
 export const SHAPE_COLORS = {
-  circle:   '#4affdb',
-  triangle: '#ff4a6e',
-  cross:    '#ffaa4a',
-  square:   '#e8ff4a',
-  star:     '#c44aff',
-  whot:     '#e8ff4a',
+  circle: "#4affdb",
+  triangle: "#ff4a6e",
+  cross: "#ffaa4a",
+  square: "#e8ff4a",
+  star: "#c44aff",
+  whot: "#e8ff4a",
 };
 
 // ─── SVG paths — all in a 100×100 viewBox ────────────────────
@@ -15,9 +15,7 @@ export const SHAPE_COLORS = {
 // consistent when placed side-by-side at the same pixel size.
 const PATHS = {
   // Filled circle (r = 38, centred)
-  circle: (c) => (
-    <circle cx="50" cy="50" r="38" fill={c} />
-  ),
+  circle: (c) => <circle cx="50" cy="50" r="38" fill={c} />,
 
   // Rounded-corner square (76×76 box, r = 8)
   square: (c) => (
@@ -25,16 +23,11 @@ const PATHS = {
   ),
 
   // Equilateral triangle (wide base, apex near top)
-  triangle: (c) => (
-    <polygon points="50,8 93,88 7,88" fill={c} />
-  ),
+  triangle: (c) => <polygon points="50,8 93,88 7,88" fill={c} />,
 
   // Plus/cross (arm width ≈ 28, arm length ≈ 38 each side)
   cross: (c) => (
-    <path
-      d="M36,10 H64 V36 H90 V64 H64 V90 H36 V64 H10 V36 H36 Z"
-      fill={c}
-    />
+    <path d="M36,10 H64 V36 H90 V64 H64 V90 H36 V64 H10 V36 H36 Z" fill={c} />
   ),
 
   // 5-pointed star (outer r ≈ 46, inner r ≈ 19)
@@ -50,14 +43,17 @@ const PATHS = {
     <g>
       <circle cx="50" cy="50" r="44" fill="none" stroke={c} strokeWidth="6" />
       <text
-        x="50" y="68"
+        x="50"
+        y="68"
         textAnchor="middle"
         fontSize="52"
         fontWeight="900"
         fontFamily="'Bebas Neue', Impact, sans-serif"
         fill={c}
         letterSpacing="-2"
-      >W</text>
+      >
+        W
+      </text>
     </g>
   ),
 };
@@ -72,7 +68,7 @@ const PATHS = {
  *   style   : extra inline styles for the <svg> element
  */
 export function ShapeIcon({ shape, size = 24, color, style }) {
-  const fill = color || SHAPE_COLORS[shape] || '#ffffff';
+  const fill = color || SHAPE_COLORS[shape] || "#ffffff";
   const draw = PATHS[shape] || PATHS.square;
 
   return (
@@ -80,7 +76,7 @@ export function ShapeIcon({ shape, size = 24, color, style }) {
       viewBox="0 0 100 100"
       width={size}
       height={size}
-      style={{ display: 'block', flexShrink: 0, ...style }}
+      style={{ display: "block", flexShrink: 0, ...style }}
       aria-label={shape}
     >
       {draw(fill)}
@@ -93,10 +89,10 @@ export function ShapeIcon({ shape, size = 24, color, style }) {
  * Used by CardShape and other display components.
  */
 export const SHAPE_META = {
-  circle:   { label: 'Circle',   color: SHAPE_COLORS.circle   },
-  triangle: { label: 'Triangle', color: SHAPE_COLORS.triangle },
-  cross:    { label: 'Cross',    color: SHAPE_COLORS.cross    },
-  square:   { label: 'Square',   color: SHAPE_COLORS.square   },
-  star:     { label: 'Star',     color: SHAPE_COLORS.star     },
-  whot:     { label: 'Whot',     color: SHAPE_COLORS.whot     },
+  circle: { label: "Circle", color: SHAPE_COLORS.circle },
+  triangle: { label: "Triangle", color: SHAPE_COLORS.triangle },
+  cross: { label: "Cross", color: SHAPE_COLORS.cross },
+  square: { label: "Square", color: SHAPE_COLORS.square },
+  star: { label: "Star", color: SHAPE_COLORS.star },
+  whot: { label: "Whot", color: SHAPE_COLORS.whot },
 };
