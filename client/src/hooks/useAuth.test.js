@@ -231,3 +231,140 @@ describe('useAuth', () => {
     expect(token).toBe('jwt-123');
   });
 });
+
+// ─── Guest sign-in flow ─────────────────────────────────────────
+describe('useAuth — guest sign-in', () => {
+  // sessionStorage is a global in jsdom but tests pollute each other
+  // if we don't reset between cases. clear() only — keep the mocked
+  // supabase setup that beforeEach above provides.
+  beforeEach(() => {
+    if (typeof sessionStorage !== 'undefined') sessionStorage.clear();
+  });
+
+  it('returns no user / no guest by default', async () => {
+    const { result } = renderHook(() => useAuth());
+    await waitFor(() => expect(result.current.loading).toBe(false));
+    expect(result.current.user).toBeNull();
+    expect(result.current.guestUser).toBeNull();
+    expect(result.current.isGuest).toBe(false);
+  });
+
+  it('signInAsGuest rejects names below the minimum length', async () => {
+    const { result } = renderHook(() => useAuth());
+    await waitFor(() => expect(result.current.loading).toBe(false));
+
+    let res;
+    act(() => {
+      res = result.current.signInAsGuest({ username: 'abc' });
+    });
+    expect(res.ok).toBe(false);
+    expect(res.error).toMatch(/4-20/);
+    expect(result.current.guestUser).toBeNull();
+    expect(result.current.user).toBeNull();
+    // Storage should not have been written.
+    expect(sessionStorage.getItem('bluff_guest_id')).toBeNull();
+    expect(sessionStorage.getItem('bluff_guest_username')).toBeNull();
+  });
+
+  it('signInAsGuest persists id + username and exposes a unified user', async () => {
+    const { result } = renderHook(() => useAuth());
+    await waitFor(() => expect(result.current.loading).toBe(false));
+
+    act(() => {
+      result.current.signInAsGuest({ username: '  Joker  ' });
+    });
+
+    expect(result.current.isGuest).toBe(true);
+    expect(result.current.user?.id).toMatch(/^guest:/);
+    expect(result.current.user?.isGuest).toBe(true);
+    expect(result.current.username).toBe('Joker');
+    // Persistence — the UUID part is whatever the hook minted.
+    expect(sessionStorage.getItem('bluff_guest_username')).toBe('Joker');
+    expect(sessionStorage.getItem('bluff_guest_id')).toBeTruthy();
+    expect(result.current.user.id).toBe(`guest:${sessionStorage.getItem('bluff_guest_id')}`);
+  });
+
+  it('rehydrates the guest from sessionStorage on mount', async () => {
+    sessionStorage.setItem('bluff_guest_id', '550e8400-e29b-41d4-a716-446655440000');
+    sessionStorage.setItem('bluff_guest_username', 'StoredGuest');
+
+    const { result } = renderHook(() => useAuth());
+    await waitFor(() => expect(result.current.loading).toBe(false));
+    expect(result.current.isGuest).toBe(true);
+    expect(result.current.username).toBe('StoredGuest');
+    expect(result.current.user.id).toBe('guest:550e8400-e29b-41d4-a716-446655440000');
+  });
+
+  it('getGuestAuth returns the persisted credentials', async () => {
+    const { result } = renderHook(() => useAuth());
+    await waitFor(() => expect(result.current.loading).toBe(false));
+
+    act(() => {
+      result.current.signInAsGuest({ username: 'PersistMe' });
+    });
+
+    const auth = result.current.getGuestAuth();
+    expect(auth?.username).toBe('PersistMe');
+    expect(auth?.guestId).toBe(sessionStorage.getItem('bluff_guest_id'));
+  });
+
+  it('getGuestAuth returns null when no guest is signed in', async () => {
+    const { result } = renderHook(() => useAuth());
+    await waitFor(() => expect(result.current.loading).toBe(false));
+    expect(result.current.getGuestAuth()).toBeNull();
+  });
+
+  it('signOutGuest clears the guest entry and storage', async () => {
+    const { result } = renderHook(() => useAuth());
+    await waitFor(() => expect(result.current.loading).toBe(false));
+
+    act(() => {
+      result.current.signInAsGuest({ username: 'Temporary' });
+    });
+    expect(result.current.isGuest).toBe(true);
+
+    act(() => {
+      result.current.signOutGuest();
+    });
+    expect(result.current.isGuest).toBe(false);
+    expect(result.current.user).toBeNull();
+    expect(sessionStorage.getItem('bluff_guest_id')).toBeNull();
+    expect(sessionStorage.getItem('bluff_guest_username')).toBeNull();
+  });
+
+  it('a real Supabase session shadows a stored guest entry', async () => {
+    // Pretend a guest was signed in previously and an authenticated
+    // session now exists for the same tab — the real user should win.
+    sessionStorage.setItem('bluff_guest_id', '550e8400-e29b-41d4-a716-446655440000');
+    sessionStorage.setItem('bluff_guest_username', 'OldGuest');
+
+    supabaseMock.auth.getSession.mockResolvedValueOnce({
+      data: { session: { user: { id: 'real-1', email: 'real@x.com' } } },
+    });
+    supabaseMock.fromBuilder.single.mockResolvedValueOnce({
+      data: { id: 'real-1', username: 'real-name' },
+      error: null,
+    });
+
+    const { result } = renderHook(() => useAuth());
+    await waitFor(() => expect(result.current.loading).toBe(false));
+
+    expect(result.current.user?.id).toBe('real-1');
+    expect(result.current.isGuest).toBe(false);
+    expect(result.current.username).toBe('real-name');
+    // And the stored guest entry is cleared so a future sign-out
+    // doesn't accidentally fall back into it.
+    expect(sessionStorage.getItem('bluff_guest_id')).toBeNull();
+  });
+
+  it('signInAsGuest sanitises whitespace before persisting', async () => {
+    const { result } = renderHook(() => useAuth());
+    await waitFor(() => expect(result.current.loading).toBe(false));
+
+    act(() => {
+      result.current.signInAsGuest({ username: '   Padded   ' });
+    });
+    expect(result.current.username).toBe('Padded');
+    expect(sessionStorage.getItem('bluff_guest_username')).toBe('Padded');
+  });
+});

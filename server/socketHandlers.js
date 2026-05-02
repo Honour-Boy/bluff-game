@@ -2,6 +2,7 @@
 // SOCKET HANDLERS — All Socket.IO event logic
 // ============================================================
 
+const crypto = require('node:crypto');
 const { createClient } = require('@supabase/supabase-js');
 const { AccessToken } = require('livekit-server-sdk');
 const engine = require('./gameEngine');
@@ -15,6 +16,47 @@ const supabase = createClient(
   process.env.SUPABASE_SERVICE_ROLE_KEY,
   { auth: { autoRefreshToken: false, persistSession: false } }
 );
+
+// ─── Guest auth helpers ───────────────────────────────────────
+// Anonymous players can join with a typed display name. Their
+// `socket.userId` is `guest:<uuid>` so the prefix lets server logic
+// cheaply distinguish guests from authenticated Supabase users
+// (e.g. avoid profile-table writes). The UUID is supplied by the
+// client (persisted in sessionStorage) so a refresh inside the same
+// browser tab keeps the same identity and reconnect lookups work.
+const GUEST_USER_PREFIX = 'guest:';
+const GUEST_USERNAME_MIN = 4;
+const GUEST_USERNAME_MAX = 20;
+
+/**
+ * Sanitise a typed guest display name.
+ *  - Strips control chars / HTML / zero-width / emojis (anything
+ *    outside letters / numbers / space / `_` / `.` / `-`).
+ *  - Trims and clamps to GUEST_USERNAME_MAX.
+ *  - Returns null if the result is shorter than GUEST_USERNAME_MIN.
+ *
+ * Exported for tests.
+ */
+function sanitizeGuestUsername(raw) {
+  const cleaned = String(raw || '')
+    .replace(/[^\p{L}\p{N}\s_.\-]/gu, '')
+    .trim()
+    .slice(0, GUEST_USERNAME_MAX);
+  if (cleaned.length < GUEST_USERNAME_MIN) return null;
+  return cleaned;
+}
+
+/**
+ * Validate a client-supplied guestId. We don't trust raw input — a
+ * malicious client could send a UUID that collides with a real
+ * Supabase user id (or an existing guest's id). The check below
+ * accepts only RFC-4122 hex UUIDs; anything else is rejected and
+ * the server picks a fresh one.
+ */
+function isValidGuestId(id) {
+  return typeof id === 'string'
+    && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id);
+}
 
 /**
  * In-memory store: roomCode → roomState
@@ -648,9 +690,42 @@ const dcKey = (code, playerId) => `${code}:${playerId}`;
 
 function registerSocketHandlers(io, socket) {
 
-  // ─── AUTHENTICATE socket with Supabase JWT ───────────────
+  // ─── AUTHENTICATE socket with Supabase JWT or guest ──────
   // Must be called once after connecting, before any game events.
-  socket.on('authenticate', async ({ token } = {}, callback) => {
+  // Two payload shapes:
+  //   { token } — verify a Supabase JWT, stamp the real user id.
+  //   { guest: { username, guestId? } } — anonymous play. Client may
+  //     supply a previously-issued guestId from sessionStorage so a
+  //     refresh keeps the same identity (and reconnect lookups work);
+  //     otherwise the server mints a fresh UUID and returns it so the
+  //     client can persist it.
+  socket.on('authenticate', async ({ token, guest } = {}, callback) => {
+    // Guest path — typed username, no Supabase verification.
+    if (!token && guest && typeof guest === 'object') {
+      const cleanUsername = sanitizeGuestUsername(guest.username);
+      if (!cleanUsername) {
+        return callback?.({
+          success: false,
+          error: `Display name must be ${GUEST_USERNAME_MIN}-${GUEST_USERNAME_MAX} characters`,
+        });
+      }
+
+      const guestId = isValidGuestId(guest.guestId)
+        ? guest.guestId
+        : crypto.randomUUID();
+
+      socket.userId   = `${GUEST_USER_PREFIX}${guestId}`;
+      socket.username = cleanUsername;
+      socket.isGuest  = true;
+
+      return callback?.({
+        success: true,
+        guest: true,
+        guestId,
+        username: cleanUsername,
+      });
+    }
+
     if (!token) return callback?.({ success: false, error: 'No token provided' });
 
     try {
@@ -667,6 +742,7 @@ function registerSocketHandlers(io, socket) {
         .single();
 
       socket.userId   = data.user.id;
+      socket.isGuest  = false;
       socket.username = profile?.username
         || data.user.user_metadata?.username
         || data.user.user_metadata?.full_name
@@ -2158,4 +2234,13 @@ function registerSocketHandlers(io, socket) {
   });
 }
 
-module.exports = { registerSocketHandlers, rooms };
+module.exports = {
+  registerSocketHandlers,
+  rooms,
+  // Exposed for unit tests + clarity. Treat as internal.
+  sanitizeGuestUsername,
+  isValidGuestId,
+  GUEST_USER_PREFIX,
+  GUEST_USERNAME_MIN,
+  GUEST_USERNAME_MAX,
+};

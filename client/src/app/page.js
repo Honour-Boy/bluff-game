@@ -20,12 +20,12 @@ function HomeContent() {
 
   const {
     user, profile, loading, authError, setAuthError,
-    sendEmailOtp, signInWithGoogle, signOut,
+    sendEmailOtp, signInWithGoogle, signInAsGuest, signOut, signOutGuest,
     updateUsername,
-    getAccessToken, username,
+    getAccessToken, getGuestAuth, username, isGuest,
   } = useAuth();
 
-  const game = useGame(getAccessToken);
+  const game = useGame(getAccessToken, getGuestAuth);
 
   const {
     roomCode, isHost, playerId,
@@ -81,11 +81,15 @@ function HomeContent() {
   }
 
   // ─── Auth gate ─────────────────────────────────────────────
+  // useAuth returns a unified `user` — real Supabase user wins,
+  // guest fills in otherwise. AuthScreen only shows when neither
+  // identity is present.
   if (!user) {
     return (
       <AuthScreen
         onSendEmailOtp={sendEmailOtp}
         onGoogleSignIn={signInWithGoogle}
+        onGuestSignIn={signInAsGuest}
         error={authError}
         setError={setAuthError}
       />
@@ -115,9 +119,11 @@ function HomeContent() {
     return wrap(
       <LandingScreen
         username={username}
+        isGuest={isGuest}
         onCreateRoom={createRoom}
         onJoinRoom={joinRoom}
         onSignOut={signOut}
+        onSignOutGuest={signOutGuest}
         onUpdateUsername={updateUsername}
         initialJoinCode={initialJoinCode}
         error={error}

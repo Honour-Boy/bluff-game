@@ -61,15 +61,23 @@ function Divider() {
   );
 }
 
-// ─── AuthScreen — passwordless, magic-link only ───────────────
+// ─── AuthScreen — passwordless magic link OR anonymous play ───
 // Single email field. signInWithOtp creates the user if new and
 // signs in if existing — same flow either way. The email contains
 // a magic link; clicking it opens an authenticated session. We don't
 // ask for the OTP code separately because the link makes that step
 // redundant.
-export function AuthScreen({ onSendEmailOtp, onGoogleSignIn, error, setError }) {
+//
+// Guest path (onGuestSignIn): user types a display name + clicks
+// "Continue as guest". Identity lives in sessionStorage only and
+// vanishes when the tab closes — sign-in remains the persistent
+// option. The guest form is a sibling stage of the email form,
+// reachable via "Play as guest" toggle.
+export function AuthScreen({ onSendEmailOtp, onGoogleSignIn, onGuestSignIn, error, setError }) {
   const [email, setEmail] = useState('');
-  const [stage, setStage] = useState('email'); // 'email' | 'sent'
+  const [guestName, setGuestName] = useState('');
+  // 'email' | 'guest' | 'sent'
+  const [stage, setStage] = useState('email');
   const [submitting, setSubmitting] = useState(false);
 
   const handleSendLink = async (e) => {
@@ -80,6 +88,19 @@ export function AuthScreen({ onSendEmailOtp, onGoogleSignIn, error, setError }) 
     const ok = await onSendEmailOtp({ email: email.trim() });
     setSubmitting(false);
     if (ok) setStage('sent');
+  };
+
+  // Guest sign-in is synchronous — no server round-trip until the
+  // socket authenticate event later. We just validate locally and
+  // hand the typed name to useAuth.signInAsGuest, which mints the
+  // UUID + persists to sessionStorage. The page-level effect picks
+  // up the new user and renders LandingScreen automatically.
+  const handleGuest = (e) => {
+    e.preventDefault();
+    setError(null);
+    if (!onGuestSignIn) return;
+    const res = onGuestSignIn({ username: guestName });
+    if (!res?.ok) setError(res?.error || 'Could not start guest session');
   };
 
   return (
@@ -112,7 +133,7 @@ export function AuthScreen({ onSendEmailOtp, onGoogleSignIn, error, setError }) 
             BLUFF
           </h1>
           <div style={{ color: 'var(--text-dim)', fontSize: 11, letterSpacing: '0.2em', marginTop: 6 }}>
-            Sign in to play
+            {stage === 'guest' ? 'Play as guest' : 'Sign in to play'}
           </div>
           <div style={{ display: 'flex', justifyContent: 'center', gap: 12, marginTop: 16, opacity: 0.4 }}>
             {['circle', 'square', 'triangle', 'cross', 'star'].map(shape => (
@@ -135,8 +156,12 @@ export function AuthScreen({ onSendEmailOtp, onGoogleSignIn, error, setError }) 
             </div>
           )}
 
-          <GoogleButton onClick={onGoogleSignIn} />
-          <Divider />
+          {stage !== 'guest' && (
+            <>
+              <GoogleButton onClick={onGoogleSignIn} />
+              <Divider />
+            </>
+          )}
 
           {stage === 'email' && (
             <form onSubmit={handleSendLink} style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
@@ -160,6 +185,75 @@ export function AuthScreen({ onSendEmailOtp, onGoogleSignIn, error, setError }) 
               </div>
               <button type="submit" className="primary" style={{ padding: '12px', marginTop: 4 }} disabled={submitting}>
                 {submitting ? 'Sending…' : 'Continue →'}
+              </button>
+
+              {/* Guest path — sibling CTA. Persists only for the
+                  current tab; sign-in is the path that survives a
+                  new browser session. */}
+              {onGuestSignIn && (
+                <>
+                  <Divider />
+                  <button
+                    type="button"
+                    onClick={() => { setStage('guest'); setError(null); }}
+                    style={{
+                      width: '100%',
+                      padding: '11px 16px',
+                      background: 'transparent',
+                      border: '1px solid var(--border)',
+                      borderRadius: 'var(--radius)',
+                      color: 'var(--text-dim)',
+                      fontSize: 13,
+                      cursor: 'pointer',
+                      transition: 'border-color 0.15s, color 0.15s',
+                    }}
+                    onMouseEnter={e => {
+                      e.currentTarget.style.borderColor = 'var(--accent)';
+                      e.currentTarget.style.color = 'var(--text)';
+                    }}
+                    onMouseLeave={e => {
+                      e.currentTarget.style.borderColor = 'var(--border)';
+                      e.currentTarget.style.color = 'var(--text-dim)';
+                    }}
+                  >
+                    🎭 Play as guest
+                  </button>
+                </>
+              )}
+            </form>
+          )}
+
+          {stage === 'guest' && (
+            <form onSubmit={handleGuest} style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+              <div>
+                <label style={{ fontSize: 10, color: 'var(--text-dim)', letterSpacing: '0.1em', display: 'block', marginBottom: 5 }}>
+                  DISPLAY NAME
+                </label>
+                <input
+                  type="text"
+                  value={guestName}
+                  onChange={e => setGuestName(e.target.value)}
+                  placeholder="e.g. Joker"
+                  autoComplete="off"
+                  autoFocus
+                  required
+                  minLength={4}
+                  maxLength={20}
+                  style={INPUT_STYLE}
+                />
+                <div style={{ fontSize: 11, color: 'var(--text-dim)', marginTop: 6, lineHeight: 1.5 }}>
+                  4–20 characters. No email required — but your name and stats only stick around for this tab. Sign in to save them.
+                </div>
+              </div>
+              <button type="submit" className="primary" style={{ padding: '12px', marginTop: 4 }}>
+                Continue as guest →
+              </button>
+              <button
+                type="button"
+                onClick={() => { setStage('email'); setError(null); }}
+                style={{ fontSize: 11, padding: '8px', background: 'none', border: 'none', color: 'var(--text-dim)', cursor: 'pointer', marginTop: 4 }}
+              >
+                ← Sign in instead
               </button>
             </form>
           )}
