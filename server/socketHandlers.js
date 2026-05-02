@@ -892,24 +892,37 @@ function registerSocketHandlers(io, socket) {
       if (!room) return callback({ success: false, error: 'Room not found' });
       if (room.hostSocketId !== socket.id) return callback({ success: false, error: 'Not the host' });
 
-      // v2 Phase E2 — Mirror Match validation. Spec: only selectable
-      // when alive count is even AT GAME START. Refuse the start
-      // rather than silently disabling the modifier.
+      // v2 Phase E2 — Mirror Match constraint. Spec says only selectable
+      // when alive count is even AT GAME START. Originally we refused
+      // the start outright; that was a bad UX (host clicks Start, gets
+      // an error, has to dig back into settings). Auto-disable instead
+      // and notify the room. The host can re-enable in a future game
+      // if the count becomes even.
+      let mirrorMatchAutoDisabled = false;
       if (
         room.mode === engine.MODES.ONLINE
         && room.config?.roomModifiers?.mirrorMatch
         && !engine.isMirrorMatchEligibleAtStart(room)
       ) {
-        return callback({
-          success: false,
-          error: 'Mirror Match requires an even player count. Adjust the table or disable Mirror Match.',
-        });
+        room.config.roomModifiers.mirrorMatch = false;
+        mirrorMatchAutoDisabled = true;
       }
 
       engine.startGame(room);
       await saveRoom(room);
-      callback({ success: true });
+      callback({ success: true, mirrorMatchAutoDisabled });
       await broadcastRoomState(io, roomCode);
+
+      if (mirrorMatchAutoDisabled) {
+        // Surface the auto-disable so the host knows what changed.
+        // Routes through the existing power-card banner kind that
+        // already has front-end rendering for ad-hoc system events.
+        io.to(roomCode).emit('power_card_triggered', {
+          kind: 'system_notice',
+          title: 'Mirror Match disabled',
+          subtitle: 'requires an even player count',
+        });
+      }
 
       // v2 Phase E2 — Speed Mode: arm the 15s timer for the first
       // active player IF the modifier is on. No-op otherwise.
