@@ -90,11 +90,41 @@ export function PlayerList({ players, turnOrder, currentPlayerId, isHost, phase,
                   }}>TURN</span>
                 )}
               </div>
-              <div style={{ marginTop: 4 }}>
+              <div style={{ marginTop: 4, display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
                 {isAlive
                   ? <RiskMeter riskLevel={player.riskLevel} size="sm" />
                   : <span style={{ fontSize: 10, color: 'var(--accent2)', letterSpacing: '0.1em' }}>ELIMINATED</span>
                 }
+                {/* v2 Phase F — Bounty chip + bet streak indicator */}
+                {isAlive && player.hasBounty && (
+                  <span
+                    title="Bounty placed — collect by calling a successful bluff"
+                    style={{
+                      fontSize: 10,
+                      color: '#ff3552',
+                      letterSpacing: '0.12em',
+                      border: '1px solid #ff3552',
+                      padding: '1px 6px',
+                      borderRadius: 2,
+                      fontWeight: 700,
+                    }}
+                  >
+                    ☠ BOUNTY
+                  </span>
+                )}
+                {isAlive && player.consecutiveCorrectBets > 0 && (
+                  <span
+                    title={`Bet streak: ${player.consecutiveCorrectBets} correct in a row`}
+                    style={{
+                      fontSize: 10,
+                      color: 'var(--accent)',
+                      letterSpacing: '0.1em',
+                      opacity: 0.8,
+                    }}
+                  >
+                    BET ×{player.consecutiveCorrectBets}
+                  </span>
+                )}
               </div>
             </div>
 

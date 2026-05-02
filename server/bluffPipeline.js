@@ -315,6 +315,42 @@ function _stageDefaultSpin(room, state) {
     : state.accuser?.id || null;
 }
 
+// ─── Stage 7.5 (Phase F): Bounty collection ─────────────────
+//
+// If a successful bluff was called against a player carrying a
+// bounty, the accuser collects it: their risk level drops by 1 and
+// the bounty clears. Counter resets on the bounty holder.
+function _stageBountyCollection(room, state) {
+  if (state.bluffIsCorrect !== true) return;
+  if (!state.accused?.hasBounty) return;
+  if (!room.config?.systems?.bounty) return;
+
+  const accused = state.accused;
+  const accuser = state.accuser;
+  accused.hasBounty = false;
+  accused.consecutiveSurvivedSpins = 0;
+  if (accuser) {
+    const bullets = accuser.chamber
+      .map((s, i) => (s === 'bullet' ? i : -1))
+      .filter(i => i !== -1);
+    if (bullets.length > 0) {
+      const removeIdx = bullets[Math.floor(Math.random() * bullets.length)];
+      const next = [...accuser.chamber];
+      next[removeIdx] = null;
+      accuser.chamber = next;
+      accuser.riskLevel = next.filter(s => s === 'bullet').length;
+    }
+  }
+  state.events.push({
+    kind: 'bounty_collected',
+    holderId: accused.id,
+    holderName: accused.username || null,
+    accuserId: accuser?.id || null,
+    accuserName: accuser?.username || null,
+    accuserRiskAfter: accuser?.riskLevel ?? null,
+  });
+}
+
 // ─── Stage 7 (Phase D): Role-driven post-bluff effects ───────
 //
 // Two role-passives that fire AFTER bluff correctness + spin target
@@ -412,6 +448,7 @@ function resolveBluff(room, accuserId) {
     _stageSwap,
     _stageDefaultSpin,
     _stageRoleEffects,
+    _stageBountyCollection,
   ]);
 
   if (!state.outcome) {
@@ -533,6 +570,7 @@ function resumeAfterSwap(room, accuserId, pickedCardId) {
     _stageMirror,
     _stageDefaultSpin,
     _stageRoleEffects,
+    _stageBountyCollection,
   ]);
 
   if (!state.outcome) {

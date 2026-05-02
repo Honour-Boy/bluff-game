@@ -439,6 +439,45 @@ export function useGame(getAccessToken) {
     if (roomState?.phase !== 'sniper_pending' && sniperPrompt) setSniperPrompt(null);
   }, [roomState?.phase]); // eslint-disable-line
 
+  // ─── v2 Phase F — Betting ─────────────────────────────────
+  const placeBet = useCallback((prediction) => {
+    return new Promise((resolve) => {
+      socket.emit('place_bet', { roomCode, prediction }, (res) => {
+        if (!res?.success) setError(res?.error || 'Bet failed');
+        resolve(res);
+      });
+    });
+  }, [socket, roomCode]);
+
+  // ─── v2 Phase F — Dead Man's Hand ghost vote ──────────────
+  const ghostVote = useCallback((option) => {
+    return new Promise((resolve) => {
+      socket.emit('ghost_vote', { roomCode, option }, (res) => {
+        if (!res?.success) setError(res?.error || 'Ghost vote failed');
+        resolve(res);
+      });
+    });
+  }, [socket, roomCode]);
+
+  // ─── v2 Phase F — Last Stand actions ──────────────────────
+  const lastStandSpin = useCallback(() => {
+    return new Promise((resolve) => {
+      socket.emit('last_stand_spin', { roomCode }, (res) => {
+        if (!res?.success) setError(res?.error || 'Last stand spin failed');
+        resolve(res);
+      });
+    });
+  }, [socket, roomCode]);
+
+  const lastStandEndTurn = useCallback(() => {
+    return new Promise((resolve) => {
+      socket.emit('last_stand_end_turn', { roomCode }, (res) => {
+        if (!res?.success) setError(res?.error || 'Last stand end turn failed');
+        resolve(res);
+      });
+    });
+  }, [socket, roomCode]);
+
   const sendChatMessage = useCallback((text) => {
     if (!roomCode || !text?.trim()) return;
     socket.emit('send_chat_message', { roomCode, text: text.trim() }, (res) => {
@@ -511,6 +550,11 @@ export function useGame(getAccessToken) {
     sniperPrompt,
     powerEventQueue,
     consumePowerEvent,
+    // v2 Phase F — Systems
+    placeBet,
+    ghostVote,
+    lastStandSpin,
+    lastStandEndTurn,
     setError,
   };
 }

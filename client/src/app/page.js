@@ -50,6 +50,10 @@ function HomeContent() {
     sniperPrompt,
     powerEventQueue,
     consumePowerEvent,
+    placeBet,
+    ghostVote,
+    lastStandSpin,
+    lastStandEndTurn,
   } = game;
 
   // Voice — opt-in via Join Voice button. Hook tears down on roomCode change.
@@ -153,6 +157,10 @@ function HomeContent() {
           sniperPrompt={sniperPrompt}
           powerEventQueue={powerEventQueue}
           consumePowerEvent={consumePowerEvent}
+          placeBet={placeBet}
+          ghostVote={ghostVote}
+          lastStandSpin={lastStandSpin}
+          lastStandEndTurn={lastStandEndTurn}
           voice={voice}
         />
       );
@@ -201,6 +209,10 @@ function HomeContent() {
           sniperPrompt={sniperPrompt}
           powerEventQueue={powerEventQueue}
           consumePowerEvent={consumePowerEvent}
+          placeBet={placeBet}
+          ghostVote={ghostVote}
+          lastStandSpin={lastStandSpin}
+          lastStandEndTurn={lastStandEndTurn}
           voice={voice}
         />
       );

@@ -55,6 +55,42 @@ const PRESETS = {
     bg: "linear-gradient(90deg, rgba(10,4,6,0.96) 0%, rgba(34,6,14,0.95) 50%, rgba(10,4,6,0.96) 100%)",
     glyph: "coin",
   },
+  bounty_collected: {
+    title: "BOUNTY COLLECTED",
+    accent: "var(--accent)",
+    bg: "linear-gradient(90deg, rgba(10,4,6,0.96) 0%, rgba(20,28,8,0.96) 50%, rgba(10,4,6,0.96) 100%)",
+    glyph: "coin",
+  },
+  betting_open: {
+    title: "PLACE YOUR BETS",
+    accent: "var(--accent)",
+    bg: "linear-gradient(90deg, rgba(10,10,11,0.96) 0%, rgba(18,22,8,0.96) 50%, rgba(10,10,11,0.96) 100%)",
+    glyph: "coin",
+  },
+  betting_streak_reward: {
+    title: "BETTING STREAK!",
+    accent: "var(--accent)",
+    bg: "linear-gradient(90deg, rgba(10,10,11,0.96) 0%, rgba(18,22,8,0.96) 50%, rgba(10,10,11,0.96) 100%)",
+    glyph: "coin",
+  },
+  ghost_vote_started: {
+    title: "GHOST COUNCIL CONVENES",
+    accent: "#aa9ee0",
+    bg: "linear-gradient(90deg, #07080a 0%, #0c0a14 50%, #07080a 100%)",
+    glyph: "snow",
+  },
+  ghost_vote_result: {
+    title: "GHOST COUNCIL DECIDES",
+    accent: "#aa9ee0",
+    bg: "linear-gradient(90deg, #07080a 0%, #0c0a14 50%, #07080a 100%)",
+    glyph: "snow",
+  },
+  last_stand_entered: {
+    title: "LAST STAND",
+    accent: "#ff3552",
+    bg: "linear-gradient(90deg, #050506 0%, #0a0204 50%, #050506 100%)",
+    glyph: "duel",
+  },
   sudden_death: {
     title: "SUDDEN DEATH",
     accent: "#7cd5ff", // ice blue

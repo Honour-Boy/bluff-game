@@ -48,6 +48,22 @@ function emitPowerCardEvents(io, roomCode, events) {
   }
 }
 
+// ─── v2 Phase F — system timer registries ────────────────────
+// 10s betting + 15s ghost-vote windows are server-side. We keep
+// per-room timer handles so reconnects + disconnect cleanup can
+// cancel them.
+const bettingTimers = new Map();    // roomCode → setTimeout handle
+const ghostVoteTimers = new Map();  // roomCode → setTimeout handle
+
+function _clearBettingTimer(code) {
+  const t = bettingTimers.get(code);
+  if (t) { clearTimeout(t); bettingTimers.delete(code); }
+}
+function _clearGhostVoteTimer(code) {
+  const t = ghostVoteTimers.get(code);
+  if (t) { clearTimeout(t); ghostVoteTimers.delete(code); }
+}
+
 /**
  * Compute the alive Sniper's eligible redirect targets — every
  * alive player EXCEPT the Sniper themselves and any current Mirror
@@ -174,6 +190,122 @@ function finaliseAssassinElimination(room, outcome) {
   }
 }
 
+// ─── v2 Phase F — post-elim / post-survival hooks ────────────
+
+/**
+ * Handle Bounty placement after a survival. Returns the bounty_placed
+ * banner event (or null). Caller emits.
+ */
+function _bountyOnSurvival(room, playerId) {
+  return engine.onSurvivalForBounty(room, playerId);
+}
+
+/**
+ * Handle Bounty clear on elimination. Idempotent.
+ */
+function _bountyOnElimination(room, playerId) {
+  engine.onEliminationForBounty(room, playerId);
+}
+
+/**
+ * After an elimination, decide whether DMH should fire (and whether
+ * Last Stand should fire instead — Last Stand wins if alive=2).
+ * Returns one of:
+ *   { kind: 'last_stand' }      — caller transitions
+ *   { kind: 'ghost_vote' }      — caller starts the vote
+ *   null                         — nothing to do
+ *
+ * Last Stand takes priority if both conditions are satisfied.
+ */
+function _decidePostElimSystemPhase(room) {
+  if (engine.shouldEnterLastStand(room)) return { kind: 'last_stand' };
+  if (engine.shouldOpenGhostVote(room)) return { kind: 'ghost_vote' };
+  return null;
+}
+
+/**
+ * Open a 10s betting window if betting is enabled. Schedules the
+ * close via setTimeout — when the timer fires, we close the window
+ * and broadcast a fresh state. Eligible bettors get a private
+ * `betting_pending` ping; the spin target gets a `betting_in_progress`
+ * ping. Public-state version is also exposed in `room.betting` so
+ * any client can render the wait UI.
+ */
+function _maybeOpenBetting(io, room) {
+  if (!room?.config?.systems?.betting) return false;
+  if (room.phase !== 'spin_pending') return false;
+  const eligibleIds = engine.startBettingWindow(room);
+  if (!eligibleIds || eligibleIds.length === 0) return false;
+  const code = room.code;
+  _clearBettingTimer(code);
+  const handle = setTimeout(async () => {
+    bettingTimers.delete(code);
+    const r = await getRoom(code);
+    if (!r || !r.betting) return;
+    engine.closeBettingWindow(r);
+    await saveRoom(r);
+    await broadcastRoomState(io, code);
+  }, engine.BETTING_WINDOW_MS);
+  bettingTimers.set(code, handle);
+  // Public banner for the table.
+  io.to(code).emit('power_card_triggered', {
+    kind: 'betting_open',
+    spinTargetId: room.spinTargetId,
+    spinTargetName: room.players.find(p => p.id === room.spinTargetId)?.username || null,
+    closesAt: room.betting.closesAt,
+  });
+  return true;
+}
+
+/**
+ * Open a 15s ghost vote. Living players are paused — phase moves to
+ * 'ghost_vote_pending'. Eligible voters (eliminated players) get the
+ * vote popup via room_state.
+ */
+function _openGhostVote(io, room) {
+  const code = room.code;
+  engine.startGhostVote(room);
+  room.phase = 'ghost_vote_pending';
+  room.lastAction = {
+    type: 'ghost_vote_started',
+    closesAt: room.ghostVote.closesAt,
+  };
+  _clearGhostVoteTimer(code);
+  const handle = setTimeout(async () => {
+    ghostVoteTimers.delete(code);
+    const r = await getRoom(code);
+    if (!r || !r.ghostVote) return;
+    const banner = engine.resolveGhostVote(r);
+    r.phase = 'playing';
+    r.lastAction = {
+      type: 'ghost_vote_resolved',
+      winningOption: banner?.winningOption || null,
+      applied: banner?.applied || 'noop',
+    };
+    await saveRoom(r);
+    if (banner) io.to(code).emit('power_card_triggered', banner);
+    await broadcastRoomState(io, code);
+  }, engine.DMH_VOTE_WINDOW_MS);
+  ghostVoteTimers.set(code, handle);
+  io.to(code).emit('power_card_triggered', {
+    kind: 'ghost_vote_started',
+    closesAt: room.ghostVote.closesAt,
+  });
+}
+
+/**
+ * Transition the room into Last Stand. Mutates room and emits the
+ * cinematic banner. Caller must broadcast room_state afterwards.
+ */
+function _enterLastStand(io, room) {
+  const code = room.code;
+  engine.enterLastStand(room);
+  io.to(code).emit('power_card_triggered', {
+    kind: 'last_stand_entered',
+    finalistIds: room.lastStand?.finalistIds || [],
+  });
+}
+
 /**
  * Apply a bluff-pipeline outcome to room state.
  * - 'blocked' → caller's bluff is wasted; advance turn normally.
@@ -246,6 +378,37 @@ function applyBluffOutcome(room, outcome) {
     mirrorEndsAccuserTurn: outcome.mirrorEndsAccuserTurn || false,
   };
   return outcome;
+}
+
+/**
+ * Trampoline: post-elimination, decide what's next on the table.
+ * Order of precedence:
+ *   1. game_over   — single survivor.
+ *   2. last_stand  — exactly two alive (and Last Stand enabled).
+ *   3. ghost_vote  — DMH threshold crossed (and DMH enabled).
+ *   4. nothing     — caller continues normal flow.
+ *
+ * IMPORTANT: caller must NOT have set room.phase to 'game_over' yet —
+ * we make that decision here so Last Stand / DMH can intercept.
+ */
+function applyPostElimSystemHooks(io, room) {
+  const winner = engine.checkGameOver(room);
+  if (winner) {
+    room.phase = 'game_over';
+    room.lastAction = { type: 'game_over', winnerId: winner.id, winnerName: winner.username };
+    return { transitioned: 'game_over' };
+  }
+  const decision = _decidePostElimSystemPhase(room);
+  if (!decision) return { transitioned: null };
+  if (decision.kind === 'last_stand') {
+    _enterLastStand(io, room);
+    return { transitioned: 'last_stand' };
+  }
+  if (decision.kind === 'ghost_vote') {
+    _openGhostVote(io, room);
+    return { transitioned: 'ghost_vote_pending' };
+  }
+  return { transitioned: null };
 }
 
 async function broadcastRoomState(io, roomCode) {
@@ -749,6 +912,20 @@ function registerSocketHandlers(io, socket) {
       if (!room) return callback({ success: false, error: 'Room not found' });
       if (room.phase !== 'spin_pending') return callback({ success: false, error: 'No spin pending' });
       if (room.spinTargetId !== playerId) return callback({ success: false, error: 'Not your spin' });
+      // v2 Phase F — Betting window: spin target must wait until the
+      // 10s window closes (or every eligible bettor has placed a bet).
+      if (room.betting && !room.betting.closed) {
+        // Allow spin if every eligible bettor has placed a bet (early
+        // close) — otherwise wait for the timer.
+        const everyoneBet = room.betting.eligibleIds.every(
+          id => room.betting.bets[id]
+        );
+        if (!everyoneBet) {
+          return callback({ success: false, error: 'Betting window still open' });
+        }
+        engine.closeBettingWindow(room);
+        _clearBettingTimer(code);
+      }
 
       const player = room.players.find(p => p.id === playerId);
       if (!player) return callback({ success: false, error: 'Player not found' });
@@ -782,6 +959,19 @@ function registerSocketHandlers(io, socket) {
         }
       }
 
+      // v2 Phase F — Bounty + Betting evaluation. Bounty placement
+      // happens on survival; clearing on elimination. Bets evaluate
+      // immediately against the just-resolved outcome.
+      const bountyEvents = [];
+      if (spinResult.eliminated) {
+        _bountyOnElimination(room, player.id);
+      } else {
+        const placed = _bountyOnSurvival(room, player.id);
+        if (placed) bountyEvents.push(placed);
+      }
+      const betEvents = engine.evaluateBets(room, spinResult.eliminated);
+      _clearBettingTimer(code);
+
       // v2 Phase D — Medic interception for spin elimination.
       // engine.spinGun has already mutated player.status if eliminated,
       // but elimination from turn order + game-over haven't happened
@@ -791,6 +981,7 @@ function registerSocketHandlers(io, socket) {
       // Medic prompt then fires AFTER the spin overlay clears (the
       // client gates the prompt on `pendingMedicSave` in room_state).
       let medicPaused = false;
+      let postElimSystemPhase = null;
       if (spinResult.eliminated) {
         // Don't yet remove from turnOrder — Medic save needs the
         // player to still be in their seat for revival.
@@ -820,6 +1011,18 @@ function registerSocketHandlers(io, socket) {
       // (set by maybeStartMedicPause). Otherwise return to playing.
       if (!medicPaused) {
         room.phase = 'playing';
+        // v2 Phase F — post-elim system check. Last Stand takes
+        // priority over DMH; both are evaluated here so the elim
+        // animation finishes first then we transition.
+        if (spinResult.eliminated && room.mode === engine.MODES.ONLINE) {
+          if (engine.shouldEnterLastStand(room)) {
+            postElimSystemPhase = 'last_stand';
+            _enterLastStand(io, room);
+          } else if (engine.shouldOpenGhostVote(room)) {
+            postElimSystemPhase = 'ghost_vote_pending';
+            _openGhostVote(io, room);
+          }
+        }
       }
       room.spinTargetId = null;
       room.cardPlayedThisTurn = false;
@@ -846,6 +1049,11 @@ function registerSocketHandlers(io, socket) {
       await saveRoom(room);
       console.log(`[Room ${code}] ${player.username} spun slot ${spinResult.spinIndex} → ${spinResult.eliminated ? (medicPaused ? 'ELIM (Medic deciding)' : 'ELIMINATED') : 'survived'}`);
       await broadcastRoomState(io, code);
+      // v2 Phase F — post-spin banners (bounty + betting streak).
+      // Emitted AFTER broadcastRoomState so clients already have
+      // updated chamber/riskLevel when the banner fires.
+      for (const ev of bountyEvents) io.to(code).emit('power_card_triggered', ev);
+      for (const ev of betEvents) io.to(code).emit('power_card_triggered', ev);
       callback({ success: true, spinResult });
     } catch (err) {
       callback({ success: false, error: err.message });
@@ -929,6 +1137,8 @@ function registerSocketHandlers(io, socket) {
           && maybeStartMedicPause(io, room, outcome.eliminatedPlayerId, 'assassin', () => {
             // Decline → finalise elimination as if no Medic existed.
             finaliseAssassinElimination(room, outcome);
+            // After Assassin finalisation, check for Last Stand / DMH.
+            applyPostElimSystemHooks(io, room);
           })
         ) {
           await saveRoom(room);
@@ -938,6 +1148,20 @@ function registerSocketHandlers(io, socket) {
         }
 
         applyBluffOutcome(room, outcome);
+
+        // v2 Phase F — post-elim systems (Assassin path with no Medic).
+        if (outcome.kind === 'eliminated') {
+          // outcome.eliminatedPlayerId already removed; clear bounty.
+          if (outcome.eliminatedPlayerId) {
+            _bountyOnElimination(room, outcome.eliminatedPlayerId);
+          }
+          applyPostElimSystemHooks(io, room);
+        }
+
+        // v2 Phase F — open betting window when entering spin_pending.
+        if (room.phase === 'spin_pending') {
+          _maybeOpenBetting(io, room);
+        }
 
         await saveRoom(room);
         emitPowerCardEvents(io, code, events);
@@ -1004,6 +1228,7 @@ function registerSocketHandlers(io, socket) {
         outcome.kind === 'eliminated'
         && maybeStartMedicPause(io, room, outcome.eliminatedPlayerId, 'assassin', () => {
           finaliseAssassinElimination(room, outcome);
+          applyPostElimSystemHooks(io, room);
         })
       ) {
         await saveRoom(room);
@@ -1013,6 +1238,17 @@ function registerSocketHandlers(io, socket) {
       }
 
       applyBluffOutcome(room, outcome);
+
+      if (outcome.kind === 'eliminated') {
+        if (outcome.eliminatedPlayerId) {
+          _bountyOnElimination(room, outcome.eliminatedPlayerId);
+        }
+        applyPostElimSystemHooks(io, room);
+      }
+
+      if (room.phase === 'spin_pending') {
+        _maybeOpenBetting(io, room);
+      }
 
       await saveRoom(room);
       emitPowerCardEvents(io, code, events);
@@ -1333,6 +1569,10 @@ function registerSocketHandlers(io, socket) {
       // Clear the pause and apply the (possibly modified) outcome.
       room.pendingSniperRedirect = null;
       applyBluffOutcome(room, outcome);
+
+      if (room.phase === 'spin_pending') {
+        _maybeOpenBetting(io, room);
+      }
 
       await saveRoom(room);
       if (banner) io.to(code).emit('power_card_triggered', banner);
@@ -1655,6 +1895,144 @@ function registerSocketHandlers(io, socket) {
     }
   });
 
+  // ─── PLAYER: Place a bet (v2 Phase F) ────────────────────
+  // While the betting window is open, every alive player except the
+  // spin target can submit `prediction: 'survive' | 'eliminated'`.
+  // First-bet wins for now — a later edit replaces it. Skipped bets
+  // are no-ops (no streak change).
+  socket.on('place_bet', async ({ roomCode, prediction } = {}, callback) => {
+    try {
+      if (!socket.userId) return callback?.({ success: false, error: 'Not authenticated' });
+      const code = roomCode?.toUpperCase();
+      const room = await getRoom(code);
+      if (!room) return callback?.({ success: false, error: 'Room not found' });
+      if (room.mode !== engine.MODES.ONLINE) return callback?.({ success: false, error: 'Online mode only' });
+      const res = engine.placeBet(room, socket.userId, prediction);
+      if (!res.ok) return callback?.({ success: false, error: res.error });
+      await saveRoom(room);
+      await broadcastRoomState(io, code);
+      callback?.({ success: true });
+    } catch (err) {
+      console.error('[place_bet]', err);
+      callback?.({ success: false, error: err.message });
+    }
+  });
+
+  // ─── PLAYER: Ghost vote (v2 Phase F — DMH) ───────────────
+  // Eligible voters are eliminated players. Vote option ids are
+  // [1, 2] always; [3] is added if any risk modifier is enabled in
+  // room.config.
+  socket.on('ghost_vote', async ({ roomCode, option } = {}, callback) => {
+    try {
+      if (!socket.userId) return callback?.({ success: false, error: 'Not authenticated' });
+      const code = roomCode?.toUpperCase();
+      const room = await getRoom(code);
+      if (!room) return callback?.({ success: false, error: 'Room not found' });
+      if (room.phase !== 'ghost_vote_pending') return callback?.({ success: false, error: 'No ghost vote open' });
+      const res = engine.castGhostVote(room, socket.userId, Number(option));
+      if (!res.ok) return callback?.({ success: false, error: res.error });
+      await saveRoom(room);
+      await broadcastRoomState(io, code);
+
+      // Early-resolve: every eligible voter has voted → tally now.
+      if (room.ghostVote) {
+        const everyoneVoted = room.ghostVote.eligibleVoterIds.every(
+          id => room.ghostVote.votes[id] !== undefined
+        );
+        if (everyoneVoted) {
+          _clearGhostVoteTimer(code);
+          const banner = engine.resolveGhostVote(room);
+          room.phase = 'playing';
+          room.lastAction = {
+            type: 'ghost_vote_resolved',
+            winningOption: banner?.winningOption || null,
+            applied: banner?.applied || 'noop',
+          };
+          await saveRoom(room);
+          if (banner) io.to(code).emit('power_card_triggered', banner);
+          await broadcastRoomState(io, code);
+        }
+      }
+      callback?.({ success: true });
+    } catch (err) {
+      console.error('[ghost_vote]', err);
+      callback?.({ success: false, error: err.message });
+    }
+  });
+
+  // ─── PLAYER: Last Stand spin (v2 Phase F) ────────────────
+  // The active finalist pulls the trigger. Survival → opponent's
+  // turn. Elimination → game_over with the other finalist as winner.
+  socket.on('last_stand_spin', async ({ roomCode } = {}, callback) => {
+    try {
+      if (!socket.userId) return callback?.({ success: false, error: 'Not authenticated' });
+      const code = roomCode?.toUpperCase();
+      const room = await getRoom(code);
+      if (!room) return callback?.({ success: false, error: 'Room not found' });
+      if (room.phase !== 'last_stand') return callback?.({ success: false, error: 'Not in Last Stand' });
+
+      const player = room.players.find(p => p.id === socket.userId);
+      const chamberBefore = player ? [...player.chamber] : null;
+      const res = engine.lastStandSpin(room, socket.userId);
+      if (!res.ok) return callback?.({ success: false, error: res.error });
+
+      room.lastAction = {
+        type: 'last_stand_spin_result',
+        spinTargetId: socket.userId,
+        spinTargetName: player?.username || null,
+        spinIndex: res.spinIndex,
+        chamber: chamberBefore,
+        chamberAfter: res.chamberAfter,
+        eliminated: res.eliminated,
+        riskLevel: res.riskLevel,
+      };
+
+      if (res.eliminated) {
+        engine.eliminateFromTurnOrder(room, socket.userId);
+        const winner = engine.checkGameOver(room);
+        if (winner) {
+          room.pendingGameOver = { id: winner.id, name: winner.username };
+        }
+      }
+
+      await saveRoom(room);
+      await broadcastRoomState(io, code);
+      callback?.({ success: true, ...res });
+    } catch (err) {
+      console.error('[last_stand_spin]', err);
+      callback?.({ success: false, error: err.message });
+    }
+  });
+
+  // ─── PLAYER: Last Stand end turn (v2 Phase F) ────────────
+  // Pass the gun to the opponent finalist after a survival.
+  socket.on('last_stand_end_turn', async ({ roomCode } = {}, callback) => {
+    try {
+      if (!socket.userId) return callback?.({ success: false, error: 'Not authenticated' });
+      const code = roomCode?.toUpperCase();
+      const room = await getRoom(code);
+      if (!room) return callback?.({ success: false, error: 'Room not found' });
+      if (room.phase !== 'last_stand') return callback?.({ success: false, error: 'Not in Last Stand' });
+
+      const res = engine.lastStandEndTurn(room, socket.userId);
+      if (!res.ok) return callback?.({ success: false, error: res.error });
+
+      const next = room.players.find(p => p.id === res.nextActiveId);
+      room.lastAction = {
+        type: 'last_stand_turn_passed',
+        activeFinalistId: res.nextActiveId,
+        activeFinalistName: next?.username || null,
+      };
+
+      await saveRoom(room);
+      await broadcastRoomState(io, code);
+      callback?.({ success: true });
+    } catch (err) {
+      console.error('[last_stand_end_turn]', err);
+      callback?.({ success: false, error: err.message });
+    }
+  });
+
   // ─── Disconnect ──────────────────────────────────────────
   socket.on('disconnect', async () => {
     console.log(`[Socket] Disconnected: ${socket.id}`);
@@ -1668,6 +2046,9 @@ function registerSocketHandlers(io, socket) {
         io.to(code).emit('host_disconnecting', { countdown: 30 });
         const timer = setTimeout(() => {
           io.to(code).emit('game_ended', { reason: 'The host left the game.' });
+          // v2 Phase F — clear any open Phase F timers tied to this room.
+          _clearBettingTimer(code);
+          _clearGhostVoteTimer(code);
           // v2 Phase E2 — clear any in-flight Speed Mode timer when
           // the room is torn down so a stale timeout doesn't fire
           // against a deleted room.
@@ -1703,7 +2084,7 @@ function registerSocketHandlers(io, socket) {
         continue;
       }
 
-      if (['playing', 'bluff_resolution', 'spin_pending', 'swap_pending', 'medic_pending', 'sniper_pending'].includes(room.phase)) {
+      if (['playing', 'bluff_resolution', 'spin_pending', 'swap_pending', 'medic_pending', 'sniper_pending', 'ghost_vote_pending', 'last_stand'].includes(room.phase)) {
         io.to(code).emit('player_disconnecting', { playerId: player.id, playerName: player.username });
 
         const key = dcKey(code, player.id);
