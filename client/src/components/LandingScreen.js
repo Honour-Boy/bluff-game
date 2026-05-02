@@ -8,9 +8,12 @@ import { PreGameSettingsPanel, DEFAULT_V2_CONFIG } from './PreGameSettingsPanel'
 
 export function LandingScreen({
   username,
+  isGuest = false,           // true when current identity is a guest (no Supabase user)
   onCreateRoom,
   onJoinRoom,
   onSignOut,
+  onSignOutGuest,            // optional — clears guest sessionStorage so AuthScreen
+                             // can render again. Used by the "sign in to save" CTA.
   onUpdateUsername,
   initialJoinCode,   // ?join=CODE — auto-opens join form with code locked
   error,
@@ -86,34 +89,75 @@ export function LandingScreen({
       <div style={{ position: 'fixed', bottom: 20, right: 20, width: 60, height: 60, borderBottom: '2px solid var(--accent)', borderRight: '2px solid var(--accent)', opacity: 0.3 }} />
 
       {/* User bar — top right */}
+      {/* Guests can't edit their username via the profile modal
+          (no row in the profiles table) so the chip is non-clickable
+          for them. Authenticated users keep the click-to-edit affordance. */}
       <div style={{
         position: 'fixed', top: 14, right: 14, zIndex: 10,
         display: 'flex', alignItems: 'center', gap: 8,
       }}>
         <button
-          onClick={() => setShowProfile(true)}
+          onClick={() => { if (!isGuest) setShowProfile(true); }}
+          disabled={isGuest}
+          title={isGuest ? 'Sign in to edit your display name' : 'Edit profile'}
           style={{
             fontSize: 11, color: 'var(--text-dim)',
             border: '1px solid var(--border)',
             background: 'var(--surface2)',
             padding: '5px 10px', borderRadius: 4,
-            cursor: 'pointer', letterSpacing: '0.06em',
+            cursor: isGuest ? 'default' : 'pointer',
+            letterSpacing: '0.06em',
+            display: 'flex', alignItems: 'center', gap: 6,
           }}
         >
-          👤 {username}
+          <span>👤 {username}</span>
+          {isGuest && (
+            <span style={{
+              fontSize: 9,
+              padding: '1px 6px',
+              borderRadius: 3,
+              background: 'rgba(232,255,74,0.12)',
+              border: '1px solid rgba(232,255,74,0.4)',
+              color: 'var(--accent)',
+              letterSpacing: '0.1em',
+              fontWeight: 600,
+            }}>
+              GUEST
+            </span>
+          )}
         </button>
-        <button
-          onClick={onSignOut}
-          style={{
-            fontSize: 11, color: 'var(--text-dim)',
-            border: '1px solid var(--border)',
-            background: 'none',
-            padding: '5px 10px', borderRadius: 4,
-            cursor: 'pointer',
-          }}
-        >
-          Sign out
-        </button>
+        {/* Sign-in CTA for guests so they can convert to a real
+            account without losing the page. Falls back to a plain
+            sign-out for already-authenticated users. */}
+        {isGuest && onSignOutGuest ? (
+          <button
+            onClick={onSignOutGuest}
+            title="Sign in to save your username and stats across sessions"
+            style={{
+              fontSize: 11, color: 'var(--accent)',
+              border: '1px solid var(--accent)',
+              background: 'none',
+              padding: '5px 10px', borderRadius: 4,
+              cursor: 'pointer',
+              letterSpacing: '0.06em',
+            }}
+          >
+            Sign in to save →
+          </button>
+        ) : (
+          <button
+            onClick={onSignOut}
+            style={{
+              fontSize: 11, color: 'var(--text-dim)',
+              border: '1px solid var(--border)',
+              background: 'none',
+              padding: '5px 10px', borderRadius: 4,
+              cursor: 'pointer',
+            }}
+          >
+            Sign out
+          </button>
+        )}
       </div>
 
       <div className="fade-in" style={{ width: '100%', maxWidth: 480, position: 'relative', zIndex: 1 }}>
