@@ -31,6 +31,15 @@ export function ActionLog({ lastAction }) {
     game_over: ({ winnerName }) => `🎉 GAME OVER — ${winnerName} is the last player standing!`,
     continued: ({ playerId }) => `→ Player continued their turn.`,
     disconnected: ({ playerName }) => `🔌 ${playerName} disconnected — eliminated.`,
+    // v2 Phase C — power-card outcome lines.
+    bluff_blocked: () => `🛡 Shield blocked the bluff.`,
+    assassin_strike: ({ eliminatedName, assassinHolderName }) => {
+      if (eliminatedName && assassinHolderName) {
+        return `🗡 ${assassinHolderName}'s Assassin struck — ${eliminatedName} eliminated.`;
+      }
+      return `🗡 Assassin struck.`;
+    },
+    swap_pending: () => `🔄 Swap activated — holder is choosing a card.`,
   };
 
   const fn = messages[lastAction.type];
@@ -49,6 +58,9 @@ export function ActionLog({ lastAction }) {
     game_over: 'var(--accent)',
     continued: 'var(--text-dim)',
     disconnected: 'var(--accent2)',
+    bluff_blocked: 'var(--alive)',
+    assassin_strike: 'var(--accent2)',
+    swap_pending: 'var(--warning)',
   };
 
   const color = colors[lastAction.type] || 'var(--text-dim)';

@@ -9,6 +9,7 @@ import { HowToPlayModal } from './HowToPlayModal';
 import { TurnActionModal, WaitingForPlayerBanner } from './TurnActionModal';
 import { VoicePanel, VoiceIndicator } from './VoicePanel';
 import { PowerCard, POWER_META } from './PowerCard';
+import { AnnouncementBanner } from './AnnouncementBanner';
 
 // ─── Constants ────────────────────────────────────────────────
 const SHAPES = ['circle', 'triangle', 'cross', 'square', 'star'];
@@ -284,6 +285,10 @@ export function OnlinePlayerUI({
   acknowledgeSpinResult,
   spinDismissed,
   activatePowerCard,
+  swapPick,
+  assassinDecision,
+  powerEventQueue,
+  consumePowerEvent,
   voice,
 }) {
   const [showHowToPlay, setShowHowToPlay] = useState(false);
@@ -321,6 +326,19 @@ export function OnlinePlayerUI({
   const [powerPromptDismissedFor, setPowerPromptDismissedFor] = useState(null);
   const [peekedCard, setPeekedCard] = useState(null);
   const [activating, setActivating] = useState(false);
+
+  // ─── v2 Phase C — Swap picker state ──────────────────────
+  // The Swap holder is shown an anonymised picker of cards in the
+  // played pile. Each option is just an id; no shape, no number.
+  const [swapping, setSwapping] = useState(false);
+
+  // ─── v2 Phase C — Assassin re-arm decision state ─────────
+  // When the holder's next turn comes around without any bluff
+  // having been called on them, we re-prompt: re-arm or take +4
+  // shape cards penalty. We dismiss-per-turn just like the regular
+  // activation prompt so the user can't get stuck in a loop.
+  const [assassinDeciding, setAssassinDeciding] = useState(false);
+  const [assassinPromptDismissedFor, setAssassinPromptDismissedFor] = useState(null);
 
   // Trigger spin overlay when a spin_result arrives
   useEffect(() => {
@@ -528,6 +546,32 @@ export function OnlinePlayerUI({
     !spinData &&
     !justEliminated;
 
+  // ─── v2 Phase C — Swap pending visibility ───────────────
+  // The pause kicks in when the SERVER sets phase to 'swap_pending'
+  // on a bluff into a Swap-armed player. Only the Swap holder sees
+  // the picker; everyone else just sees a "Player is choosing..."
+  // banner via the action log.
+  const isSwapPending = roomState?.phase === 'swap_pending';
+  const amSwapHolder = isSwapPending && roomState?.swapHolderId === myPlayer?.id;
+  const swapPickOptions = roomState?.swapPickOptions || [];
+
+  // ─── v2 Phase C — Assassin re-arm prompt visibility ──────
+  // When my next turn starts and I still have an armed Assassin
+  // (no one called bluff on me last cycle), the spec says I must
+  // decide: re-arm (no-op) or take +4 cards penalty. We re-key
+  // dismissal on the same turn key so the prompt re-fires per turn.
+  const showAssassinReprompt =
+    isMyTurn &&
+    !isEliminated &&
+    !showSpectatorView &&
+    roomState?.phase === 'playing' &&
+    !roomState?.cardPlayedThisTurn &&
+    !roomState?.bluffUsedThisTurn &&
+    armedPowerCard?.power === 'assassin' &&
+    assassinPromptDismissedFor !== powerPromptTurnKey &&
+    !spinData &&
+    !justEliminated;
+
   const handleActivatePower = async () => {
     if (!activatePowerCard || activating) return;
     setActivating(true);
@@ -549,6 +593,39 @@ export function OnlinePlayerUI({
 
   const handleSkipPower = () => {
     setPowerPromptDismissedFor(powerPromptTurnKey);
+  };
+
+  // ─── v2 Phase C — Swap pick handler ─────────────────────
+  const handleSwapPick = async (cardId) => {
+    if (!swapPick || swapping || !cardId) return;
+    setSwapping(true);
+    try {
+      await swapPick(cardId);
+    } finally {
+      setSwapping(false);
+    }
+  };
+
+  // ─── v2 Phase C — Assassin re-arm decision handlers ─────
+  const handleAssassinRearm = async () => {
+    if (!assassinDecision || assassinDeciding) return;
+    setAssassinDeciding(true);
+    try {
+      await assassinDecision(true);
+      setAssassinPromptDismissedFor(powerPromptTurnKey);
+    } finally {
+      setAssassinDeciding(false);
+    }
+  };
+  const handleAssassinDecline = async () => {
+    if (!assassinDecision || assassinDeciding) return;
+    setAssassinDeciding(true);
+    try {
+      await assassinDecision(false);
+      setAssassinPromptDismissedFor(powerPromptTurnKey);
+    } finally {
+      setAssassinDeciding(false);
+    }
   };
 
   return (
@@ -1168,7 +1245,7 @@ export function OnlinePlayerUI({
           Suppressed while the power-card prompt is up so the player
           decides activation FIRST (per spec). */}
       <TurnActionModal
-        visible={showTurnModal && !isEliminated && !showPowerPrompt && !peekedCard}
+        visible={showTurnModal && !isEliminated && !showPowerPrompt && !showAssassinReprompt && !amSwapHolder && !peekedCard}
         isFirstTurn={isFirstTurn}
         bluffUsed={bluffUsedThisTurn}
         cardPlayed={cardPlayedThisTurn}
@@ -1288,6 +1365,212 @@ export function OnlinePlayerUI({
             )}
             <div style={{ fontSize: 11, color: 'var(--text-dim)', marginTop: 16, fontStyle: 'italic' }}>
               Only you can see this. Closing in a moment...
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── v2 Phase C — Announcement banner queue ── */}
+      {/* Renders the head of the queue. The banner self-times and
+          calls onComplete when its sweep-out finishes; we then dequeue
+          and the next event in line gets rendered. Banner is keyed by
+          the queue id so React fully remounts between events. */}
+      {Array.isArray(powerEventQueue) && powerEventQueue.length > 0 && (() => {
+        const evt = powerEventQueue[0];
+        const kind = (() => {
+          switch (evt.kind) {
+            case 'shield_blocked':   return 'bluff_blocked';
+            case 'mirror_reflected': return 'bluff_reflected';
+            case 'assassin_strike':  return 'assassin';
+            case 'swap_resolved':    return 'bluff_blocked';
+            default: return 'bluff_blocked';
+          }
+        })();
+        const titleByKind = {
+          shield_blocked:   'BLUFF BLOCKED',
+          mirror_reflected: 'BLUFF REFLECTED',
+          assassin_strike:  'ASSASSIN STRIKE',
+          swap_resolved:    'SWAP RESOLVED',
+        };
+        const subtitle = (() => {
+          if (evt.kind === 'mirror_reflected') {
+            return evt.redirectedToName ? `→ ${evt.redirectedToName}` : '';
+          }
+          if (evt.kind === 'assassin_strike') {
+            return evt.eliminatedName ? `${evt.eliminatedName} eliminated` : '';
+          }
+          if (evt.kind === 'swap_resolved') return 'card swapped';
+          return '';
+        })();
+        return (
+          <AnnouncementBanner
+            key={evt.id}
+            kind={kind}
+            title={titleByKind[evt.kind]}
+            subtitle={subtitle}
+            playerName={evt.holderName}
+            onComplete={consumePowerEvent}
+          />
+        );
+      })()}
+
+      {/* ── v2 Phase C — Swap picker modal ── */}
+      {amSwapHolder && (
+        <div style={{
+          position: 'fixed', inset: 0,
+          background: 'rgba(0,0,0,0.92)',
+          display: 'flex', flexDirection: 'column',
+          alignItems: 'center', justifyContent: 'center',
+          zIndex: 8700, padding: 24,
+        }}>
+          <div className="card fade-in" style={{
+            maxWidth: 420, width: '100%', textAlign: 'center',
+            padding: '24px 20px',
+            border: `1px solid ${POWER_META.swap.color}`,
+          }}>
+            <div style={{
+              fontFamily: "'Bebas Neue', sans-serif",
+              fontSize: 22, letterSpacing: '0.12em',
+              color: POWER_META.swap.color, marginBottom: 6,
+            }}>
+              SWAP — PICK A CARD
+            </div>
+            <div style={{ fontSize: 12, color: 'var(--text-dim)', marginBottom: 18, lineHeight: 1.5 }}>
+              Choose blindly. The cards below are ALL face-down — no shapes, no names. Your played card will be swapped with the one you pick, then both reveal face-up.
+            </div>
+            <div style={{
+              display: 'grid',
+              gridTemplateColumns: 'repeat(auto-fill, minmax(56px, 1fr))',
+              gap: 10,
+              marginBottom: 16,
+              maxHeight: '50vh',
+              overflowY: 'auto',
+              padding: 4,
+            }}>
+              {swapPickOptions.length === 0 ? (
+                <div style={{ gridColumn: '1 / -1', fontSize: 12, color: 'var(--text-dim)', padding: 20 }}>
+                  No cards in the played pile. Cancel & spin instead.
+                </div>
+              ) : swapPickOptions.map((opt) => (
+                <button
+                  key={opt.id}
+                  onClick={() => handleSwapPick(opt.id)}
+                  disabled={swapping}
+                  style={{
+                    width: 56, height: 80,
+                    background: 'linear-gradient(160deg, #14141a 0%, #08080a 100%)',
+                    border: `1.5px solid ${POWER_META.swap.color}66`,
+                    borderRadius: 6,
+                    cursor: swapping ? 'wait' : 'pointer',
+                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    color: `${POWER_META.swap.color}aa`,
+                    fontFamily: "'Bebas Neue', sans-serif",
+                    fontSize: 18, letterSpacing: '0.1em',
+                    boxShadow: `inset 0 0 12px ${POWER_META.swap.color}22`,
+                    transition: 'transform 0.1s, border-color 0.1s',
+                  }}
+                  onMouseEnter={e => {
+                    if (!swapping) {
+                      e.currentTarget.style.borderColor = POWER_META.swap.color;
+                      e.currentTarget.style.transform = 'translateY(-2px)';
+                    }
+                  }}
+                  onMouseLeave={e => {
+                    e.currentTarget.style.borderColor = `${POWER_META.swap.color}66`;
+                    e.currentTarget.style.transform = 'none';
+                  }}
+                >
+                  ?
+                </button>
+              ))}
+            </div>
+            <div style={{ fontSize: 10, color: 'var(--text-dim)', fontStyle: 'italic' }}>
+              {swapping ? 'Swapping…' : 'Tap any card to swap.'}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── Other players see "X is choosing..." while Swap pauses ── */}
+      {isSwapPending && !amSwapHolder && (
+        <div style={{
+          position: 'fixed', inset: 0,
+          background: 'rgba(0,0,0,0.7)',
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          zIndex: 8650, padding: 24,
+          pointerEvents: 'none',
+        }}>
+          <div className="card" style={{
+            maxWidth: 320, textAlign: 'center', padding: '20px 24px',
+            border: `1px solid ${POWER_META.swap.color}`,
+          }}>
+            <div style={{
+              fontFamily: "'Bebas Neue', sans-serif",
+              fontSize: 22, letterSpacing: '0.12em',
+              color: POWER_META.swap.color, marginBottom: 8,
+            }}>
+              SWAP IN PROGRESS
+            </div>
+            <div style={{ fontSize: 12, color: 'var(--text-dim)' }}>
+              {players?.find(p => p.id === roomState?.swapHolderId)?.username || 'Player'} is choosing a card…
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── v2 Phase C — Assassin re-arm decision prompt ── */}
+      {showAssassinReprompt && (
+        <div style={{
+          position: 'fixed', inset: 0,
+          background: 'rgba(0,0,0,0.88)',
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          zIndex: 8350, padding: 24,
+        }}>
+          <div className="card fade-in" style={{
+            maxWidth: 360, width: '100%', textAlign: 'center',
+            padding: '28px 24px',
+            border: `1px solid ${POWER_META.assassin.color}`,
+          }}>
+            <div style={{ fontSize: 10, color: 'var(--text-dim)', letterSpacing: '0.15em', marginBottom: 10 }}>
+              ASSASSIN — STILL ARMED
+            </div>
+            <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 16 }}>
+              <PowerCard type="assassin" size="md" />
+            </div>
+            <div style={{
+              fontFamily: "'Bebas Neue', sans-serif",
+              fontSize: 20, letterSpacing: '0.06em',
+              color: POWER_META.assassin.color, marginBottom: 8,
+            }}>
+              No one called your bluff.
+            </div>
+            <div style={{ fontSize: 12, color: 'var(--text-dim)', marginBottom: 18, lineHeight: 1.5 }}>
+              Re-arm to keep the threat alive, or stand down and take the +4 card penalty.
+            </div>
+            <div style={{ display: 'flex', gap: 10 }}>
+              <button
+                className="primary"
+                onClick={handleAssassinRearm}
+                disabled={assassinDeciding}
+                style={{ flex: 1, padding: '12px' }}
+              >
+                {assassinDeciding ? '…' : 'Re-arm'}
+              </button>
+              <button
+                onClick={handleAssassinDecline}
+                disabled={assassinDeciding}
+                style={{
+                  flex: 1, padding: '12px',
+                  background: 'var(--surface2)',
+                  border: '1px solid var(--border)',
+                  borderRadius: 'var(--radius)',
+                  color: 'var(--text-dim)',
+                  cursor: assassinDeciding ? 'wait' : 'pointer',
+                  fontSize: 13,
+                }}
+              >
+                Stand down (+4)
+              </button>
             </div>
           </div>
         </div>
