@@ -29,13 +29,16 @@ export function useGame(getAccessToken) {
   const chatOpenRef = useRef(false);
   useEffect(() => { chatOpenRef.current = chatOpen; }, [chatOpen]);
 
-  // ─── v2 Phase C — power-card trigger events ───────────────
-  // The server emits `power_card_triggered` whenever a power-card
-  // effect fires (Freeze landing, Shield blocking a bluff, ...). The
-  // payload shape varies by `kind`. UI consumers display a banner and
-  // then call `clearPowerCardEvent()` to dismiss.
-  const [powerCardEvent, setPowerCardEvent] = useState(null);
-  const clearPowerCardEvent = useCallback(() => setPowerCardEvent(null), []);
+  // ─── v2 Phase C — power-card announcement queue ──────────
+  // The server emits `power_card_triggered` events when any power
+  // card fires (Shield blocking, Mirror reflecting, Freeze landing,
+  // etc.). We queue them so back-to-back banners (e.g. Swap → Mirror
+  // after the swapped check) play sequentially instead of stomping
+  // each other.
+  const [powerEventQueue, setPowerEventQueue] = useState([]);
+  const consumePowerEvent = useCallback(() => {
+    setPowerEventQueue((q) => q.slice(1));
+  }, []);
 
   // ─── Show transient notification ──────────────────────────
   // Use a ref-tracked timer so back-to-back notifications don't
@@ -180,6 +183,13 @@ export function useGame(getAccessToken) {
     };
     const onBluffCalled = () => notify('⚠️ Bluff called! Host: reveal the last card.', 'warning');
     const onSpinAcknowledged = () => setSpinDismissed(true);
+    const onPowerCardTriggered = (evt) => {
+      if (!evt || !evt.kind) return;
+      // Stamp a queue id so React can key on it without us mutating
+      // the event itself (server may resend the same kind+holder).
+      const id = `${evt.kind}:${evt.holderId || '?'}:${Date.now()}:${Math.random().toString(36).slice(2, 8)}`;
+      setPowerEventQueue((q) => [...q, { id, ...evt }]);
+    };
     const onHostDisconnecting = ({ countdown } = {}) => {
       notify(`Host disconnected. Game ends in ${countdown ?? 30}s if they don't return.`, 'error');
     };
@@ -188,14 +198,6 @@ export function useGame(getAccessToken) {
   clearSession();
   notify(reason || 'The game has ended.', 'error');
 };
-    // Each emission gets a fresh id so back-to-back triggers (e.g.
-    // freeze followed by another power) re-mount the banner instead
-    // of being swallowed by React state-equality checks.
-    const onPowerCardTriggered = (payload) => {
-      if (!payload?.kind) return;
-      setPowerCardEvent({ ...payload, _id: Date.now() + Math.random() });
-    };
-
     socket.on('connect', onConnect);
     socket.on('disconnect', onDisconnect);
     socket.on('room_state', onRoomState);
@@ -345,6 +347,32 @@ export function useGame(getAccessToken) {
     });
   }, [socket, roomCode]);
 
+  // ─── v2 Phase C — Swap pick ───────────────────────────────
+  // After a Swap is triggered by an incoming bluff, the server pauses
+  // the bluff resolution and sets phase = 'swap_pending'. The Swap
+  // holder picks a card id from the anonymised playedPile preview;
+  // server resolves the rest of the pipeline.
+  const swapPick = useCallback((cardId) => {
+    return new Promise((resolve) => {
+      socket.emit('swap_pick', { roomCode, cardId }, (res) => {
+        if (!res?.success) setError(res?.error || 'Swap failed');
+        resolve(res);
+      });
+    });
+  }, [socket, roomCode]);
+
+  // ─── v2 Phase C — Assassin re-arm decision ────────────────
+  // Spec: if no bluff was called on the Assassin holder before their
+  // next activation prompt, they choose to re-arm or take +4 cards.
+  const assassinDecision = useCallback((rearm) => {
+    return new Promise((resolve) => {
+      socket.emit('assassin_decision', { roomCode, rearm: !!rearm }, (res) => {
+        if (!res?.success) setError(res?.error || 'Assassin decision failed');
+        resolve(res);
+      });
+    });
+  }, [socket, roomCode]);
+
   const sendChatMessage = useCallback((text) => {
     if (!roomCode || !text?.trim()) return;
     socket.emit('send_chat_message', { roomCode, text: text.trim() }, (res) => {
@@ -408,8 +436,10 @@ export function useGame(getAccessToken) {
     closeChat,
     leaveGame,
     activatePowerCard,
-    powerCardEvent,
-    clearPowerCardEvent,
+    swapPick,
+    assassinDecision,
+    powerEventQueue,
+    consumePowerEvent,
     setError,
   };
 }

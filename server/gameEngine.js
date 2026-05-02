@@ -380,6 +380,32 @@ function advanceTurn(room) {
 }
 
 /**
+ * Did `playerId` survive a full circuit of the table without anyone
+ * calling bluff on them since they armed `armedPowerCard`? Returns
+ * true when their next turn comes around and the armed card is the
+ * same one they armed last time. Used by the Assassin "decide to
+ * re-arm or take penalty" flow at turn start.
+ *
+ * Specifically: if the active turn just rotated back to a player
+ * whose armedPowerCard.activatedAtTurn !== currentTurnIndex, we
+ * know the activation has aged through one full rotation.
+ */
+function isArmedFromPriorTurn(room, playerId) {
+  const player = room.players.find(p => p.id === playerId);
+  if (!player?.armedPowerCard) return false;
+  // We armed at activatedAtTurn, and the turn index has advanced
+  // (and wrapped) at least once. The simple check: turnIndex
+  // changed since arming. NOTE: turn index can be the SAME on the
+  // next visit if no eliminations and the modulo math lines up,
+  // so we additionally compare roundNumber as a tiebreaker.
+  return (
+    player.armedPowerCard.activatedAtTurn !== room.currentTurnIndex
+    || (player.armedPowerCard.activatedAtRound !== undefined
+        && player.armedPowerCard.activatedAtRound !== room.roundNumber)
+  );
+}
+
+/**
  * Walk every Swap card in every hand and remove `playerId` from its
  * pending-set (the set of "alive players who must still take a turn
  * before this Swap is activatable"). When the set empties, the Swap
@@ -666,6 +692,53 @@ function _findPowerCardInHand(hand) {
 }
 
 /**
+ * Assassin "decline to re-arm" penalty (Phase C, locked):
+ *   The holder armed Assassin on a previous turn but no bluff was
+ *   called on them. At their next turn the activation prompt fires
+ *   again. If they DECLINE to re-arm, they take +4 shape cards as
+ *   penalty (drawn via drawCardForPlayer; hand cap is honoured).
+ *   Either way, the Assassin is consumed.
+ *
+ *   Hand cap > 6 IS allowed here (Section 7 hand reset will wash it
+ *   on next survival, per the locked roadmap decision).
+ *
+ *   Returns:
+ *     { ok: true, dealt: Card[] }       — penalty applied successfully
+ *     { ok: false, error: string }      — couldn't apply (no armed
+ *                                         Assassin, wrong mode, etc.)
+ */
+function applyAssassinDeclinePenalty(room, playerId) {
+  if (room.mode !== MODES.ONLINE) return { ok: false, error: 'Online mode only' };
+  const player = room.players.find(p => p.id === playerId);
+  if (!player) return { ok: false, error: 'Player not found' };
+  if (!player.armedPowerCard || player.armedPowerCard.power !== 'assassin') {
+    return { ok: false, error: 'No armed Assassin to decline' };
+  }
+
+  const hand = room.hands?.get(playerId) || [];
+  const cardId = player.armedPowerCard.cardId;
+  const idx = hand.findIndex(c => c?.id === cardId);
+  if (idx !== -1) {
+    const [card] = hand.splice(idx, 1);
+    if (!room.discardPile) room.discardPile = [];
+    room.discardPile.push(card);
+  }
+  player.armedPowerCard = null;
+
+  // Draw 4 cards. Hand cap is enforced per-card by drawCardForPlayer
+  // (power cards over the cap go to discardPile and are replaced
+  // with shapes — exactly what we want for a "regular shape cards"
+  // penalty). Hand size > 6 is allowed by spec.
+  const dealt = [];
+  for (let i = 0; i < 4; i++) {
+    const card = drawCardForPlayer(room, playerId);
+    if (card) dealt.push(card);
+    else break;
+  }
+  return { ok: true, dealt };
+}
+
+/**
  * Is the given Swap card eligible to be activated right now?
  * Swap requires that every alive player at the time the card landed
  * has since taken at least one turn.
@@ -729,6 +802,7 @@ function activatePowerCard(room, playerId) {
     power: powerCard.power,
     cardId: powerCard.id,
     activatedAtTurn: room.currentTurnIndex, // turn index when armed
+    activatedAtRound: room.roundNumber,
   };
 
   return {
@@ -1063,6 +1137,27 @@ function serializeRoom(room, requestingPlayerId = null) {
       : undefined,
     chatLog: room.chatLog || [],
     config: room.config || null,
+    // v2 Phase C — Swap pause: holderId is set while phase ===
+    // 'swap_pending' so the holder's UI can render the picker. The
+    // anonymised pile of options is computed client-side from
+    // serialised playedPile-equivalent on the holder side; here we
+    // expose it to ALL clients so they all know who is picking, but
+    // only the holder will see the modal.
+    swapHolderId: isOnline ? (room.swapHolderId || null) : undefined,
+    // Anonymised options for the Swap picker. We expose this only
+    // to the actual holder (the engine has no socket context, so we
+    // gate on requestingPlayerId here in the engine layer to keep
+    // socketHandlers free of card-data leak risk). Each item is just
+    // an opaque id; shape and number are intentionally stripped so
+    // the picker is truly blind.
+    swapPickOptions:
+      isOnline
+      && room.phase === 'swap_pending'
+      && room.swapHolderId
+      && requestingPlayerId === room.swapHolderId
+      && Array.isArray(room.playedPile)
+        ? room.playedPile.map(c => ({ id: c.id }))
+        : undefined,
   };
 }
 
@@ -1105,8 +1200,10 @@ module.exports = {
   drawCardForPlayer,
   resetRoundOnline,
   activatePowerCard,
+  applyAssassinDeclinePenalty,
   consumeFreezeOnTurnEnd,
   isSwapActivatable,
+  isArmedFromPriorTurn,
   serializeRoom,
   getCurrentPlayer,
   appendChatMessage,

@@ -41,7 +41,10 @@ function HomeContent() {
     sendChatMessage, openChat, closeChat,
     leaveGame, setError,
     activatePowerCard,
-    powerCardEvent, clearPowerCardEvent,
+    swapPick,
+    assassinDecision,
+    powerEventQueue,
+    consumePowerEvent,
   } = game;
 
   // Voice — opt-in via Join Voice button. Hook tears down on roomCode change.
@@ -136,8 +139,10 @@ function HomeContent() {
           acknowledgeSpinResult={acknowledgeSpinResult}
           spinDismissed={spinDismissed}
           activatePowerCard={activatePowerCard}
-          powerCardEvent={powerCardEvent}
-          clearPowerCardEvent={clearPowerCardEvent}
+          swapPick={swapPick}
+          assassinDecision={assassinDecision}
+          powerEventQueue={powerEventQueue}
+          consumePowerEvent={consumePowerEvent}
           voice={voice}
         />
       );
@@ -177,8 +182,10 @@ function HomeContent() {
           acknowledgeSpinResult={acknowledgeSpinResult}
           spinDismissed={spinDismissed}
           activatePowerCard={activatePowerCard}
-          powerCardEvent={powerCardEvent}
-          clearPowerCardEvent={clearPowerCardEvent}
+          swapPick={swapPick}
+          assassinDecision={assassinDecision}
+          powerEventQueue={powerEventQueue}
+          consumePowerEvent={consumePowerEvent}
           voice={voice}
         />
       );

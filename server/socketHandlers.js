@@ -5,6 +5,7 @@
 const { createClient } = require('@supabase/supabase-js');
 const { AccessToken } = require('livekit-server-sdk');
 const engine = require('./gameEngine');
+const bluffPipeline = require('./bluffPipeline');
 
 // ─── Supabase admin client (server-side only) ─────────────────
 // Used to verify JWT tokens and look up profiles.
@@ -31,6 +32,121 @@ async function saveRoom(room) {
 }
 
 // ─── Broadcast helpers ────────────────────────────────────────
+
+/**
+ * Fan out the bluff-pipeline's announce events to every socket in
+ * the room as `power_card_triggered`. The client listens for this
+ * and renders a full-screen <AnnouncementBanner /> per event.
+ *
+ * Each event already carries `kind` + `holderId` + `holderName` +
+ * any kind-specific extras (see bluffPipeline.js docs).
+ */
+function emitPowerCardEvents(io, roomCode, events) {
+  if (!events || events.length === 0) return;
+  for (const evt of events) {
+    io.to(roomCode).emit('power_card_triggered', evt);
+  }
+}
+
+/**
+ * Apply a bluff-pipeline outcome to room state.
+ * - 'blocked' → caller's bluff is wasted; advance turn normally.
+ *   Returns { advanced: true } so the caller knows to broadcast.
+ * - 'spin' → set phase to spin_pending, store spinTargetId + lastAction.
+ * - 'eliminated' → kill the named player, advance turn out of them.
+ * - 'swap_pending' → set phase to swap_pending, expose swapHolderId.
+ *
+ * Returns the same outcome object plus a `pendingTurnAdvance` flag for
+ * the Mirror "accused's turn ends" path (handled after the spin in
+ * spin_acknowledged).
+ */
+function applyBluffOutcome(room, outcome) {
+  if (!outcome) return null;
+
+  if (outcome.kind === 'blocked') {
+    // Bluff was nullified by Shield. Spec: accuser loses their
+    // bluff opportunity for this turn but must still play a card
+    // and end normally. bluffUsedThisTurn stays true (caller set it
+    // before invoking the pipeline) so the bluff button is gated.
+    room.phase = 'playing';
+    room.spinTargetId = null;
+    room.lastAction = {
+      type: 'bluff_blocked',
+      shieldHolderId: outcome.accusedId,
+      accuserId: outcome.accuserId,
+    };
+    return outcome;
+  }
+
+  if (outcome.kind === 'eliminated') {
+    // Assassin path. Eliminate the accuser and advance the room
+    // out of their seat. The accuser was the current-turn player,
+    // so we just remove them from turn order and reset turn flags.
+    const eliminatedId = outcome.eliminatedPlayerId;
+    if (eliminatedId) {
+      const eliminated = room.players.find(p => p.id === eliminatedId);
+      if (eliminated) {
+        eliminated.status = 'eliminated';
+        eliminated.isSpectator = true;
+      }
+      engine.eliminateFromTurnOrder(room, eliminatedId);
+      // Refresh required-shape since elimination historically rolls
+      // a new card type via newCardType(). Match that pattern.
+      engine.newCardType(room);
+    }
+    room.phase = 'playing';
+    room.spinTargetId = null;
+    room.cardPlayedThisTurn = false;
+    room.bluffUsedThisTurn = false;
+    room.lastAction = {
+      type: 'assassin_strike',
+      eliminatedId,
+      eliminatedName: room.players.find(p => p.id === eliminatedId)?.username || null,
+      assassinHolderId: outcome.accusedId,
+      assassinHolderName: room.players.find(p => p.id === outcome.accusedId)?.username || null,
+    };
+    // Game-over check after Assassin eliminates — same shape as the
+    // existing path in spin elimination.
+    const gameOverWinner = engine.checkGameOver(room);
+    if (gameOverWinner) {
+      room.phase = 'game_over';
+      room.lastAction = { type: 'game_over', winnerId: gameOverWinner.id, winnerName: gameOverWinner.username };
+    }
+    return outcome;
+  }
+
+  if (outcome.kind === 'swap_pending') {
+    room.phase = 'swap_pending';
+    room.swapHolderId = outcome.swapHolderId;
+    room.lastAction = {
+      type: 'swap_pending',
+      swapHolderId: outcome.swapHolderId,
+      accuserId: outcome.accuserId,
+      accusedId: outcome.accusedId,
+    };
+    return outcome;
+  }
+
+  // Default: spin
+  room.phase = 'spin_pending';
+  room.spinTargetId = outcome.spinTargetId;
+  const target = room.players.find(p => p.id === outcome.spinTargetId);
+  room.lastAction = {
+    type: 'spin_pending',
+    spinTargetId: outcome.spinTargetId,
+    spinTargetName: target?.username || null,
+    bluffCorrect: outcome.bluffIsCorrect,
+    autoResolved: true,
+    accuserId: outcome.accuserId,
+    accuserName: room.players.find(p => p.id === outcome.accuserId)?.username || null,
+    accusedId: outcome.accusedId,
+    accusedName: room.players.find(p => p.id === outcome.accusedId)?.username || null,
+    revealedCard: outcome.revealedCard || null,
+    mirrorEndsAccusedTurn: outcome.mirrorEndsAccusedTurn || false,
+    mirrorEndsAccuserTurn: outcome.mirrorEndsAccuserTurn || false,
+  };
+  return outcome;
+}
 
 async function broadcastRoomState(io, roomCode) {
   const room = await getRoom(roomCode);
@@ -387,6 +503,13 @@ function registerSocketHandlers(io, socket) {
   });
 
   // ─── PLAYER: Call bluff ──────────────────────────────────
+  // Online mode runs through the bluff-resolution PIPELINE (see
+  // server/bluffPipeline.js). The pipeline returns:
+  //   - events: [...] of power_card_triggered banner payloads
+  //   - outcome: { kind: 'spin' | 'blocked' | 'eliminated' | 'swap_pending', ... }
+  // We translate the outcome into room state via applyBluffOutcome,
+  // then fan out the events to every socket and broadcast a fresh
+  // room_state.
   socket.on('call_bluff', async ({ roomCode, playerId } = {}, callback) => {
     try {
       const code = roomCode?.toUpperCase();
@@ -410,36 +533,70 @@ function registerSocketHandlers(io, socket) {
       const callerPlayer = room.players.find(p => p.id === playerId);
 
       if (room.mode === engine.MODES.ONLINE) {
-        const { bluffIsCorrect, spinTarget, revealedCard, accuser, accused } = engine.resolveBluffOnline(room);
+        const { events, outcome } = bluffPipeline.resolveBluff(room, playerId);
+        applyBluffOutcome(room, outcome);
 
-        room.phase = 'spin_pending';
-        room.spinTargetId = spinTarget.id;
-        room.lastAction = {
-          type: 'spin_pending',
-          spinTargetId: spinTarget.id,
-          spinTargetName: spinTarget.username,
-          bluffCorrect: bluffIsCorrect,
-          autoResolved: true,
-          accuserId: accuser?.id,
-          accuserName: accuser?.username,
-          accusedId: accused?.id,
-          accusedName: accused?.username,
-          revealedCard: revealedCard || null,
-        };
-      } else {
-        room.phase = 'bluff_resolution';
-        room.lastAction = {
-          type: 'bluff_called',
-          callerId: playerId,
-          callerName: callerPlayer?.username || null,
-        };
+        await saveRoom(room);
+        emitPowerCardEvents(io, code, events);
+        await broadcastRoomState(io, code);
+        return callback({ success: true });
       }
+
+      // Physical mode unchanged.
+      room.phase = 'bluff_resolution';
+      room.lastAction = {
+        type: 'bluff_called',
+        callerId: playerId,
+        callerName: callerPlayer?.username || null,
+      };
 
       await saveRoom(room);
       await broadcastRoomState(io, code);
       callback({ success: true });
     } catch (err) {
       callback({ success: false, error: err.message });
+    }
+  });
+
+  // ─── PLAYER: Swap pick (v2 Phase C) ──────────────────────
+  // Resumes a paused bluff resolution after the Swap holder picks
+  // an anonymous card from the played-pile preview. Re-runs the
+  // bluff-correctness + Mirror + default-spin stages on the post-
+  // swap world. See bluffPipeline.resumeAfterSwap for details.
+  socket.on('swap_pick', async ({ roomCode, cardId } = {}, callback) => {
+    try {
+      if (!socket.userId) return callback?.({ success: false, error: 'Not authenticated' });
+
+      const code = roomCode?.toUpperCase();
+      const room = await getRoom(code);
+      if (!room) return callback?.({ success: false, error: 'Room not found' });
+      if (room.mode !== engine.MODES.ONLINE) return callback?.({ success: false, error: 'Online mode only' });
+      if (room.phase !== 'swap_pending') return callback?.({ success: false, error: 'No Swap pending' });
+      if (room.swapHolderId !== socket.userId) return callback?.({ success: false, error: 'Not the Swap holder' });
+      if (!cardId) return callback?.({ success: false, error: 'No card picked' });
+
+      // Reconstruct the original accuser id from lastAction (stamped
+      // by applyBluffOutcome when entering swap_pending).
+      const accuserId = room.lastAction?.accuserId;
+      if (!accuserId) return callback?.({ success: false, error: 'Lost bluff context' });
+
+      const { events, outcome } = bluffPipeline.resumeAfterSwap(room, accuserId, cardId);
+      if (outcome?.kind === 'error') {
+        return callback?.({ success: false, error: outcome.error });
+      }
+
+      // Clear the swap pause AFTER the pipeline runs but BEFORE
+      // applyBluffOutcome (which sets the new phase based on outcome).
+      room.swapHolderId = null;
+      applyBluffOutcome(room, outcome);
+
+      await saveRoom(room);
+      emitPowerCardEvents(io, code, events);
+      await broadcastRoomState(io, code);
+      callback?.({ success: true });
+    } catch (err) {
+      console.error('[swap_pick]', err);
+      callback?.({ success: false, error: err.message });
     }
   });
 
@@ -547,6 +704,53 @@ function registerSocketHandlers(io, socket) {
       });
     } catch (err) {
       console.error('[activate_power_card]', err);
+      callback?.({ success: false, error: err.message });
+    }
+  });
+
+  // ─── PLAYER: Assassin re-arm decision (v2 Phase C) ───────
+  // Spec: if no bluff was called on the Assassin holder before their
+  // NEXT activation prompt, they decide whether to re-arm. If they
+  // re-arm, the card stays armed (no-op). If they decline, the card
+  // is consumed AND they take +4 shape cards as penalty.
+  // Holder can also choose never to activate it at all — for that
+  // path, this handler is never called and no penalty applies.
+  socket.on('assassin_decision', async ({ roomCode, rearm } = {}, callback) => {
+    try {
+      if (!socket.userId) return callback?.({ success: false, error: 'Not authenticated' });
+
+      const code = roomCode?.toUpperCase();
+      const room = await getRoom(code);
+      if (!room) return callback?.({ success: false, error: 'Room not found' });
+      if (room.mode !== engine.MODES.ONLINE) return callback?.({ success: false, error: 'Online mode only' });
+      if (room.phase !== 'playing') return callback?.({ success: false, error: 'Wrong phase' });
+
+      const currentPlayerId = room.turnOrder[room.currentTurnIndex];
+      if (currentPlayerId !== socket.userId) return callback?.({ success: false, error: 'Not your turn' });
+
+      const player = room.players.find(p => p.id === socket.userId);
+      if (!player?.armedPowerCard || player.armedPowerCard.power !== 'assassin') {
+        return callback?.({ success: false, error: 'No armed Assassin' });
+      }
+
+      if (rearm) {
+        // Re-arm = stamp the activation timer on the new turn so the
+        // prompt won't re-fire instantly next loop. Card stays armed.
+        player.armedPowerCard.activatedAtTurn = room.currentTurnIndex;
+        player.armedPowerCard.activatedAtRound = room.roundNumber;
+        await saveRoom(room);
+        await broadcastRoomState(io, code);
+        return callback?.({ success: true, rearmed: true });
+      }
+
+      // Decline → consume + +4 shape penalty.
+      const res = engine.applyAssassinDeclinePenalty(room, socket.userId);
+      if (!res.ok) return callback?.({ success: false, error: res.error });
+      await saveRoom(room);
+      await broadcastRoomState(io, code);
+      callback?.({ success: true, rearmed: false, penaltyDealt: res.dealt.length });
+    } catch (err) {
+      console.error('[assassin_decision]', err);
       callback?.({ success: false, error: err.message });
     }
   });
