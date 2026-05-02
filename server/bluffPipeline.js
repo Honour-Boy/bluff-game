@@ -169,15 +169,23 @@ function _stageAssassin(room, state) {
   const { accuser, accused } = state;
   if (!accused?.armedPowerCard || accused.armedPowerCard.power !== 'assassin') return;
 
-  // Phase D Sheriff exemption hook — Sheriff cannot be killed by
-  // Assassin. Phase C: stays armed, no effect (function returns
-  // false). Phase D: this branch fires the role's protection banner.
+  // Phase D Sheriff exemption — Sheriff cannot be killed by Assassin.
+  // The Assassin stays armed (consumption is gated on a successful
+  // strike, not a fired-and-fizzled trigger). The bluff proceeds to
+  // the normal stages so a correct call still spins the accused, and
+  // a Sheriff calling correctly still gets the role's risk-drop. We
+  // emit a public `sheriff_protected` banner so the table sees the
+  // immunity fire.
   if (_isSheriff(room, accuser?.id)) {
-    // Phase D: emit a Sheriff-protection event here, leave Assassin
-    // armed, do NOT mark bluff as resolved (the bluff still
-    // proceeds normally to stage 3+). For now, flag the future hook:
-    // eslint-disable-next-line no-unused-vars
-    const PHASE_D_SHERIFF_HOOK = true;
+    state.events.push({
+      kind: 'sheriff_protected',
+      // holderId/holderName key the banner on the Sheriff (the
+      // protected role) — same convention as other role banners.
+      holderId: accuser.id,
+      holderName: accuser.username,
+      assassinHolderId: accused.id,
+      assassinHolderName: accused.username,
+    });
     return;
   }
 

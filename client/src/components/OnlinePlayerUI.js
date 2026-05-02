@@ -1775,6 +1775,7 @@ export function OnlinePlayerUI({
             // v2 Phase D — role banners.
             case 'gambler_caught':   return 'assassin';     // crimson, dramatic
             case 'sheriff_relief':   return 'bluff_blocked'; // lime — relief
+            case 'sheriff_protected': return 'bluff_blocked'; // lime — Sheriff palette
             case 'medic_save':       return 'sudden_death'; // ice blue — Medic palette
             case 'sniper_redirect':  return 'assassin';     // crimson — Sniper palette
             default: return 'bluff_blocked';
@@ -1788,6 +1789,7 @@ export function OnlinePlayerUI({
           freeze_skip:      'FREEZE',
           gambler_caught:   'GAMBLER CAUGHT',
           sheriff_relief:   'SHERIFF RELIEVED',
+          sheriff_protected: 'SHERIFF PROTECTED',
           medic_save:       'MEDIC SAVE',
           sniper_redirect:  'SNIPER REDIRECT',
         };
@@ -1804,6 +1806,7 @@ export function OnlinePlayerUI({
           }
           if (evt.kind === 'gambler_caught') return 'risk jumps to 4';
           if (evt.kind === 'sheriff_relief') return 'one bullet removed';
+          if (evt.kind === 'sheriff_protected') return 'assassin held back';
           if (evt.kind === 'medic_save') {
             return evt.revivedPlayerName ? `${evt.revivedPlayerName} revived` : 'player revived';
           }
@@ -1962,7 +1965,7 @@ export function OnlinePlayerUI({
                 className="primary"
                 onClick={handleAssassinRearm}
                 disabled={assassinDeciding}
-                style={{ flex: 1, padding: '12px' }}
+                style={{ flex: 1, padding: '12px', minHeight: 44 }}
               >
                 {assassinDeciding ? '…' : 'Re-arm'}
               </button>
@@ -1970,7 +1973,7 @@ export function OnlinePlayerUI({
                 onClick={handleAssassinDecline}
                 disabled={assassinDeciding}
                 style={{
-                  flex: 1, padding: '12px',
+                  flex: 1, padding: '12px', minHeight: 44,
                   background: 'var(--surface2)',
                   border: '1px solid var(--border)',
                   borderRadius: 'var(--radius)',
@@ -2002,7 +2005,8 @@ export function OnlinePlayerUI({
             position: 'fixed',
             bottom: 90,
             right: 12,
-            padding: '8px 14px',
+            padding: '12px 16px',
+            minHeight: 44,
             background: 'rgba(122,60,255,0.12)',
             border: `1px solid ${ROLE_META.saboteur.color}`,
             borderRadius: 'var(--radius)',
@@ -2057,7 +2061,8 @@ export function OnlinePlayerUI({
                     onClick={() => handleSaboteurPick(p.id)}
                     disabled={saboteurBusy}
                     style={{
-                      padding: '10px 8px',
+                      padding: '12px 8px',
+                      minHeight: 44,
                       background: 'var(--surface2)',
                       border: `1px solid ${ROLE_META.saboteur.color}66`,
                       borderRadius: 6,
@@ -2117,7 +2122,7 @@ export function OnlinePlayerUI({
                 className="primary"
                 disabled={medicDeciding}
                 onClick={() => handleMedicDecide(true)}
-                style={{ flex: 1, padding: '12px' }}
+                style={{ flex: 1, padding: '12px', minHeight: 44 }}
               >
                 {medicDeciding ? '…' : '✚ Save them'}
               </button>
@@ -2125,7 +2130,7 @@ export function OnlinePlayerUI({
                 disabled={medicDeciding}
                 onClick={() => handleMedicDecide(false)}
                 style={{
-                  flex: 1, padding: '12px',
+                  flex: 1, padding: '12px', minHeight: 44,
                   background: 'var(--surface2)',
                   border: '1px solid var(--border)',
                   borderRadius: 'var(--radius)',
@@ -2204,7 +2209,8 @@ export function OnlinePlayerUI({
                     onClick={() => eligible && handleSniperRedirect(p.id)}
                     disabled={!eligible || sniperDeciding}
                     style={{
-                      padding: '10px 8px',
+                      padding: '12px 8px',
+                      minHeight: 44,
                       background: eligible ? 'var(--surface2)' : 'rgba(40,40,40,0.4)',
                       border: `1px solid ${eligible ? `${ROLE_META.sniper.color}66` : 'var(--border)'}`,
                       borderRadius: 6,

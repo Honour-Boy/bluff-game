@@ -2111,6 +2111,31 @@ function registerSocketHandlers(io, socket) {
               room.pendingSniperRedirect = null;
               applyBluffOutcome(room, outcome);
             }
+            // v2 Phase H — Swap holder disconnect: the room is paused
+            // on swap_pending waiting for them to pick a played-pile
+            // card. Treat their disconnect as forfeit — the original
+            // played card stays on top, the bluff resolves against it
+            // (i.e. fall through to default spin without consuming the
+            // Swap). We replicate the resumeAfterSwap "no-op swap"
+            // branch by clearing the pause and re-running the post-swap
+            // stages with the picked card == the original card.
+            if (room.phase === 'swap_pending' && room.swapHolderId === still.id) {
+              const accuserId = room.lastAction?.accuserId;
+              const top = room.playedPile?.[room.playedPile.length - 1];
+              if (accuserId && top?.id) {
+                const { events: swapEvents, outcome: swapOutcome } =
+                  bluffPipeline.resumeAfterSwap(room, accuserId, top.id);
+                room.swapHolderId = null;
+                if (swapOutcome && swapOutcome.kind !== 'error') {
+                  applyBluffOutcome(room, swapOutcome);
+                }
+                emitPowerCardEvents(io, code, swapEvents);
+              } else {
+                // Couldn't reconstruct context — just unfreeze the room.
+                room.swapHolderId = null;
+                room.phase = 'playing';
+              }
+            }
 
             const eliminated = engine.handleDisconnect(room, capturedSocketId);
             if (eliminated) {

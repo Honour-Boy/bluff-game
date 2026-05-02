@@ -1975,6 +1975,11 @@ function enterLastStand(room) {
   }
 
   room.phase = 'last_stand';
+  // v2 Phase H — flip the flag that pickRedemptionCandidates reads
+  // so any pending Redemption Spin pass is silently dropped once the
+  // duel begins. The locked spec says Last Stand suspends Redemption
+  // Spin entirely — pure spin-vs-spin, no eliminated-player rescues.
+  room.lastStandActive = true;
   room.spinTargetId = null;
   room.cardPlayedThisTurn = false;
   room.bluffUsedThisTurn = false;
