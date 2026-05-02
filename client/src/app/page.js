@@ -40,6 +40,20 @@ function HomeContent() {
     chatMessages, chatUnread, chatOpen,
     sendChatMessage, openChat, closeChat,
     leaveGame, setError,
+    activatePowerCard,
+    swapPick,
+    assassinDecision,
+    medicDecide,
+    saboteurTransfer,
+    sniperRedirect,
+    medicPrompt,
+    sniperPrompt,
+    powerEventQueue,
+    consumePowerEvent,
+    placeBet,
+    ghostVote,
+    lastStandSpin,
+    lastStandEndTurn,
   } = game;
 
   // Voice — opt-in via Join Voice button. Hook tears down on roomCode change.
@@ -133,6 +147,20 @@ function HomeContent() {
           leaveGame={leaveGame}
           acknowledgeSpinResult={acknowledgeSpinResult}
           spinDismissed={spinDismissed}
+          activatePowerCard={activatePowerCard}
+          swapPick={swapPick}
+          assassinDecision={assassinDecision}
+          medicDecide={medicDecide}
+          saboteurTransfer={saboteurTransfer}
+          sniperRedirect={sniperRedirect}
+          medicPrompt={medicPrompt}
+          sniperPrompt={sniperPrompt}
+          powerEventQueue={powerEventQueue}
+          consumePowerEvent={consumePowerEvent}
+          placeBet={placeBet}
+          ghostVote={ghostVote}
+          lastStandSpin={lastStandSpin}
+          lastStandEndTurn={lastStandEndTurn}
           voice={voice}
         />
       );
@@ -171,6 +199,20 @@ function HomeContent() {
           leaveGame={leaveGame}
           acknowledgeSpinResult={acknowledgeSpinResult}
           spinDismissed={spinDismissed}
+          activatePowerCard={activatePowerCard}
+          swapPick={swapPick}
+          assassinDecision={assassinDecision}
+          medicDecide={medicDecide}
+          saboteurTransfer={saboteurTransfer}
+          sniperRedirect={sniperRedirect}
+          medicPrompt={medicPrompt}
+          sniperPrompt={sniperPrompt}
+          powerEventQueue={powerEventQueue}
+          consumePowerEvent={consumePowerEvent}
+          placeBet={placeBet}
+          ghostVote={ghostVote}
+          lastStandSpin={lastStandSpin}
+          lastStandEndTurn={lastStandEndTurn}
           voice={voice}
         />
       );

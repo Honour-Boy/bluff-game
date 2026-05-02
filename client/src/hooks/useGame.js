@@ -29,6 +29,17 @@ export function useGame(getAccessToken) {
   const chatOpenRef = useRef(false);
   useEffect(() => { chatOpenRef.current = chatOpen; }, [chatOpen]);
 
+  // ─── v2 Phase C — power-card announcement queue ──────────
+  // The server emits `power_card_triggered` events when any power
+  // card fires (Shield blocking, Mirror reflecting, Freeze landing,
+  // etc.). We queue them so back-to-back banners (e.g. Swap → Mirror
+  // after the swapped check) play sequentially instead of stomping
+  // each other.
+  const [powerEventQueue, setPowerEventQueue] = useState([]);
+  const consumePowerEvent = useCallback(() => {
+    setPowerEventQueue((q) => q.slice(1));
+  }, []);
+
   // ─── Show transient notification ──────────────────────────
   // Use a ref-tracked timer so back-to-back notifications don't
   // wipe each other (older setTimeout firing on the newer message).
@@ -172,6 +183,13 @@ export function useGame(getAccessToken) {
     };
     const onBluffCalled = () => notify('⚠️ Bluff called! Host: reveal the last card.', 'warning');
     const onSpinAcknowledged = () => setSpinDismissed(true);
+    const onPowerCardTriggered = (evt) => {
+      if (!evt || !evt.kind) return;
+      // Stamp a queue id so React can key on it without us mutating
+      // the event itself (server may resend the same kind+holder).
+      const id = `${evt.kind}:${evt.holderId || '?'}:${Date.now()}:${Math.random().toString(36).slice(2, 8)}`;
+      setPowerEventQueue((q) => [...q, { id, ...evt }]);
+    };
     const onHostDisconnecting = ({ countdown } = {}) => {
       notify(`Host disconnected. Game ends in ${countdown ?? 30}s if they don't return.`, 'error');
     };
@@ -180,7 +198,6 @@ export function useGame(getAccessToken) {
   clearSession();
   notify(reason || 'The game has ended.', 'error');
 };
-
     socket.on('connect', onConnect);
     socket.on('disconnect', onDisconnect);
     socket.on('room_state', onRoomState);
@@ -189,6 +206,7 @@ export function useGame(getAccessToken) {
     socket.on('spin_acknowledged', onSpinAcknowledged);
     socket.on('host_disconnecting', onHostDisconnecting);
     socket.on('game_ended', onGameEnded);
+    socket.on('power_card_triggered', onPowerCardTriggered);
 
     return () => {
       socket.off('connect', onConnect);
@@ -199,6 +217,7 @@ export function useGame(getAccessToken) {
       socket.off('spin_acknowledged', onSpinAcknowledged);
       socket.off('host_disconnecting', onHostDisconnecting);
       socket.off('game_ended', onGameEnded);
+      socket.off('power_card_triggered', onPowerCardTriggered);
     };
   }, [socket, notify, clearSession, authenticateSocket]);
 
@@ -211,9 +230,13 @@ export function useGame(getAccessToken) {
 
   /**
    * Create a room. In online mode, host is also auto-joined as a player on the server.
+   * `config` is the v2 settings object (host-only toggles); when omitted the
+   * server falls back to its safe defaults. Pure plumbing for now — nothing
+   * reads it yet.
    */
-  const createRoom = useCallback((mode = 'physical') => {
-    socket.emit('create_room', { mode }, (res) => {
+  const createRoom = useCallback((mode = 'physical', config) => {
+    const payload = config ? { mode, config } : { mode };
+    socket.emit('create_room', payload, (res) => {
       if (res.success) {
         setRoomCode(res.roomCode);
         setIsHost(true);
@@ -309,6 +332,152 @@ export function useGame(getAccessToken) {
     });
   }, [socket, roomCode]);
 
+  // ─── v2 Phase B — power-card activation ──────────────────
+  // Emits the activate_power_card event with the active room code.
+  // Returns a Promise<{ success, power, consumed, peekedCard?, ...
+  // error? }> so the caller (UI) can decide what to render — Peek
+  // returns a privately-known peekedCard, every other power just
+  // arms the player and the UI flips on the next room_state.
+  const activatePowerCard = useCallback(() => {
+    return new Promise((resolve) => {
+      socket.emit('activate_power_card', { roomCode }, (res) => {
+        if (!res?.success) setError(res?.error || 'Could not activate');
+        resolve(res);
+      });
+    });
+  }, [socket, roomCode]);
+
+  // ─── v2 Phase C — Swap pick ───────────────────────────────
+  // After a Swap is triggered by an incoming bluff, the server pauses
+  // the bluff resolution and sets phase = 'swap_pending'. The Swap
+  // holder picks a card id from the anonymised playedPile preview;
+  // server resolves the rest of the pipeline.
+  const swapPick = useCallback((cardId) => {
+    return new Promise((resolve) => {
+      socket.emit('swap_pick', { roomCode, cardId }, (res) => {
+        if (!res?.success) setError(res?.error || 'Swap failed');
+        resolve(res);
+      });
+    });
+  }, [socket, roomCode]);
+
+  // ─── v2 Phase C — Assassin re-arm decision ────────────────
+  // Spec: if no bluff was called on the Assassin holder before their
+  // next activation prompt, they choose to re-arm or take +4 cards.
+  const assassinDecision = useCallback((rearm) => {
+    return new Promise((resolve) => {
+      socket.emit('assassin_decision', { roomCode, rearm: !!rearm }, (res) => {
+        if (!res?.success) setError(res?.error || 'Assassin decision failed');
+        resolve(res);
+      });
+    });
+  }, [socket, roomCode]);
+
+  // ─── v2 Phase D — Medic save / decline ────────────────────
+  // Server pauses an elimination flow (spin or Assassin) when an
+  // alive Medic with hand-room exists. The Medic resolves via this
+  // event with `save: true | false`.
+  const medicDecide = useCallback((save) => {
+    return new Promise((resolve) => {
+      socket.emit('medic_decide', { roomCode, save: !!save }, (res) => {
+        if (!res?.success) setError(res?.error || 'Medic decision failed');
+        resolve(res);
+      });
+    });
+  }, [socket, roomCode]);
+
+  // ─── v2 Phase D — Saboteur transfer ───────────────────────
+  // Once per game; silent. Random card from holder hand → target.
+  const saboteurTransfer = useCallback((targetPlayerId) => {
+    return new Promise((resolve) => {
+      socket.emit('saboteur_transfer', { roomCode, targetPlayerId }, (res) => {
+        if (!res?.success) setError(res?.error || 'Saboteur transfer failed');
+        resolve(res);
+      });
+    });
+  }, [socket, roomCode]);
+
+  // ─── v2 Phase D — Sniper redirect ─────────────────────────
+  // After bluff resolution picks a spin target, Sniper can redirect
+  // to any other alive non-Mirror player. Pass null to decline.
+  const sniperRedirect = useCallback((newTargetId) => {
+    return new Promise((resolve) => {
+      socket.emit('sniper_redirect', { roomCode, newTargetId: newTargetId || null }, (res) => {
+        if (!res?.success) setError(res?.error || 'Sniper redirect failed');
+        resolve(res);
+      });
+    });
+  }, [socket, roomCode]);
+
+  // ─── v2 Phase D — server-pushed prompts ──────────────────
+  // Track inbound `medic_save_pending` / `sniper_redirect_pending`
+  // privately-targeted events so the local UI can render the role
+  // prompt only on the right player. Cleared automatically when the
+  // pause resolves (room.phase moves off `medic_pending` /
+  // `sniper_pending` in the next room_state).
+  const [medicPrompt, setMedicPrompt] = useState(null);
+  const [sniperPrompt, setSniperPrompt] = useState(null);
+
+  useEffect(() => {
+    const onMedicSavePending = (payload) => {
+      setMedicPrompt(payload || null);
+    };
+    const onSniperRedirectPending = (payload) => {
+      setSniperPrompt(payload || null);
+    };
+    socket.on('medic_save_pending', onMedicSavePending);
+    socket.on('sniper_redirect_pending', onSniperRedirectPending);
+    return () => {
+      socket.off('medic_save_pending', onMedicSavePending);
+      socket.off('sniper_redirect_pending', onSniperRedirectPending);
+    };
+  }, [socket]);
+
+  // Auto-clear prompts when the server moves off the pending phase.
+  useEffect(() => {
+    if (roomState?.phase !== 'medic_pending' && medicPrompt) setMedicPrompt(null);
+    if (roomState?.phase !== 'sniper_pending' && sniperPrompt) setSniperPrompt(null);
+  }, [roomState?.phase]); // eslint-disable-line
+
+  // ─── v2 Phase F — Betting ─────────────────────────────────
+  const placeBet = useCallback((prediction) => {
+    return new Promise((resolve) => {
+      socket.emit('place_bet', { roomCode, prediction }, (res) => {
+        if (!res?.success) setError(res?.error || 'Bet failed');
+        resolve(res);
+      });
+    });
+  }, [socket, roomCode]);
+
+  // ─── v2 Phase F — Dead Man's Hand ghost vote ──────────────
+  const ghostVote = useCallback((option) => {
+    return new Promise((resolve) => {
+      socket.emit('ghost_vote', { roomCode, option }, (res) => {
+        if (!res?.success) setError(res?.error || 'Ghost vote failed');
+        resolve(res);
+      });
+    });
+  }, [socket, roomCode]);
+
+  // ─── v2 Phase F — Last Stand actions ──────────────────────
+  const lastStandSpin = useCallback(() => {
+    return new Promise((resolve) => {
+      socket.emit('last_stand_spin', { roomCode }, (res) => {
+        if (!res?.success) setError(res?.error || 'Last stand spin failed');
+        resolve(res);
+      });
+    });
+  }, [socket, roomCode]);
+
+  const lastStandEndTurn = useCallback(() => {
+    return new Promise((resolve) => {
+      socket.emit('last_stand_end_turn', { roomCode }, (res) => {
+        if (!res?.success) setError(res?.error || 'Last stand end turn failed');
+        resolve(res);
+      });
+    });
+  }, [socket, roomCode]);
+
   const sendChatMessage = useCallback((text) => {
     if (!roomCode || !text?.trim()) return;
     socket.emit('send_chat_message', { roomCode, text: text.trim() }, (res) => {
@@ -371,6 +540,21 @@ export function useGame(getAccessToken) {
     openChat,
     closeChat,
     leaveGame,
+    activatePowerCard,
+    swapPick,
+    assassinDecision,
+    medicDecide,
+    saboteurTransfer,
+    sniperRedirect,
+    medicPrompt,
+    sniperPrompt,
+    powerEventQueue,
+    consumePowerEvent,
+    // v2 Phase F — Systems
+    placeBet,
+    ghostVote,
+    lastStandSpin,
+    lastStandEndTurn,
     setError,
   };
 }
