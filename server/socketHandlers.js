@@ -264,6 +264,215 @@ async function broadcastRoomState(io, roomCode) {
   }
 }
 
+// ─── v2 Phase E2 — Speed Mode turn timer ─────────────────────
+//
+// Spec: when speedMode is enabled, the active player has 15 seconds
+// from the start of their turn to take an action (play_card_online or
+// call_bluff). On timeout they are auto-spun as penalty.
+//
+// Implementation:
+//   - One in-flight timer per room: `speedModeTimers.set(code, ...)`.
+//   - `armSpeedModeTimer(io, room)` cancels any in-flight timer and
+//     arms a fresh deadline IF speedMode is on AND phase === 'playing'.
+//   - `cancelSpeedModeTimer(roomCode)` cancels the timer (called when
+//     the active player takes an action OR phase exits 'playing').
+//   - Timer fires `engine.spinGun` on the active player as penalty.
+//     Result broadcasts as a regular spin_result lastAction tagged
+//     with `speedModePenalty: true`.
+//
+// Timer storage is keyed by roomCode so reconnects / re-registrations
+// don't double-arm.
+const SPEED_MODE_DURATION_MS = 15_000;
+const speedModeTimers = new Map(); // roomCode → { timeout, deadline }
+
+function cancelSpeedModeTimer(roomCode) {
+  const entry = speedModeTimers.get(roomCode);
+  if (entry) {
+    clearTimeout(entry.timeout);
+    speedModeTimers.delete(roomCode);
+  }
+}
+
+function armSpeedModeTimer(io, room) {
+  if (!room) return;
+  const code = room.code;
+  cancelSpeedModeTimer(code);
+  if (!room.config?.roomModifiers?.speedMode) {
+    delete room.speedModeDeadline;
+    return;
+  }
+  if (room.mode !== engine.MODES.ONLINE) return;
+  if (room.phase !== 'playing') {
+    delete room.speedModeDeadline;
+    return;
+  }
+  const currentPlayerId = room.turnOrder[room.currentTurnIndex];
+  if (!currentPlayerId) return;
+
+  const deadline = Date.now() + SPEED_MODE_DURATION_MS;
+  room.speedModeDeadline = deadline;
+
+  const timeout = setTimeout(async () => {
+    try {
+      const live = await getRoom(code);
+      if (!live) return;
+      // If anything moved on (phase change, eliminations, etc.) the
+      // arm cycle gets re-run elsewhere — bail if the active player
+      // is no longer who we thought.
+      if (live.phase !== 'playing') return;
+      const stillActive = live.turnOrder[live.currentTurnIndex];
+      if (stillActive !== currentPlayerId) return;
+      const player = live.players.find(p => p.id === currentPlayerId);
+      if (!player || player.status !== 'alive') return;
+
+      speedModeTimers.delete(code);
+      delete live.speedModeDeadline;
+
+      // Auto-spin penalty: same engine.spinGun + downstream pipeline
+      // as a manual player_spin. Mirror Match queueing applies normally.
+      const riskLevelBefore = player.riskLevel;
+      const chamberBefore = [...player.chamber];
+      const spinResult = engine.spinGun(player, engine.getSpinModifiers(live));
+
+      if (
+        live.mirrorMatchActive
+        && !live._mirrorMatchInFlight
+        && live.mode === engine.MODES.ONLINE
+      ) {
+        const oppositeId = engine.getMirrorMatchOpposite(live, player.id);
+        if (oppositeId && oppositeId !== player.id) {
+          live.pendingMirrorMatchSpin = { targetId: oppositeId, triggeredBy: player.id };
+        }
+      }
+
+      let medicPaused = false;
+      if (spinResult.eliminated) {
+        const finalise = () => {
+          engine.eliminateFromTurnOrder(live, player.id);
+          engine.newCardType(live);
+          if (live.mode === engine.MODES.ONLINE) {
+            const cur = live.turnOrder[live.currentTurnIndex];
+            if (cur) engine.drawCardForPlayer(live, cur);
+          }
+          const gameOverWinner = engine.checkGameOver(live);
+          if (gameOverWinner) {
+            live.pendingGameOver = { id: gameOverWinner.id, name: gameOverWinner.username };
+          }
+        };
+        medicPaused = maybeStartMedicPause(io, live, player.id, 'spin', finalise);
+        if (!medicPaused) finalise();
+      } else if (live.mode === engine.MODES.ONLINE) {
+        engine.resetHandOnSurvival(live, player.id, 6);
+      }
+
+      if (!medicPaused) live.phase = 'playing';
+      live.spinTargetId = null;
+      live.cardPlayedThisTurn = false;
+      live.bluffUsedThisTurn = true;
+
+      live.lastAction = {
+        type: 'spin_result',
+        spinTargetId: player.id,
+        spinTargetName: player.username,
+        spinIndex: spinResult.spinIndex,
+        chamber: chamberBefore,
+        chamberAfter: spinResult.chamber,
+        roll: spinResult.spinIndex,
+        eliminated: spinResult.eliminated,
+        riskLevel: spinResult.riskLevel,
+        riskLevelBefore,
+        medicPending: medicPaused,
+        speedModePenalty: true,
+        ...(spinResult.eliminated && !medicPaused ? { newCardType: live.currentCardType } : {}),
+      };
+
+      await saveRoom(live);
+      await broadcastRoomState(io, code);
+    } catch (err) {
+      console.error('[speedModeTimer]', err);
+    }
+  }, SPEED_MODE_DURATION_MS);
+
+  speedModeTimers.set(code, { timeout, deadline });
+}
+
+// ─── v2 Phase E2 — Mirror Match second-spin runner ───────────
+//
+// Called from spin_acknowledged after the primary spin's overlay is
+// dismissed. Runs an additional engine.spinGun against the queued
+// opposite-player target, broadcasts a spin_result lastAction, and
+// handles game-over hold-back identically to the primary path.
+//
+// We set `room._mirrorMatchInFlight = true` for the duration so the
+// player_spin handler's mirror-match queue logic doesn't re-trigger
+// recursively (the second spin is itself a "spin" but should not
+// spawn a third).
+async function runMirrorMatchSpin(io, room, pending) {
+  if (!room || !pending?.targetId) return;
+  const code = room.code;
+  const target = room.players.find(p => p.id === pending.targetId);
+  if (!target || target.status !== 'alive') {
+    // Target is no longer alive (got eliminated mid-flow) — skip.
+    await broadcastRoomState(io, code);
+    return;
+  }
+
+  room._mirrorMatchInFlight = true;
+  try {
+    const riskLevelBefore = target.riskLevel;
+    const chamberBefore = [...target.chamber];
+    const spinResult = engine.spinGun(target, engine.getSpinModifiers(room));
+
+    let medicPaused = false;
+    if (spinResult.eliminated) {
+      const finalise = () => {
+        engine.eliminateFromTurnOrder(room, target.id);
+        engine.newCardType(room);
+        if (room.mode === engine.MODES.ONLINE) {
+          const currentPlayerId = room.turnOrder[room.currentTurnIndex];
+          if (currentPlayerId) engine.drawCardForPlayer(room, currentPlayerId);
+        }
+        const gameOverWinner = engine.checkGameOver(room);
+        if (gameOverWinner) {
+          room.pendingGameOver = { id: gameOverWinner.id, name: gameOverWinner.username };
+        }
+      };
+
+      medicPaused = maybeStartMedicPause(io, room, target.id, 'spin', finalise);
+      if (!medicPaused) finalise();
+    } else if (room.mode === engine.MODES.ONLINE) {
+      // Survivors of a Mirror Match spin still get the standard hand
+      // reset (Section 7) — same as a normal survival.
+      engine.resetHandOnSurvival(room, target.id, 6);
+    }
+
+    if (!medicPaused) room.phase = 'playing';
+    room.spinTargetId = null;
+
+    room.lastAction = {
+      type: 'spin_result',
+      spinTargetId: target.id,
+      spinTargetName: target.username,
+      spinIndex: spinResult.spinIndex,
+      chamber: chamberBefore,
+      chamberAfter: spinResult.chamber,
+      roll: spinResult.spinIndex,
+      eliminated: spinResult.eliminated,
+      riskLevel: spinResult.riskLevel,
+      riskLevelBefore,
+      medicPending: medicPaused,
+      mirrorMatch: true,
+      mirrorMatchTriggeredBy: pending.triggeredBy,
+      ...(spinResult.eliminated && !medicPaused ? { newCardType: room.currentCardType } : {}),
+    };
+
+    await saveRoom(room);
+    await broadcastRoomState(io, code);
+  } finally {
+    delete room._mirrorMatchInFlight;
+  }
+}
+
 // ─── Register all handlers ────────────────────────────────────
 
 const hostDisconnectTimers = new Map();
@@ -444,10 +653,28 @@ function registerSocketHandlers(io, socket) {
       if (!room) return callback({ success: false, error: 'Room not found' });
       if (room.hostSocketId !== socket.id) return callback({ success: false, error: 'Not the host' });
 
+      // v2 Phase E2 — Mirror Match validation. Spec: only selectable
+      // when alive count is even AT GAME START. Refuse the start
+      // rather than silently disabling the modifier.
+      if (
+        room.mode === engine.MODES.ONLINE
+        && room.config?.roomModifiers?.mirrorMatch
+        && !engine.isMirrorMatchEligibleAtStart(room)
+      ) {
+        return callback({
+          success: false,
+          error: 'Mirror Match requires an even player count. Adjust the table or disable Mirror Match.',
+        });
+      }
+
       engine.startGame(room);
       await saveRoom(room);
       callback({ success: true });
       await broadcastRoomState(io, roomCode);
+
+      // v2 Phase E2 — Speed Mode: arm the 15s timer for the first
+      // active player IF the modifier is on. No-op otherwise.
+      armSpeedModeTimer(io, room);
     } catch (err) {
       callback({ success: false, error: err.message });
     }
@@ -528,7 +755,32 @@ function registerSocketHandlers(io, socket) {
 
       const riskLevelBefore = player.riskLevel;
       const chamberBefore = [...player.chamber]; // snapshot BEFORE spin mutates it
-      const spinResult = engine.spinGun(player);
+      // v2 Phase E1 — Risk modifiers (Double Barrel / Hot Potato) plug
+      // in via getSpinModifiers; pullTrigger reads them.
+      const spinResult = engine.spinGun(player, engine.getSpinModifiers(room));
+
+      // v2 Phase E2 — Mirror Match: queue an opposite-player spin to
+      // run after the primary spin's overlay dismisses. We DO NOT
+      // recurse / run it here — `spin_acknowledged` is the trigger.
+      // Skip the queue if THIS spin is itself a mirror-match spin
+      // (no infinite loop) or the primary player is the only one
+      // alive after this spin resolves.
+      if (
+        room.mirrorMatchActive
+        && !room._mirrorMatchInFlight
+        && room.mode === engine.MODES.ONLINE
+      ) {
+        const oppositeId = engine.getMirrorMatchOpposite(room, player.id);
+        if (oppositeId && oppositeId !== player.id) {
+          // Defer until the primary spin's UI overlay is acknowledged
+          // by clients. spin_acknowledged dequeues this and starts
+          // the second spin via a fresh spin_pending phase.
+          room.pendingMirrorMatchSpin = {
+            targetId: oppositeId,
+            triggeredBy: player.id,
+          };
+        }
+      }
 
       // v2 Phase D — Medic interception for spin elimination.
       // engine.spinGun has already mutated player.status if eliminated,
@@ -647,6 +899,11 @@ function registerSocketHandlers(io, socket) {
 
       room.bluffUsedThisTurn = true;
       const callerPlayer = room.players.find(p => p.id === playerId);
+
+      // v2 Phase E2 — Speed Mode: bluff call counts as the player's
+      // action. Cancel any pending 15s timer.
+      cancelSpeedModeTimer(code);
+      delete room.speedModeDeadline;
 
       if (room.mode === engine.MODES.ONLINE) {
         const { events, outcome } = bluffPipeline.resolveBluff(room, playerId);
@@ -823,6 +1080,11 @@ function registerSocketHandlers(io, socket) {
         playerName: actingPlayer?.username || null,
       };
 
+      // v2 Phase E2 — Speed Mode: player took an action, cancel the
+      // 15s deadline. (end_turn re-arms it for the next active player.)
+      cancelSpeedModeTimer(code);
+      delete room.speedModeDeadline;
+
       await saveRoom(room);
       await broadcastRoomState(io, code);
       callback({ success: true, card: result.card });
@@ -846,6 +1108,15 @@ function registerSocketHandlers(io, socket) {
 
       const result = engine.activatePowerCard(room, socket.userId);
       if (!result.ok) return callback?.({ success: false, error: result.error });
+
+      // v2 Phase E2 — Speed Mode: activating a power IS the player's
+      // action for the turn (they still need to play a card / call
+      // bluff afterwards, but the 15s pressure releases here so they
+      // aren't punished for thinking). Re-arming on follow-up actions
+      // would be defensible too, but spec wording is "take their
+      // action" — activation counts.
+      cancelSpeedModeTimer(code);
+      delete room.speedModeDeadline;
 
       await saveRoom(room);
       await broadcastRoomState(io, code);
@@ -1106,6 +1377,13 @@ function registerSocketHandlers(io, socket) {
       room.bluffUsedThisTurn = false;
       engine.advanceTurn(room);
 
+      // v2 Phase E2 — Sudden Death tick. Each advanceTurn that did
+      // NOT come on the heels of an elimination counts toward the
+      // 4-turn streak. eliminateFromTurnOrder already resets the
+      // counter when someone dies. tickSuddenDeath returns a banner
+      // payload only when the threshold was just reached this tick.
+      const suddenDeathBanner = engine.tickSuddenDeath(room);
+
       const gameOverWinner = engine.checkGameOver(room);
       if (gameOverWinner) {
         room.phase = 'game_over';
@@ -1120,6 +1398,14 @@ function registerSocketHandlers(io, socket) {
       if (freezeTrigger) {
         io.to(code).emit('power_card_triggered', freezeTrigger);
       }
+      if (suddenDeathBanner) {
+        io.to(code).emit('power_card_triggered', suddenDeathBanner);
+      }
+
+      // v2 Phase E2 — Speed Mode: reset the per-turn timer for the
+      // new active player. Cancels any in-flight timer for the prior
+      // turn (idempotent) and arms a fresh 15s deadline.
+      armSpeedModeTimer(io, room);
 
       callback({ success: true });
     } catch (err) {
@@ -1136,7 +1422,27 @@ function registerSocketHandlers(io, socket) {
       if (room.mode !== engine.MODES.ONLINE) return callback({ success: false, error: 'Online mode only' });
       if (room.phase !== 'round_end') return callback({ success: false, error: 'Not in round_end phase' });
 
+      // v2 Phase E1 — Redemption Spin candidates are picked BEFORE
+      // resetRoundOnline so we know who got the second-chance shot
+      // for this round. The spins themselves run AFTER reset so
+      // survivors get their 3-card fresh hand from the freshly-built
+      // deck (resetRoundOnline rebuilds the deck and deals only to
+      // alive players; redemption survivors revive into the alive set
+      // afterwards and get their own 3-card deal).
+      const redemptionCandidateIds = engine.pickRedemptionCandidates(room);
+
       engine.resetRoundOnline(room);
+
+      const redemptionResults = [];
+      for (const playerId of redemptionCandidateIds) {
+        // Re-validate at run time — game-over could've been triggered
+        // by something between pick + run. (In this handler that's
+        // not really possible, but defensive.)
+        const winnerYet = engine.checkGameOver(room);
+        if (winnerYet) break;
+        const result = engine.runRedemptionSpin(room, playerId);
+        if (result) redemptionResults.push(result);
+      }
 
       const gameOverWinner = engine.checkGameOver(room);
       if (gameOverWinner) {
@@ -1145,8 +1451,26 @@ function registerSocketHandlers(io, socket) {
       }
 
       await saveRoom(room);
-      callback({ success: true });
+      callback({ success: true, redemptionResults });
       await broadcastRoomState(io, roomCode);
+
+      // Emit one redemption_spin event per spin so clients can replay
+      // each one with the existing spin animation.
+      for (const r of redemptionResults) {
+        const player = room.players.find(p => p.id === r.playerId);
+        io.to(roomCode).emit('redemption_spin', {
+          playerId: r.playerId,
+          playerName: player?.username || null,
+          eliminated: r.eliminated,
+          spinIndex: r.spinIndex,
+          chamber: r.chamber,
+          chamberAfter: r.chamberAfter,
+          riskLevel: r.riskLevel,
+        });
+      }
+
+      // v2 Phase E2 — Speed Mode: arm timer for round 2's first player.
+      armSpeedModeTimer(io, room);
     } catch (err) {
       callback({ success: false, error: err.message });
     }
@@ -1181,9 +1505,28 @@ function registerSocketHandlers(io, socket) {
       room.phase = 'game_over';
       room.lastAction = { type: 'game_over', winnerId: id, winnerName: name };
       delete room.pendingGameOver;
+      // A pending Mirror Match spin would be moot if the game just
+      // ended — discard it.
+      delete room.pendingMirrorMatchSpin;
       await saveRoom(room);
       io.to(code).emit('spin_acknowledged');
       await broadcastRoomState(io, code);
+      return;
+    }
+
+    // v2 Phase E2 — Mirror Match: if a follow-up spin was queued by
+    // the previous spin handler, dispatch it now (after the primary
+    // spin overlay has been dismissed). We run it server-side using
+    // the same engine.spinGun call as a regular spin, then broadcast
+    // the result as a fresh spin_result lastAction. Game-over / Medic
+    // interception runs against the second spin's result too.
+    if (room?.pendingMirrorMatchSpin) {
+      const pending = room.pendingMirrorMatchSpin;
+      delete room.pendingMirrorMatchSpin;
+      await runMirrorMatchSpin(io, room, pending);
+      // runMirrorMatchSpin handles its own broadcasts. Still emit the
+      // ack so clients tear down their existing overlay.
+      io.to(code).emit('spin_acknowledged');
       return;
     }
 
@@ -1325,6 +1668,10 @@ function registerSocketHandlers(io, socket) {
         io.to(code).emit('host_disconnecting', { countdown: 30 });
         const timer = setTimeout(() => {
           io.to(code).emit('game_ended', { reason: 'The host left the game.' });
+          // v2 Phase E2 — clear any in-flight Speed Mode timer when
+          // the room is torn down so a stale timeout doesn't fire
+          // against a deleted room.
+          cancelSpeedModeTimer(code);
           rooms.delete(code);
           hostDisconnectTimers.delete(code);
         }, 30000);
