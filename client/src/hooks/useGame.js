@@ -29,6 +29,16 @@ export function useGame(getAccessToken) {
   const chatOpenRef = useRef(false);
   useEffect(() => { chatOpenRef.current = chatOpen; }, [chatOpen]);
 
+  // ─── v2 Phase C — power-card announcement queue ──────────
+  // The server emits `power_card_triggered` events when Shield /
+  // Mirror / Swap / Assassin fire. We queue them so back-to-back
+  // banners (e.g. Swap → Mirror after the swapped check) play
+  // sequentially instead of stomping each other.
+  const [powerEventQueue, setPowerEventQueue] = useState([]);
+  const consumePowerEvent = useCallback(() => {
+    setPowerEventQueue((q) => q.slice(1));
+  }, []);
+
   // ─── Show transient notification ──────────────────────────
   // Use a ref-tracked timer so back-to-back notifications don't
   // wipe each other (older setTimeout firing on the newer message).
@@ -172,6 +182,13 @@ export function useGame(getAccessToken) {
     };
     const onBluffCalled = () => notify('⚠️ Bluff called! Host: reveal the last card.', 'warning');
     const onSpinAcknowledged = () => setSpinDismissed(true);
+    const onPowerCardTriggered = (evt) => {
+      if (!evt || !evt.kind) return;
+      // Stamp a queue id so React can key on it without us mutating
+      // the event itself (server may resend the same kind+holder).
+      const id = `${evt.kind}:${evt.holderId || '?'}:${Date.now()}:${Math.random().toString(36).slice(2, 8)}`;
+      setPowerEventQueue((q) => [...q, { id, ...evt }]);
+    };
     const onHostDisconnecting = ({ countdown } = {}) => {
       notify(`Host disconnected. Game ends in ${countdown ?? 30}s if they don't return.`, 'error');
     };
@@ -189,6 +206,7 @@ export function useGame(getAccessToken) {
     socket.on('spin_acknowledged', onSpinAcknowledged);
     socket.on('host_disconnecting', onHostDisconnecting);
     socket.on('game_ended', onGameEnded);
+    socket.on('power_card_triggered', onPowerCardTriggered);
 
     return () => {
       socket.off('connect', onConnect);
@@ -199,6 +217,7 @@ export function useGame(getAccessToken) {
       socket.off('spin_acknowledged', onSpinAcknowledged);
       socket.off('host_disconnecting', onHostDisconnecting);
       socket.off('game_ended', onGameEnded);
+      socket.off('power_card_triggered', onPowerCardTriggered);
     };
   }, [socket, notify, clearSession, authenticateSocket]);
 
@@ -328,6 +347,32 @@ export function useGame(getAccessToken) {
     });
   }, [socket, roomCode]);
 
+  // ─── v2 Phase C — Swap pick ───────────────────────────────
+  // After a Swap is triggered by an incoming bluff, the server pauses
+  // the bluff resolution and sets phase = 'swap_pending'. The Swap
+  // holder picks a card id from the anonymised playedPile preview;
+  // server resolves the rest of the pipeline.
+  const swapPick = useCallback((cardId) => {
+    return new Promise((resolve) => {
+      socket.emit('swap_pick', { roomCode, cardId }, (res) => {
+        if (!res?.success) setError(res?.error || 'Swap failed');
+        resolve(res);
+      });
+    });
+  }, [socket, roomCode]);
+
+  // ─── v2 Phase C — Assassin re-arm decision ────────────────
+  // Spec: if no bluff was called on the Assassin holder before their
+  // next activation prompt, they choose to re-arm or take +4 cards.
+  const assassinDecision = useCallback((rearm) => {
+    return new Promise((resolve) => {
+      socket.emit('assassin_decision', { roomCode, rearm: !!rearm }, (res) => {
+        if (!res?.success) setError(res?.error || 'Assassin decision failed');
+        resolve(res);
+      });
+    });
+  }, [socket, roomCode]);
+
   const sendChatMessage = useCallback((text) => {
     if (!roomCode || !text?.trim()) return;
     socket.emit('send_chat_message', { roomCode, text: text.trim() }, (res) => {
@@ -391,6 +436,10 @@ export function useGame(getAccessToken) {
     closeChat,
     leaveGame,
     activatePowerCard,
+    swapPick,
+    assassinDecision,
+    powerEventQueue,
+    consumePowerEvent,
     setError,
   };
 }
