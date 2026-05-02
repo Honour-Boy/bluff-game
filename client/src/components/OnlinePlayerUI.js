@@ -12,6 +12,11 @@ import { PowerCard, POWER_META } from './PowerCard';
 import { AnnouncementBanner } from './AnnouncementBanner';
 import { RoleRevealOverlay, ROLE_META } from './RoleRevealOverlay';
 import {
+  useAnnouncementSpeech,
+  loadSpeechEnabled,
+  saveSpeechEnabled,
+} from '../hooks/useAnnouncementSpeech';
+import {
   BettingPopup,
   BettingWaitOverlay,
   GhostVotePopup,
@@ -584,6 +589,28 @@ export function OnlinePlayerUI({
   const [bettingBusy, setBettingBusy] = useState(false);
   const [ghostVotingBusy, setGhostVotingBusy] = useState(false);
   const [lastStandSpinBusy, setLastStandSpinBusy] = useState(false);
+
+  // ─── v2 spoken announcements ─────────────────────────────
+  // Default ON (loaded from localStorage). The hook watches the head
+  // of powerEventQueue and speaks each new event via the browser's
+  // native speechSynthesis. Toggle button lives next to the chat 💬.
+  const [speechEnabled, setSpeechEnabled] = useState(true);
+  useEffect(() => {
+    // Read once on mount (browser-only — `loadSpeechEnabled` already
+    // guards typeof window).
+    setSpeechEnabled(loadSpeechEnabled());
+  }, []);
+  const toggleSpeech = () => {
+    setSpeechEnabled((prev) => {
+      const next = !prev;
+      saveSpeechEnabled(next);
+      return next;
+    });
+  };
+  const announcementHead = Array.isArray(powerEventQueue) && powerEventQueue.length > 0
+    ? powerEventQueue[0]
+    : null;
+  useAnnouncementSpeech(announcementHead, { enabled: speechEnabled });
 
   // Trigger spin overlay when a spin_result arrives
   useEffect(() => {
@@ -1413,6 +1440,38 @@ export function OnlinePlayerUI({
         }}
       >
         ↻
+      </button>
+
+      {/* ── Speech toggle (fixed, bottom-right, stacked above chat 💬). The
+            chat button is 56px tall + 16px from the bottom; we sit at
+            ~84px above that so they don't overlap. Persists to
+            localStorage via toggleSpeech. ── */}
+      <button
+        type="button"
+        onClick={toggleSpeech}
+        title={speechEnabled ? 'Mute spoken announcements' : 'Unmute spoken announcements'}
+        aria-label={speechEnabled ? 'Mute spoken announcements' : 'Unmute spoken announcements'}
+        aria-pressed={speechEnabled}
+        style={{
+          position: 'fixed',
+          right: 'max(22px, env(safe-area-inset-right))',
+          // Sit above the 56px chat button (which is 16px from bottom).
+          // 16 + 56 + 12 gap = 84.
+          bottom: 'calc(env(safe-area-inset-bottom, 0px) + 84px)',
+          width: 44, height: 44,
+          borderRadius: '50%',
+          background: 'var(--surface2)',
+          border: `1px solid ${speechEnabled ? 'var(--accent)' : 'var(--border)'}`,
+          color: speechEnabled ? 'var(--accent)' : 'var(--text-dim)',
+          fontSize: 18,
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          cursor: 'pointer',
+          boxShadow: '0 4px 14px rgba(0,0,0,0.45)',
+          zIndex: 7900,
+          WebkitTapHighlightColor: 'transparent',
+        }}
+      >
+        {speechEnabled ? '🔊' : '🔇'}
       </button>
 
       {/* ── Spin overlay ── */}
