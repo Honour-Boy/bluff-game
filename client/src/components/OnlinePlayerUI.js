@@ -713,6 +713,15 @@ export function OnlinePlayerUI({
   // ─── v2 Phase B — track the current turn key ────────────
   // When the active turn key changes, reset the prompt-dismissed
   // flag so a brand-new turn shows the prompt again.
+  //
+  // myTurnKey is declared inline here rather than below with the
+  // rest of the derived constants because this useEffect references
+  // it in its dependency array — deps are read synchronously during
+  // render, so the const must be in scope at this line. Hoisting
+  // the const further down (where the rest of the derived state
+  // lives) caused a TDZ "Cannot access before initialization"
+  // crash that broke the whole online-mode screen.
+  const myTurnKey = `${roomState?.currentPlayerId || ''}:${roomState?.currentTurnIndex || 0}:${roomState?.roundNumber || 0}`;
   useEffect(() => {
     if (!isMyTurn) return;
     setPowerPromptTurnKey(myTurnKey);
@@ -750,10 +759,7 @@ export function OnlinePlayerUI({
   // in myHand. There's at most one (hand cap = 1).
   const heldPowerCard = (roomState?.myHand || []).find(c => c?.type === 'power') || null;
   const armedPowerCard = myPlayer?.armedPowerCard || null;
-  // Build a turn key that changes whenever a fresh turn for me starts.
-  // We key on (currentPlayerId, turnIndex, roundNumber) so a re-deal
-  // during the same turn doesn't re-trigger the prompt.
-  const myTurnKey = `${roomState?.currentPlayerId || ''}:${roomState?.currentTurnIndex || 0}:${roomState?.roundNumber || 0}`;
+  // myTurnKey is declared above where its useEffect needs it — see comment there.
 
   const isPlaying = phase === 'playing';
   const isSpinPending = phase === 'spin_pending';
