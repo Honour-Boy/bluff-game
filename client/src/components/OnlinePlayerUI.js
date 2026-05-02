@@ -11,7 +11,6 @@ import { VoicePanel, VoiceIndicator } from './VoicePanel';
 import { PowerCard, POWER_META } from './PowerCard';
 import { AnnouncementBanner } from './AnnouncementBanner';
 import { RoleRevealOverlay, ROLE_META } from './RoleRevealOverlay';
-import { RiskMeter } from './RiskMeter';
 import {
   BettingPopup,
   BettingWaitOverlay,
