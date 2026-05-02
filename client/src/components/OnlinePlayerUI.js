@@ -11,6 +11,13 @@ import { VoicePanel, VoiceIndicator } from './VoicePanel';
 import { PowerCard, POWER_META } from './PowerCard';
 import { AnnouncementBanner } from './AnnouncementBanner';
 import { RoleRevealOverlay, ROLE_META } from './RoleRevealOverlay';
+import {
+  BettingPopup,
+  BettingWaitOverlay,
+  GhostVotePopup,
+  GhostVoteWaitOverlay,
+  LastStandCinematic,
+} from './SystemsOverlays';
 
 // ─── Constants ────────────────────────────────────────────────
 const SHAPES = ['circle', 'triangle', 'cross', 'square', 'star'];
@@ -295,6 +302,11 @@ export function OnlinePlayerUI({
   sniperPrompt,
   powerEventQueue,
   consumePowerEvent,
+  // v2 Phase F — Systems
+  placeBet,
+  ghostVote,
+  lastStandSpin,
+  lastStandEndTurn,
   voice,
 }) {
   const [showHowToPlay, setShowHowToPlay] = useState(false);
@@ -358,6 +370,11 @@ export function OnlinePlayerUI({
   const [sniperDeciding, setSniperDeciding] = useState(false);
   const [saboteurOpen, setSaboteurOpen] = useState(false);
   const [saboteurBusy, setSaboteurBusy] = useState(false);
+
+  // ─── v2 Phase F — Systems busy flags ─────────────────────
+  const [bettingBusy, setBettingBusy] = useState(false);
+  const [ghostVotingBusy, setGhostVotingBusy] = useState(false);
+  const [lastStandSpinBusy, setLastStandSpinBusy] = useState(false);
 
   // Trigger spin overlay when a spin_result arrives
   useEffect(() => {
@@ -1959,6 +1976,70 @@ export function OnlinePlayerUI({
             </div>
           </div>
         </div>
+      )}
+
+      {/* ── v2 Phase F — Betting overlay ── */}
+      {(() => {
+        const betting = roomState?.betting;
+        if (!betting) return null;
+        if (myPlayer?.id === betting.spinTargetId) {
+          return <BettingWaitOverlay closesAt={betting.closesAt} />;
+        }
+        if (!betting.eligibleIds?.includes(myPlayer?.id)) return null;
+        return (
+          <BettingPopup
+            betting={betting}
+            players={roomState?.players}
+            myBet={betting.myBet}
+            onBet={async (prediction) => {
+              if (bettingBusy) return;
+              setBettingBusy(true);
+              try { await placeBet?.(prediction); }
+              finally { setBettingBusy(false); }
+            }}
+          />
+        );
+      })()}
+
+      {/* ── v2 Phase F — Ghost vote overlay (DMH) ── */}
+      {(() => {
+        const gv = roomState?.ghostVote;
+        if (!gv) return null;
+        if (gv.amGhostVoter) {
+          return (
+            <GhostVotePopup
+              ghostVote={gv}
+              myVote={gv.myVote}
+              onVote={async (option) => {
+                if (ghostVotingBusy) return;
+                setGhostVotingBusy(true);
+                try { await ghostVote?.(option); }
+                finally { setGhostVotingBusy(false); }
+              }}
+            />
+          );
+        }
+        return <GhostVoteWaitOverlay closesAt={gv.closesAt} />;
+      })()}
+
+      {/* ── v2 Phase F — Last Stand cinematic ── */}
+      {roomState?.phase === 'last_stand' && roomState?.lastStand && (
+        <LastStandCinematic
+          lastStand={roomState.lastStand}
+          players={roomState.players}
+          myPlayerId={myPlayer?.id}
+          spinPending={lastStandSpinBusy}
+          onSpin={async () => {
+            if (lastStandSpinBusy) return;
+            setLastStandSpinBusy(true);
+            try { await lastStandSpin?.(); }
+            finally { setLastStandSpinBusy(false); }
+          }}
+          onEndTurn={async () => {
+            if (lastStandSpinBusy) return;
+            await lastStandEndTurn?.();
+          }}
+        />
       )}
 
       <style>{`
