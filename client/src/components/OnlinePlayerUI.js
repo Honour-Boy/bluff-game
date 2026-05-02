@@ -11,6 +11,7 @@ import { VoicePanel, VoiceIndicator } from './VoicePanel';
 import { PowerCard, POWER_META } from './PowerCard';
 import { AnnouncementBanner } from './AnnouncementBanner';
 import { RoleRevealOverlay, ROLE_META } from './RoleRevealOverlay';
+import { RiskMeter } from './RiskMeter';
 import {
   BettingPopup,
   BettingWaitOverlay,
@@ -272,6 +273,205 @@ function ShareButton({ roomCode, senderName }) {
       )}
     </div>
   );
+}
+
+// ─── Compact risk meter (6 dots, no label) ───────────────────
+// A condensed version of <RiskMeter> for the player chips. Plays
+// well at chip widths around 64–80px.
+function MiniRiskDots({ riskLevel = 1 }) {
+  return (
+    <div style={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+      {Array.from({ length: 6 }).map((_, i) => {
+        const loaded = i < (riskLevel ?? 1);
+        const danger = loaded && (riskLevel ?? 1) >= 5;
+        return (
+          <div
+            key={i}
+            style={{
+              width: 5,
+              height: 5,
+              borderRadius: '50%',
+              background: loaded
+                ? (danger ? 'var(--accent2)' : 'var(--warning)')
+                : 'transparent',
+              border: `1px solid ${loaded ? (danger ? 'var(--accent2)' : 'var(--warning)') : 'var(--border)'}`,
+            }}
+          />
+        );
+      })}
+    </div>
+  );
+}
+
+// ─── Player chip (top-down view) ─────────────────────────────
+// Compact portrait showing another player's at-a-glance state:
+// truncated name, card count, risk meter, bounty icon, turn ring.
+// Sized 80×110 desktop / 64×88 mobile.
+function PlayerChip({
+  player,
+  isCurrentTurn,
+  isSpinTarget,
+  voice,
+  onClick,
+  compact = false,
+}) {
+  const alive = player.status === 'alive';
+  const w = compact ? 64 : 80;
+  const h = compact ? 88 : 110;
+
+  const name = player.username || '';
+  const truncated = name.length > 12 ? name.slice(0, 11) + '…' : name;
+
+  const borderColor = isCurrentTurn && alive
+    ? 'var(--warning)'
+    : isSpinTarget
+      ? 'var(--accent2)'
+      : 'var(--border)';
+
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      style={{
+        width: w,
+        height: h,
+        flexShrink: 0,
+        padding: compact ? 5 : 7,
+        background: 'var(--surface2)',
+        border: `2px solid ${borderColor}`,
+        borderRadius: 8,
+        opacity: alive ? 1 : 0.4,
+        display: 'flex',
+        flexDirection: 'column',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        gap: 3,
+        cursor: onClick ? 'pointer' : 'default',
+        color: 'var(--text)',
+        textAlign: 'center',
+        boxShadow: isCurrentTurn && alive ? '0 0 12px rgba(255,170,74,0.35)' : 'none',
+        animation: isCurrentTurn && alive ? 'chipTurnPulse 1.6s ease-in-out infinite' : 'none',
+        position: 'relative',
+        userSelect: 'none',
+        WebkitTapHighlightColor: 'transparent',
+      }}
+    >
+      {/* Bounty icon — top-right corner */}
+      {alive && player.hasBounty && (
+        <span
+          title="Bounty placed"
+          style={{
+            position: 'absolute',
+            top: 2,
+            right: 4,
+            fontSize: compact ? 9 : 11,
+            color: '#ff3552',
+            lineHeight: 1,
+          }}
+        >
+          ☠
+        </span>
+      )}
+
+      {/* Name + voice indicator */}
+      <div style={{
+        fontSize: compact ? 9 : 11,
+        fontWeight: 700,
+        color: isCurrentTurn && alive ? 'var(--warning)' : 'var(--text)',
+        whiteSpace: 'nowrap',
+        overflow: 'hidden',
+        textOverflow: 'ellipsis',
+        maxWidth: '100%',
+        letterSpacing: '0.02em',
+        textDecoration: !alive ? 'line-through' : 'none',
+        display: 'flex',
+        alignItems: 'center',
+        gap: 3,
+        justifyContent: 'center',
+      }}>
+        {voice && (
+          <VoiceIndicator
+            playerId={player.id}
+            speakingIds={voice.speakingIds}
+            voiceConnected={voice.isConnected}
+            size={compact ? 6 : 7}
+          />
+        )}
+        <span style={{ overflow: 'hidden', textOverflow: 'ellipsis' }}>
+          {truncated}
+        </span>
+      </div>
+
+      {/* Card count */}
+      <div style={{
+        fontSize: compact ? 9 : 10,
+        color: 'var(--text-dim)',
+        letterSpacing: '0.04em',
+      }}>
+        🃏 {player.handSize ?? '?'}
+      </div>
+
+      {/* Risk meter (compact dots) */}
+      {alive && (
+        <MiniRiskDots riskLevel={player.riskLevel} />
+      )}
+
+      {/* Bottom row: turn or spin indicator */}
+      <div style={{
+        fontSize: compact ? 8 : 9,
+        letterSpacing: '0.08em',
+        minHeight: compact ? 10 : 12,
+        color: isCurrentTurn && alive
+          ? 'var(--warning)'
+          : isSpinTarget
+            ? 'var(--accent2)'
+            : 'transparent',
+      }}>
+        {isCurrentTurn && alive ? 'TURN' : isSpinTarget ? '🔫 SPIN' : '·'}
+      </div>
+    </button>
+  );
+}
+
+// ─── Distribute other players around the table ──────────────
+// Excludes the local player. Returns { top, left, right }.
+//
+//   1-3 others   → all top
+//   4-6 others   → 2 top, rest split L/R
+//   7-10 others  → split top/L/R roughly evenly
+//   11-14 others → ~6 L, ~6 R, remainder top
+//   15+ others   → caps the sides at 6 each, overflow on top
+//
+// When a side ends up with more than 6 players the chip strip wraps
+// into a second inner row — handled by `flexWrap: 'wrap'` in the
+// renderer, not here.
+export function distributePlayers(others) {
+  const list = Array.isArray(others) ? others : [];
+  const n = list.length;
+  if (n === 0) return { top: [], left: [], right: [] };
+
+  let topCount;
+  if (n <= 3) {
+    topCount = n;
+  } else if (n <= 6) {
+    topCount = 2;
+  } else if (n <= 10) {
+    topCount = Math.ceil(n / 3);
+  } else {
+    // 11+: cap sides at 6 each, push remainder to top
+    const sideMax = 6;
+    topCount = Math.max(0, n - 2 * sideMax);
+  }
+
+  const remaining = n - topCount;
+  const leftCount = Math.ceil(remaining / 2);
+  const rightCount = remaining - leftCount;
+
+  return {
+    top: list.slice(0, topCount),
+    left: list.slice(topCount, topCount + leftCount),
+    right: list.slice(topCount + leftCount, topCount + leftCount + rightCount),
+  };
 }
 
 // ─── Main component ───────────────────────────────────────────
