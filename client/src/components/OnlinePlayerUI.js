@@ -1775,6 +1775,7 @@ export function OnlinePlayerUI({
             // v2 Phase D — role banners.
             case 'gambler_caught':   return 'assassin';     // crimson, dramatic
             case 'sheriff_relief':   return 'bluff_blocked'; // lime — relief
+            case 'sheriff_protected': return 'bluff_blocked'; // lime — Sheriff palette
             case 'medic_save':       return 'sudden_death'; // ice blue — Medic palette
             case 'sniper_redirect':  return 'assassin';     // crimson — Sniper palette
             default: return 'bluff_blocked';
@@ -1788,6 +1789,7 @@ export function OnlinePlayerUI({
           freeze_skip:      'FREEZE',
           gambler_caught:   'GAMBLER CAUGHT',
           sheriff_relief:   'SHERIFF RELIEVED',
+          sheriff_protected: 'SHERIFF PROTECTED',
           medic_save:       'MEDIC SAVE',
           sniper_redirect:  'SNIPER REDIRECT',
         };
@@ -1804,6 +1806,7 @@ export function OnlinePlayerUI({
           }
           if (evt.kind === 'gambler_caught') return 'risk jumps to 4';
           if (evt.kind === 'sheriff_relief') return 'one bullet removed';
+          if (evt.kind === 'sheriff_protected') return 'assassin held back';
           if (evt.kind === 'medic_save') {
             return evt.revivedPlayerName ? `${evt.revivedPlayerName} revived` : 'player revived';
           }
