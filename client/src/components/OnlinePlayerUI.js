@@ -9,6 +9,7 @@ import { HowToPlayModal } from './HowToPlayModal';
 import { TurnActionModal, WaitingForPlayerBanner } from './TurnActionModal';
 import { VoicePanel, VoiceIndicator } from './VoicePanel';
 import { PowerCard, POWER_META } from './PowerCard';
+import { AnnouncementBanner } from './AnnouncementBanner';
 
 // ─── Constants ────────────────────────────────────────────────
 const SHAPES = ['circle', 'triangle', 'cross', 'square', 'star'];
@@ -284,6 +285,8 @@ export function OnlinePlayerUI({
   acknowledgeSpinResult,
   spinDismissed,
   activatePowerCard,
+  powerCardEvent,
+  clearPowerCardEvent,
   voice,
 }) {
   const [showHowToPlay, setShowHowToPlay] = useState(false);
@@ -440,6 +443,7 @@ export function OnlinePlayerUI({
     players, turnOrder, currentPlayerId, currentCardType,
     phase, roundNumber, lastAction,
     bluffUsedThisTurn, cardPlayedThisTurn, spinTargetId, isFirstTurn,
+    bluffBlockedThisTurn = false,
     deckSize = 0, playedPileSize = 0, myHand = [],
   } = roomState;
 
@@ -481,9 +485,13 @@ export function OnlinePlayerUI({
   let actionHint = '';
   if (isMyTurn && isPlaying) {
     if (!bluffUsedThisTurn && !cardPlayedThisTurn) {
-      actionHint = isFirstTurn
-        ? 'Play a card from your hand. (No bluff on the first turn.)'
-        : "Play a card from your hand, or call bluff on the previous player.";
+      if (bluffBlockedThisTurn) {
+        actionHint = 'Last turn was frozen — no card to challenge. Play a card from your hand.';
+      } else {
+        actionHint = isFirstTurn
+          ? 'Play a card from your hand. (No bluff on the first turn.)'
+          : "Play a card from your hand, or call bluff on the previous player.";
+      }
     } else if (bluffUsedThisTurn && !cardPlayedThisTurn) {
       actionHint = 'Bluff called. Now play your card.';
     } else if (cardPlayedThisTurn) {
@@ -551,8 +559,26 @@ export function OnlinePlayerUI({
     setPowerPromptDismissedFor(powerPromptTurnKey);
   };
 
+  // ─── v2 Phase C — Power-card trigger banner ─────────────
+  // The hook stamps a fresh _id on every emission so the same kind
+  // back-to-back still re-mounts the banner via its key.
+  const freezeBanner = powerCardEvent && powerCardEvent.kind === 'freeze_skip'
+    ? (
+      <AnnouncementBanner
+        key={powerCardEvent._id}
+        kind="sudden_death" // closest existing preset visually; freeze = ice-blue sweep
+        title="FREEZE"
+        subtitle={`${powerCardEvent.skippedName || 'Next player'} is skipped`}
+        playerName={powerCardEvent.holderName || undefined}
+        onComplete={clearPowerCardEvent}
+      />
+    )
+    : null;
+
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 16, maxWidth: 500, margin: '0 auto', paddingBottom: 180 }}>
+
+      {freezeBanner}
 
       {/* ── Header ── */}
       <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap' }}>
@@ -733,11 +759,12 @@ export function OnlinePlayerUI({
               <button
                 className="danger"
                 onClick={callBluff}
-                disabled={bluffUsedThisTurn || cardPlayedThisTurn}
+                disabled={bluffUsedThisTurn || cardPlayedThisTurn || bluffBlockedThisTurn}
+                title={bluffBlockedThisTurn ? 'No card to challenge — last turn was frozen' : undefined}
                 style={{
                   flex: 1,
-                  opacity: bluffUsedThisTurn || cardPlayedThisTurn ? 0.4 : 1,
-                  cursor: bluffUsedThisTurn || cardPlayedThisTurn ? 'not-allowed' : 'pointer',
+                  opacity: bluffUsedThisTurn || cardPlayedThisTurn || bluffBlockedThisTurn ? 0.4 : 1,
+                  cursor: bluffUsedThisTurn || cardPlayedThisTurn || bluffBlockedThisTurn ? 'not-allowed' : 'pointer',
                 }}
               >
                 ⚠️ Call Bluff
