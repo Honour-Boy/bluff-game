@@ -254,6 +254,13 @@ function createRoom(hostSocketId, mode = MODES.PHYSICAL, config = null) {
     // physical-mode rooms lean, but startGame/resetRoundOnline
     // create it eagerly anyway.
     discardPile: [],
+    // Phase C — Freeze. One-shot skip queue: when the holder ends
+    // their turn after arming freeze, we set skipNextPlayer=true so
+    // the next advanceTurn burns through the next player. The player
+    // AFTER the skip inherits bluffBlockedThisTurn so they can't call
+    // bluff (no card was played by the skipped player).
+    skipNextPlayer: false,
+    bluffBlockedThisTurn: false,
   };
 }
 
@@ -326,6 +333,14 @@ function getCurrentPlayer(room) {
 }
 
 // ─── Turn management ───────────────────────────────────────────
+//
+// v2 Phase C — Freeze. When the freeze holder ends their turn we
+// stamp room.skipNextPlayer = true (and queue the bluff-block). On
+// the very next advanceTurn, we advance an EXTRA step so the next
+// player in turn order is fully skipped. The player AFTER the
+// skipped one inherits room.bluffBlockedThisTurn = true, which the
+// call_bluff handler honours by rejecting the bluff (the previous
+// "turn" had no card to challenge — it never happened).
 
 function advanceTurn(room) {
   if (!room.turnOrder.length) return room;
@@ -341,6 +356,26 @@ function advanceTurn(room) {
   room.bluffUsedThisTurn = false;
   room.cardPlayedThisTurn = false;
   room.isFirstTurn = false;
+  // Default: clear the bluff-blocked flag — it only persists for the
+  // single turn that immediately follows a freeze-skip. The handler
+  // that fired the freeze re-sets the flag AFTER advanceTurn runs so
+  // it survives this reset (see consumeFreezeOnTurnEnd).
+  room.bluffBlockedThisTurn = false;
+
+  // Freeze: if the previous holder armed a freeze and we owe the table
+  // one extra advance, do it here. We re-credit Swap for the SKIPPED
+  // player (they "spent" their turn from the engine's perspective even
+  // though they didn't act), advance a second time, and stamp the
+  // bluff-block flag for the player who actually takes the turn.
+  if (room.skipNextPlayer) {
+    const skippedPlayerId = room.turnOrder[room.currentTurnIndex] || null;
+    if (skippedPlayerId) _creditSwapTurnFor(room, skippedPlayerId);
+    room.currentTurnIndex = (room.currentTurnIndex + 1) % room.turnOrder.length;
+    room.skipNextPlayer = false;
+    // The player AFTER the skip inherits the bluff-block.
+    room.bluffBlockedThisTurn = true;
+  }
+
   return room;
 }
 
@@ -778,6 +813,72 @@ function activatePowerCard(room, playerId) {
   };
 }
 
+// ─── Freeze trigger (Phase C) ──────────────────────────────────
+// The freeze power card is "activated at turn start" (Phase B arms
+// it) and "consumed on turn end". Concretely: when the holder calls
+// end_turn, we look for an armed freeze on the player. If present we
+// pull the card from their hand into the discard pile, clear the
+// armed marker, and queue a one-shot skip on the room. The next
+// advanceTurn() will burn through the skipped player without giving
+// them a turn; the player AFTER the skipped one inherits a bluff
+// block (the spec: there's "no card to challenge" because the last
+// turn never happened).
+//
+// Returns the trigger payload (so the caller can broadcast a
+// `power_card_triggered` event) or null if the holder had no armed
+// freeze. Callers should invoke this BEFORE advanceTurn().
+
+function consumeFreezeOnTurnEnd(room, holderId) {
+  if (room.mode !== MODES.ONLINE) return null;
+  if (!room.turnOrder?.length) return null;
+
+  const holder = room.players.find(p => p.id === holderId);
+  if (!holder) return null;
+  const armed = holder.armedPowerCard;
+  if (!armed || armed.power !== 'freeze') return null;
+
+  // Identify who would be skipped: the next player in turn order,
+  // computed BEFORE any advance happens. We don't mutate
+  // currentTurnIndex here — advanceTurn will, then act on the flag.
+  const holderIdx = room.turnOrder.indexOf(holderId);
+  if (holderIdx === -1) return null;
+  const skippedIdx = (holderIdx + 1) % room.turnOrder.length;
+  const skippedId = room.turnOrder[skippedIdx];
+  // If the only "next" player is the holder themselves (1-player table
+  // shouldn't happen in practice but be defensive), bail without
+  // arming the skip.
+  if (!skippedId || skippedId === holderId) return null;
+  const skipped = room.players.find(p => p.id === skippedId) || null;
+
+  // Pull the freeze card from the holder's hand into discard. The
+  // armed.cardId points at it; fall back to a search on power slug
+  // in case state drifted.
+  if (!room.discardPile) room.discardPile = [];
+  const hand = room.hands?.get(holderId);
+  if (hand) {
+    let idx = armed.cardId
+      ? hand.findIndex(c => c?.id === armed.cardId)
+      : -1;
+    if (idx === -1) idx = hand.findIndex(c => c?.type === 'power' && c.power === 'freeze');
+    if (idx !== -1) {
+      const [card] = hand.splice(idx, 1);
+      room.discardPile.push(card);
+    }
+  }
+
+  // Clear armed state and stamp the one-shot skip on the room.
+  holder.armedPowerCard = null;
+  room.skipNextPlayer = true;
+
+  return {
+    kind: 'freeze_skip',
+    holderId,
+    holderName: holder.username || null,
+    skippedId,
+    skippedName: skipped?.username || null,
+  };
+}
+
 // ─── Bluff resolution ──────────────────────────────────────────
 
 function resolveBluffOnline(room) {
@@ -867,6 +968,10 @@ function resetRoundOnline(room) {
   room.bluffUsedThisTurn = false;
   room.cardPlayedThisTurn = false;
   room.isFirstTurn = true;
+  // Phase C — Freeze: any pending skip / bluff-block from the previous
+  // round is cleared on a fresh round, just like armedPowerCard.
+  room.skipNextPlayer = false;
+  room.bluffBlockedThisTurn = false;
 
   return room;
 }
@@ -1019,6 +1124,9 @@ function serializeRoom(room, requestingPlayerId = null) {
     lastAction: room.lastAction,
     bluffUsedThisTurn: room.bluffUsedThisTurn || false,
     cardPlayedThisTurn: room.cardPlayedThisTurn || false,
+    // Phase C — Freeze. Exposed so the UI can grey out / hide the
+    // "Call Bluff" button on the turn that follows a freeze-skip.
+    bluffBlockedThisTurn: room.bluffBlockedThisTurn || false,
     spinTargetId: room.spinTargetId || null,
     isFirstTurn: room.isFirstTurn || false,
     deckSize: isOnline && room.deck ? room.deck.length : undefined,
@@ -1093,6 +1201,7 @@ module.exports = {
   resetRoundOnline,
   activatePowerCard,
   applyAssassinDeclinePenalty,
+  consumeFreezeOnTurnEnd,
   isSwapActivatable,
   isArmedFromPriorTurn,
   serializeRoom,

@@ -458,6 +458,7 @@ export function OnlinePlayerUI({
     players, turnOrder, currentPlayerId, currentCardType,
     phase, roundNumber, lastAction,
     bluffUsedThisTurn, cardPlayedThisTurn, spinTargetId, isFirstTurn,
+    bluffBlockedThisTurn = false,
     deckSize = 0, playedPileSize = 0, myHand = [],
   } = roomState;
 
@@ -499,9 +500,13 @@ export function OnlinePlayerUI({
   let actionHint = '';
   if (isMyTurn && isPlaying) {
     if (!bluffUsedThisTurn && !cardPlayedThisTurn) {
-      actionHint = isFirstTurn
-        ? 'Play a card from your hand. (No bluff on the first turn.)'
-        : "Play a card from your hand, or call bluff on the previous player.";
+      if (bluffBlockedThisTurn) {
+        actionHint = 'Last turn was frozen — no card to challenge. Play a card from your hand.';
+      } else {
+        actionHint = isFirstTurn
+          ? 'Play a card from your hand. (No bluff on the first turn.)'
+          : "Play a card from your hand, or call bluff on the previous player.";
+      }
     } else if (bluffUsedThisTurn && !cardPlayedThisTurn) {
       actionHint = 'Bluff called. Now play your card.';
     } else if (cardPlayedThisTurn) {
@@ -630,6 +635,7 @@ export function OnlinePlayerUI({
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 16, maxWidth: 500, margin: '0 auto', paddingBottom: 180 }}>
+
 
       {/* ── Header ── */}
       <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap' }}>
@@ -810,11 +816,12 @@ export function OnlinePlayerUI({
               <button
                 className="danger"
                 onClick={callBluff}
-                disabled={bluffUsedThisTurn || cardPlayedThisTurn}
+                disabled={bluffUsedThisTurn || cardPlayedThisTurn || bluffBlockedThisTurn}
+                title={bluffBlockedThisTurn ? 'No card to challenge — last turn was frozen' : undefined}
                 style={{
                   flex: 1,
-                  opacity: bluffUsedThisTurn || cardPlayedThisTurn ? 0.4 : 1,
-                  cursor: bluffUsedThisTurn || cardPlayedThisTurn ? 'not-allowed' : 'pointer',
+                  opacity: bluffUsedThisTurn || cardPlayedThisTurn || bluffBlockedThisTurn ? 0.4 : 1,
+                  cursor: bluffUsedThisTurn || cardPlayedThisTurn || bluffBlockedThisTurn ? 'not-allowed' : 'pointer',
                 }}
               >
                 ⚠️ Call Bluff
@@ -1383,6 +1390,7 @@ export function OnlinePlayerUI({
             case 'mirror_reflected': return 'bluff_reflected';
             case 'assassin_strike':  return 'assassin';
             case 'swap_resolved':    return 'bluff_blocked';
+            case 'freeze_skip':      return 'sudden_death'; // ice-blue preset
             default: return 'bluff_blocked';
           }
         })();
@@ -1391,6 +1399,7 @@ export function OnlinePlayerUI({
           mirror_reflected: 'BLUFF REFLECTED',
           assassin_strike:  'ASSASSIN STRIKE',
           swap_resolved:    'SWAP RESOLVED',
+          freeze_skip:      'FREEZE',
         };
         const subtitle = (() => {
           if (evt.kind === 'mirror_reflected') {
@@ -1400,6 +1409,9 @@ export function OnlinePlayerUI({
             return evt.eliminatedName ? `${evt.eliminatedName} eliminated` : '';
           }
           if (evt.kind === 'swap_resolved') return 'card swapped';
+          if (evt.kind === 'freeze_skip') {
+            return evt.skippedName ? `${evt.skippedName} is skipped` : 'turn skipped';
+          }
           return '';
         })();
         return (

@@ -30,10 +30,11 @@ export function useGame(getAccessToken) {
   useEffect(() => { chatOpenRef.current = chatOpen; }, [chatOpen]);
 
   // ─── v2 Phase C — power-card announcement queue ──────────
-  // The server emits `power_card_triggered` events when Shield /
-  // Mirror / Swap / Assassin fire. We queue them so back-to-back
-  // banners (e.g. Swap → Mirror after the swapped check) play
-  // sequentially instead of stomping each other.
+  // The server emits `power_card_triggered` events when any power
+  // card fires (Shield blocking, Mirror reflecting, Freeze landing,
+  // etc.). We queue them so back-to-back banners (e.g. Swap → Mirror
+  // after the swapped check) play sequentially instead of stomping
+  // each other.
   const [powerEventQueue, setPowerEventQueue] = useState([]);
   const consumePowerEvent = useCallback(() => {
     setPowerEventQueue((q) => q.slice(1));
@@ -197,7 +198,6 @@ export function useGame(getAccessToken) {
   clearSession();
   notify(reason || 'The game has ended.', 'error');
 };
-
     socket.on('connect', onConnect);
     socket.on('disconnect', onDisconnect);
     socket.on('room_state', onRoomState);
