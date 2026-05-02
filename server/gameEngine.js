@@ -1459,6 +1459,12 @@ function serializeRoom(room, requestingPlayerId = null) {
         p.id === requestingPlayerId
           ? (p.role || 'barehand')
           : (room.phase === 'game_over' ? (p.role || 'barehand') : null),
+      // v2 Phase D — role ability flags. Only the player themselves
+      // sees their own ability availability — never leaked publicly
+      // (would expose role identity by elimination).
+      medicAbilityAvailable: p.id === requestingPlayerId ? !!p.medicAbilityAvailable : undefined,
+      saboteurAbilityAvailable: p.id === requestingPlayerId ? !!p.saboteurAbilityAvailable : undefined,
+      sniperAbilityAvailable: p.id === requestingPlayerId ? !!p.sniperAbilityAvailable : undefined,
     })),
     turnOrder: room.turnOrder,
     currentTurnIndex: room.currentTurnIndex,

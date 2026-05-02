@@ -10,6 +10,7 @@ import { TurnActionModal, WaitingForPlayerBanner } from './TurnActionModal';
 import { VoicePanel, VoiceIndicator } from './VoicePanel';
 import { PowerCard, POWER_META } from './PowerCard';
 import { AnnouncementBanner } from './AnnouncementBanner';
+import { RoleRevealOverlay, ROLE_META } from './RoleRevealOverlay';
 
 // ─── Constants ────────────────────────────────────────────────
 const SHAPES = ['circle', 'triangle', 'cross', 'square', 'star'];
@@ -287,6 +288,11 @@ export function OnlinePlayerUI({
   activatePowerCard,
   swapPick,
   assassinDecision,
+  medicDecide,
+  saboteurTransfer,
+  sniperRedirect,
+  medicPrompt,
+  sniperPrompt,
   powerEventQueue,
   consumePowerEvent,
   voice,
@@ -339,6 +345,19 @@ export function OnlinePlayerUI({
   // activation prompt so the user can't get stuck in a loop.
   const [assassinDeciding, setAssassinDeciding] = useState(false);
   const [assassinPromptDismissedFor, setAssassinPromptDismissedFor] = useState(null);
+
+  // ─── v2 Phase D — Role reveal state ──────────────────────
+  // Plays once at the start of the first round. Local-only flag —
+  // a refresh re-shows it (sessionStorage-backed dedupe is overkill
+  // for a 7.5s overlay, and reconnects already pause for the spin
+  // overlay anyway).
+  const [roleRevealSeen, setRoleRevealSeen] = useState(false);
+
+  // ─── v2 Phase D — role action busy flags ─────────────────
+  const [medicDeciding, setMedicDeciding] = useState(false);
+  const [sniperDeciding, setSniperDeciding] = useState(false);
+  const [saboteurOpen, setSaboteurOpen] = useState(false);
+  const [saboteurBusy, setSaboteurBusy] = useState(false);
 
   // Trigger spin overlay when a spin_result arrives
   useEffect(() => {
@@ -445,6 +464,13 @@ export function OnlinePlayerUI({
     if (!isMyTurn) return;
     setPowerPromptTurnKey(myTurnKey);
   }, [myTurnKey, isMyTurn]);
+
+  // ─── v2 Phase D — reset role-reveal flag if we re-enter lobby ─
+  // (Server restart, "new game" flow, etc.) Lets the same browser
+  // session see role reveal again on a fresh game.
+  useEffect(() => {
+    if (roomState?.phase === 'lobby') setRoleRevealSeen(false);
+  }, [roomState?.phase]);
 
   if (!roomState || !myPlayer) {
     return (
@@ -632,6 +658,58 @@ export function OnlinePlayerUI({
       setAssassinDeciding(false);
     }
   };
+
+  // ─── v2 Phase D — role action handlers ──────────────────
+  const handleMedicDecide = async (save) => {
+    if (!medicDecide || medicDeciding) return;
+    setMedicDeciding(true);
+    try {
+      await medicDecide(save);
+    } finally {
+      setMedicDeciding(false);
+    }
+  };
+
+  const handleSniperRedirect = async (newTargetId) => {
+    if (!sniperRedirect || sniperDeciding) return;
+    setSniperDeciding(true);
+    try {
+      await sniperRedirect(newTargetId);
+    } finally {
+      setSniperDeciding(false);
+    }
+  };
+
+  const handleSaboteurPick = async (targetId) => {
+    if (!saboteurTransfer || saboteurBusy) return;
+    setSaboteurBusy(true);
+    try {
+      const res = await saboteurTransfer(targetId);
+      if (res?.success) setSaboteurOpen(false);
+    } finally {
+      setSaboteurBusy(false);
+    }
+  };
+
+  // ─── v2 Phase D — derived role state ─────────────────────
+  const myRole = myPlayer?.role || 'barehand';
+  const showRoleReveal =
+    !roleRevealSeen
+    && roomState?.phase === 'playing'
+    && roomState?.roundNumber === 1
+    && !!myPlayer?.role;
+  const isMedic = myRole === 'medic';
+  const isSaboteur = myRole === 'saboteur';
+  const isSniper = myRole === 'sniper';
+  const medicPending = roomState?.pendingMedicSave || null;
+  const sniperPending = roomState?.pendingSniperRedirect || null;
+  const amTargetMedic = !!medicPending?.amTargetMedic;
+  const amTargetSniper = !!sniperPending?.amTargetSniper;
+  const sniperEligibleTargets = sniperPending?.eligibleTargetIds || sniperPrompt?.eligibleTargetIds || [];
+  const saboteurAvailable = isSaboteur
+    && myPlayer?.status === 'alive'
+    && (myPlayer?.saboteurAbilityAvailable !== false)
+    && (roomState?.myHand?.length || 0) > 3;
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 16, maxWidth: 500, margin: '0 auto', paddingBottom: 180 }}>
@@ -1391,6 +1469,11 @@ export function OnlinePlayerUI({
             case 'assassin_strike':  return 'assassin';
             case 'swap_resolved':    return 'bluff_blocked';
             case 'freeze_skip':      return 'sudden_death'; // ice-blue preset
+            // v2 Phase D — role banners.
+            case 'gambler_caught':   return 'assassin';     // crimson, dramatic
+            case 'sheriff_relief':   return 'bluff_blocked'; // lime — relief
+            case 'medic_save':       return 'sudden_death'; // ice blue — Medic palette
+            case 'sniper_redirect':  return 'assassin';     // crimson — Sniper palette
             default: return 'bluff_blocked';
           }
         })();
@@ -1400,6 +1483,10 @@ export function OnlinePlayerUI({
           assassin_strike:  'ASSASSIN STRIKE',
           swap_resolved:    'SWAP RESOLVED',
           freeze_skip:      'FREEZE',
+          gambler_caught:   'GAMBLER CAUGHT',
+          sheriff_relief:   'SHERIFF RELIEVED',
+          medic_save:       'MEDIC SAVE',
+          sniper_redirect:  'SNIPER REDIRECT',
         };
         const subtitle = (() => {
           if (evt.kind === 'mirror_reflected') {
@@ -1411,6 +1498,14 @@ export function OnlinePlayerUI({
           if (evt.kind === 'swap_resolved') return 'card swapped';
           if (evt.kind === 'freeze_skip') {
             return evt.skippedName ? `${evt.skippedName} is skipped` : 'turn skipped';
+          }
+          if (evt.kind === 'gambler_caught') return 'risk jumps to 4';
+          if (evt.kind === 'sheriff_relief') return 'one bullet removed';
+          if (evt.kind === 'medic_save') {
+            return evt.revivedPlayerName ? `${evt.revivedPlayerName} revived` : 'player revived';
+          }
+          if (evt.kind === 'sniper_redirect') {
+            return evt.toName ? `→ ${evt.toName}` : 'spin redirected';
           }
           return '';
         })();
@@ -1583,6 +1678,284 @@ export function OnlinePlayerUI({
               >
                 Stand down (+4)
               </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── v2 Phase D — Role reveal overlay ── */}
+      {showRoleReveal && (
+        <RoleRevealOverlay
+          role={myRole}
+          onComplete={() => setRoleRevealSeen(true)}
+        />
+      )}
+
+      {/* ── v2 Phase D — Saboteur trigger button (alive Saboteur only) ── */}
+      {saboteurAvailable && !showRoleReveal && (
+        <button
+          onClick={() => setSaboteurOpen(true)}
+          style={{
+            position: 'fixed',
+            bottom: 90,
+            right: 12,
+            padding: '8px 14px',
+            background: 'rgba(122,60,255,0.12)',
+            border: `1px solid ${ROLE_META.saboteur.color}`,
+            borderRadius: 'var(--radius)',
+            color: ROLE_META.saboteur.color,
+            fontFamily: "'Bebas Neue', sans-serif",
+            fontSize: 13,
+            letterSpacing: '0.1em',
+            cursor: 'pointer',
+            boxShadow: `0 0 12px ${ROLE_META.saboteur.color}33`,
+            zIndex: 8200,
+          }}
+          title="Saboteur — silently move a random card from your hand into another player's hand. Once per game."
+        >
+          🕶 SABOTAGE
+        </button>
+      )}
+
+      {/* ── v2 Phase D — Saboteur target picker ── */}
+      {saboteurOpen && (
+        <div style={{
+          position: 'fixed', inset: 0,
+          background: 'rgba(0,0,0,0.9)',
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          zIndex: 8950, padding: 24,
+        }}>
+          <div className="card fade-in" style={{
+            maxWidth: 380, width: '100%', textAlign: 'center',
+            padding: '24px 20px',
+            border: `1px solid ${ROLE_META.saboteur.color}`,
+          }}>
+            <div style={{
+              fontFamily: "'Bebas Neue', sans-serif",
+              fontSize: 22, letterSpacing: '0.12em',
+              color: ROLE_META.saboteur.color, marginBottom: 6,
+            }}>
+              SABOTAGE
+            </div>
+            <div style={{ fontSize: 12, color: 'var(--text-dim)', marginBottom: 18, lineHeight: 1.5 }}>
+              Pick a target. One random card will move from your hand into theirs. They won't be told.
+            </div>
+            <div style={{
+              display: 'grid',
+              gridTemplateColumns: 'repeat(auto-fill, minmax(110px, 1fr))',
+              gap: 8,
+              marginBottom: 14,
+            }}>
+              {alivePlayers
+                .filter(p => p.id !== myPlayer.id)
+                .map(p => (
+                  <button
+                    key={p.id}
+                    onClick={() => handleSaboteurPick(p.id)}
+                    disabled={saboteurBusy}
+                    style={{
+                      padding: '10px 8px',
+                      background: 'var(--surface2)',
+                      border: `1px solid ${ROLE_META.saboteur.color}66`,
+                      borderRadius: 6,
+                      color: 'var(--text)',
+                      cursor: saboteurBusy ? 'wait' : 'pointer',
+                      fontSize: 12,
+                      letterSpacing: '0.04em',
+                    }}
+                  >
+                    {p.username}
+                    <div style={{ fontSize: 10, color: 'var(--text-dim)', marginTop: 4 }}>🃏 {p.handSize ?? '?'}</div>
+                  </button>
+                ))}
+            </div>
+            <button
+              onClick={() => setSaboteurOpen(false)}
+              disabled={saboteurBusy}
+              style={{
+                fontSize: 11, color: 'var(--text-dim)',
+                background: 'none', border: 'none',
+                cursor: saboteurBusy ? 'wait' : 'pointer', textDecoration: 'underline',
+              }}
+            >
+              Cancel
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* ── v2 Phase D — Medic save prompt ── */}
+      {amTargetMedic && medicPending && (
+        <div style={{
+          position: 'fixed', inset: 0,
+          background: 'rgba(0,0,0,0.92)',
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          zIndex: 9100, padding: 24,
+        }}>
+          <div className="card fade-in" style={{
+            maxWidth: 380, width: '100%', textAlign: 'center',
+            padding: '28px 24px',
+            border: `1px solid ${ROLE_META.medic.color}`,
+          }}>
+            <div style={{ fontSize: 10, color: ROLE_META.medic.color, letterSpacing: '0.18em', marginBottom: 12 }}>
+              MEDIC — SAVE THEM?
+            </div>
+            <div style={{
+              fontFamily: "'Bebas Neue', sans-serif",
+              fontSize: 26, color: 'var(--text)', marginBottom: 8, letterSpacing: '0.05em',
+            }}>
+              {medicPending.eliminatedPlayerName || 'A player'} is about to be eliminated.
+            </div>
+            <div style={{ fontSize: 12, color: 'var(--text-dim)', marginBottom: 22, lineHeight: 1.55 }}>
+              Save them? You'll take +2 cards as the cost. This is your only Medic save — once per game.
+            </div>
+            <div style={{ display: 'flex', gap: 10 }}>
+              <button
+                className="primary"
+                disabled={medicDeciding}
+                onClick={() => handleMedicDecide(true)}
+                style={{ flex: 1, padding: '12px' }}
+              >
+                {medicDeciding ? '…' : '✚ Save them'}
+              </button>
+              <button
+                disabled={medicDeciding}
+                onClick={() => handleMedicDecide(false)}
+                style={{
+                  flex: 1, padding: '12px',
+                  background: 'var(--surface2)',
+                  border: '1px solid var(--border)',
+                  borderRadius: 'var(--radius)',
+                  color: 'var(--text-dim)',
+                  cursor: medicDeciding ? 'wait' : 'pointer',
+                  fontSize: 13,
+                }}
+              >
+                Let them go
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── v2 Phase D — Medic deciding banner (everyone else) ── */}
+      {medicPending && !amTargetMedic && (
+        <div style={{
+          position: 'fixed',
+          left: 0, right: 0,
+          top: 'calc(38vh + 110px)',
+          display: 'flex', justifyContent: 'center',
+          zIndex: 8650, padding: '0 16px',
+          pointerEvents: 'none',
+        }}>
+          <div className="card" style={{
+            maxWidth: 320, textAlign: 'center', padding: '14px 18px',
+            border: `1px solid ${ROLE_META.medic.color}`,
+            background: 'rgba(8,12,20,0.96)',
+          }}>
+            <div style={{ fontFamily: "'Bebas Neue', sans-serif", fontSize: 18, color: ROLE_META.medic.color, marginBottom: 4 }}>
+              MEDIC IS DECIDING…
+            </div>
+            <div style={{ fontSize: 11, color: 'var(--text-dim)' }}>
+              {medicPending.eliminatedPlayerName || 'Someone'} hangs in the balance.
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── v2 Phase D — Sniper redirect picker ── */}
+      {amTargetSniper && sniperPending && (
+        <div style={{
+          position: 'fixed', inset: 0,
+          background: 'rgba(0,0,0,0.92)',
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          zIndex: 9100, padding: 24,
+        }}>
+          <div className="card fade-in" style={{
+            maxWidth: 420, width: '100%', textAlign: 'center',
+            padding: '24px 20px',
+            border: `1px solid ${ROLE_META.sniper.color}`,
+          }}>
+            <div style={{
+              fontFamily: "'Bebas Neue', sans-serif",
+              fontSize: 22, letterSpacing: '0.12em',
+              color: ROLE_META.sniper.color, marginBottom: 6,
+            }}>
+              SNIPER — REDIRECT THE SHOT?
+            </div>
+            <div style={{ fontSize: 12, color: 'var(--text-dim)', marginBottom: 18, lineHeight: 1.5 }}>
+              Currently aimed at <strong style={{ color: 'var(--text)' }}>{sniperPending.originalSpinTargetName || 'someone'}</strong>.
+              Pick a new target — Mirror holders are off-limits — or pass.
+            </div>
+            <div style={{
+              display: 'grid',
+              gridTemplateColumns: 'repeat(auto-fill, minmax(110px, 1fr))',
+              gap: 8,
+              marginBottom: 14,
+            }}>
+              {alivePlayers.map(p => {
+                const eligible = sniperEligibleTargets.includes(p.id);
+                return (
+                  <button
+                    key={p.id}
+                    onClick={() => eligible && handleSniperRedirect(p.id)}
+                    disabled={!eligible || sniperDeciding}
+                    style={{
+                      padding: '10px 8px',
+                      background: eligible ? 'var(--surface2)' : 'rgba(40,40,40,0.4)',
+                      border: `1px solid ${eligible ? `${ROLE_META.sniper.color}66` : 'var(--border)'}`,
+                      borderRadius: 6,
+                      color: eligible ? 'var(--text)' : 'var(--text-dim)',
+                      cursor: !eligible ? 'not-allowed' : sniperDeciding ? 'wait' : 'pointer',
+                      fontSize: 12,
+                      letterSpacing: '0.04em',
+                      opacity: eligible ? 1 : 0.45,
+                    }}
+                    title={!eligible ? 'Cannot redirect — Mirror holder or self.' : undefined}
+                  >
+                    {p.username}
+                    {p.id === sniperPending.originalSpinTargetId && (
+                      <div style={{ fontSize: 9, color: ROLE_META.sniper.color, marginTop: 3 }}>current target</div>
+                    )}
+                  </button>
+                );
+              })}
+            </div>
+            <button
+              onClick={() => handleSniperRedirect(null)}
+              disabled={sniperDeciding}
+              style={{
+                fontSize: 11, color: 'var(--text-dim)',
+                background: 'none', border: 'none',
+                cursor: sniperDeciding ? 'wait' : 'pointer', textDecoration: 'underline',
+              }}
+            >
+              Pass — let the original target spin
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* ── v2 Phase D — Sniper deciding banner (everyone else) ── */}
+      {sniperPending && !amTargetSniper && (
+        <div style={{
+          position: 'fixed',
+          left: 0, right: 0,
+          top: 'calc(38vh + 110px)',
+          display: 'flex', justifyContent: 'center',
+          zIndex: 8650, padding: '0 16px',
+          pointerEvents: 'none',
+        }}>
+          <div className="card" style={{
+            maxWidth: 320, textAlign: 'center', padding: '14px 18px',
+            border: `1px solid ${ROLE_META.sniper.color}`,
+            background: 'rgba(20,4,8,0.96)',
+          }}>
+            <div style={{ fontFamily: "'Bebas Neue', sans-serif", fontSize: 18, color: ROLE_META.sniper.color, marginBottom: 4 }}>
+              REDIRECT INCOMING…
+            </div>
+            <div style={{ fontSize: 11, color: 'var(--text-dim)' }}>
+              {sniperPending.originalSpinTargetName || 'Someone'} was the target.
             </div>
           </div>
         </div>
