@@ -1356,7 +1356,7 @@ function registerSocketHandlers(io, socket) {
         continue;
       }
 
-      if (['playing', 'bluff_resolution', 'spin_pending'].includes(room.phase)) {
+      if (['playing', 'bluff_resolution', 'spin_pending', 'swap_pending', 'medic_pending', 'sniper_pending'].includes(room.phase)) {
         io.to(code).emit('player_disconnecting', { playerId: player.id, playerName: player.username });
 
         const key = dcKey(code, player.id);
@@ -1368,6 +1368,22 @@ function registerSocketHandlers(io, socket) {
           // have changed and we should NOT eliminate.
           const still = room.players.find(p => p.id === player.id && p.socketId === capturedSocketId);
           if (still?.status === 'alive') {
+            // v2 Phase D — if this player was holding the room hostage
+            // mid-Medic/Sniper pause, auto-decline first so the game
+            // doesn't deadlock.
+            if (room.phase === 'medic_pending' && room.pendingMedicSave?.medicId === still.id) {
+              const pending = room.pendingMedicSave;
+              if (typeof pending.finaliseFn === 'function') pending.finaliseFn();
+              room.pendingMedicSave = null;
+              if (room.phase === 'medic_pending') room.phase = 'playing';
+            }
+            if (room.phase === 'sniper_pending' && room.pendingSniperRedirect?.sniperId === still.id) {
+              const pending = room.pendingSniperRedirect;
+              const outcome = pending.deferredOutcome;
+              room.pendingSniperRedirect = null;
+              applyBluffOutcome(room, outcome);
+            }
+
             const eliminated = engine.handleDisconnect(room, capturedSocketId);
             if (eliminated) {
               room.lastAction = { type: 'disconnected', playerId: eliminated.id, playerName: eliminated.username };
