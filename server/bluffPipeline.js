@@ -100,13 +100,38 @@ function _isBluffCorrect(room) {
 }
 
 // Phase D hook — Sheriff role exempts the accuser from Assassin's
-// strike. Wired so the production code shape stays stable: the
-// Assassin stage already calls this; flipping the body on flips the
-// behaviour. Today: always false (no roles in Phase C scope).
+// strike. Now LIVE: reads `player.role === 'sheriff'` (set at
+// startGame by engine.assignRoles when alive count >= 9). The
+// Sheriff also gains a passive risk-drop on correct bluff calls
+// — that lives in stage 6 below.
 function _isSheriff(room, playerId) {
-  // Phase D will read `_findPlayer(room, playerId)?.role === 'sheriff'`.
-  // Leaving the call site visible so Phase D agents can grep for it.
-  return false;
+  return _findPlayer(room, playerId)?.role === 'sheriff';
+}
+
+function _isGambler(room, playerId) {
+  return _findPlayer(room, playerId)?.role === 'gambler';
+}
+
+// v2 Phase D — Gambler: when a bluff is correctly called on the
+// Gambler, their risk level jumps to 4 BEFORE the spin happens.
+// This is implemented by re-shaping their chamber array to hold
+// exactly 4 bullets at random positions (preserving the spec's
+// "risk level = bullet count" invariant). External modifiers
+// (Sudden Death, etc.) still affect Gambler's risk normally because
+// they read `player.chamber`/`player.riskLevel` like everyone else.
+function _bumpGamblerRiskToFour(player) {
+  const TARGET = 4;
+  const SIZE = player.chamber.length;
+  const filled = new Array(SIZE).fill(null);
+  // Random-distinct slot sampling.
+  const indices = [];
+  while (indices.length < TARGET) {
+    const idx = Math.floor(Math.random() * SIZE);
+    if (!indices.includes(idx)) indices.push(idx);
+  }
+  for (const i of indices) filled[i] = 'bullet';
+  player.chamber = filled;
+  player.riskLevel = TARGET;
 }
 
 // ─── Stage 1: Shield ──────────────────────────────────────────
@@ -290,6 +315,59 @@ function _stageDefaultSpin(room, state) {
     : state.accuser?.id || null;
 }
 
+// ─── Stage 7 (Phase D): Role-driven post-bluff effects ───────
+//
+// Two role-passives that fire AFTER bluff correctness + spin target
+// have been determined:
+//
+//   • Gambler — if a bluff is CORRECTLY called against them, their
+//     risk level jumps immediately to 4 (chamber rewritten to hold
+//     4 bullets) BEFORE the spin. Both Mirror-redirected and direct
+//     spin-on-Gambler paths trigger this when the accused = Gambler
+//     and bluff was correct.
+//
+//   • Sheriff — every correct bluff call BY the Sheriff drops their
+//     risk level by 1 (one bullet removed from chamber). Permanent
+//     passive — fires every time, not once per game. Fires regardless
+//     of spin outcome (the elimination of the accused doesn't matter
+//     for the Sheriff's chamber).
+function _stageRoleEffects(room, state) {
+  if (state.bluffIsCorrect !== true) return;
+
+  // Gambler — accused was the bluffer and got caught. Spin happens
+  // AFTER this stage (caller's player_spin handler), so by bumping
+  // chamber here the spin will land in a 4-bullet chamber.
+  if (state.accused && _isGambler(room, state.accused.id)) {
+    _bumpGamblerRiskToFour(state.accused);
+    state.events.push({
+      kind: 'gambler_caught',
+      holderId: state.accused.id,
+      holderName: state.accused.username,
+    });
+  }
+
+  // Sheriff — accuser made a correct call. Drop a bullet.
+  if (state.accuser && _isSheriff(room, state.accuser.id)) {
+    const chamber = state.accuser.chamber;
+    const bulletIndices = chamber
+      .map((s, i) => (s === 'bullet' ? i : -1))
+      .filter(i => i !== -1);
+    if (bulletIndices.length > 0) {
+      const removeIdx = bulletIndices[Math.floor(Math.random() * bulletIndices.length)];
+      const next = [...chamber];
+      next[removeIdx] = null;
+      state.accuser.chamber = next;
+      state.accuser.riskLevel = next.filter(s => s === 'bullet').length;
+      state.events.push({
+        kind: 'sheriff_relief',
+        holderId: state.accuser.id,
+        holderName: state.accuser.username,
+        riskLevel: state.accuser.riskLevel,
+      });
+    }
+  }
+}
+
 // ─── Pipeline driver ─────────────────────────────────────────
 
 function _runStages(room, state, stages) {
@@ -333,6 +411,7 @@ function resolveBluff(room, accuserId) {
     _stageMirror,
     _stageSwap,
     _stageDefaultSpin,
+    _stageRoleEffects,
   ]);
 
   if (!state.outcome) {
@@ -453,6 +532,7 @@ function resumeAfterSwap(room, accuserId, pickedCardId) {
     _stageBluffCorrectness,
     _stageMirror,
     _stageDefaultSpin,
+    _stageRoleEffects,
   ]);
 
   if (!state.outcome) {
