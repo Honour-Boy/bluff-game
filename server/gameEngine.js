@@ -344,6 +344,17 @@ function createPlayer(id, username, socketId) {
     medicAbilityAvailable: true,
     saboteurAbilityAvailable: true,
     sniperAbilityAvailable: true,
+    // v2 Phase F — Bounty system. Counter increments when the player
+    // survives a spin; resets when (a) bounty is placed at 3, (b) the
+    // bounty is collected by a successful bluff call, (c) the bounty
+    // holder is eliminated. Persists across rounds — Section 7 hand
+    // reset does NOT clear it.
+    consecutiveSurvivedSpins: 0,
+    hasBounty: false,
+    // v2 Phase F — Betting system. Counter increments when this
+    // player's bet on a spin outcome was correct. At 3, drop risk by 1
+    // and reset to 0. Skipped bets do not change the counter.
+    consecutiveCorrectBets: 0,
   };
 }
 
@@ -1377,6 +1388,479 @@ function resetHandOnSurvival(room, playerId, cardsToDeal = 6) {
   return dealt;
 }
 
+// ─── v2 Phase F — Bounty ─────────────────────────────────────
+//
+// When a player survives 3 spins in a row, a bounty is placed on
+// them. A successful bluff call against a bounty holder drops the
+// accuser's risk level by 1 AND clears the bounty. Bounty also
+// clears when the holder is eliminated.
+//
+// Counters live on the player; helpers here are pure mutations.
+const BOUNTY_THRESHOLD = 3;
+
+/**
+ * Called after a successful spin survival. Increments the counter
+ * and, if it crosses the threshold and the player doesn't yet hold
+ * a bounty, places one. Returns a banner-event payload when a bounty
+ * is placed, otherwise null.
+ *
+ * Gated by `room.config.systems.bounty` — caller is responsible for
+ * checking that flag before invoking, but we noop when disabled to
+ * keep call sites tidy.
+ */
+function onSurvivalForBounty(room, playerId) {
+  if (!room?.config?.systems?.bounty) return null;
+  const player = room.players.find(p => p.id === playerId);
+  if (!player) return null;
+  player.consecutiveSurvivedSpins = (player.consecutiveSurvivedSpins || 0) + 1;
+  if (
+    player.consecutiveSurvivedSpins >= BOUNTY_THRESHOLD
+    && !player.hasBounty
+  ) {
+    player.hasBounty = true;
+    // Counter is "collected into" the bounty — reset to 0.
+    player.consecutiveSurvivedSpins = 0;
+    return {
+      kind: 'bounty_placed',
+      holderId: player.id,
+      holderName: player.username || null,
+    };
+  }
+  return null;
+}
+
+/**
+ * Called when a bullet hits — counter resets, and if the player held
+ * a bounty it's cleared (no reward, just gone).
+ */
+function onEliminationForBounty(room, playerId) {
+  const player = room.players.find(p => p.id === playerId);
+  if (!player) return;
+  player.consecutiveSurvivedSpins = 0;
+  if (player.hasBounty) {
+    player.hasBounty = false;
+  }
+}
+
+/**
+ * A successful bluff against the bounty holder collects the bounty:
+ *   - Bounty clears.
+ *   - Accuser's risk level drops by 1 (one bullet removed if any).
+ *   - Counter resets.
+ *
+ * Returns a banner event payload or null. Pure mutation — does NOT
+ * gate on room.config.systems.bounty here so callers can replay the
+ * collection on legacy rooms; the caller checks the flag before
+ * invoking in normal flow.
+ */
+function collectBounty(room, accusedId, accuserId) {
+  const accused = room.players.find(p => p.id === accusedId);
+  const accuser = room.players.find(p => p.id === accuserId);
+  if (!accused?.hasBounty) return null;
+  accused.hasBounty = false;
+  accused.consecutiveSurvivedSpins = 0;
+  let droppedTo = null;
+  if (accuser) {
+    const bullets = accuser.chamber
+      .map((s, i) => (s === 'bullet' ? i : -1))
+      .filter(i => i !== -1);
+    if (bullets.length > 0) {
+      const removeIdx = bullets[Math.floor(Math.random() * bullets.length)];
+      const next = [...accuser.chamber];
+      next[removeIdx] = null;
+      accuser.chamber = next;
+      accuser.riskLevel = next.filter(s => s === 'bullet').length;
+      droppedTo = accuser.riskLevel;
+    } else {
+      droppedTo = 0;
+    }
+  }
+  return {
+    kind: 'bounty_collected',
+    holderId: accusedId,
+    holderName: accused.username || null,
+    accuserId: accuser?.id || null,
+    accuserName: accuser?.username || null,
+    accuserRiskAfter: droppedTo,
+  };
+}
+
+// ─── v2 Phase F — Betting ────────────────────────────────────
+//
+// When a spin enters spin_pending, a 10s betting window opens for
+// every alive player except the spin target. Players bet
+// 'survive' | 'eliminated'. After the spin resolves we evaluate.
+// Correct guesses bump consecutiveCorrectBets; at 3 the player's
+// risk level drops by 1 and counter resets.
+const BETTING_STREAK_REWARD = 3;
+const BETTING_WINDOW_MS = 10_000;
+
+/**
+ * Initialise the betting state on a room. Called when entering
+ * spin_pending if the system is enabled. Returns the eligible bettor
+ * ids (everyone alive except the spin target).
+ */
+function startBettingWindow(room) {
+  if (!room?.config?.systems?.betting) return [];
+  if (!room.spinTargetId) return [];
+  const eligibleIds = room.players
+    .filter(p => p.status === 'alive' && p.id !== room.spinTargetId)
+    .map(p => p.id);
+  room.betting = {
+    spinTargetId: room.spinTargetId,
+    eligibleIds,
+    bets: {}, // playerId → 'survive' | 'eliminated'
+    startedAt: Date.now(),
+    closesAt: Date.now() + BETTING_WINDOW_MS,
+    closed: false,
+  };
+  return eligibleIds;
+}
+
+/**
+ * Place / overwrite a bet. Returns { ok, error? }.
+ */
+function placeBet(room, playerId, prediction) {
+  if (!room?.betting || room.betting.closed) {
+    return { ok: false, error: 'No betting window open' };
+  }
+  if (!['survive', 'eliminated'].includes(prediction)) {
+    return { ok: false, error: 'Invalid prediction' };
+  }
+  if (!room.betting.eligibleIds.includes(playerId)) {
+    return { ok: false, error: 'Not eligible to bet' };
+  }
+  room.betting.bets[playerId] = prediction;
+  return { ok: true };
+}
+
+/**
+ * Close the betting window without evaluating. Idempotent.
+ */
+function closeBettingWindow(room) {
+  if (!room?.betting) return;
+  room.betting.closed = true;
+}
+
+/**
+ * Evaluate bets after a spin resolves. For each bet:
+ *   - correct  → consecutiveCorrectBets++
+ *                if reaches BETTING_STREAK_REWARD, drop a bullet from
+ *                their chamber and reset to 0.
+ *   - wrong    → consecutiveCorrectBets resets to 0.
+ *
+ * Returns array of banner events for streak rewards.
+ */
+function evaluateBets(room, eliminated) {
+  if (!room?.betting) return [];
+  const events = [];
+  const actual = eliminated ? 'eliminated' : 'survive';
+  for (const [pid, prediction] of Object.entries(room.betting.bets)) {
+    const player = room.players.find(p => p.id === pid);
+    if (!player) continue;
+    if (prediction === actual) {
+      player.consecutiveCorrectBets = (player.consecutiveCorrectBets || 0) + 1;
+      if (player.consecutiveCorrectBets >= BETTING_STREAK_REWARD) {
+        // Drop one bullet (if any).
+        const bullets = player.chamber
+          .map((s, i) => (s === 'bullet' ? i : -1))
+          .filter(i => i !== -1);
+        if (bullets.length > 0) {
+          const removeIdx = bullets[Math.floor(Math.random() * bullets.length)];
+          const next = [...player.chamber];
+          next[removeIdx] = null;
+          player.chamber = next;
+          player.riskLevel = next.filter(s => s === 'bullet').length;
+        }
+        player.consecutiveCorrectBets = 0;
+        events.push({
+          kind: 'betting_streak_reward',
+          holderId: player.id,
+          holderName: player.username || null,
+          riskAfter: player.riskLevel,
+        });
+      }
+    } else {
+      player.consecutiveCorrectBets = 0;
+    }
+  }
+  // Clear the betting state after evaluation.
+  room.betting = null;
+  return events;
+}
+
+// ─── v2 Phase F — Dead Man's Hand ────────────────────────────
+//
+// When eliminated count crosses the threshold (alive < total - 2),
+// trigger a 15s ghost vote among eliminated players. Each new
+// elimination past the threshold opens a fresh vote.
+//
+// Three options:
+//   1. Change required card shape to a new random shape
+//   2. Give all living players one extra card
+//   3. Activate a random risk modifier for one round
+//      (only available if host enabled at least one risk modifier)
+const DMH_VOTE_WINDOW_MS = 15_000;
+const DMH_THRESHOLD_MARGIN = 2;
+
+function _hasAnyRiskModifierEnabled(room) {
+  const rm = room?.config?.riskModifiers;
+  if (!rm) return false;
+  return Object.values(rm).some(Boolean);
+}
+
+/**
+ * Should we open a DMH vote? Called immediately after an
+ * elimination is finalised in the turn order. Returns true if
+ * eliminated count > DMH_THRESHOLD_MARGIN.
+ */
+function shouldOpenGhostVote(room) {
+  if (!room?.config?.systems?.deadMansHand) return false;
+  const total = room.players.length;
+  const alive = room.players.filter(p => p.status === 'alive').length;
+  return (total - alive) > DMH_THRESHOLD_MARGIN;
+}
+
+/**
+ * Initialise the ghost vote state. Returns the option list (array of
+ * 1-3 ints corresponding to vote option ids; option 3 is omitted
+ * when no risk modifiers are configured).
+ */
+function startGhostVote(room) {
+  const optionIds = [1, 2];
+  if (_hasAnyRiskModifierEnabled(room)) optionIds.push(3);
+  room.ghostVote = {
+    optionIds,
+    votes: {}, // ghostId → optionId
+    startedAt: Date.now(),
+    closesAt: Date.now() + DMH_VOTE_WINDOW_MS,
+    eligibleVoterIds: room.players
+      .filter(p => p.status === 'eliminated')
+      .map(p => p.id),
+    closed: false,
+  };
+  return room.ghostVote;
+}
+
+function castGhostVote(room, voterId, optionId) {
+  if (!room?.ghostVote || room.ghostVote.closed) {
+    return { ok: false, error: 'No ghost vote open' };
+  }
+  if (!room.ghostVote.optionIds.includes(optionId)) {
+    return { ok: false, error: 'Invalid option' };
+  }
+  if (!room.ghostVote.eligibleVoterIds.includes(voterId)) {
+    return { ok: false, error: 'Only eliminated players can vote' };
+  }
+  room.ghostVote.votes[voterId] = optionId;
+  return { ok: true };
+}
+
+/**
+ * Tally the ghost vote and apply the winning effect (or no-op on
+ * tie). Returns { winningOption, applied, banner } where banner is
+ * the event payload for the table.
+ */
+function resolveGhostVote(room) {
+  if (!room?.ghostVote) return null;
+  room.ghostVote.closed = true;
+  const counts = {};
+  for (const opt of room.ghostVote.optionIds) counts[opt] = 0;
+  for (const v of Object.values(room.ghostVote.votes)) {
+    if (counts[v] !== undefined) counts[v]++;
+  }
+  // Find max — if a tie at the top, no-op.
+  let max = -1;
+  let winner = null;
+  let tie = false;
+  for (const [opt, n] of Object.entries(counts)) {
+    if (n > max) { max = n; winner = Number(opt); tie = false; }
+    else if (n === max) { tie = true; }
+  }
+  if (max <= 0 || tie || winner == null) {
+    const banner = {
+      kind: 'ghost_vote_result',
+      winningOption: null,
+      applied: 'noop',
+      counts,
+    };
+    room.ghostVote = null;
+    return banner;
+  }
+
+  let applied = 'noop';
+  if (winner === 1) {
+    // Change required shape to a new random shape (different from
+    // the current).
+    const candidates = SHAPES.filter(s => s !== room.currentCardType);
+    const next = candidates[Math.floor(Math.random() * candidates.length)] || SHAPES[0];
+    room.currentCardType = next;
+    applied = `shape:${next}`;
+  } else if (winner === 2) {
+    // Give every alive player one extra card.
+    if (room.mode === MODES.ONLINE) {
+      for (const p of room.players) {
+        if (p.status !== 'alive') continue;
+        drawCardForPlayer(room, p.id);
+      }
+    }
+    applied = 'extra_cards';
+  } else if (winner === 3) {
+    // Activate a random enabled risk modifier "for one round only".
+    // We just stamp it on a temporary slot — Phase E owns the actual
+    // semantics. We keep this conservative and well-documented.
+    const enabledMods = Object.entries(room.config?.riskModifiers || {})
+      .filter(([, v]) => v)
+      .map(([k]) => k);
+    if (enabledMods.length > 0) {
+      const pick = enabledMods[Math.floor(Math.random() * enabledMods.length)];
+      room.activeGhostRiskMod = { name: pick, expiresAtRound: room.roundNumber + 1 };
+      applied = `risk_mod:${pick}`;
+    } else {
+      applied = 'noop';
+    }
+  }
+
+  const banner = {
+    kind: 'ghost_vote_result',
+    winningOption: winner,
+    applied,
+    counts,
+  };
+  room.ghostVote = null;
+  return banner;
+}
+
+// ─── v2 Phase F — Last Stand ─────────────────────────────────
+//
+// When alive count = 2 and no pending pause phases, the room
+// transitions into Last Stand mode. Both players' hands are cleared,
+// chambers reset to 1 bullet, armed power cards consumed, role
+// passives suspended for the duration. Two actions per turn:
+// last_stand_spin and last_stand_end_turn. Winner = last alive after
+// a fail spin.
+
+function _allPendingPhasesClear(room) {
+  return ![
+    'spin_pending',
+    'swap_pending',
+    'medic_pending',
+    'sniper_pending',
+    'bluff_resolution',
+    'betting_pending',
+    'ghost_vote_pending',
+    'last_stand',
+  ].includes(room.phase);
+}
+
+function shouldEnterLastStand(room) {
+  if (!room?.config?.systems?.lastStand) return false;
+  if (room.phase === 'last_stand') return false;
+  const alive = room.players.filter(p => p.status === 'alive');
+  if (alive.length !== 2) return false;
+  return _allPendingPhasesClear(room);
+}
+
+/**
+ * Initialise Last Stand on the room. Mutates: clears the two
+ * finalists' hands (push to discardPile), resets chambers, clears
+ * armedPowerCard. Sets phase = 'last_stand'. Records lastStand state
+ * with a turn pointer.
+ */
+function enterLastStand(room) {
+  const alive = room.players.filter(p => p.status === 'alive');
+  if (alive.length !== 2) return null;
+
+  if (!room.discardPile) room.discardPile = [];
+
+  for (const p of alive) {
+    if (room.hands && room.hands.has(p.id)) {
+      const hand = room.hands.get(p.id) || [];
+      for (const card of hand) room.discardPile.push(card);
+      room.hands.set(p.id, []);
+    }
+    p.armedPowerCard = null;
+    p.chamber = initChamber();
+    p.riskLevel = p.chamber.filter(s => s === 'bullet').length;
+  }
+
+  room.phase = 'last_stand';
+  room.spinTargetId = null;
+  room.cardPlayedThisTurn = false;
+  room.bluffUsedThisTurn = false;
+  // Pick a starting player — first finalist in the existing turn
+  // order so it's deterministic from the room's perspective.
+  const orderedFinalists = room.turnOrder.filter(id =>
+    alive.some(p => p.id === id)
+  );
+  room.lastStand = {
+    finalistIds: orderedFinalists.length === 2 ? orderedFinalists : alive.map(p => p.id),
+    activeFinalistId: (orderedFinalists[0] || alive[0].id),
+    startedAt: Date.now(),
+  };
+  // Synthesise the turn order to just the two finalists so any
+  // generic turn-querying UI still works coherently.
+  room.turnOrder = [...room.lastStand.finalistIds];
+  room.currentTurnIndex = 0;
+  if (room.turnOrder[0] !== room.lastStand.activeFinalistId) {
+    room.currentTurnIndex = room.turnOrder.indexOf(room.lastStand.activeFinalistId);
+  }
+  room.lastAction = {
+    type: 'last_stand_started',
+    finalistIds: room.lastStand.finalistIds,
+  };
+  return room.lastStand;
+}
+
+/**
+ * The active finalist pulls the trigger. Returns the spin result
+ * payload and any post-state (game_over winner if applicable).
+ */
+function lastStandSpin(room, playerId) {
+  if (room.phase !== 'last_stand') return { ok: false, error: 'Not in Last Stand' };
+  if (!room.lastStand) return { ok: false, error: 'Last Stand state missing' };
+  if (room.lastStand.activeFinalistId !== playerId) {
+    return { ok: false, error: 'Not your turn' };
+  }
+  const player = room.players.find(p => p.id === playerId);
+  if (!player) return { ok: false, error: 'Player not found' };
+
+  const chamberBefore = [...player.chamber];
+  const { spinIndex, eliminated, chamber, bulletCount } = pullTrigger(player.chamber);
+  player.chamber = chamber;
+  player.riskLevel = bulletCount;
+  if (eliminated) {
+    player.status = 'eliminated';
+    player.isSpectator = true;
+  }
+  return {
+    ok: true,
+    spinIndex,
+    eliminated,
+    chamberBefore,
+    chamberAfter: player.chamber,
+    riskLevel: bulletCount,
+  };
+}
+
+/**
+ * Pass the gun to the other finalist. Used when the active player
+ * survives. Updates lastStand.activeFinalistId and currentTurnIndex.
+ */
+function lastStandEndTurn(room, playerId) {
+  if (room.phase !== 'last_stand') return { ok: false, error: 'Not in Last Stand' };
+  if (!room.lastStand) return { ok: false, error: 'Last Stand state missing' };
+  if (room.lastStand.activeFinalistId !== playerId) {
+    return { ok: false, error: 'Not your turn' };
+  }
+  const [a, b] = room.lastStand.finalistIds;
+  const next = playerId === a ? b : a;
+  room.lastStand.activeFinalistId = next;
+  room.currentTurnIndex = room.turnOrder.indexOf(next);
+  if (room.currentTurnIndex < 0) room.currentTurnIndex = 0;
+  return { ok: true, nextActiveId: next };
+}
+
 // ─── Utilities ─────────────────────────────────────────────────
 
 function eliminateFromTurnOrder(room, playerId) {
@@ -1465,6 +1949,13 @@ function serializeRoom(room, requestingPlayerId = null) {
       medicAbilityAvailable: p.id === requestingPlayerId ? !!p.medicAbilityAvailable : undefined,
       saboteurAbilityAvailable: p.id === requestingPlayerId ? !!p.saboteurAbilityAvailable : undefined,
       sniperAbilityAvailable: p.id === requestingPlayerId ? !!p.sniperAbilityAvailable : undefined,
+      // v2 Phase F — Bounty + Betting public state. hasBounty is
+      // public (the table NEEDS to know who is targeted). The streak
+      // counters are also public so the player list can show a small
+      // running tally next to each chip.
+      hasBounty: !!p.hasBounty,
+      consecutiveSurvivedSpins: p.consecutiveSurvivedSpins || 0,
+      consecutiveCorrectBets: p.consecutiveCorrectBets || 0,
     })),
     turnOrder: room.turnOrder,
     currentTurnIndex: room.currentTurnIndex,
@@ -1542,6 +2033,45 @@ function serializeRoom(room, requestingPlayerId = null) {
               : undefined,
         }
       : null,
+    // v2 Phase F — Betting state. Exposed to all clients while the
+    // window is open so each player can render the bet popup or the
+    // "betting in progress" wait screen. Includes the spin target,
+    // window deadline (server-time ms epoch), and whether THIS player
+    // has already placed a bet. Does NOT leak others' bets.
+    betting: isOnline && room.betting && !room.betting.closed
+      ? {
+          spinTargetId: room.betting.spinTargetId,
+          eligibleIds: room.betting.eligibleIds,
+          closesAt: room.betting.closesAt,
+          myBet: requestingPlayerId
+            ? (room.betting.bets[requestingPlayerId] || null)
+            : null,
+        }
+      : null,
+    // v2 Phase F — Ghost vote state. Exposed to all clients but only
+    // the eligible voters (eliminated players) see the option list
+    // — living players just see a "ghost council deciding" notice.
+    ghostVote: isOnline && room.ghostVote && !room.ghostVote.closed
+      ? {
+          closesAt: room.ghostVote.closesAt,
+          // Only eliminated players see options + their cast vote.
+          optionIds: room.ghostVote.eligibleVoterIds.includes(requestingPlayerId)
+            ? room.ghostVote.optionIds
+            : null,
+          myVote: requestingPlayerId
+            ? (room.ghostVote.votes[requestingPlayerId] || null)
+            : null,
+          amGhostVoter: room.ghostVote.eligibleVoterIds.includes(requestingPlayerId),
+        }
+      : null,
+    // v2 Phase F — Last Stand. Exposed to all clients so the
+    // duel cinematic renders for everyone simultaneously.
+    lastStand: isOnline && room.lastStand
+      ? {
+          finalistIds: room.lastStand.finalistIds,
+          activeFinalistId: room.lastStand.activeFinalistId,
+        }
+      : null,
   };
 }
 
@@ -1604,4 +2134,28 @@ module.exports = {
   applyMedicSave,
   applySaboteurTransfer,
   applySniperRedirect,
+  // v2 Phase F — Bounty
+  BOUNTY_THRESHOLD,
+  onSurvivalForBounty,
+  onEliminationForBounty,
+  collectBounty,
+  // v2 Phase F — Betting
+  BETTING_WINDOW_MS,
+  BETTING_STREAK_REWARD,
+  startBettingWindow,
+  placeBet,
+  closeBettingWindow,
+  evaluateBets,
+  // v2 Phase F — Dead Man's Hand
+  DMH_VOTE_WINDOW_MS,
+  DMH_THRESHOLD_MARGIN,
+  shouldOpenGhostVote,
+  startGhostVote,
+  castGhostVote,
+  resolveGhostVote,
+  // v2 Phase F — Last Stand
+  shouldEnterLastStand,
+  enterLastStand,
+  lastStandSpin,
+  lastStandEndTurn,
 };
