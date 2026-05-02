@@ -43,6 +43,11 @@ function HomeContent() {
     activatePowerCard,
     swapPick,
     assassinDecision,
+    medicDecide,
+    saboteurTransfer,
+    sniperRedirect,
+    medicPrompt,
+    sniperPrompt,
     powerEventQueue,
     consumePowerEvent,
   } = game;
@@ -141,6 +146,11 @@ function HomeContent() {
           activatePowerCard={activatePowerCard}
           swapPick={swapPick}
           assassinDecision={assassinDecision}
+          medicDecide={medicDecide}
+          saboteurTransfer={saboteurTransfer}
+          sniperRedirect={sniperRedirect}
+          medicPrompt={medicPrompt}
+          sniperPrompt={sniperPrompt}
           powerEventQueue={powerEventQueue}
           consumePowerEvent={consumePowerEvent}
           voice={voice}
@@ -184,6 +194,11 @@ function HomeContent() {
           activatePowerCard={activatePowerCard}
           swapPick={swapPick}
           assassinDecision={assassinDecision}
+          medicDecide={medicDecide}
+          saboteurTransfer={saboteurTransfer}
+          sniperRedirect={sniperRedirect}
+          medicPrompt={medicPrompt}
+          sniperPrompt={sniperPrompt}
           powerEventQueue={powerEventQueue}
           consumePowerEvent={consumePowerEvent}
           voice={voice}

@@ -49,11 +49,139 @@ function emitPowerCardEvents(io, roomCode, events) {
 }
 
 /**
+ * Compute the alive Sniper's eligible redirect targets — every
+ * alive player EXCEPT the Sniper themselves and any current Mirror
+ * holder. Returns an array of player ids.
+ */
+function _sniperEligibleTargets(room, sniperId) {
+  return room.players
+    .filter(p =>
+      p.status === 'alive'
+      && p.id !== sniperId
+      && p.armedPowerCard?.power !== 'mirror'
+    )
+    .map(p => p.id);
+}
+
+/**
+ * If a Sniper is alive + has not used their ability, intercept the
+ * spin path BEFORE it lands as `spin_pending`. Sets phase to
+ * 'sniper_pending', stores the deferred outcome, emits a private
+ * `sniper_redirect_pending` to the Sniper. Returns true if the
+ * pause kicked in (caller should NOT continue applying the outcome).
+ */
+function maybeStartSniperPause(io, room, outcome) {
+  if (!outcome || outcome.kind !== 'spin') return false;
+  const sniper = engine.findAvailableSniper(room);
+  if (!sniper) return false;
+
+  const eligible = _sniperEligibleTargets(room, sniper.id);
+  // If the only eligible "non-Mirror, non-self" target IS the
+  // current target, redirect would be a no-op — skip the pause.
+  if (eligible.length === 0) return false;
+
+  const originalTarget = room.players.find(p => p.id === outcome.spinTargetId);
+  room.phase = 'sniper_pending';
+  room.pendingSniperRedirect = {
+    sniperId: sniper.id,
+    originalSpinTargetId: outcome.spinTargetId,
+    originalSpinTargetName: originalTarget?.username || null,
+    eligibleTargetIds: eligible,
+    deferredOutcome: outcome,
+  };
+  room.lastAction = {
+    type: 'sniper_pending',
+    sniperId: sniper.id, // local reference only — never serialised
+    originalSpinTargetId: outcome.spinTargetId,
+    originalSpinTargetName: originalTarget?.username || null,
+  };
+
+  // Private prompt to the Sniper.
+  if (sniper.socketId) {
+    io.to(sniper.socketId).emit('sniper_redirect_pending', {
+      originalSpinTargetId: outcome.spinTargetId,
+      originalSpinTargetName: originalTarget?.username || null,
+      eligibleTargetIds: eligible,
+    });
+  }
+  return true;
+}
+
+/**
+ * If a Medic can save AND the elimination came from spin/Assassin,
+ * pause the elimination flow. Sets phase to 'medic_pending',
+ * stores the elimination context, emits private prompt to the
+ * Medic. Returns true if the pause kicked in.
+ *
+ * IMPORTANT: caller must NOT yet remove the player from turnOrder.
+ * On Medic save, the player stays alive — turn order is intact.
+ * On Medic decline, the caller's existing finalisation runs.
+ */
+function maybeStartMedicPause(io, room, eliminatedPlayerId, source, finaliseFn) {
+  const medic = engine.findAvailableMedic(room);
+  if (!medic) return false;
+
+  const eliminated = room.players.find(p => p.id === eliminatedPlayerId);
+  room.phase = 'medic_pending';
+  room.pendingMedicSave = {
+    medicId: medic.id,
+    eliminatedPlayerId,
+    eliminatedPlayerName: eliminated?.username || null,
+    source,
+    finaliseFn, // server-only — closure that runs the elimination on decline
+  };
+
+  if (medic.socketId) {
+    io.to(medic.socketId).emit('medic_save_pending', {
+      eliminatedPlayerId,
+      eliminatedPlayerName: eliminated?.username || null,
+      source,
+    });
+  }
+  return true;
+}
+
+/**
+ * Finalise an Assassin elimination. Extracted so the call-bluff
+ * handler can defer it through Medic save and replay it later.
+ */
+function finaliseAssassinElimination(room, outcome) {
+  const eliminatedId = outcome.eliminatedPlayerId;
+  if (eliminatedId) {
+    const eliminated = room.players.find(p => p.id === eliminatedId);
+    if (eliminated) {
+      eliminated.status = 'eliminated';
+      eliminated.isSpectator = true;
+    }
+    engine.eliminateFromTurnOrder(room, eliminatedId);
+    engine.newCardType(room);
+  }
+  room.phase = 'playing';
+  room.spinTargetId = null;
+  room.cardPlayedThisTurn = false;
+  room.bluffUsedThisTurn = false;
+  room.lastAction = {
+    type: 'assassin_strike',
+    eliminatedId,
+    eliminatedName: room.players.find(p => p.id === eliminatedId)?.username || null,
+    assassinHolderId: outcome.accusedId,
+    assassinHolderName: room.players.find(p => p.id === outcome.accusedId)?.username || null,
+  };
+  const gameOverWinner = engine.checkGameOver(room);
+  if (gameOverWinner) {
+    room.phase = 'game_over';
+    room.lastAction = { type: 'game_over', winnerId: gameOverWinner.id, winnerName: gameOverWinner.username };
+  }
+}
+
+/**
  * Apply a bluff-pipeline outcome to room state.
  * - 'blocked' → caller's bluff is wasted; advance turn normally.
  *   Returns { advanced: true } so the caller knows to broadcast.
  * - 'spin' → set phase to spin_pending, store spinTargetId + lastAction.
+ *            Sniper redirect interception happens upstream (call site).
  * - 'eliminated' → kill the named player, advance turn out of them.
+ *                  Medic save interception happens upstream (call site).
  * - 'swap_pending' → set phase to swap_pending, expose swapHolderId.
  *
  * Returns the same outcome object plus a `pendingTurnAdvance` flag for
@@ -79,39 +207,11 @@ function applyBluffOutcome(room, outcome) {
   }
 
   if (outcome.kind === 'eliminated') {
-    // Assassin path. Eliminate the accuser and advance the room
-    // out of their seat. The accuser was the current-turn player,
-    // so we just remove them from turn order and reset turn flags.
-    const eliminatedId = outcome.eliminatedPlayerId;
-    if (eliminatedId) {
-      const eliminated = room.players.find(p => p.id === eliminatedId);
-      if (eliminated) {
-        eliminated.status = 'eliminated';
-        eliminated.isSpectator = true;
-      }
-      engine.eliminateFromTurnOrder(room, eliminatedId);
-      // Refresh required-shape since elimination historically rolls
-      // a new card type via newCardType(). Match that pattern.
-      engine.newCardType(room);
-    }
-    room.phase = 'playing';
-    room.spinTargetId = null;
-    room.cardPlayedThisTurn = false;
-    room.bluffUsedThisTurn = false;
-    room.lastAction = {
-      type: 'assassin_strike',
-      eliminatedId,
-      eliminatedName: room.players.find(p => p.id === eliminatedId)?.username || null,
-      assassinHolderId: outcome.accusedId,
-      assassinHolderName: room.players.find(p => p.id === outcome.accusedId)?.username || null,
-    };
-    // Game-over check after Assassin eliminates — same shape as the
-    // existing path in spin elimination.
-    const gameOverWinner = engine.checkGameOver(room);
-    if (gameOverWinner) {
-      room.phase = 'game_over';
-      room.lastAction = { type: 'game_over', winnerId: gameOverWinner.id, winnerName: gameOverWinner.username };
-    }
+    // Assassin path. The Medic-save interception happens at the
+    // call site BEFORE applyBluffOutcome runs (call_bluff handler);
+    // by the time we get here, either no Medic existed, the Medic
+    // declined, or this is the post-decline finalisation path.
+    finaliseAssassinElimination(room, outcome);
     return outcome;
   }
 
@@ -430,14 +530,33 @@ function registerSocketHandlers(io, socket) {
       const chamberBefore = [...player.chamber]; // snapshot BEFORE spin mutates it
       const spinResult = engine.spinGun(player);
 
+      // v2 Phase D — Medic interception for spin elimination.
+      // engine.spinGun has already mutated player.status if eliminated,
+      // but elimination from turn order + game-over haven't happened
+      // yet. If a Medic can save (alive Medic with hand-room), defer
+      // the post-elim cleanup. The spin_result lastAction still
+      // broadcasts so clients see the spin animation play out — the
+      // Medic prompt then fires AFTER the spin overlay clears (the
+      // client gates the prompt on `pendingMedicSave` in room_state).
+      let medicPaused = false;
       if (spinResult.eliminated) {
-        engine.eliminateFromTurnOrder(room, player.id);
-        engine.newCardType(room);
+        // Don't yet remove from turnOrder — Medic save needs the
+        // player to still be in their seat for revival.
+        const finalise = () => {
+          engine.eliminateFromTurnOrder(room, player.id);
+          engine.newCardType(room);
+          if (room.mode === engine.MODES.ONLINE) {
+            const currentPlayerId = room.turnOrder[room.currentTurnIndex];
+            if (currentPlayerId) engine.drawCardForPlayer(room, currentPlayerId);
+          }
+          const gameOverWinner = engine.checkGameOver(room);
+          if (gameOverWinner) {
+            room.pendingGameOver = { id: gameOverWinner.id, name: gameOverWinner.username };
+          }
+        };
 
-        if (room.mode === engine.MODES.ONLINE) {
-          const currentPlayerId = room.turnOrder[room.currentTurnIndex];
-          if (currentPlayerId) engine.drawCardForPlayer(room, currentPlayerId);
-        }
+        medicPaused = maybeStartMedicPause(io, room, player.id, 'spin', finalise);
+        if (!medicPaused) finalise();
       } else if (room.mode === engine.MODES.ONLINE) {
         // v2 Section 7: surviving a spin in online mode discards the
         // hand and deals 6 fresh cards. Redemption Spin survivors get
@@ -445,7 +564,11 @@ function registerSocketHandlers(io, socket) {
         engine.resetHandOnSurvival(room, player.id, 6);
       }
 
-      room.phase = 'playing';
+      // If a Medic save is pending, leave phase as 'medic_pending'
+      // (set by maybeStartMedicPause). Otherwise return to playing.
+      if (!medicPaused) {
+        room.phase = 'playing';
+      }
       room.spinTargetId = null;
       room.cardPlayedThisTurn = false;
       room.bluffUsedThisTurn = true;
@@ -462,21 +585,14 @@ function registerSocketHandlers(io, socket) {
         eliminated: spinResult.eliminated,
         riskLevel: spinResult.riskLevel,
         riskLevelBefore,
-        ...(spinResult.eliminated ? { newCardType: room.currentCardType } : {}),
+        // Tag medic-pending state on the action so the elim popup
+        // on clients can hold off and show the Medic UI instead.
+        medicPending: medicPaused,
+        ...(spinResult.eliminated && !medicPaused ? { newCardType: room.currentCardType } : {}),
       };
 
-      // If this spin ended the game, hold the transition until the
-      // overlay is acknowledged — overwriting lastAction here would
-      // hide the spin animation from clients (they gate the overlay
-      // on lastAction.type === 'spin_result'). The transition runs
-      // in the spin_acknowledged handler.
-      const gameOverWinner = engine.checkGameOver(room);
-      if (gameOverWinner) {
-        room.pendingGameOver = { id: gameOverWinner.id, name: gameOverWinner.username };
-      }
-
       await saveRoom(room);
-      console.log(`[Room ${code}] ${player.username} spun slot ${spinResult.spinIndex} → ${spinResult.eliminated ? 'ELIMINATED' : 'survived'}`);
+      console.log(`[Room ${code}] ${player.username} spun slot ${spinResult.spinIndex} → ${spinResult.eliminated ? (medicPaused ? 'ELIM (Medic deciding)' : 'ELIMINATED') : 'survived'}`);
       await broadcastRoomState(io, code);
       callback({ success: true, spinResult });
     } catch (err) {
@@ -534,6 +650,36 @@ function registerSocketHandlers(io, socket) {
 
       if (room.mode === engine.MODES.ONLINE) {
         const { events, outcome } = bluffPipeline.resolveBluff(room, playerId);
+
+        // v2 Phase D — Sniper interception: redirect the spin BEFORE
+        // it lands as `spin_pending`. If a Sniper is alive + still has
+        // the ability + has at least one eligible target (alive,
+        // non-self, non-Mirror), pause here. Sniper resumes via
+        // `sniper_redirect`. Banner events still fire so the table
+        // sees Shield/Mirror/Swap activations even mid-pause.
+        if (outcome.kind === 'spin' && maybeStartSniperPause(io, room, outcome)) {
+          await saveRoom(room);
+          emitPowerCardEvents(io, code, events);
+          await broadcastRoomState(io, code);
+          return callback({ success: true });
+        }
+
+        // v2 Phase D — Medic interception (Assassin path). Defer
+        // the elimination through a Medic save prompt. Closure
+        // captures the outcome for replay on decline.
+        if (
+          outcome.kind === 'eliminated'
+          && maybeStartMedicPause(io, room, outcome.eliminatedPlayerId, 'assassin', () => {
+            // Decline → finalise elimination as if no Medic existed.
+            finaliseAssassinElimination(room, outcome);
+          })
+        ) {
+          await saveRoom(room);
+          emitPowerCardEvents(io, code, events);
+          await broadcastRoomState(io, code);
+          return callback({ success: true });
+        }
+
         applyBluffOutcome(room, outcome);
 
         await saveRoom(room);
@@ -588,6 +734,27 @@ function registerSocketHandlers(io, socket) {
       // Clear the swap pause AFTER the pipeline runs but BEFORE
       // applyBluffOutcome (which sets the new phase based on outcome).
       room.swapHolderId = null;
+
+      // v2 Phase D — same Sniper / Medic interceptions as call_bluff,
+      // applied to the post-swap world.
+      if (outcome.kind === 'spin' && maybeStartSniperPause(io, room, outcome)) {
+        await saveRoom(room);
+        emitPowerCardEvents(io, code, events);
+        await broadcastRoomState(io, code);
+        return callback?.({ success: true });
+      }
+      if (
+        outcome.kind === 'eliminated'
+        && maybeStartMedicPause(io, room, outcome.eliminatedPlayerId, 'assassin', () => {
+          finaliseAssassinElimination(room, outcome);
+        })
+      ) {
+        await saveRoom(room);
+        emitPowerCardEvents(io, code, events);
+        await broadcastRoomState(io, code);
+        return callback?.({ success: true });
+      }
+
       applyBluffOutcome(room, outcome);
 
       await saveRoom(room);
@@ -751,6 +918,157 @@ function registerSocketHandlers(io, socket) {
       callback?.({ success: true, rearmed: false, penaltyDealt: res.dealt.length });
     } catch (err) {
       console.error('[assassin_decision]', err);
+      callback?.({ success: false, error: err.message });
+    }
+  });
+
+  // ─── PLAYER: Medic decision (v2 Phase D) ─────────────────
+  // While room.phase === 'medic_pending', the Medic chooses save
+  // or decline. On save: revert the elimination + 2 cards to Medic.
+  // On decline: replay the deferred finalisation closure.
+  socket.on('medic_decide', async ({ roomCode, save } = {}, callback) => {
+    try {
+      if (!socket.userId) return callback?.({ success: false, error: 'Not authenticated' });
+
+      const code = roomCode?.toUpperCase();
+      const room = await getRoom(code);
+      if (!room) return callback?.({ success: false, error: 'Room not found' });
+      if (room.mode !== engine.MODES.ONLINE) return callback?.({ success: false, error: 'Online mode only' });
+      if (room.phase !== 'medic_pending') return callback?.({ success: false, error: 'No Medic save pending' });
+
+      const pending = room.pendingMedicSave;
+      if (!pending) return callback?.({ success: false, error: 'Lost Medic context' });
+      if (pending.medicId !== socket.userId) return callback?.({ success: false, error: 'Not the Medic' });
+
+      if (save) {
+        const res = engine.applyMedicSave(room, pending.eliminatedPlayerId, pending.source);
+        if (!res.ok) {
+          // e.g. 6+ cards now — finalise instead.
+          if (typeof pending.finaliseFn === 'function') pending.finaliseFn();
+          room.pendingMedicSave = null;
+          if (room.phase === 'medic_pending') room.phase = 'playing';
+          await saveRoom(room);
+          await broadcastRoomState(io, code);
+          return callback?.({ success: false, error: res.error });
+        }
+
+        // Medic save banner — public.
+        io.to(code).emit('power_card_triggered', {
+          kind: 'medic_save',
+          holderId: res.medicId,
+          // Medic identity is intentionally exposed in this banner
+          // — the spec says role activation is public when it fires.
+          revivedPlayerId: res.revivedPlayerId,
+          revivedPlayerName: pending.eliminatedPlayerName,
+        });
+
+        room.lastAction = {
+          type: 'medic_save',
+          revivedPlayerId: res.revivedPlayerId,
+          revivedPlayerName: pending.eliminatedPlayerName,
+        };
+        room.pendingMedicSave = null;
+        room.phase = 'playing';
+        await saveRoom(room);
+        await broadcastRoomState(io, code);
+        return callback?.({ success: true, saved: true, dealt: res.dealt.length });
+      }
+
+      // Decline → run the deferred finalisation closure (which
+      // applies the eliminate-from-turn-order + game_over check).
+      if (typeof pending.finaliseFn === 'function') pending.finaliseFn();
+      room.pendingMedicSave = null;
+      if (room.phase === 'medic_pending') room.phase = 'playing';
+      await saveRoom(room);
+      await broadcastRoomState(io, code);
+      callback?.({ success: true, saved: false });
+    } catch (err) {
+      console.error('[medic_decide]', err);
+      callback?.({ success: false, error: err.message });
+    }
+  });
+
+  // ─── PLAYER: Saboteur transfer (v2 Phase D) ──────────────
+  // Once-per-game silent move of one random card from the holder's
+  // hand into the target's. No banner — only handSize updates.
+  socket.on('saboteur_transfer', async ({ roomCode, targetPlayerId } = {}, callback) => {
+    try {
+      if (!socket.userId) return callback?.({ success: false, error: 'Not authenticated' });
+
+      const code = roomCode?.toUpperCase();
+      const room = await getRoom(code);
+      if (!room) return callback?.({ success: false, error: 'Room not found' });
+      if (room.mode !== engine.MODES.ONLINE) return callback?.({ success: false, error: 'Online mode only' });
+      if (!['playing', 'spin_pending', 'bluff_resolution'].includes(room.phase)) {
+        return callback?.({ success: false, error: `Cannot use ability in phase ${room.phase}` });
+      }
+
+      const res = engine.applySaboteurTransfer(room, socket.userId, targetPlayerId);
+      if (!res.ok) return callback?.({ success: false, error: res.error });
+
+      await saveRoom(room);
+      await broadcastRoomState(io, code);
+      callback?.({ success: true });
+    } catch (err) {
+      console.error('[saboteur_transfer]', err);
+      callback?.({ success: false, error: err.message });
+    }
+  });
+
+  // ─── PLAYER: Sniper redirect (v2 Phase D) ────────────────
+  // Resumes a paused bluff resolution where the spin target was
+  // about to be locked in. Sniper picks a new alive target (not
+  // self, not Mirror holder) — or passes by sending newTargetId=null.
+  socket.on('sniper_redirect', async ({ roomCode, newTargetId } = {}, callback) => {
+    try {
+      if (!socket.userId) return callback?.({ success: false, error: 'Not authenticated' });
+
+      const code = roomCode?.toUpperCase();
+      const room = await getRoom(code);
+      if (!room) return callback?.({ success: false, error: 'Room not found' });
+      if (room.mode !== engine.MODES.ONLINE) return callback?.({ success: false, error: 'Online mode only' });
+      if (room.phase !== 'sniper_pending') return callback?.({ success: false, error: 'No Sniper redirect pending' });
+
+      const pending = room.pendingSniperRedirect;
+      if (!pending) return callback?.({ success: false, error: 'Lost Sniper context' });
+      if (pending.sniperId !== socket.userId) return callback?.({ success: false, error: 'Not the Sniper' });
+
+      const outcome = pending.deferredOutcome;
+      let banner = null;
+
+      if (newTargetId) {
+        // Eligibility check — re-validate (alive list could have
+        // shifted between prompt and decision in pathological cases).
+        if (!pending.eligibleTargetIds.includes(newTargetId)) {
+          return callback?.({ success: false, error: 'Target not eligible' });
+        }
+        const res = engine.applySniperRedirect(room, socket.userId, newTargetId);
+        if (!res.ok) return callback?.({ success: false, error: res.error });
+
+        outcome.spinTargetId = res.newSpinTargetId;
+        const newTarget = room.players.find(p => p.id === res.newSpinTargetId);
+        const oldTarget = room.players.find(p => p.id === pending.originalSpinTargetId);
+        banner = {
+          kind: 'sniper_redirect',
+          holderId: socket.userId,
+          // Public role-reveal moment — Sniper identity surfaces.
+          fromId: oldTarget?.id || null,
+          fromName: oldTarget?.username || null,
+          toId: newTarget?.id || null,
+          toName: newTarget?.username || null,
+        };
+      }
+
+      // Clear the pause and apply the (possibly modified) outcome.
+      room.pendingSniperRedirect = null;
+      applyBluffOutcome(room, outcome);
+
+      await saveRoom(room);
+      if (banner) io.to(code).emit('power_card_triggered', banner);
+      await broadcastRoomState(io, code);
+      callback?.({ success: true, redirected: !!newTargetId });
+    } catch (err) {
+      console.error('[sniper_redirect]', err);
       callback?.({ success: false, error: err.message });
     }
   });
@@ -1038,7 +1356,7 @@ function registerSocketHandlers(io, socket) {
         continue;
       }
 
-      if (['playing', 'bluff_resolution', 'spin_pending'].includes(room.phase)) {
+      if (['playing', 'bluff_resolution', 'spin_pending', 'swap_pending', 'medic_pending', 'sniper_pending'].includes(room.phase)) {
         io.to(code).emit('player_disconnecting', { playerId: player.id, playerName: player.username });
 
         const key = dcKey(code, player.id);
@@ -1050,6 +1368,22 @@ function registerSocketHandlers(io, socket) {
           // have changed and we should NOT eliminate.
           const still = room.players.find(p => p.id === player.id && p.socketId === capturedSocketId);
           if (still?.status === 'alive') {
+            // v2 Phase D — if this player was holding the room hostage
+            // mid-Medic/Sniper pause, auto-decline first so the game
+            // doesn't deadlock.
+            if (room.phase === 'medic_pending' && room.pendingMedicSave?.medicId === still.id) {
+              const pending = room.pendingMedicSave;
+              if (typeof pending.finaliseFn === 'function') pending.finaliseFn();
+              room.pendingMedicSave = null;
+              if (room.phase === 'medic_pending') room.phase = 'playing';
+            }
+            if (room.phase === 'sniper_pending' && room.pendingSniperRedirect?.sniperId === still.id) {
+              const pending = room.pendingSniperRedirect;
+              const outcome = pending.deferredOutcome;
+              room.pendingSniperRedirect = null;
+              applyBluffOutcome(room, outcome);
+            }
+
             const eliminated = engine.handleDisconnect(room, capturedSocketId);
             if (eliminated) {
               room.lastAction = { type: 'disconnected', playerId: eliminated.id, playerName: eliminated.username };
