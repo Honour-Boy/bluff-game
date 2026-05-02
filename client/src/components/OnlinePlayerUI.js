@@ -332,6 +332,7 @@ function PlayerChip({
     <button
       type="button"
       onClick={onClick}
+      className="topdown-chip"
       style={{
         width: w,
         height: h,
@@ -516,6 +517,15 @@ export function OnlinePlayerUI({
   const [whotPickerCard, setWhotPickerCard] = useState(null);
   // Turn action modal
   const [showTurnModal, setShowTurnModal] = useState(false);
+
+  // Top-down layout: anchor we scroll back to when the user taps "Center".
+  // Refers to the central card-table block.
+  const tableCenterRef = useRef(null);
+  const scrollToCenter = () => {
+    if (tableCenterRef.current) {
+      tableCenterRef.current.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }
+  };
 
   // Spectator state
   const [spectatingId, setSpectatingId] = useState(null);
@@ -928,52 +938,69 @@ export function OnlinePlayerUI({
     && (myPlayer?.saboteurAbilityAvailable !== false)
     && (roomState?.myHand?.length || 0) > 3;
 
+  // ─── Top-down player distribution ────────────────────────
+  // Excludes the local player. Calculated each render — small lists.
+  const distributed = distributePlayers(otherPlayers);
+  const renderChip = (p) => (
+    <PlayerChip
+      key={p.id}
+      player={p}
+      isCurrentTurn={p.id === currentPlayerId}
+      isSpinTarget={isSpinPending && p.id === spinTargetId}
+      voice={voice}
+      onClick={showSpectatorView ? () => handleSpectatePlayer(p.id) : undefined}
+    />
+  );
+
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 16, maxWidth: 500, margin: '0 auto', paddingBottom: 180 }}>
-
-
-      {/* ── Header ── */}
-      <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap' }}>
-        <div>
-          <h1 style={{ fontSize: 28, color: isEliminated ? 'var(--accent2)' : 'var(--accent)', lineHeight: 1, fontFamily: "'Bebas Neue', sans-serif", marginBottom: 8 }}>
+    <div
+      style={{
+        position: 'relative',
+        minHeight: '100vh',
+        display: 'flex',
+        flexDirection: 'column',
+        WebkitOverflowScrolling: 'touch',
+        paddingBottom: 'env(safe-area-inset-bottom, 0px)',
+      }}
+    >
+      {/* ── Top header strip ── */}
+      <div style={{
+        display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between',
+        gap: 12, flexWrap: 'wrap',
+        padding: '4px 4px 12px',
+      }}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+          <h1 style={{
+            fontSize: 24, color: isEliminated ? 'var(--accent2)' : 'var(--accent)',
+            lineHeight: 1, fontFamily: "'Bebas Neue', sans-serif", margin: 0,
+          }}>
             BLUFF
           </h1>
-          {/* Room code — large, bordered, copyable */}
-          <div style={{ fontSize: 9, color: 'var(--text-dim)', letterSpacing: '0.12em', marginBottom: 4 }}>ROOM CODE</div>
           <div
             title="Click to copy"
             onClick={() => navigator.clipboard?.writeText(roomCode)}
             style={{
               fontFamily: "'Bebas Neue', sans-serif",
-              fontSize: 30, letterSpacing: '0.2em',
+              fontSize: 18, letterSpacing: '0.18em',
               color: 'var(--accent)',
               border: '1px solid var(--accent)',
-              padding: '4px 12px', borderRadius: 'var(--radius)',
+              padding: '2px 10px', borderRadius: 'var(--radius)',
               background: 'rgba(232,255,74,0.04)',
               cursor: 'pointer', display: 'inline-block', lineHeight: 1.2,
+              alignSelf: 'flex-start',
             }}
           >
             {roomCode}
           </div>
-          <div style={{ fontSize: 9, color: 'var(--text-dim)', marginTop: 4, letterSpacing: '0.08em' }}>
+          <div style={{ fontSize: 9, color: 'var(--text-dim)', letterSpacing: '0.08em' }}>
             Round {roundNumber} · tap to copy
           </div>
-          {/* Share button — available in lobby */}
           {isLobby && myPlayer && (
-            <div style={{ marginTop: 8 }}>
-              <ShareButton roomCode={roomCode} senderName={myPlayer.username} />
-            </div>
+            <ShareButton roomCode={roomCode} senderName={myPlayer.username} />
           )}
-          {voice && (
-            <div style={{ marginTop: 8 }}>
-              <VoicePanel {...voice} />
-            </div>
-          )}
+          {voice && <VoicePanel {...voice} />}
         </div>
         <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 5 }}>
-          <div style={{ fontFamily: "'Bebas Neue', sans-serif", fontSize: 20, color: isEliminated ? 'var(--accent2)' : 'var(--text)', lineHeight: 1 }}>
-            {myPlayer.username}
-          </div>
           <span className={`tag ${isEliminated ? 'eliminated' : 'alive'}`}>
             {isEliminated ? 'Eliminated' : isHost ? 'Host · Alive' : 'Alive'}
           </span>
@@ -986,348 +1013,408 @@ export function OnlinePlayerUI({
         </div>
       </div>
 
-      {/* ── Other players bar ── */}
-      {otherPlayers.length > 0 && (
-        <div style={{ overflowX: 'auto', WebkitOverflowScrolling: 'touch' }}>
-          <div style={{ display: 'flex', gap: 8, paddingBottom: 4, minWidth: 'max-content' }}>
-            {otherPlayers.map(p => {
-              const isCurrentTurnPlayer = p.id === currentPlayerId;
-              const alive = p.status === 'alive';
-              return (
-                <div
-                  key={p.id}
+      {/* ── Top region (~25vh) — top-side player chips ── */}
+      <div className="topdown-top" style={{
+        minHeight: '22vh',
+        display: 'flex', alignItems: 'center', justifyContent: 'center',
+        flexWrap: 'wrap', gap: 8,
+        padding: '8px 4px',
+      }}>
+        {distributed.top.length > 0 ? (
+          distributed.top.map(renderChip)
+        ) : (
+          <div style={{ fontSize: 10, color: 'var(--text-dim)', letterSpacing: '0.12em' }}>
+            {otherPlayers.length === 0 ? '(waiting for players…)' : ''}
+          </div>
+        )}
+      </div>
+
+      {/* ── Middle region (~50vh) — left chips | center table | right chips ── */}
+      <div className="topdown-middle" style={{
+        display: 'grid',
+        gridTemplateColumns: 'auto 1fr auto',
+        gap: 10,
+        alignItems: 'center',
+        minHeight: '46vh',
+        padding: '4px 0',
+      }}>
+        {/* Left side chips */}
+        <div className="topdown-side" style={{
+          display: 'flex', flexDirection: 'column',
+          flexWrap: 'wrap', gap: 8,
+          maxHeight: '46vh',
+          alignContent: 'flex-start',
+        }}>
+          {distributed.left.map(renderChip)}
+        </div>
+
+        {/* Center: card table */}
+        <div ref={tableCenterRef} style={{
+          display: 'flex', flexDirection: 'column', alignItems: 'stretch',
+          gap: 10,
+        }}>
+          {(isPlaying || isSpinPending || isRoundEnd) && (
+            <div className="card" style={{
+              display: 'flex', alignItems: 'center', justifyContent: 'space-around',
+              gap: 12, padding: '18px 14px',
+              background: 'radial-gradient(ellipse at center, var(--surface) 0%, var(--bg) 100%)',
+              border: '1px solid var(--border)',
+            }}>
+              <FaceDownStack count={deckSize} label="DRAW" warning={deckSize < 5 && deckSize > 0} />
+              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6 }}>
+                <div style={{ fontSize: 9, color: 'var(--text-dim)', letterSpacing: '0.12em' }}>REQUIRED</div>
+                <CardShape type={currentCardType} size="md" />
+                <div style={{ fontSize: 10, color: 'var(--text-dim)' }}>
+                  {currentCardType?.toUpperCase()}
+                </div>
+              </div>
+              <FaceDownStack count={playedPileSize} label="PLAYED" />
+            </div>
+          )}
+
+          {/* Lobby card sits at the table center */}
+          {isLobby && (
+            <div className="card" style={{ textAlign: 'center' }}>
+              <div style={{ fontSize: 10, color: 'var(--text-dim)', letterSpacing: '0.12em', marginBottom: 14 }}>
+                LOBBY — {alivePlayers.length} player{alivePlayers.length !== 1 ? 's' : ''} joined
+              </div>
+              {isHost ? (
+                <>
+                  <button
+                    className="primary"
+                    onClick={startGame}
+                    disabled={alivePlayers.length < 2}
+                    style={{ width: '100%', padding: '14px', fontSize: 13, marginBottom: 10 }}
+                  >
+                    ▶ Start Game ({alivePlayers.length} players)
+                  </button>
+                  {alivePlayers.length < 2 && (
+                    <div style={{ fontSize: 11, color: 'var(--text-dim)' }}>
+                      Need at least 2 players to start.
+                    </div>
+                  )}
+                </>
+              ) : (
+                <div style={{ fontSize: 12, color: 'var(--text-dim)' }}>
+                  Waiting for the host to start the game...
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Bluff-reveal panel + spin trigger live in the centre during spin_pending */}
+          {isSpinPending && (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+              {lastAction?.autoResolved && lastAction?.accuserName && (
+                <div className="card fade-in" style={{
+                  border: `1px solid ${lastAction.bluffCorrect ? 'var(--alive)' : 'var(--accent2)'}`,
+                  background: lastAction.bluffCorrect ? 'rgba(74,255,128,0.04)' : 'rgba(255,74,110,0.04)',
+                }}>
+                  <div style={{ fontSize: 10, color: 'var(--text-dim)', letterSpacing: '0.12em', marginBottom: 10 }}>
+                    BLUFF CALLED
+                  </div>
+                  <div style={{ fontSize: 13, marginBottom: 8 }}>
+                    <strong style={{ color: 'var(--text)' }}>{lastAction.accuserName}</strong>
+                    {' '}called bluff on{' '}
+                    <strong style={{ color: 'var(--text)' }}>{lastAction.accusedName}</strong>
+                  </div>
+
+                  {lastAction.revealedCard ? (
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 10 }}>
+                      <div style={{ fontSize: 9, color: 'var(--text-dim)', letterSpacing: '0.1em', flexShrink: 0 }}>
+                        CARD REVEALED:
+                      </div>
+                      <div style={{
+                        display: 'flex', alignItems: 'center', gap: 6,
+                        padding: '6px 10px', background: 'var(--surface2)',
+                        border: '1px solid var(--border)', borderRadius: 4,
+                        fontSize: 13, fontWeight: 700,
+                        animation: 'cardFlipIn 0.5s ease-out',
+                      }}>
+                        <ShapeIcon shape={lastAction.revealedCard.shape} size={20} />
+                        <span style={{ color: 'var(--text)', textTransform: 'capitalize' }}>
+                          {lastAction.revealedCard.shape === 'whot' ? 'WHOT' : lastAction.revealedCard.shape}
+                        </span>
+                        <span style={{ color: 'var(--text-dim)', fontSize: 11 }}>{lastAction.revealedCard.number}</span>
+                      </div>
+                    </div>
+                  ) : (
+                    <div style={{ fontSize: 12, color: 'var(--text-dim)', marginBottom: 10 }}>
+                      No card was played.
+                    </div>
+                  )}
+
+                  <div style={{
+                    fontFamily: "'Bebas Neue', sans-serif",
+                    fontSize: 18, letterSpacing: '0.08em',
+                    color: lastAction.bluffCorrect ? 'var(--alive)' : 'var(--accent2)',
+                    marginBottom: 4,
+                  }}>
+                    {lastAction.bluffCorrect
+                      ? `✓ Bluff correct — ${lastAction.accusedName} was lying!`
+                      : `✗ Bluff wrong — ${lastAction.accusedName} told the truth!`}
+                  </div>
+                  <div style={{ fontSize: 11, color: 'var(--text-dim)' }}>
+                    → <strong>{lastAction.spinTargetName}</strong> must spin.
+                  </div>
+                </div>
+              )}
+
+              {isMySpinTurn && !isEliminated && (
+                <div className="card" style={{ border: '1px solid var(--accent2)', textAlign: 'center' }}>
+                  <div style={{ fontSize: 10, color: 'var(--accent2)', letterSpacing: '0.12em', marginBottom: 14 }}>
+                    YOUR FATE AWAITS
+                  </div>
+                  <button
+                    className="danger"
+                    onClick={playerSpin}
+                    style={{ width: '100%', fontSize: 16, padding: '14px' }}
+                  >
+                    🔫 Pull the Trigger
+                  </button>
+                </div>
+              )}
+
+              {!isMySpinTurn && spinTargetPlayer && (
+                <div style={{
+                  padding: '14px 16px', background: 'rgba(255,74,110,0.05)',
+                  border: '1px solid var(--accent2)', borderRadius: 'var(--radius)',
+                  fontSize: 12, color: 'var(--accent2)', textAlign: 'center',
+                  animation: 'pulse 1.5s ease-in-out infinite',
+                }}>
+                  🔫 Waiting for <strong>{spinTargetPlayer.username}</strong> to pull the trigger...
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Round end + game over banners over the table */}
+          {isRoundEnd && (
+            <div className="card" style={{ textAlign: 'center', border: '1px solid var(--alive)' }}>
+              <div style={{ fontFamily: "'Bebas Neue', sans-serif", fontSize: 28, color: 'var(--alive)', marginBottom: 8 }}>
+                {lastAction?.winnerId === myPlayer.id ? '🏆 You Won This Round!' : `🏆 ${lastAction?.winnerName ?? '?'} Won This Round!`}
+              </div>
+              {isHost && (
+                <button className="primary" onClick={startNextRound} style={{ marginTop: 12 }}>
+                  ▶ Next Round
+                </button>
+              )}
+              {!isHost && (
+                <div style={{ fontSize: 11, color: 'var(--text-dim)', marginTop: 8 }}>
+                  Waiting for host to start the next round...
+                </div>
+              )}
+            </div>
+          )}
+
+          {isGameOver && (
+            <div className="card" style={{ textAlign: 'center', border: '1px solid var(--accent)' }}>
+              <div style={{ fontFamily: "'Bebas Neue', sans-serif", fontSize: 32, color: 'var(--accent)', marginBottom: 8 }}>
+                {lastAction?.winnerId === myPlayer.id ? '🎉 You Win!' : `${lastAction?.winnerName ?? '?'} Wins!`}
+              </div>
+              <div style={{ fontSize: 12, color: 'var(--text-dim)', marginBottom: 16 }}>Game over.</div>
+              <button className="primary" onClick={leaveGame}>🔄 New Game</button>
+            </div>
+          )}
+
+          {/* Last-action log + waiting banner sit just below the table */}
+          {lastAction && <ActionLog lastAction={lastAction} />}
+
+          {!isMyTurn && isPlaying && currentPlayer && !isEliminated && (
+            <WaitingForPlayerBanner playerName={currentPlayer.username} />
+          )}
+        </div>
+
+        {/* Right side chips */}
+        <div className="topdown-side" style={{
+          display: 'flex', flexDirection: 'column',
+          flexWrap: 'wrap', gap: 8,
+          maxHeight: '46vh',
+          alignContent: 'flex-start',
+        }}>
+          {distributed.right.map(renderChip)}
+        </div>
+      </div>
+
+      {/* ── Bottom seat (~25vh) — local player ── */}
+      <div className="topdown-bottom" style={{
+        marginTop: 'auto',
+        paddingTop: 12,
+        paddingBottom: 'calc(env(safe-area-inset-bottom, 0px) + 8px)',
+        borderTop: '1px solid var(--border)',
+        background: 'linear-gradient(to top, rgba(0,0,0,0.45) 0%, transparent 100%)',
+      }}>
+        {/* Local nameplate */}
+        <div style={{
+          display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+          gap: 12, marginBottom: 8, flexWrap: 'wrap',
+        }}>
+          <div style={{
+            fontFamily: "'Bebas Neue', sans-serif",
+            fontSize: 18,
+            color: isEliminated ? 'var(--accent2)' : isMyTurn && isPlaying ? 'var(--warning)' : 'var(--text)',
+            letterSpacing: '0.05em',
+            display: 'flex', alignItems: 'center', gap: 8,
+          }}>
+            {voice && (
+              <VoiceIndicator
+                playerId={myPlayer.id}
+                speakingIds={voice.speakingIds}
+                voiceConnected={voice.isConnected}
+                size={9}
+              />
+            )}
+            {myPlayer.username} {isMyTurn && isPlaying && !isEliminated && <span style={{ fontSize: 10, color: 'var(--warning)', border: '1px solid var(--warning)', padding: '1px 5px', borderRadius: 2 }}>YOUR TURN</span>}
+          </div>
+
+          {/* Chamber strip */}
+          {!isEliminated && !isLobby && (
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '5px 10px', background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 'var(--radius)' }}>
+              <div style={{ fontSize: 9, color: 'var(--text-dim)', letterSpacing: '0.1em', flexShrink: 0 }}>CHAMBER</div>
+              <div style={{ display: 'flex', gap: 4 }}>
+                {Array.from({ length: 6 }).map((_, i) => {
+                  const isBullet = myPlayer.chamber?.[i] === 'bullet';
+                  return (
+                    <div key={i} style={{
+                      width: 11, height: 11, borderRadius: '50%',
+                      background: isBullet ? 'var(--accent2)' : 'var(--surface2)',
+                      border: `1px solid ${isBullet ? 'var(--accent2)' : 'var(--border)'}`,
+                      boxShadow: isBullet ? '0 0 5px rgba(255,74,110,0.5)' : 'none',
+                    }} />
+                  );
+                })}
+              </div>
+              <div style={{ fontSize: 9, color: 'var(--text-dim)' }}>
+                {myPlayer.chamber?.filter(s => s === 'bullet').length ?? 1}/6
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* Action buttons (Call Bluff / End Turn) */}
+        {isMyTurn && isPlaying && !isEliminated && (
+          <div style={{ marginBottom: 10 }}>
+            <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
+              {!isFirstTurn && (
+                <button
+                  className="danger"
+                  onClick={callBluff}
+                  disabled={bluffUsedThisTurn || cardPlayedThisTurn || bluffBlockedThisTurn}
+                  title={bluffBlockedThisTurn ? 'No card to challenge — last turn was frozen' : undefined}
                   style={{
-                    maxWidth: 100, minWidth: 70,
-                    padding: '6px 8px',
-                    background: 'var(--surface2)',
-                    border: `1px solid ${isCurrentTurnPlayer && alive ? 'var(--warning)' : 'var(--border)'}`,
-                    borderRadius: 'var(--radius)',
-                    opacity: alive ? 1 : 0.4,
-                    flexShrink: 0,
+                    flex: 1,
+                    opacity: bluffUsedThisTurn || cardPlayedThisTurn || bluffBlockedThisTurn ? 0.4 : 1,
+                    cursor: bluffUsedThisTurn || cardPlayedThisTurn || bluffBlockedThisTurn ? 'not-allowed' : 'pointer',
                   }}
                 >
-                  <div style={{
-                    fontSize: 10, fontWeight: 700,
-                    color: isCurrentTurnPlayer && alive ? 'var(--warning)' : 'var(--text)',
-                    overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
-                    textDecoration: !alive ? 'line-through' : 'none',
-                    display: 'flex', alignItems: 'center', gap: 4,
-                  }}>
-                    <VoiceIndicator playerId={p.id} speakingIds={voice?.speakingIds} voiceConnected={voice?.isConnected} size={8} />
-                    {p.username}
-                  </div>
-                  <div style={{ fontSize: 9, color: 'var(--text-dim)', marginTop: 3 }}>
-                    🃏 {p.handSize ?? '?'}
-                    {isSpinPending && p.id === spinTargetId && (
-                      <span style={{ color: 'var(--accent2)', marginLeft: 4 }}>🔫</span>
-                    )}
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        </div>
-      )}
-
-      {/* ── Central hub ── */}
-      {(isPlaying || isSpinPending || isRoundEnd) && (
-        <div className="card" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-around', gap: 16, padding: '20px 16px' }}>
-          <FaceDownStack count={deckSize} label="DRAW" warning={deckSize < 5 && deckSize > 0} />
-          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6 }}>
-            <div style={{ fontSize: 9, color: 'var(--text-dim)', letterSpacing: '0.12em' }}>REQUIRED</div>
-            <CardShape type={currentCardType} size="md" />
-            <div style={{ fontSize: 10, color: 'var(--text-dim)' }}>
-              {currentCardType?.toUpperCase()}
-            </div>
-          </div>
-          <FaceDownStack count={playedPileSize} label="PLAYED" />
-        </div>
-      )}
-
-      {/* ── Lobby state ── */}
-      {isLobby && (
-        <div className="card" style={{ textAlign: 'center' }}>
-          <div style={{ fontSize: 10, color: 'var(--text-dim)', letterSpacing: '0.12em', marginBottom: 14 }}>
-            LOBBY — {alivePlayers.length} player{alivePlayers.length !== 1 ? 's' : ''} joined
-          </div>
-          {isHost ? (
-            <>
-              <button
-                className="primary"
-                onClick={startGame}
-                disabled={alivePlayers.length < 2}
-                style={{ width: '100%', padding: '14px', fontSize: 13, marginBottom: 10 }}
-              >
-                ▶ Start Game ({alivePlayers.length} players)
-              </button>
-              {alivePlayers.length < 2 && (
-                <div style={{ fontSize: 11, color: 'var(--text-dim)' }}>
-                  Need at least 2 players to start.
-                </div>
+                  ⚠️ Call Bluff
+                </button>
               )}
-            </>
-          ) : (
-            <div style={{ fontSize: 12, color: 'var(--text-dim)' }}>
-              Waiting for the host to start the game...
+              {cardPlayedThisTurn && (
+                <button className="primary" onClick={endTurn} style={{ flex: 1 }}>
+                  ✅ End Turn
+                </button>
+              )}
             </div>
-          )}
-        </div>
-      )}
-
-      {/* ── Action log ── */}
-      {lastAction && <ActionLog lastAction={lastAction} />}
-
-      {/* ── Chamber bullet count ── */}
-{!isEliminated && !isLobby && (
-  <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '8px 14px', background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 'var(--radius)' }}>
-    <div style={{ fontSize: 10, color: 'var(--text-dim)', letterSpacing: '0.1em', flexShrink: 0 }}>CHAMBER</div>
-    <div style={{ display: 'flex', gap: 5 }}>
-      {Array.from({ length: 6 }).map((_, i) => {
-        const isBullet = myPlayer.chamber?.[i] === 'bullet';
-        return (
-          <div key={i} style={{
-            width: 14, height: 14, borderRadius: '50%',
-            background: isBullet ? 'var(--accent2)' : 'var(--surface2)',
-            border: `1.5px solid ${isBullet ? 'var(--accent2)' : 'var(--border)'}`,
-            boxShadow: isBullet ? '0 0 6px rgba(255,74,110,0.5)' : 'none',
-          }} />
-        );
-      })}
-    </div>
-    <div style={{ fontSize: 10, color: 'var(--text-dim)', marginLeft: 2 }}>
-      {myPlayer.chamber?.filter(s => s === 'bullet').length ?? 1}/6
-    </div>
-  </div>
-)}
-
-      {/* ── My turn actions ── */}
-      {isMyTurn && isPlaying && !isEliminated && (
-        <div className="card" style={{ border: '1px solid var(--warning)' }}>
-          <div style={{ fontSize: 10, color: 'var(--warning)', letterSpacing: '0.12em', marginBottom: 14 }}>
-            YOUR TURN
-          </div>
-          <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
-            {!isFirstTurn && (
-              <button
-                className="danger"
-                onClick={callBluff}
-                disabled={bluffUsedThisTurn || cardPlayedThisTurn || bluffBlockedThisTurn}
-                title={bluffBlockedThisTurn ? 'No card to challenge — last turn was frozen' : undefined}
-                style={{
-                  flex: 1,
-                  opacity: bluffUsedThisTurn || cardPlayedThisTurn || bluffBlockedThisTurn ? 0.4 : 1,
-                  cursor: bluffUsedThisTurn || cardPlayedThisTurn || bluffBlockedThisTurn ? 'not-allowed' : 'pointer',
-                }}
-              >
-                ⚠️ Call Bluff
-              </button>
-            )}
-            {cardPlayedThisTurn && (
-              <button className="primary" onClick={endTurn} style={{ flex: 1 }}>
-                ✅ End Turn
-              </button>
+            {actionHint && (
+              <div style={{ fontSize: 11, color: 'var(--text-dim)', marginTop: 8 }}>
+                {actionHint}
+              </div>
             )}
           </div>
-          {actionHint && (
-            <div style={{ fontSize: 11, color: 'var(--text-dim)', marginTop: 12 }}>
-              {actionHint}
+        )}
+
+        {/* Hand (or spectator picker) */}
+        {showSpectatorView ? (
+          <div className="card" style={{ marginTop: 4 }}>
+            <div style={{ fontSize: 10, color: 'var(--text-dim)', letterSpacing: '0.12em', marginBottom: 10 }}>
+              👁 SPECTATING
             </div>
-          )}
-        </div>
-      )}
-
-      {/* Waiting for someone else's turn */}
-      {!isMyTurn && isPlaying && currentPlayer && !isEliminated && (
-        <WaitingForPlayerBanner playerName={currentPlayer.username} />
-      )}
-
-      {/* ── Spin pending ── */}
-      {isSpinPending && (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-
-          {/* Bluff reveal panel */}
-          {lastAction?.autoResolved && lastAction?.accuserName && (
-            <div className="card fade-in" style={{
-              border: `1px solid ${lastAction.bluffCorrect ? 'var(--alive)' : 'var(--accent2)'}`,
-              background: lastAction.bluffCorrect ? 'rgba(74,255,128,0.04)' : 'rgba(255,74,110,0.04)',
-            }}>
-              <div style={{ fontSize: 10, color: 'var(--text-dim)', letterSpacing: '0.12em', marginBottom: 10 }}>
-                BLUFF CALLED
-              </div>
-              <div style={{ fontSize: 13, marginBottom: 8 }}>
-                <strong style={{ color: 'var(--text)' }}>{lastAction.accuserName}</strong>
-                {' '}called bluff on{' '}
-                <strong style={{ color: 'var(--text)' }}>{lastAction.accusedName}</strong>
-              </div>
-
-              {lastAction.revealedCard ? (
-                <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 10 }}>
-                  <div style={{ fontSize: 9, color: 'var(--text-dim)', letterSpacing: '0.1em', flexShrink: 0 }}>
-                    CARD REVEALED:
-                  </div>
-                  <div style={{
-                    display: 'flex', alignItems: 'center', gap: 6,
-                    padding: '6px 10px', background: 'var(--surface2)',
-                    border: '1px solid var(--border)', borderRadius: 4,
-                    fontSize: 13, fontWeight: 700,
-                    animation: 'cardFlipIn 0.5s ease-out',
-                  }}>
-                    <ShapeIcon shape={lastAction.revealedCard.shape} size={20} />
-                    <span style={{ color: 'var(--text)', textTransform: 'capitalize' }}>
-                      {lastAction.revealedCard.shape === 'whot' ? 'WHOT' : lastAction.revealedCard.shape}
-                    </span>
-                    <span style={{ color: 'var(--text-dim)', fontSize: 11 }}>{lastAction.revealedCard.number}</span>
-                  </div>
+            <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 12 }}>
+              {alivePlayers.map(p => (
+                <button
+                  key={p.id}
+                  onClick={() => handleSpectatePlayer(p.id)}
+                  style={{
+                    padding: '6px 12px', fontSize: 12,
+                    border: `1px solid ${spectatingId === p.id ? 'var(--accent)' : 'var(--border)'}`,
+                    background: spectatingId === p.id ? 'rgba(232,255,74,0.06)' : 'var(--surface2)',
+                    color: spectatingId === p.id ? 'var(--accent)' : 'var(--text)',
+                    borderRadius: 'var(--radius)', cursor: 'pointer',
+                  }}
+                >
+                  {p.username} 🃏{p.handSize ?? '?'}
+                </button>
+              ))}
+            </div>
+            {spectatingId && spectatedHand.length > 0 && (
+              <>
+                <div style={{ fontSize: 10, color: 'var(--text-dim)', marginBottom: 8 }}>
+                  {alivePlayers.find(p => p.id === spectatingId)?.username}&apos;s hand
                 </div>
-              ) : (
-                <div style={{ fontSize: 12, color: 'var(--text-dim)', marginBottom: 10 }}>
-                  No card was played.
-                </div>
-              )}
-
-              <div style={{
-                fontFamily: "'Bebas Neue', sans-serif",
-                fontSize: 18, letterSpacing: '0.08em',
-                color: lastAction.bluffCorrect ? 'var(--alive)' : 'var(--accent2)',
-                marginBottom: 4,
-              }}>
-                {lastAction.bluffCorrect
-                  ? `✓ Bluff correct — ${lastAction.accusedName} was lying!`
-                  : `✗ Bluff wrong — ${lastAction.accusedName} told the truth!`}
-              </div>
-              <div style={{ fontSize: 11, color: 'var(--text-dim)' }}>
-                → <strong>{lastAction.spinTargetName}</strong> must spin.
-              </div>
-            </div>
-          )}
-
-          {/* My spin button */}
-          {isMySpinTurn && !isEliminated && (
-            <div className="card" style={{ border: '1px solid var(--accent2)', textAlign: 'center' }}>
-              <div style={{ fontSize: 10, color: 'var(--accent2)', letterSpacing: '0.12em', marginBottom: 14 }}>
-                YOUR FATE AWAITS
-              </div>
-              <button
-                className="danger"
-                onClick={playerSpin}
-                style={{ width: '100%', fontSize: 16, padding: '14px' }}
-              >
-                🔫 Pull the Trigger
-              </button>
-              <div style={{ fontSize: 11, color: 'var(--text-dim)', marginTop: 12 }}>
-                You must spin. Tap to reveal your fate.
-              </div>
-            </div>
-          )}
-
-          {/* Waiting for someone else to spin */}
-          {!isMySpinTurn && spinTargetPlayer && (
-            <div style={{
-              padding: '14px 16px', background: 'rgba(255,74,110,0.05)',
-              border: '1px solid var(--accent2)', borderRadius: 'var(--radius)',
-              fontSize: 12, color: 'var(--accent2)', textAlign: 'center',
-              animation: 'pulse 1.5s ease-in-out infinite',
-            }}>
-              🔫 Waiting for <strong>{spinTargetPlayer.username}</strong> to pull the trigger...
-            </div>
-          )}
-        </div>
-      )}
-
-      {/* ── Round end ── */}
-      {isRoundEnd && (
-        <div className="card" style={{ textAlign: 'center', border: '1px solid var(--alive)' }}>
-          <div style={{ fontFamily: "'Bebas Neue', sans-serif", fontSize: 32, color: 'var(--alive)', marginBottom: 8 }}>
-            {lastAction?.winnerId === myPlayer.id ? '🏆 You Won This Round!' : `🏆 ${lastAction?.winnerName ?? '?'} Won This Round!`}
+                <CardHand hand={spectatedHand} selectedCardId={null} interactive={false} />
+              </>
+            )}
+            {spectatingId && spectatedHand.length === 0 && (
+              <div style={{ fontSize: 11, color: 'var(--text-dim)' }}>No cards to show.</div>
+            )}
+            {!spectatingId && (
+              <div style={{ fontSize: 11, color: 'var(--text-dim)' }}>Select a player above to see their hand.</div>
+            )}
           </div>
-          {isHost && (
-            <button className="primary" onClick={startNextRound} style={{ marginTop: 12 }}>
-              ▶ Next Round
-            </button>
-          )}
-          {!isHost && (
-            <div style={{ fontSize: 11, color: 'var(--text-dim)', marginTop: 8 }}>
-              Waiting for host to start the next round...
-            </div>
-          )}
-        </div>
-      )}
-
-      {/* ── Game over ── */}
-      {isGameOver && (
-        <div className="card" style={{ textAlign: 'center', border: '1px solid var(--accent)' }}>
-          <div style={{ fontFamily: "'Bebas Neue', sans-serif", fontSize: 36, color: 'var(--accent)', marginBottom: 8 }}>
-            {lastAction?.winnerId === myPlayer.id ? '🎉 You Win!' : `${lastAction?.winnerName ?? '?'} Wins!`}
-          </div>
-          <div style={{ fontSize: 12, color: 'var(--text-dim)', marginBottom: 16 }}>Game over.</div>
-          <button className="primary" onClick={leaveGame}>🔄 New Game</button>
-        </div>
-      )}
-
-      {/* ── Card hand or spectator view ── */}
-      {showSpectatorView ? (
-        <div className="card">
-          <div style={{ fontSize: 10, color: 'var(--text-dim)', letterSpacing: '0.12em', marginBottom: 14 }}>
-            👁 SPECTATING
-          </div>
-          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 16 }}>
-            {alivePlayers.map(p => (
-              <button
-                key={p.id}
-                onClick={() => handleSpectatePlayer(p.id)}
-                style={{
-                  padding: '6px 12px', fontSize: 12,
-                  border: `1px solid ${spectatingId === p.id ? 'var(--accent)' : 'var(--border)'}`,
-                  background: spectatingId === p.id ? 'rgba(232,255,74,0.06)' : 'var(--surface2)',
-                  color: spectatingId === p.id ? 'var(--accent)' : 'var(--text)',
-                  borderRadius: 'var(--radius)', cursor: 'pointer',
-                }}
-              >
-                {p.username} 🃏{p.handSize ?? '?'}
-              </button>
-            ))}
-          </div>
-          {spectatingId && spectatedHand.length > 0 && (
-            <>
-              <div style={{ fontSize: 10, color: 'var(--text-dim)', marginBottom: 8 }}>
-                {alivePlayers.find(p => p.id === spectatingId)?.username}&apos;s hand
+        ) : (
+          !isLobby && !isGameOver && (
+            <div>
+              <div style={{ fontSize: 10, color: 'var(--text-dim)', letterSpacing: '0.12em', marginBottom: 6, display: 'flex', justifyContent: 'space-between' }}>
+                <span>YOUR HAND</span>
+                <span>{myHand.length} card{myHand.length !== 1 ? 's' : ''}</span>
               </div>
-              <CardHand hand={spectatedHand} selectedCardId={null} interactive={false} />
-            </>
-          )}
-          {spectatingId && spectatedHand.length === 0 && (
-            <div style={{ fontSize: 11, color: 'var(--text-dim)' }}>No cards to show.</div>
-          )}
-          {!spectatingId && (
-            <div style={{ fontSize: 11, color: 'var(--text-dim)' }}>Select a player above to see their hand.</div>
-          )}
-        </div>
-      ) : (
-        !isLobby && !isGameOver && (
-          <div>
-            <div style={{ fontSize: 10, color: 'var(--text-dim)', letterSpacing: '0.12em', marginBottom: 8, display: 'flex', justifyContent: 'space-between' }}>
-              <span>YOUR HAND</span>
-              <span>{myHand.length} card{myHand.length !== 1 ? 's' : ''}</span>
+              <CardHand
+                hand={myHand}
+                selectedCardId={isMyTurn && isPlaying && !cardPlayedThisTurn ? selectedCardId : null}
+                onCardClick={handleCardClick}
+                interactive={isMyTurn && isPlaying && !cardPlayedThisTurn}
+              />
             </div>
-            <CardHand
-              hand={myHand}
-              selectedCardId={isMyTurn && isPlaying && !cardPlayedThisTurn ? selectedCardId : null}
-              onCardClick={handleCardClick}
-              interactive={isMyTurn && isPlaying && !cardPlayedThisTurn}
-            />
-          </div>
-        )
-      )}
+          )
+        )}
 
-      {/* Leave game — only in lobby or game_over */}
-      {(!phase || ['lobby', 'game_over'].includes(phase)) && (
-        <button
-          onClick={leaveGame}
-          style={{ alignSelf: 'flex-start', fontSize: 11, color: 'var(--text-dim)', border: 'none', background: 'none', padding: 0, textDecoration: 'underline', cursor: 'pointer', marginTop: 8 }}
-        >
-          Leave game
-        </button>
-      )}
+        {/* Leave game — only in lobby or game_over */}
+        {(!phase || ['lobby', 'game_over'].includes(phase)) && (
+          <button
+            onClick={leaveGame}
+            style={{ alignSelf: 'flex-start', fontSize: 11, color: 'var(--text-dim)', border: 'none', background: 'none', padding: 0, textDecoration: 'underline', cursor: 'pointer', marginTop: 10 }}
+          >
+            Leave game
+          </button>
+        )}
+      </div>
+
+      {/* ── Centralize button (fixed, bottom-left to avoid the chat 💬 at bottom-right) ── */}
+      <button
+        type="button"
+        onClick={scrollToCenter}
+        title="Centre on the table"
+        aria-label="Centre on the table"
+        style={{
+          position: 'fixed',
+          left: 16,
+          bottom: 'calc(env(safe-area-inset-bottom, 0px) + 16px)',
+          width: 44, height: 44,
+          borderRadius: '50%',
+          background: 'var(--surface2)',
+          border: '1px solid var(--accent)',
+          color: 'var(--accent)',
+          fontSize: 18,
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          cursor: 'pointer',
+          boxShadow: '0 4px 14px rgba(0,0,0,0.45)',
+          zIndex: 7900,
+          WebkitTapHighlightColor: 'transparent',
+        }}
+      >
+        ↻
+      </button>
 
       {/* ── Spin overlay ── */}
       {spinData && (
@@ -2251,6 +2338,20 @@ export function OnlinePlayerUI({
           0%   { transform: rotateY(90deg) scaleX(0.4); opacity: 0; }
           60%  { transform: rotateY(-8deg) scaleX(1.02); opacity: 1; }
           100% { transform: rotateY(0deg) scaleX(1); opacity: 1; }
+        }
+        @keyframes chipTurnPulse {
+          0%, 100% { box-shadow: 0 0 8px rgba(255,170,74,0.25); }
+          50%      { box-shadow: 0 0 18px rgba(255,170,74,0.55); }
+        }
+        /* Mobile: smaller chips, tighter middle grid */
+        @media (max-width: 640px) {
+          .topdown-middle { gap: 6px !important; }
+          .topdown-side { max-height: 48vh !important; }
+          .topdown-chip {
+            width: 64px !important;
+            height: 88px !important;
+            padding: 5px !important;
+          }
         }
       `}</style>
     </div>
