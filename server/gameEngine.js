@@ -204,11 +204,20 @@ function dealCards(deck, orderedPlayerIds, cardsPerPlayer = 6) {
 // exactly what the backend returns, ensuring perfect sync.
 
 /**
- * Create a fresh chamber with exactly 1 bullet at a random position
+ * Create a fresh chamber with `bullets` bullets at random positions.
+ * Default = 1 bullet (vanilla rules). Russian Roulette risk modifier
+ * (Phase E1) starts every chamber with 3 bullets — pass `bullets: 3`.
  */
-function initChamber() {
+function initChamber(bullets = 1) {
+  const safe = Math.max(0, Math.min(CHAMBER_SIZE, Math.floor(bullets)));
   const chamber = new Array(CHAMBER_SIZE).fill(null);
-  chamber[Math.floor(Math.random() * CHAMBER_SIZE)] = 'bullet';
+  // Sample `safe` distinct slot indices for bullet placement.
+  const slots = [];
+  while (slots.length < safe) {
+    const idx = Math.floor(Math.random() * CHAMBER_SIZE);
+    if (!slots.includes(idx)) slots.push(idx);
+  }
+  for (const i of slots) chamber[i] = 'bullet';
   return chamber;
 }
 
@@ -229,12 +238,39 @@ function addBulletToChamber(chamber) {
  * Pull the trigger.
  * Backend picks a random slot index, checks for bullet.
  * On survival → add another bullet for next time.
- * Returns { spinIndex, eliminated, chamber, bulletCount }
+ *
+ * v2 Phase E1 — Risk modifiers:
+ *   - doubleBarrel: roll TWO independent spin indices and take the
+ *     higher value before checking the chamber. Skews probability of
+ *     landing on a higher slot — combined with the spec's "bullets
+ *     placed at random" this shifts elimination odds in the early
+ *     game (when there's only 1 bullet and it could be anywhere).
+ *     The reported `spinIndex` is the chosen (higher) index.
+ *   - hotPotato: on SURVIVAL, add 2 bullets instead of 1. Clamps at
+ *     full chamber — addBulletToChamber is a no-op when no empties
+ *     remain, so the second add naturally degrades to "add 1" if the
+ *     chamber was already 5/6, or "add 0" if 6/6.
+ *
+ * Returns { spinIndex, eliminated, chamber, bulletCount }.
  */
-function pullTrigger(chamber) {
-  const spinIndex = Math.floor(Math.random() * CHAMBER_SIZE);
+function pullTrigger(chamber, modifiers = {}) {
+  let spinIndex = Math.floor(Math.random() * CHAMBER_SIZE);
+  if (modifiers.doubleBarrel) {
+    const second = Math.floor(Math.random() * CHAMBER_SIZE);
+    spinIndex = Math.max(spinIndex, second);
+  }
   const eliminated = chamber[spinIndex] === 'bullet';
-  const updatedChamber = eliminated ? chamber : addBulletToChamber(chamber);
+  let updatedChamber = chamber;
+  if (!eliminated) {
+    updatedChamber = addBulletToChamber(chamber);
+    if (modifiers.hotPotato) {
+      // Hot Potato: +2 bullets on survival. The first add is the
+      // standard one; the second add is the modifier bonus. If the
+      // chamber is already full, addBulletToChamber returns it
+      // unchanged (graceful clamp at chamber capacity).
+      updatedChamber = addBulletToChamber(updatedChamber);
+    }
+  }
   const bulletCount = updatedChamber.filter(s => s === 'bullet').length;
   return { spinIndex, eliminated, chamber: updatedChamber, bulletCount };
 }
@@ -585,6 +621,36 @@ function startGame(room) {
   room.isFirstTurn = true;
   room.lastPlayedCard = null;
   room.discardPile = room.discardPile || [];
+
+  // v2 Phase E1 — Risk modifiers initial state.
+  //   • Russian Roulette: every player starts with 3 bullets in their
+  //     chamber instead of 1. createPlayer already rolled a 1-bullet
+  //     chamber so we re-init here once we know the room config.
+  //   • All other risk modifiers (Double Barrel, Hot Potato, Redemption
+  //     Spin) only affect spin-time behaviour and are read off
+  //     `room.config.riskModifiers` at the call sites.
+  //
+  // v2 Phase E2 — Room modifiers initial state.
+  //   • Sudden Death: counter starts at 0 and increments on every
+  //     elimination-free advanceTurn. Resets on any elimination.
+  //   • Mirror Match: only legal at game-start when the alive count
+  //     is even. Caller (start_game socket handler) is responsible
+  //     for refusing the start if mirrorMatch is set with an odd
+  //     alive count — engine just forwards.
+  if (room.config?.riskModifiers?.russianRoulette) {
+    for (const p of alivePlayers) {
+      p.chamber = initChamber(3);
+      p.riskLevel = 3;
+    }
+  }
+  room.suddenDeathCounter = 0;
+  // mirrorMatchActive is latched at startGame and stays on for the
+  // full game even if alive count goes odd post-elimination (locked
+  // decision in the spec roadmap).
+  room.mirrorMatchActive = !!room.config?.roomModifiers?.mirrorMatch;
+  // Speed Mode is a runtime concern handled in socketHandlers — no
+  // engine-side state required. We expose the flag to the client via
+  // serializeRoom for UI affordances (countdown ring, etc.).
 
   // v2 Phase D — assign roles BEFORE the deal so the per-player
   // power-card hand cap (Collector = 3, others = 1) is honoured
@@ -1299,6 +1365,11 @@ function resetRoundOnline(room) {
   // round is cleared on a fresh round, just like armedPowerCard.
   room.skipNextPlayer = false;
   room.bluffBlockedThisTurn = false;
+  // v2 Phase E — Sudden Death counter resets between rounds; the
+  // 4-turn streak is per-round, not game-wide. Redemption flags also
+  // clear so newly-eliminated players are eligible in future rounds.
+  room.suddenDeathCounter = 0;
+  resetRedemptionFlags(room);
 
   return room;
 }
@@ -1307,7 +1378,7 @@ function resetRoundOnline(room) {
 // Now fully deterministic — backend picks spinIndex from chamber array.
 // Frontend receives { spinIndex, chamber } and animates to that exact slot.
 
-function spinGun(player) {
+function spinGun(player, modifiers = {}) {
   // v2 Phase D — Gambler role: risk level NEVER increases from
   // surviving spins. We accomplish this by spinning normally to
   // determine elimination, but on SURVIVAL we revert the chamber
@@ -1317,10 +1388,17 @@ function spinGun(player) {
   // it on survival anyway). Note: external modifiers like Sudden
   // Death (Phase E2) are applied OUTSIDE this fn and can still
   // bump Gambler's risk level — exactly per spec.
+  //
+  // v2 Phase E1 — Risk modifiers (Double Barrel, Hot Potato) are
+  // forwarded to pullTrigger via `modifiers`. Russian Roulette is
+  // applied at startGame (chamber init) so it doesn't need to
+  // appear here. Gambler's "no bullet on survival" still wins over
+  // Hot Potato — we revert the chamber after the fact regardless of
+  // how many bullets pullTrigger would've added.
   const isGambler = player.role === 'gambler';
   const before = [...player.chamber];
 
-  const { spinIndex, eliminated, chamber, bulletCount } = pullTrigger(player.chamber);
+  const { spinIndex, eliminated, chamber, bulletCount } = pullTrigger(player.chamber, modifiers);
 
   if (!eliminated && isGambler) {
     // Skip the survival bullet add — Gambler's chamber is frozen
@@ -1425,6 +1503,118 @@ function onSurvivalForBounty(room, playerId) {
       holderId: player.id,
       holderName: player.username || null,
     };
+  }
+  return null;
+}
+
+// ─── v2 Phase E — Risk + Room Modifier helpers ───────────────
+//
+// These are pure helpers — no I/O, no socket access. Callers in
+// socketHandlers.js orchestrate timing (when each fires) and broadcast
+// the resulting events. Engine just owns the rule.
+
+/**
+ * Pluck the risk-modifier flags out of room.config defensively. Used
+ * by spinGun call sites to forward the right modifiers into pullTrigger.
+ * Returns a frozen object with `doubleBarrel` / `hotPotato` booleans
+ * (other risk mods don't affect pullTrigger directly).
+ */
+function getSpinModifiers(room) {
+  const r = room?.config?.riskModifiers || {};
+  return {
+    doubleBarrel: !!r.doubleBarrel,
+    hotPotato: !!r.hotPotato,
+  };
+}
+
+// ─── Sudden Death (Phase E2) ─────────────────────────────────
+//
+// Spec: every 4 elimination-free turns, all alive players' risk
+// levels increase by 1 simultaneously. Counter resets to 0 on any
+// elimination.
+//
+// Implementation contract:
+//   - `tickSuddenDeath(room)` is called at the END of an advanceTurn
+//     that did not eliminate anyone. Increments the counter; if it
+//     hits 4 it bumps every alive chamber and returns a banner
+//     payload (caller broadcasts as `power_card_triggered`).
+//   - `resetSuddenDeath(room)` is called whenever someone gets
+//     eliminated (any path: spin, Assassin, disconnect).
+//
+// Important: Sudden Death IS allowed to bump Gambler's chamber
+// (locked: external modifiers still affect Gambler — only spin-
+// survival is frozen). Same logic for any role.
+const SUDDEN_DEATH_THRESHOLD = 4;
+
+function tickSuddenDeath(room) {
+  if (!room?.config?.roomModifiers?.suddenDeath) return null;
+  if (typeof room.suddenDeathCounter !== 'number') room.suddenDeathCounter = 0;
+  room.suddenDeathCounter++;
+  if (room.suddenDeathCounter < SUDDEN_DEATH_THRESHOLD) return null;
+
+  // Threshold reached — bump every alive player's chamber by one,
+  // reset counter, return banner payload.
+  const bumpedIds = [];
+  for (const p of room.players) {
+    if (p.status !== 'alive') continue;
+    const before = p.chamber || [];
+    const next = addBulletToChamber(before);
+    if (next !== before) {
+      p.chamber = next;
+      p.riskLevel = next.filter(s => s === 'bullet').length;
+      bumpedIds.push(p.id);
+    } else {
+      // Chamber was already full — nothing changes. Still credit the
+      // player as "affected" so the UI can flash them; their risk
+      // stays at 6.
+      bumpedIds.push(p.id);
+    }
+  }
+  room.suddenDeathCounter = 0;
+  return {
+    kind: 'sudden_death',
+    affectedPlayerIds: bumpedIds,
+  };
+}
+
+function resetSuddenDeath(room) {
+  if (room) room.suddenDeathCounter = 0;
+}
+
+// ─── Mirror Match (Phase E2) ─────────────────────────────────
+//
+// Spec: only selectable when alive count is EVEN at game start.
+// When a player spins, the player directly opposite them in the
+// turn order ALSO spins immediately. Modifier stays active even
+// when alive count goes odd post-elimination (locked decision —
+// fall back to "next alive in opposite direction").
+//
+// Engine helper: pure target finder. Returns the opposite player's
+// id, or null if there's no eligible opposite (only one alive, etc.).
+
+function getMirrorMatchOpposite(room, originalPlayerId) {
+  if (!room?.mirrorMatchActive) return null;
+  const order = room.turnOrder || [];
+  if (order.length < 2) return null;
+  const idx = order.indexOf(originalPlayerId);
+  if (idx === -1) return null;
+
+  const oppositeIdx = (idx + Math.floor(order.length / 2)) % order.length;
+  const oppositeId = order[oppositeIdx];
+  if (!oppositeId || oppositeId === originalPlayerId) return null;
+
+  const opposite = room.players.find(p => p.id === oppositeId);
+  if (opposite && opposite.status === 'alive') return oppositeId;
+
+  // Fallback: walk forward from oppositeIdx looking for the next alive
+  // player who isn't `originalPlayerId`. Spec phrasing: "next alive in
+  // opposite direction".
+  for (let step = 1; step < order.length; step++) {
+    const probeIdx = (oppositeIdx + step) % order.length;
+    const probeId = order[probeIdx];
+    if (probeId === originalPlayerId) continue;
+    const probe = room.players.find(p => p.id === probeId);
+    if (probe && probe.status === 'alive') return probeId;
   }
   return null;
 }
@@ -1843,6 +2033,141 @@ function lastStandSpin(room, playerId) {
   };
 }
 
+function isMirrorMatchEligibleAtStart(room) {
+  // Mirror Match requires an EVEN alive count at the moment of
+  // start_game. Caller validates and refuses the start if this is
+  // false; the engine's own startGame doesn't enforce it because the
+  // physical-mode start has different validation needs.
+  const alive = room.players.filter(p => p.status === 'alive').length;
+  return alive >= 2 && alive % 2 === 0;
+}
+
+// ─── Redemption Spin (Phase E1) ──────────────────────────────
+//
+// Spec table for K (number of eliminated players who get a second
+// chance): 2-4 → 1, 5-6 → 2, 7-9 → 3, 10-12 → 4, 13-15 → 5.
+// Trigger: end of every round (between round_end and the next deal).
+// Each chosen player spins their CURRENT chamber. Survivors re-enter
+// with 3 fresh cards and their chamber is RESET to a fresh 1-bullet
+// chamber. Failures stay eliminated.
+//
+// Disabled once Last Stand is active — `room.lastStandActive` is the
+// hook flag (Phase F3 will flip it on; until then it's never set, so
+// Redemption Spin always runs when configured).
+
+function _redemptionSubsetSize(totalPlayers) {
+  // Locked-decision table from the spec roadmap. Total = ALL players
+  // ever in the game (alive + eliminated). Round-up of 40% would also
+  // produce the same numbers across this range, but the explicit
+  // table avoids ambiguity.
+  if (totalPlayers <= 1) return 0;
+  if (totalPlayers <= 4) return 1;
+  if (totalPlayers <= 6) return 2;
+  if (totalPlayers <= 9) return 3;
+  if (totalPlayers <= 12) return 4;
+  return 5;
+}
+
+/**
+ * Pure helper: pick the eliminated players who get a second chance
+ * this round. Returns up to K random eliminated player ids. Does NOT
+ * mutate state.
+ */
+function pickRedemptionCandidates(room) {
+  if (!room?.config?.riskModifiers?.redemptionSpin) return [];
+  if (room.lastStandActive) return [];
+  const total = room.players.length;
+  const eliminated = room.players.filter(p => p.status === 'eliminated' && !p._redemptionConsumed);
+  if (eliminated.length === 0) return [];
+  const alive = room.players.filter(p => p.status === 'alive').length;
+  if (alive <= 1) return []; // Game's already over.
+
+  const k = Math.min(_redemptionSubsetSize(total), eliminated.length);
+  if (k === 0) return [];
+  const shuffled = _shuffle(eliminated);
+  return shuffled.slice(0, k).map(p => p.id);
+}
+
+/**
+ * Run a single redemption spin for `playerId` against their CURRENT
+ * chamber. On survival: revive into the turn order (append), reset
+ * chamber to a fresh 1-bullet chamber, deal 3 fresh cards (online
+ * mode), clear isSpectator. On failure: stay eliminated.
+ *
+ * Modifier interactions:
+ *   • Double Barrel still applies during a redemption spin (it's a
+ *     spin like any other).
+ *   • Hot Potato also applies — if they survive, the +2 bullet rule
+ *     would kick in… BUT the chamber is reset on success regardless,
+ *     so functionally the only relevant case is elimination.
+ *   • Russian Roulette: chamber reset on success ALWAYS goes back to
+ *     1 bullet (not 3). Spec language: "gun chamber RESETS to 1 bullet".
+ *
+ * Returns:
+ *   {
+ *     playerId, eliminated, spinIndex,
+ *     chamber: chamberBefore,        // for animation
+ *     chamberAfter: chamberAfter,    // post-spin / post-reset
+ *     riskLevel,
+ *     freshCards: Card[]             // empty array if eliminated
+ *   }
+ */
+function runRedemptionSpin(room, playerId) {
+  const player = room.players.find(p => p.id === playerId);
+  if (!player) return null;
+  if (player.status !== 'eliminated') return null;
+  player._redemptionConsumed = true; // each elim only gets one shot per round
+
+  const chamberBefore = [...player.chamber];
+  const modifiers = getSpinModifiers(room);
+  const { spinIndex, eliminated, chamber, bulletCount } = pullTrigger(player.chamber, modifiers);
+
+  if (eliminated) {
+    // Stay eliminated — chamber stays as-is. (pullTrigger only mutates
+    // chamber on survival, so `chamber` here is the unchanged input.)
+    player.chamber = chamber;
+    player.riskLevel = bulletCount;
+    return {
+      playerId,
+      eliminated: true,
+      spinIndex,
+      chamber: chamberBefore,
+      chamberAfter: chamber,
+      riskLevel: bulletCount,
+      freshCards: [],
+    };
+  }
+
+  // Survived → revive.
+  player.status = 'alive';
+  player.isSpectator = false;
+  // Chamber RESETS to 1 bullet (locked).
+  player.chamber = initChamber(1);
+  player.riskLevel = 1;
+  // Re-insert into turn order if not already present. We APPEND;
+  // they take their turn when rotation comes around to them.
+  if (!room.turnOrder.includes(playerId)) {
+    room.turnOrder.push(playerId);
+  }
+
+  // Online mode: fresh hand of 3 (Redemption Spin survivors get a
+  // smaller hand than normal-survival's 6 — see locked decision).
+  let freshCards = [];
+  if (room.mode === MODES.ONLINE) {
+    freshCards = resetHandOnSurvival(room, playerId, 3);
+  }
+
+  return {
+    playerId,
+    eliminated: false,
+    spinIndex,
+    chamber: chamberBefore,
+    chamberAfter: player.chamber,
+    riskLevel: player.riskLevel,
+    freshCards,
+  };
+}
+
 /**
  * Pass the gun to the other finalist. Used when the active player
  * survives. Updates lastStand.activeFinalistId and currentTurnIndex.
@@ -1859,6 +2184,17 @@ function lastStandEndTurn(room, playerId) {
   room.currentTurnIndex = room.turnOrder.indexOf(next);
   if (room.currentTurnIndex < 0) room.currentTurnIndex = 0;
   return { ok: true, nextActiveId: next };
+}
+
+/**
+ * Reset per-round redemption bookkeeping. Called from resetRoundOnline
+ * BEFORE a new round starts so the next round's redemption pass can
+ * pick from any newly-eliminated players too.
+ */
+function resetRedemptionFlags(room) {
+  for (const p of room.players) {
+    delete p._redemptionConsumed;
+  }
 }
 
 // ─── Utilities ─────────────────────────────────────────────────
@@ -1880,6 +2216,9 @@ function eliminateFromTurnOrder(room, playerId) {
   // a Swap shouldn't suddenly unlock just because someone died. The
   // alive-set snapshot still mirrors the live alive set this way.
   _removePlayerFromSwapSnapshots(room, playerId);
+  // v2 Phase E2 — Sudden Death: any elimination resets the streak
+  // counter to 0. Locked decision per the roadmap.
+  resetSuddenDeath(room);
 }
 
 function handleDisconnect(room, socketId) {
@@ -2072,6 +2411,19 @@ function serializeRoom(room, requestingPlayerId = null) {
           activeFinalistId: room.lastStand.activeFinalistId,
         }
       : null,
+    // v2 Phase E2 — Speed Mode countdown. The server stores
+    // `room.speedModeDeadline` (an absolute ms timestamp) when a
+    // turn-bound timer is armed. We expose msRemaining so the client
+    // can render a countdown ring without polling.
+    speedModeMsRemaining:
+      isOnline && room.config?.roomModifiers?.speedMode && room.speedModeDeadline
+        ? Math.max(0, room.speedModeDeadline - Date.now())
+        : undefined,
+    // v2 Phase E2 — Sudden Death streak counter exposed publicly so
+    // every client can hint "X turns until risk bump" if they want.
+    suddenDeathCounter: isOnline ? (room.suddenDeathCounter || 0) : undefined,
+    // v2 Phase E2 — Mirror Match active flag (latched at game start).
+    mirrorMatchActive: isOnline ? !!room.mirrorMatchActive : undefined,
   };
 }
 
@@ -2158,4 +2510,14 @@ module.exports = {
   enterLastStand,
   lastStandSpin,
   lastStandEndTurn,
+  // v2 Phase E — Risk + Room modifiers
+  getSpinModifiers,
+  tickSuddenDeath,
+  resetSuddenDeath,
+  SUDDEN_DEATH_THRESHOLD,
+  getMirrorMatchOpposite,
+  isMirrorMatchEligibleAtStart,
+  pickRedemptionCandidates,
+  runRedemptionSpin,
+  resetRedemptionFlags,
 };
