@@ -2266,6 +2266,63 @@ function reconnectPlayer(room, playerId, newSocketId) {
   return player;
 }
 
+/**
+ * Reset a finished room back to lobby state so the same group can play
+ * another game without re-joining (issue #54). Mutates `room` in place
+ * so callers holding the reference see the reset.
+ *
+ * Implementation strategy: rebuild from `createRoom` + `createPlayer`
+ * rather than enumerating fields to clear. New v2 phases keep adding
+ * room/player state (mirrorMatchActive, pendingMedicSave, hasBounty,
+ * consecutiveCorrectBets, …) and a hand-maintained reset list would
+ * silently rot. This way, if a future feature adds room state via
+ * createRoom or per-player state via createPlayer, the reset already
+ * covers it. Only `code`, `hostUserId`, `createdAt`, and `chatLog`
+ * are explicitly preserved across the reset.
+ */
+function resetRoomForReplay(room) {
+  if (!room) return room;
+
+  const code         = room.code;
+  const hostSocketId = room.hostSocketId;
+  const hostUserId   = room.hostUserId;
+  const mode         = room.mode;
+  const config       = room.config;
+  const createdAt    = room.createdAt;
+  const chatLog      = room.chatLog || [];
+
+  // Snapshot just enough to re-create players in fresh state.
+  const playerIdentities = room.players.map(p => ({
+    id: p.id,
+    username: p.username,
+    socketId: p.socketId,
+  }));
+
+  // Wipe every key on the existing room object so dynamic v2 fields
+  // (pendingGameOver, pendingMedicSave, swapHolderId, mirrorMatchActive,
+  // suddenDeathCounter, …) don't survive the reset.
+  for (const key of Object.keys(room)) delete room[key];
+
+  // Refill from the canonical lobby shape.
+  Object.assign(room, createRoom(hostSocketId, mode, config));
+
+  // Restore preserved bits.
+  room.code           = code;
+  room.hostUserId     = hostUserId;
+  room.createdAt      = createdAt;
+  room.lastActivityAt = Date.now();
+  room.chatLog        = chatLog;
+
+  // Re-create each player at default state — same id/username/socketId,
+  // fresh chamber, alive, role=barehand, ability flags reset, bounty
+  // and bet counters zeroed.
+  for (const ident of playerIdentities) {
+    room.players.push(createPlayer(ident.id, ident.username, ident.socketId));
+  }
+
+  return room;
+}
+
 // ─── Serialization ─────────────────────────────────────────────
 
 function serializeRoom(room, requestingPlayerId = null) {
@@ -2480,6 +2537,7 @@ module.exports = {
   checkGameOver,
   declareRoundWinner,
   reconnectPlayer,
+  resetRoomForReplay,
   validateAndPlayCard,
   ensureDrawPile,
   drawCardForPlayer,
