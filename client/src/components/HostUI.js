@@ -149,6 +149,7 @@ export function HostUI({
   resolveBluff,
   declareRoundWin,
   leaveGame,
+  restartRoom,
   acknowledgeSpinResult,
   spinDismissed,
   voice,
@@ -492,9 +493,14 @@ export function HostUI({
           )}
 
           {isGameOver && (
-            <button className="primary" onClick={leaveGame}>
-              🔄 New Game
-            </button>
+            <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
+              <button className="primary" onClick={restartRoom}>
+                🔄 Play Again
+              </button>
+              <button onClick={leaveGame}>
+                Leave Room
+              </button>
+            </div>
           )}
         </div>
       </div>

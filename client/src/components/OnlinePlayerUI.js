@@ -495,6 +495,7 @@ export function OnlinePlayerUI({
   startNextRound,
   spectatePlayer,
   leaveGame,
+  restartRoom,
   acknowledgeSpinResult,
   spinDismissed,
   activatePowerCard,
@@ -1245,7 +1246,16 @@ export function OnlinePlayerUI({
                 {lastAction?.winnerId === myPlayer.id ? '🎉 You Win!' : `${lastAction?.winnerName ?? '?'} Wins!`}
               </div>
               <div style={{ fontSize: 12, color: 'var(--text-dim)', marginBottom: 16 }}>Game over.</div>
-              <button className="primary" onClick={leaveGame}>🔄 New Game</button>
+              {isHost ? (
+                <div style={{ display: 'flex', gap: 10, justifyContent: 'center', flexWrap: 'wrap' }}>
+                  <button className="primary" onClick={restartRoom}>🔄 Play Again</button>
+                  <button onClick={leaveGame}>Leave Room</button>
+                </div>
+              ) : (
+                <div style={{ fontSize: 11, color: 'var(--text-dim)' }}>
+                  Waiting for host to start a new game...
+                </div>
+              )}
             </div>
           )}
 
