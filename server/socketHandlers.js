@@ -2132,6 +2132,42 @@ function registerSocketHandlers(io, socket) {
     }
   });
 
+  // ─── HOST: Restart a finished room for another game ──────
+  // Issue #54. After phase=game_over, the room had no path back to
+  // lobby — clicking "New Game" just dumped the host out of the room
+  // and forced everyone to re-create + re-share a code. This handler
+  // resets the room in place so the same group plays again. Only the
+  // host (matched by stable userId, not socket.id) may invoke it,
+  // and only from game_over.
+  socket.on('restart_room', async ({ roomCode } = {}, callback) => {
+    if (!socket.userId) return callback?.({ success: false, error: 'Not authenticated' });
+    try {
+      const code = roomCode?.toUpperCase();
+      const room = await getRoom(code);
+      if (!room) return callback?.({ success: false, error: 'Room not found' });
+      if (room.hostUserId !== socket.userId) {
+        return callback?.({ success: false, error: 'Only the host can restart the room' });
+      }
+      if (room.phase !== 'game_over') {
+        return callback?.({ success: false, error: 'Game has not ended yet' });
+      }
+
+      engine.resetRoomForReplay(room);
+      // Host's socket may have reconnected since the room was created;
+      // refresh hostSocketId so phase-based broadcasts target the live
+      // socket (start_next_round, etc. read this).
+      room.hostSocketId = socket.id;
+
+      await saveRoom(room);
+      callback?.({ success: true });
+      await broadcastRoomState(io, code);
+      console.log(`[Room ${code}] Restarted by host (${socket.username})`);
+    } catch (err) {
+      console.error('[restart_room]', err);
+      callback?.({ success: false, error: err.message });
+    }
+  });
+
   // ─── PLAYER: Place a bet (v2 Phase F) ────────────────────
   // While the betting window is open, every alive player except the
   // spin target can submit `prediction: 'survive' | 'eliminated'`.
