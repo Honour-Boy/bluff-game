@@ -1427,10 +1427,12 @@ function spinGun(player, modifiers = {}) {
  *   When an online-mode player SURVIVES a spin, their existing hand
  *   is discarded and they are dealt a fresh batch of cards.
  *
- *   - Normal spin survival → 6 fresh cards.
- *   - Redemption Spin survival → 3 fresh cards. (Redemption Spin
- *     itself ships in Phase E1; this fn accepts a `cardsToDeal`
- *     parameter so the Phase E plug-in is a one-liner.)
+ *   - Normal spin survival → fresh cards EQUAL to the surviving
+ *     hand size at the moment of survival (omit cardsToDeal). This
+ *     keeps the deck draining and lets the game actually end (issue
+ *     #56). Pre-fix it was a fixed 6, which made hands grow back to
+ *     full forever.
+ *   - Redemption Spin survival → 3 fresh cards (caller passes 3).
  *
  *   Hand-cap rule applies during the fresh deal — `drawCardForPlayer`
  *   already discards over-cap power cards onto room.discardPile and
@@ -1441,7 +1443,7 @@ function spinGun(player, modifiers = {}) {
  *
  *   Returns the array of fresh cards dealt (caller can broadcast).
  */
-function resetHandOnSurvival(room, playerId, cardsToDeal = 6) {
+function resetHandOnSurvival(room, playerId, cardsToDeal = null) {
   if (room.mode !== MODES.ONLINE) return [];
   if (!room.hands) return [];
 
@@ -1452,6 +1454,9 @@ function resetHandOnSurvival(room, playerId, cardsToDeal = 6) {
   if (!room.discardPile) room.discardPile = [];
 
   const oldHand = room.hands.get(playerId) || [];
+  // null/undefined → match the surviving hand size. Explicit numbers
+  // (e.g. 3 for Redemption Spin) override.
+  const targetCount = cardsToDeal == null ? oldHand.length : cardsToDeal;
   // Surface any power cards the player had into the discard pile too.
   // The spec is "discard the existing hand" — power cards included.
   for (const card of oldHand) {
@@ -1463,7 +1468,7 @@ function resetHandOnSurvival(room, playerId, cardsToDeal = 6) {
   player.armedPowerCard = null;
 
   const dealt = [];
-  for (let i = 0; i < cardsToDeal; i++) {
+  for (let i = 0; i < targetCount; i++) {
     const card = drawCardForPlayer(room, playerId);
     if (card) dealt.push(card);
     else break;

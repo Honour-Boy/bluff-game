@@ -594,7 +594,8 @@ function armSpeedModeTimer(io, room) {
         medicPaused = maybeStartMedicPause(io, live, player.id, 'spin', finalise);
         if (!medicPaused) finalise();
       } else if (live.mode === engine.MODES.ONLINE) {
-        engine.resetHandOnSurvival(live, player.id, 6);
+        // Issue #56: deal cards equal to surviving hand size, not fixed 6.
+        engine.resetHandOnSurvival(live, player.id);
       }
 
       if (!medicPaused) live.phase = 'playing';
@@ -675,7 +676,7 @@ async function runMirrorMatchSpin(io, room, pending) {
     } else if (room.mode === engine.MODES.ONLINE) {
       // Survivors of a Mirror Match spin still get the standard hand
       // reset (Section 7) — same as a normal survival.
-      engine.resetHandOnSurvival(room, target.id, 6);
+      engine.resetHandOnSurvival(room, target.id);
     }
 
     if (!medicPaused) room.phase = 'playing';
@@ -1181,10 +1182,11 @@ function registerSocketHandlers(io, socket) {
         medicPaused = maybeStartMedicPause(io, room, player.id, 'spin', finalise);
         if (!medicPaused) finalise();
       } else if (room.mode === engine.MODES.ONLINE) {
-        // v2 Section 7: surviving a spin in online mode discards the
-        // hand and deals 6 fresh cards. Redemption Spin survivors get
-        // 3 instead — that path will plug in here in Phase E1.
-        engine.resetHandOnSurvival(room, player.id, 6);
+        // Issue #56: surviving a spin in online mode discards the hand
+        // and deals fresh cards equal to the surviving hand size, so
+        // the deck actually drains and the game can end. Redemption
+        // Spin survivors get 3 instead (Phase E1 explicit override).
+        engine.resetHandOnSurvival(room, player.id);
       }
 
       // If a Medic save is pending, leave phase as 'medic_pending'
