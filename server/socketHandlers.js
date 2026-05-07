@@ -2110,10 +2110,17 @@ function registerSocketHandlers(io, socket) {
         engine.eliminateFromTurnOrder(room, playerId);
         console.log(`[Room ${code}] ${player.username} left`);
 
-        const gameOverWinner = engine.checkGameOver(room);
-        if (gameOverWinner) {
-          room.phase = 'game_over';
-          room.lastAction = { type: 'game_over', winnerId: gameOverWinner.id, winnerName: gameOverWinner.username };
+        // Issue #55: leaving in lobby must not crown the remaining
+        // player as winner. Without this guard, a 2-person lobby
+        // where one taps "Leave" flipped phase to game_over, locked
+        // the other person into a fake win, and blocked the leaver
+        // from rejoining (join_room rejects when phase != lobby).
+        if (room.phase !== 'lobby') {
+          const gameOverWinner = engine.checkGameOver(room);
+          if (gameOverWinner) {
+            room.phase = 'game_over';
+            room.lastAction = { type: 'game_over', winnerId: gameOverWinner.id, winnerName: gameOverWinner.username };
+          }
         }
 
         await saveRoom(room);
