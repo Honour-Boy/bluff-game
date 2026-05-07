@@ -631,6 +631,16 @@ export function useGame(getAccessToken, getGuestAuth, authIdentityKey = null) {
   clearSession();
 }, [socket, roomCode, playerId, clearSession]);
 
+  // Issue #54 — host-only restart of a finished room. Server enforces
+  // the host check; the client doesn't need to gate it because
+  // non-host callers will just see the error returned.
+  const restartRoom = useCallback(() => {
+    if (!roomCode) return;
+    socket.emit('restart_room', { roomCode }, (res) => {
+      if (!res?.success) failError(res);
+    });
+  }, [socket, roomCode, failError]);
+
   // Derived state
   const myPlayer      = roomState?.players?.find(p => p.id === playerId) || null;
   const isMyTurn      = roomState?.currentPlayerId === playerId;
@@ -674,6 +684,7 @@ export function useGame(getAccessToken, getGuestAuth, authIdentityKey = null) {
     openChat,
     closeChat,
     leaveGame,
+    restartRoom,
     activatePowerCard,
     swapPick,
     assassinDecision,

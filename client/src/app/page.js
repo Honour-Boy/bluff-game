@@ -44,7 +44,7 @@ function HomeContent() {
     acknowledgeSpinResult, spinDismissed,
     chatMessages, chatUnread, chatOpen,
     sendChatMessage, openChat, closeChat,
-    leaveGame, setError,
+    leaveGame, restartRoom, setError,
     activatePowerCard,
     swapPick,
     assassinDecision,
@@ -156,6 +156,7 @@ function HomeContent() {
           startNextRound={startNextRound}
           spectatePlayer={spectatePlayer}
           leaveGame={leaveGame}
+          restartRoom={restartRoom}
           acknowledgeSpinResult={acknowledgeSpinResult}
           spinDismissed={spinDismissed}
           activatePowerCard={activatePowerCard}
@@ -185,6 +186,7 @@ function HomeContent() {
         resolveBluff={resolveBluff}
         declareRoundWin={declareRoundWin}
         leaveGame={leaveGame}
+        restartRoom={restartRoom}
         acknowledgeSpinResult={acknowledgeSpinResult}
         spinDismissed={spinDismissed}
         voice={voice}
@@ -208,6 +210,7 @@ function HomeContent() {
           startNextRound={startNextRound}
           spectatePlayer={spectatePlayer}
           leaveGame={leaveGame}
+          restartRoom={restartRoom}
           acknowledgeSpinResult={acknowledgeSpinResult}
           spinDismissed={spinDismissed}
           activatePowerCard={activatePowerCard}
