@@ -29,6 +29,62 @@ export function useGame(getAccessToken, getGuestAuth) {
   const chatOpenRef = useRef(false);
   useEffect(() => { chatOpenRef.current = chatOpen; }, [chatOpen]);
 
+  // Stash the userId of the last connected socket so the chat
+  // notification sound can suppress beeps for messages the user
+  // sent themselves. Without this, every send would self-ding.
+  // Server stamps `userId` after authenticate, but we don't have a
+  // direct accessor — use playerId (Supabase user.id / guest:<uuid>),
+  // which is the same string. This is a ref because the chat handler
+  // is re-bound on every socket dep change and capturing playerId in
+  // closure would lag a render.
+  const myUserIdRef = useRef(null);
+  useEffect(() => { myUserIdRef.current = playerId; }, [playerId]);
+
+  // Lazily-constructed AudioContext for the chat notification ping.
+  // Browsers gate AudioContext creation on a user gesture in some
+  // configurations; we create it on first beep instead of mount, so
+  // it inherits whatever gesture the user just made (typing,
+  // clicking, etc.). One context lives for the page's lifetime.
+  const chatPingCtxRef = useRef(null);
+  const playChatPing = useCallback(() => {
+    if (typeof window === 'undefined') return;
+    try {
+      const Ctor = window.AudioContext || window.webkitAudioContext;
+      if (!Ctor) return;
+      let ctx = chatPingCtxRef.current;
+      if (!ctx) {
+        ctx = new Ctor();
+        chatPingCtxRef.current = ctx;
+      }
+      // A brief sine ping: 880Hz, 70ms. Soft envelope so it doesn't
+      // clip and doesn't startle anyone wearing headphones in a quiet
+      // room. Two stacked oscillators (880Hz + 660Hz) give a more
+      // notification-shaped chime than a single tone.
+      const now = ctx.currentTime;
+      const gain = ctx.createGain();
+      gain.gain.setValueAtTime(0, now);
+      gain.gain.linearRampToValueAtTime(0.08, now + 0.005);
+      gain.gain.exponentialRampToValueAtTime(0.0001, now + 0.18);
+      gain.connect(ctx.destination);
+
+      const o1 = ctx.createOscillator();
+      o1.type = 'sine';
+      o1.frequency.value = 880;
+      o1.connect(gain);
+      o1.start(now);
+      o1.stop(now + 0.2);
+
+      const o2 = ctx.createOscillator();
+      o2.type = 'sine';
+      o2.frequency.value = 660;
+      o2.connect(gain);
+      o2.start(now + 0.04);
+      o2.stop(now + 0.2);
+    } catch (_) {
+      // Silently swallow — audio is a nice-to-have, not load-bearing.
+    }
+  }, []);
+
   // ─── v2 Phase C — power-card announcement queue ──────────
   // The server emits `power_card_triggered` events when any power
   // card fires (Shield blocking, Mirror reflecting, Freeze landing,
@@ -244,7 +300,13 @@ export function useGame(getAccessToken, getGuestAuth) {
         if (prev.some(m => m.id === msg.id)) return prev;
         return [...prev, msg];
       });
-      if (!chatOpenRef.current) setChatUnread((n) => n + 1);
+      if (!chatOpenRef.current) {
+        setChatUnread((n) => n + 1);
+        // Ping only for OTHER people's messages and only when the
+        // panel is closed (open panel already shows the message
+        // visually + autoscrolls — no ear-tap needed).
+        if (msg.userId !== myUserIdRef.current) playChatPing();
+      }
     };
     const onBluffCalled = () => notify('⚠️ Bluff called! Host: reveal the last card.', 'warning');
     const onSpinAcknowledged = () => setSpinDismissed(true);
@@ -284,7 +346,7 @@ export function useGame(getAccessToken, getGuestAuth) {
       socket.off('game_ended', onGameEnded);
       socket.off('power_card_triggered', onPowerCardTriggered);
     };
-  }, [socket, notify, clearSession, authenticateSocket]);
+  }, [socket, notify, clearSession, authenticateSocket, playChatPing]);
 
   // ─── On mount: authenticate if already connected ──────────
   // Triggers on either auth source becoming available — a guest

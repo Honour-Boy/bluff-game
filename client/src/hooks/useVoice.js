@@ -101,6 +101,34 @@ export function useVoice({ roomCode, isAuthenticated }) {
       roomRef.current = null;
     });
 
+    // Keep the local muted state in sync with whatever the SDK
+    // actually reports. LiveKit can mute/unmute the local mic on
+    // its own (auto-reconnect, server-initiated mute, the user's
+    // OS-level mic switch toggling). Without these listeners the
+    // UI's `muted` flag drifts: button says "Mic ON" while the SDK
+    // has the track muted, or vice versa, and pressing it produces
+    // a confusing no-op. The getter `isMicrophoneEnabled` is the
+    // source of truth — `muted = !enabled`.
+    const syncMutedFromTrack = () => {
+      const lp = room.localParticipant;
+      if (!lp) return;
+      try {
+        setMuted(!lp.isMicrophoneEnabled);
+      } catch (_) { /* getter throws while mid-publish — ignore */ }
+    };
+    room.on(RoomEvent.TrackMuted, (_pub, participant) => {
+      if (participant?.identity === room.localParticipant?.identity) {
+        syncMutedFromTrack();
+      }
+    });
+    room.on(RoomEvent.TrackUnmuted, (_pub, participant) => {
+      if (participant?.identity === room.localParticipant?.identity) {
+        syncMutedFromTrack();
+      }
+    });
+    room.on(RoomEvent.LocalTrackPublished, syncMutedFromTrack);
+    room.on(RoomEvent.LocalTrackUnpublished, syncMutedFromTrack);
+
     // Auto-play remote audio tracks. LiveKit attaches them to <audio>
     // elements managed by the SDK once we subscribe.
     room.on(RoomEvent.TrackSubscribed, (track) => {
@@ -119,7 +147,14 @@ export function useVoice({ roomCode, isAuthenticated }) {
       // Publish the mic — disabled (muted) until user toggles.
       await room.localParticipant.setMicrophoneEnabled(false);
       roomRef.current = room;
-      setMuted(true);
+      // Read back the actual track state instead of trusting the
+      // setMicrophoneEnabled(false) call above. If the publish
+      // raced or got reverted, the read-back catches it.
+      try {
+        setMuted(!room.localParticipant.isMicrophoneEnabled);
+      } catch (_) {
+        setMuted(true); // safe default if the getter throws
+      }
       setStatus('connected');
       return true;
     } catch (err) {
@@ -142,15 +177,33 @@ export function useVoice({ roomCode, isAuthenticated }) {
   }, []);
 
   // ─── Toggle mic ─────────────────────────────────────────────
+  // Asks the SDK to flip the local mic, then reads back the actual
+  // track state instead of trusting the requested flip. If the user
+  // denies the permission prompt on first unmute, setMicrophoneEnabled
+  // rejects → catch path. If LiveKit silently rejects (rare but
+  // possible mid-reconnect), the read-back keeps the UI honest. The
+  // TrackMuted/TrackUnmuted listeners installed in connect() also
+  // resync if the SDK changes mute state on its own afterwards.
   const toggleMute = useCallback(async () => {
     const room = roomRef.current;
     if (!room) return;
-    const next = !muted;
+    const desiredEnabled = muted; // muted=true → want enabled
     try {
-      await room.localParticipant.setMicrophoneEnabled(!next);
-      setMuted(next);
+      await room.localParticipant.setMicrophoneEnabled(desiredEnabled);
     } catch (err) {
       setError(err?.message || 'Could not toggle microphone');
+      // Mic permission denial leaves the track disabled; re-read so
+      // the UI reflects what actually happened, not what we asked for.
+      try {
+        setMuted(!room.localParticipant.isMicrophoneEnabled);
+      } catch (_) { /* keep prior state */ }
+      return;
+    }
+    try {
+      setMuted(!room.localParticipant.isMicrophoneEnabled);
+    } catch (_) {
+      // Getter unavailable for a beat — fall back to the requested state.
+      setMuted(!desiredEnabled);
     }
   }, [muted]);
 
