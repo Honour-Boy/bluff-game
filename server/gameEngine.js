@@ -300,6 +300,11 @@ function createRoom(hostSocketId, mode = MODES.PHYSICAL, config = null) {
     cardPlayedThisTurn: false,
     spinTargetId: null,
     createdAt: Date.now(),
+    // Last time the room saw any user-initiated activity. Bumped by
+    // saveRoom on every accepted mutation; the inactivity sweep in
+    // socketHandlers.js compares against this to garbage-collect
+    // abandoned rooms (host left tab open, lobby never starts, etc.).
+    lastActivityAt: Date.now(),
     deck: null,
     playedPile: null,
     hands: null,

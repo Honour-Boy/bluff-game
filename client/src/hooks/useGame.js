@@ -219,6 +219,28 @@ export function useGame(getAccessToken, getGuestAuth) {
     };
   }, [roomCode]);
 
+  // ─── Reload / close confirmation ──────────────────────────
+  // While the user is in a room, intercept tab close / refresh
+  // with the browser's stock "Are you sure?" prompt. Without this,
+  // a stray Cmd+R drops them into the disconnect grace period and
+  // their teammates see a "player disconnecting" toast for 30s.
+  //
+  // The browser ignores the actual returnValue text in modern
+  // versions — calling preventDefault + setting the property is
+  // the entire spec. Active in lobby too: a host hitting refresh
+  // before starting still kills the room for everyone (10s host
+  // grace runs from disconnect, not from start).
+  useEffect(() => {
+    if (!roomCode) return;
+    const onBeforeUnload = (e) => {
+      e.preventDefault();
+      e.returnValue = ''; // legacy Chrome/Safari requirement
+      return '';
+    };
+    window.addEventListener('beforeunload', onBeforeUnload);
+    return () => window.removeEventListener('beforeunload', onBeforeUnload);
+  }, [roomCode]);
+
   // ─── Socket event listeners ───────────────────────────────
   useEffect(() => {
     const onConnect = async () => {

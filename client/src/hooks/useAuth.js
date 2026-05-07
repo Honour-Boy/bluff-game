@@ -19,6 +19,7 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '../lib/supabase';
+import { getSocket } from '../lib/socket';
 
 // sessionStorage keys — scoped per browser tab so closing the tab
 // (or opening a new one) starts fresh. Identity in this game is
@@ -229,6 +230,11 @@ export function useAuth() {
   }, []);
 
   // ─── Update username ───────────────────────────────────────
+  // Persists to the `profiles` table THEN tells the server to
+  // refresh socket.username + every room.players entry the user is
+  // in. Without that second hop, the server keeps the old name
+  // stamped at authenticate-time and other clients only see the
+  // rename after a full reconnect.
   const updateUsername = useCallback(async (newUsername) => {
     if (!user) return { error: 'Not signed in' };
     const trimmed = newUsername.trim();
@@ -242,6 +248,18 @@ export function useAuth() {
 
     if (error) return { error: error.message };
     setProfile(prev => ({ ...prev, username: trimmed }));
+
+    // Best-effort socket sync. If the socket isn't authenticated
+    // (e.g. user is signed out or transport just dropped), the next
+    // reconnect's `authenticate` re-reads the profile, so the rename
+    // still propagates — just on the next reconnect rather than now.
+    try {
+      const socket = getSocket();
+      if (socket?.connected) {
+        socket.emit('update_username', {}, () => {});
+      }
+    } catch (_) { /* non-fatal */ }
+
     return { error: null };
   }, [user]);
 
