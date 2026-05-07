@@ -70,6 +70,13 @@ async function getRoom(code) {
 }
 
 async function saveRoom(room) {
+  // Stamp every accepted mutation so the inactivity sweep can tell
+  // a live room from a zombie. Includes server-internal timer
+  // mutations (betting close, ghost vote tally, etc.) — that's
+  // intentional: a room with active timers is by definition not
+  // idle. Failed handler paths early-return before saveRoom and
+  // therefore don't bump.
+  room.lastActivityAt = Date.now();
   rooms.set(room.code, room);
 }
 
@@ -678,6 +685,68 @@ async function runMirrorMatchSpin(io, room, pending) {
   }
 }
 
+// ─── Inactivity sweep ────────────────────────────────────────
+//
+// Garbage-collect rooms nobody has touched in a while. A "touch" is
+// any accepted mutation (saveRoom bumps `room.lastActivityAt`). This
+// catches the cases the host-disconnect timer doesn't:
+//   - Host stays connected but goes AFK in the lobby.
+//   - Everyone is in spectator mode and the host's gone idle.
+//   - A bug leaves the room stuck in a non-broadcasting phase.
+//
+// The threshold is generous (45 minutes) because real games can have
+// long-considered moves, and we don't want to evict a slow but live
+// game. Server restarts also clear all rooms, which is its own
+// safety net.
+const INACTIVITY_THRESHOLD_MS = 45 * 60 * 1000;
+const INACTIVITY_SWEEP_INTERVAL_MS = 60 * 1000;
+
+let inactivitySweepHandle = null;
+
+function startInactivitySweep(io) {
+  if (inactivitySweepHandle) return;
+  inactivitySweepHandle = setInterval(() => {
+    const now = Date.now();
+    for (const [code, room] of rooms.entries()) {
+      const last = room.lastActivityAt ?? room.createdAt ?? now;
+      if (now - last <= INACTIVITY_THRESHOLD_MS) continue;
+
+      io.to(code).emit('game_ended', {
+        reason: 'Room closed after long inactivity.',
+      });
+      // Same teardown the host-disconnect grace timer runs.
+      _clearBettingTimer(code);
+      _clearGhostVoteTimer(code);
+      cancelSpeedModeTimer(code);
+      const hostTimer = hostDisconnectTimers.get(code);
+      if (hostTimer) {
+        clearTimeout(hostTimer);
+        hostDisconnectTimers.delete(code);
+      }
+      // Drop any pending player-disconnect timers tied to this room.
+      for (const [key, timer] of playerDisconnectTimers.entries()) {
+        if (key.startsWith(`${code}:`)) {
+          clearTimeout(timer);
+          playerDisconnectTimers.delete(key);
+        }
+      }
+      rooms.delete(code);
+    }
+  }, INACTIVITY_SWEEP_INTERVAL_MS);
+  // Don't keep the Node event loop alive just for the sweep — if the
+  // process is otherwise quiet (e.g. tests finishing), let it exit.
+  if (typeof inactivitySweepHandle.unref === 'function') {
+    inactivitySweepHandle.unref();
+  }
+}
+
+function stopInactivitySweep() {
+  if (inactivitySweepHandle) {
+    clearInterval(inactivitySweepHandle);
+    inactivitySweepHandle = null;
+  }
+}
+
 // ─── Register all handlers ────────────────────────────────────
 
 const hostDisconnectTimers = new Map();
@@ -689,6 +758,8 @@ const playerDisconnectTimers = new Map();
 const dcKey = (code, playerId) => `${code}:${playerId}`;
 
 function registerSocketHandlers(io, socket) {
+  // Idempotent: runs once on first connection, no-ops thereafter.
+  startInactivitySweep(io);
 
   // ─── AUTHENTICATE socket with Supabase JWT or guest ──────
   // Must be called once after connecting, before any game events.
@@ -2253,6 +2324,9 @@ module.exports = {
   // Exposed for unit tests + clarity. Treat as internal.
   sanitizeGuestUsername,
   isValidGuestId,
+  startInactivitySweep,
+  stopInactivitySweep,
+  INACTIVITY_THRESHOLD_MS,
   GUEST_USER_PREFIX,
   GUEST_USERNAME_MIN,
   GUEST_USERNAME_MAX,
