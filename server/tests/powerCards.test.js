@@ -509,6 +509,26 @@ describe('resetHandOnSurvival (Section 7)', () => {
     expect(dealt).toEqual([]);
     expect(room.hands.get('p0')).toEqual(before);
   });
+
+  // Issue #56 — pre-fix this dealt 6 cards regardless of hand size,
+  // so hands stayed full forever and the deck never drained.
+  it('omitted cardsToDeal defaults to surviving hand size (#56)', () => {
+    const room = setupSurvivor();
+    // Trim the player's hand down so we can verify size-matching.
+    const trimmed = room.hands.get('p0').slice(0, 4);
+    room.hands.set('p0', trimmed);
+    const dealt = resetHandOnSurvival(room, 'p0');
+    expect(dealt).toHaveLength(4);
+    expect(room.hands.get('p0')).toHaveLength(4);
+  });
+
+  it('omitted cardsToDeal with empty hand deals zero (#56 edge case)', () => {
+    const room = setupSurvivor();
+    room.hands.set('p0', []);
+    const dealt = resetHandOnSurvival(room, 'p0');
+    expect(dealt).toEqual([]);
+    expect(room.hands.get('p0')).toEqual([]);
+  });
 });
 
 // ─── createPlayer adds armedPowerCard field ──────────────────
