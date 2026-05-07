@@ -1427,10 +1427,12 @@ function spinGun(player, modifiers = {}) {
  *   When an online-mode player SURVIVES a spin, their existing hand
  *   is discarded and they are dealt a fresh batch of cards.
  *
- *   - Normal spin survival → 6 fresh cards.
- *   - Redemption Spin survival → 3 fresh cards. (Redemption Spin
- *     itself ships in Phase E1; this fn accepts a `cardsToDeal`
- *     parameter so the Phase E plug-in is a one-liner.)
+ *   - Normal spin survival → fresh cards EQUAL to the surviving
+ *     hand size at the moment of survival (omit cardsToDeal). This
+ *     keeps the deck draining and lets the game actually end (issue
+ *     #56). Pre-fix it was a fixed 6, which made hands grow back to
+ *     full forever.
+ *   - Redemption Spin survival → 3 fresh cards (caller passes 3).
  *
  *   Hand-cap rule applies during the fresh deal — `drawCardForPlayer`
  *   already discards over-cap power cards onto room.discardPile and
@@ -1441,7 +1443,7 @@ function spinGun(player, modifiers = {}) {
  *
  *   Returns the array of fresh cards dealt (caller can broadcast).
  */
-function resetHandOnSurvival(room, playerId, cardsToDeal = 6) {
+function resetHandOnSurvival(room, playerId, cardsToDeal = null) {
   if (room.mode !== MODES.ONLINE) return [];
   if (!room.hands) return [];
 
@@ -1452,6 +1454,9 @@ function resetHandOnSurvival(room, playerId, cardsToDeal = 6) {
   if (!room.discardPile) room.discardPile = [];
 
   const oldHand = room.hands.get(playerId) || [];
+  // null/undefined → match the surviving hand size. Explicit numbers
+  // (e.g. 3 for Redemption Spin) override.
+  const targetCount = cardsToDeal == null ? oldHand.length : cardsToDeal;
   // Surface any power cards the player had into the discard pile too.
   // The spec is "discard the existing hand" — power cards included.
   for (const card of oldHand) {
@@ -1463,7 +1468,7 @@ function resetHandOnSurvival(room, playerId, cardsToDeal = 6) {
   player.armedPowerCard = null;
 
   const dealt = [];
-  for (let i = 0; i < cardsToDeal; i++) {
+  for (let i = 0; i < targetCount; i++) {
     const card = drawCardForPlayer(room, playerId);
     if (card) dealt.push(card);
     else break;
@@ -2261,6 +2266,63 @@ function reconnectPlayer(room, playerId, newSocketId) {
   return player;
 }
 
+/**
+ * Reset a finished room back to lobby state so the same group can play
+ * another game without re-joining (issue #54). Mutates `room` in place
+ * so callers holding the reference see the reset.
+ *
+ * Implementation strategy: rebuild from `createRoom` + `createPlayer`
+ * rather than enumerating fields to clear. New v2 phases keep adding
+ * room/player state (mirrorMatchActive, pendingMedicSave, hasBounty,
+ * consecutiveCorrectBets, …) and a hand-maintained reset list would
+ * silently rot. This way, if a future feature adds room state via
+ * createRoom or per-player state via createPlayer, the reset already
+ * covers it. Only `code`, `hostUserId`, `createdAt`, and `chatLog`
+ * are explicitly preserved across the reset.
+ */
+function resetRoomForReplay(room) {
+  if (!room) return room;
+
+  const code         = room.code;
+  const hostSocketId = room.hostSocketId;
+  const hostUserId   = room.hostUserId;
+  const mode         = room.mode;
+  const config       = room.config;
+  const createdAt    = room.createdAt;
+  const chatLog      = room.chatLog || [];
+
+  // Snapshot just enough to re-create players in fresh state.
+  const playerIdentities = room.players.map(p => ({
+    id: p.id,
+    username: p.username,
+    socketId: p.socketId,
+  }));
+
+  // Wipe every key on the existing room object so dynamic v2 fields
+  // (pendingGameOver, pendingMedicSave, swapHolderId, mirrorMatchActive,
+  // suddenDeathCounter, …) don't survive the reset.
+  for (const key of Object.keys(room)) delete room[key];
+
+  // Refill from the canonical lobby shape.
+  Object.assign(room, createRoom(hostSocketId, mode, config));
+
+  // Restore preserved bits.
+  room.code           = code;
+  room.hostUserId     = hostUserId;
+  room.createdAt      = createdAt;
+  room.lastActivityAt = Date.now();
+  room.chatLog        = chatLog;
+
+  // Re-create each player at default state — same id/username/socketId,
+  // fresh chamber, alive, role=barehand, ability flags reset, bounty
+  // and bet counters zeroed.
+  for (const ident of playerIdentities) {
+    room.players.push(createPlayer(ident.id, ident.username, ident.socketId));
+  }
+
+  return room;
+}
+
 // ─── Serialization ─────────────────────────────────────────────
 
 function serializeRoom(room, requestingPlayerId = null) {
@@ -2475,6 +2537,7 @@ module.exports = {
   checkGameOver,
   declareRoundWinner,
   reconnectPlayer,
+  resetRoomForReplay,
   validateAndPlayCard,
   ensureDrawPile,
   drawCardForPlayer,

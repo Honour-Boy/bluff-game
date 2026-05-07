@@ -10,8 +10,10 @@
 import { describe, it, expect } from 'vitest';
 import {
   createRoom,
+  createPlayer,
   defaultRoomConfig,
   normalizeRoomConfig,
+  resetRoomForReplay,
   serializeRoom,
   MODES,
 } from '../gameEngine.js';
@@ -140,5 +142,77 @@ describe('serializeRoom exposes config', () => {
     const serialised = serializeRoom(room);
     expect(serialised.config).toBeTruthy();
     expect(serialised.config.powerCards.enabled.peek).toBe(true);
+  });
+});
+
+// Issue #54 — replaying in the same room.
+describe('resetRoomForReplay', () => {
+  function buildFinishedRoom() {
+    const room = createRoom('host-sock', MODES.ONLINE, {
+      powerCards: { enabled: { shield: true } },
+    });
+    room.code = 'TESTAB';
+    room.hostUserId = 'host:abc';
+    room.players.push(createPlayer('p1', 'Alice', 'sock-1'));
+    room.players.push(createPlayer('p2', 'Bob',   'sock-2'));
+    // Pollute with end-of-game state.
+    room.phase = 'game_over';
+    room.pendingGameOver = { id: 'p1', name: 'Alice' };
+    room.mirrorMatchActive = true;
+    room.suddenDeathCounter = 5;
+    room.swapHolderId = 'p2';
+    room.deck = ['x', 'y'];
+    room.hands = new Map([['p1', ['c1']], ['p2', ['c2']]]);
+    room.players[0].status = 'eliminated';
+    room.players[0].riskLevel = 4;
+    room.players[0].hasBounty = true;
+    room.players[0].consecutiveCorrectBets = 2;
+    room.players[0].armedPowerCard = { power: 'shield', cardId: 'sc1', activatedAtTurn: 0 };
+    room.chatLog = [{ id: 'm1', userId: 'p1', username: 'Alice', text: 'gg', ts: 0 }];
+    return room;
+  }
+
+  it('returns the room to lobby state', () => {
+    const room = buildFinishedRoom();
+    resetRoomForReplay(room);
+    expect(room.phase).toBe('lobby');
+    expect(room.roundNumber).toBe(1);
+    expect(room.lastAction).toBeNull();
+    expect(room.deck).toBeNull();
+    expect(room.hands).toBeNull();
+  });
+
+  it('preserves room identity (code, host, mode, config) and chat log', () => {
+    const room = buildFinishedRoom();
+    resetRoomForReplay(room);
+    expect(room.code).toBe('TESTAB');
+    expect(room.hostUserId).toBe('host:abc');
+    expect(room.mode).toBe(MODES.ONLINE);
+    expect(room.config.powerCards.enabled.shield).toBe(true);
+    expect(room.chatLog).toHaveLength(1);
+  });
+
+  it('re-creates each player at default state — alive, ability flags reset', () => {
+    const room = buildFinishedRoom();
+    resetRoomForReplay(room);
+    expect(room.players).toHaveLength(2);
+    const alice = room.players.find(p => p.id === 'p1');
+    expect(alice.username).toBe('Alice');
+    expect(alice.status).toBe('alive');
+    expect(alice.riskLevel).toBe(1);
+    expect(alice.hasBounty).toBe(false);
+    expect(alice.consecutiveCorrectBets).toBe(0);
+    expect(alice.armedPowerCard).toBeNull();
+    expect(Array.isArray(alice.chamber)).toBe(true);
+    expect(alice.chamber).toHaveLength(6);
+  });
+
+  it('wipes dynamic v2 keys from the previous game', () => {
+    const room = buildFinishedRoom();
+    resetRoomForReplay(room);
+    expect('pendingGameOver' in room).toBe(false);
+    expect('mirrorMatchActive' in room).toBe(false);
+    expect('suddenDeathCounter' in room).toBe(false);
+    expect('swapHolderId' in room).toBe(false);
   });
 });

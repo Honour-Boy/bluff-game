@@ -25,7 +25,12 @@ function HomeContent() {
     getAccessToken, getGuestAuth, username, isGuest,
   } = useAuth();
 
-  const game = useGame(getAccessToken, getGuestAuth);
+  // Pass the effective auth identity so useGame re-authenticates
+  // the socket when the user transitions null → guest → real user.
+  // Without this third arg, the existing socket stays unauthenticated
+  // after guest sign-in and online-room actions get "Not authenticated"
+  // (issue #52).
+  const game = useGame(getAccessToken, getGuestAuth, user?.id ?? null);
 
   const {
     roomCode, isHost, playerId,
@@ -39,7 +44,7 @@ function HomeContent() {
     acknowledgeSpinResult, spinDismissed,
     chatMessages, chatUnread, chatOpen,
     sendChatMessage, openChat, closeChat,
-    leaveGame, setError,
+    leaveGame, restartRoom, setError,
     activatePowerCard,
     swapPick,
     assassinDecision,
@@ -151,6 +156,7 @@ function HomeContent() {
           startNextRound={startNextRound}
           spectatePlayer={spectatePlayer}
           leaveGame={leaveGame}
+          restartRoom={restartRoom}
           acknowledgeSpinResult={acknowledgeSpinResult}
           spinDismissed={spinDismissed}
           activatePowerCard={activatePowerCard}
@@ -180,6 +186,7 @@ function HomeContent() {
         resolveBluff={resolveBluff}
         declareRoundWin={declareRoundWin}
         leaveGame={leaveGame}
+        restartRoom={restartRoom}
         acknowledgeSpinResult={acknowledgeSpinResult}
         spinDismissed={spinDismissed}
         voice={voice}
@@ -203,6 +210,7 @@ function HomeContent() {
           startNextRound={startNextRound}
           spectatePlayer={spectatePlayer}
           leaveGame={leaveGame}
+          restartRoom={restartRoom}
           acknowledgeSpinResult={acknowledgeSpinResult}
           spinDismissed={spinDismissed}
           activatePowerCard={activatePowerCard}

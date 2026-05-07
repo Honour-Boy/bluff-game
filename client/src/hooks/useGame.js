@@ -7,7 +7,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { getSocket } from '../lib/socket';
 
-export function useGame(getAccessToken, getGuestAuth) {
+export function useGame(getAccessToken, getGuestAuth, authIdentityKey = null) {
   const socket = getSocket();
 
   const [roomCode, setRoomCode]       = useState(null);
@@ -348,13 +348,17 @@ export function useGame(getAccessToken, getGuestAuth) {
     };
   }, [socket, notify, clearSession, authenticateSocket, playChatPing]);
 
-  // ─── On mount: authenticate if already connected ──────────
-  // Triggers on either auth source becoming available — a guest
+  // ─── On mount + on auth-identity change: authenticate if connected ──
+  // Triggers when the effective auth identity changes — e.g. a guest
   // signing in mid-session needs to (re)authenticate the existing
-  // socket without waiting for a transport reconnect.
+  // socket without waiting for a transport reconnect. The two
+  // callback refs are useCallback-stable, so they alone wouldn't re-
+  // fire this effect on guest sign-in (issue #52). authIdentityKey
+  // (user?.id from useAuth — covers both Supabase ids and guest:<uuid>)
+  // is the actual signal we react to.
   useEffect(() => {
     if (socket.connected && (getAccessToken || getGuestAuth)) authenticateSocket();
-  }, [getAccessToken, getGuestAuth]); // eslint-disable-line
+  }, [authIdentityKey, getAccessToken, getGuestAuth]); // eslint-disable-line
 
   // ─── Actions ──────────────────────────────────────────────
 
@@ -627,6 +631,16 @@ export function useGame(getAccessToken, getGuestAuth) {
   clearSession();
 }, [socket, roomCode, playerId, clearSession]);
 
+  // Issue #54 — host-only restart of a finished room. Server enforces
+  // the host check; the client doesn't need to gate it because
+  // non-host callers will just see the error returned.
+  const restartRoom = useCallback(() => {
+    if (!roomCode) return;
+    socket.emit('restart_room', { roomCode }, (res) => {
+      if (!res?.success) failError(res);
+    });
+  }, [socket, roomCode, failError]);
+
   // Derived state
   const myPlayer      = roomState?.players?.find(p => p.id === playerId) || null;
   const isMyTurn      = roomState?.currentPlayerId === playerId;
@@ -670,6 +684,7 @@ export function useGame(getAccessToken, getGuestAuth) {
     openChat,
     closeChat,
     leaveGame,
+    restartRoom,
     activatePowerCard,
     swapPick,
     assassinDecision,

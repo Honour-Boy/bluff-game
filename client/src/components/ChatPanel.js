@@ -90,6 +90,9 @@ export function ChatPanel({
             boxShadow: '0 8px 24px rgba(0,0,0,0.45)',
             transition: 'transform 0.15s, border-color 0.15s',
             WebkitTapHighlightColor: 'transparent',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
           }}
           onMouseEnter={e => { e.currentTarget.style.transform = 'translateY(-2px)'; e.currentTarget.style.borderColor = 'var(--accent)'; }}
           onMouseLeave={e => { e.currentTarget.style.transform = 'none'; e.currentTarget.style.borderColor = 'var(--border)'; }}

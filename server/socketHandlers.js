@@ -594,7 +594,8 @@ function armSpeedModeTimer(io, room) {
         medicPaused = maybeStartMedicPause(io, live, player.id, 'spin', finalise);
         if (!medicPaused) finalise();
       } else if (live.mode === engine.MODES.ONLINE) {
-        engine.resetHandOnSurvival(live, player.id, 6);
+        // Issue #56: deal cards equal to surviving hand size, not fixed 6.
+        engine.resetHandOnSurvival(live, player.id);
       }
 
       if (!medicPaused) live.phase = 'playing';
@@ -675,7 +676,7 @@ async function runMirrorMatchSpin(io, room, pending) {
     } else if (room.mode === engine.MODES.ONLINE) {
       // Survivors of a Mirror Match spin still get the standard hand
       // reset (Section 7) — same as a normal survival.
-      engine.resetHandOnSurvival(room, target.id, 6);
+      engine.resetHandOnSurvival(room, target.id);
     }
 
     if (!medicPaused) room.phase = 'playing';
@@ -1181,10 +1182,11 @@ function registerSocketHandlers(io, socket) {
         medicPaused = maybeStartMedicPause(io, room, player.id, 'spin', finalise);
         if (!medicPaused) finalise();
       } else if (room.mode === engine.MODES.ONLINE) {
-        // v2 Section 7: surviving a spin in online mode discards the
-        // hand and deals 6 fresh cards. Redemption Spin survivors get
-        // 3 instead — that path will plug in here in Phase E1.
-        engine.resetHandOnSurvival(room, player.id, 6);
+        // Issue #56: surviving a spin in online mode discards the hand
+        // and deals fresh cards equal to the surviving hand size, so
+        // the deck actually drains and the game can end. Redemption
+        // Spin survivors get 3 instead (Phase E1 explicit override).
+        engine.resetHandOnSurvival(room, player.id);
       }
 
       // If a Medic save is pending, leave phase as 'medic_pending'
@@ -2108,10 +2110,17 @@ function registerSocketHandlers(io, socket) {
         engine.eliminateFromTurnOrder(room, playerId);
         console.log(`[Room ${code}] ${player.username} left`);
 
-        const gameOverWinner = engine.checkGameOver(room);
-        if (gameOverWinner) {
-          room.phase = 'game_over';
-          room.lastAction = { type: 'game_over', winnerId: gameOverWinner.id, winnerName: gameOverWinner.username };
+        // Issue #55: leaving in lobby must not crown the remaining
+        // player as winner. Without this guard, a 2-person lobby
+        // where one taps "Leave" flipped phase to game_over, locked
+        // the other person into a fake win, and blocked the leaver
+        // from rejoining (join_room rejects when phase != lobby).
+        if (room.phase !== 'lobby') {
+          const gameOverWinner = engine.checkGameOver(room);
+          if (gameOverWinner) {
+            room.phase = 'game_over';
+            room.lastAction = { type: 'game_over', winnerId: gameOverWinner.id, winnerName: gameOverWinner.username };
+          }
         }
 
         await saveRoom(room);
@@ -2120,6 +2129,42 @@ function registerSocketHandlers(io, socket) {
       }
     } catch (err) {
       console.error('[leave_room]', err.message);
+    }
+  });
+
+  // ─── HOST: Restart a finished room for another game ──────
+  // Issue #54. After phase=game_over, the room had no path back to
+  // lobby — clicking "New Game" just dumped the host out of the room
+  // and forced everyone to re-create + re-share a code. This handler
+  // resets the room in place so the same group plays again. Only the
+  // host (matched by stable userId, not socket.id) may invoke it,
+  // and only from game_over.
+  socket.on('restart_room', async ({ roomCode } = {}, callback) => {
+    if (!socket.userId) return callback?.({ success: false, error: 'Not authenticated' });
+    try {
+      const code = roomCode?.toUpperCase();
+      const room = await getRoom(code);
+      if (!room) return callback?.({ success: false, error: 'Room not found' });
+      if (room.hostUserId !== socket.userId) {
+        return callback?.({ success: false, error: 'Only the host can restart the room' });
+      }
+      if (room.phase !== 'game_over') {
+        return callback?.({ success: false, error: 'Game has not ended yet' });
+      }
+
+      engine.resetRoomForReplay(room);
+      // Host's socket may have reconnected since the room was created;
+      // refresh hostSocketId so phase-based broadcasts target the live
+      // socket (start_next_round, etc. read this).
+      room.hostSocketId = socket.id;
+
+      await saveRoom(room);
+      callback?.({ success: true });
+      await broadcastRoomState(io, code);
+      console.log(`[Room ${code}] Restarted by host (${socket.username})`);
+    } catch (err) {
+      console.error('[restart_room]', err);
+      callback?.({ success: false, error: err.message });
     }
   });
 
