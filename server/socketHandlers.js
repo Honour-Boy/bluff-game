@@ -496,138 +496,15 @@ async function broadcastRoomState(io, roomCode) {
   }
 }
 
-// ─── v2 Phase E2 — Speed Mode turn timer ─────────────────────
+// ─── Speed Mode auto-spin removed (#79) ──────────────────────
 //
-// Spec: when speedMode is enabled, the active player has 15 seconds
-// from the start of their turn to take an action (play_card_online or
-// call_bluff). On timeout they are auto-spun as penalty.
-//
-// Implementation:
-//   - One in-flight timer per room: `speedModeTimers.set(code, ...)`.
-//   - `armSpeedModeTimer(io, room)` cancels any in-flight timer and
-//     arms a fresh deadline IF speedMode is on AND phase === 'playing'.
-//   - `cancelSpeedModeTimer(roomCode)` cancels the timer (called when
-//     the active player takes an action OR phase exits 'playing').
-//   - Timer fires `engine.spinGun` on the active player as penalty.
-//     Result broadcasts as a regular spin_result lastAction tagged
-//     with `speedModePenalty: true`.
-//
-// Timer storage is keyed by roomCode so reconnects / re-registrations
-// don't double-arm.
-const SPEED_MODE_DURATION_MS = 15_000;
-const speedModeTimers = new Map(); // roomCode → { timeout, deadline }
-
-function cancelSpeedModeTimer(roomCode) {
-  const entry = speedModeTimers.get(roomCode);
-  if (entry) {
-    clearTimeout(entry.timeout);
-    speedModeTimers.delete(roomCode);
-  }
-}
-
-function armSpeedModeTimer(io, room) {
-  if (!room) return;
-  const code = room.code;
-  cancelSpeedModeTimer(code);
-  if (!room.config?.roomModifiers?.speedMode) {
-    delete room.speedModeDeadline;
-    return;
-  }
-  if (room.mode !== engine.MODES.ONLINE) return;
-  if (room.phase !== 'playing') {
-    delete room.speedModeDeadline;
-    return;
-  }
-  const currentPlayerId = room.turnOrder[room.currentTurnIndex];
-  if (!currentPlayerId) return;
-
-  const deadline = Date.now() + SPEED_MODE_DURATION_MS;
-  room.speedModeDeadline = deadline;
-
-  const timeout = setTimeout(async () => {
-    try {
-      const live = await getRoom(code);
-      if (!live) return;
-      // If anything moved on (phase change, eliminations, etc.) the
-      // arm cycle gets re-run elsewhere — bail if the active player
-      // is no longer who we thought.
-      if (live.phase !== 'playing') return;
-      const stillActive = live.turnOrder[live.currentTurnIndex];
-      if (stillActive !== currentPlayerId) return;
-      const player = live.players.find(p => p.id === currentPlayerId);
-      if (!player || player.status !== 'alive') return;
-
-      speedModeTimers.delete(code);
-      delete live.speedModeDeadline;
-
-      // Auto-spin penalty: same engine.spinGun + downstream pipeline
-      // as a manual player_spin. Mirror Match queueing applies normally.
-      const riskLevelBefore = player.riskLevel;
-      const chamberBefore = [...player.chamber];
-      const spinResult = engine.spinGun(player, engine.getSpinModifiers(live));
-
-      if (
-        live.mirrorMatchActive
-        && !live._mirrorMatchInFlight
-        && live.mode === engine.MODES.ONLINE
-      ) {
-        const oppositeId = engine.getMirrorMatchOpposite(live, player.id);
-        if (oppositeId && oppositeId !== player.id) {
-          live.pendingMirrorMatchSpin = { targetId: oppositeId, triggeredBy: player.id };
-        }
-      }
-
-      let medicPaused = false;
-      if (spinResult.eliminated) {
-        const finalise = () => {
-          engine.eliminateFromTurnOrder(live, player.id);
-          engine.newCardType(live);
-          if (live.mode === engine.MODES.ONLINE) {
-            const cur = live.turnOrder[live.currentTurnIndex];
-            if (cur) engine.drawCardForPlayer(live, cur);
-          }
-          const gameOverWinner = engine.checkGameOver(live);
-          if (gameOverWinner) {
-            live.pendingGameOver = { id: gameOverWinner.id, name: gameOverWinner.username };
-          }
-        };
-        medicPaused = maybeStartMedicPause(io, live, player.id, 'spin', finalise);
-        if (!medicPaused) finalise();
-      } else if (live.mode === engine.MODES.ONLINE) {
-        // Issue #56: deal cards equal to surviving hand size, not fixed 6.
-        engine.resetHandOnSurvival(live, player.id);
-      }
-
-      if (!medicPaused) live.phase = 'playing';
-      live.spinTargetId = null;
-      live.cardPlayedThisTurn = false;
-      live.bluffUsedThisTurn = true;
-
-      live.lastAction = {
-        type: 'spin_result',
-        spinTargetId: player.id,
-        spinTargetName: player.username,
-        spinIndex: spinResult.spinIndex,
-        chamber: chamberBefore,
-        chamberAfter: spinResult.chamber,
-        roll: spinResult.spinIndex,
-        eliminated: spinResult.eliminated,
-        riskLevel: spinResult.riskLevel,
-        riskLevelBefore,
-        medicPending: medicPaused,
-        speedModePenalty: true,
-        ...(spinResult.eliminated && !medicPaused ? { newCardType: live.currentCardType } : {}),
-      };
-
-      await saveRoom(live);
-      await broadcastRoomState(io, code);
-    } catch (err) {
-      console.error('[speedModeTimer]', err);
-    }
-  }, SPEED_MODE_DURATION_MS);
-
-  speedModeTimers.set(code, { timeout, deadline });
-}
+// Per #79, no game mode may auto-fire a player's gun. The previous
+// `armSpeedModeTimer` / `cancelSpeedModeTimer` pair scheduled an
+// `engine.spinGun` penalty after 15s of inactivity in Speed Mode —
+// that is the only auto-fire path that ever existed in gameplay and
+// it has been removed. The `room.speedMode` config flag is retained
+// so room serialization / lobby settings keep working; redesign of
+// Speed Mode's pressure mechanic is deferred to a separate ticket.
 
 // ─── v2 Phase E2 — Mirror Match second-spin runner ───────────
 //
@@ -738,7 +615,7 @@ function startInactivitySweep(io) {
       // Same teardown the host-disconnect grace timer runs.
       _clearBettingTimer(code);
       _clearGhostVoteTimer(code);
-      cancelSpeedModeTimer(code);
+      // Speed Mode auto-spin removed (#79) — no timer to cancel.
       const hostTimer = hostDisconnectTimers.get(code);
       if (hostTimer) {
         clearTimeout(hostTimer);
@@ -925,7 +802,7 @@ async function autoStartIdleLobby(io, room) {
       subtitle: 'requires an even player count',
     });
   }
-  armSpeedModeTimer(io, room);
+  // Speed Mode auto-spin removed (#79) — no game mode may auto-fire a player's gun.
   console.log(`[host_idle] Auto-started ${room.code} (${room.players.length} players)`);
 }
 
@@ -978,7 +855,7 @@ async function dismissIdleLobby(io, code, reason) {
   io.to(code).emit('game_ended', { reason });
   _clearBettingTimer(code);
   _clearGhostVoteTimer(code);
-  cancelSpeedModeTimer(code);
+  // Speed Mode auto-spin removed (#79) — no timer to cancel.
   const hostTimer = hostDisconnectTimers.get(code);
   if (hostTimer) {
     clearTimeout(hostTimer);
@@ -1259,9 +1136,7 @@ function registerSocketHandlers(io, socket) {
         });
       }
 
-      // v2 Phase E2 — Speed Mode: arm the 15s timer for the first
-      // active player IF the modifier is on. No-op otherwise.
-      armSpeedModeTimer(io, room);
+      // Speed Mode auto-spin removed (#79) — no game mode may auto-fire a player's gun.
     } catch (err) {
       callback({ success: false, error: err.message });
     }
@@ -1533,10 +1408,7 @@ function registerSocketHandlers(io, socket) {
       room.bluffUsedThisTurn = true;
       const callerPlayer = room.players.find(p => p.id === playerId);
 
-      // v2 Phase E2 — Speed Mode: bluff call counts as the player's
-      // action. Cancel any pending 15s timer.
-      cancelSpeedModeTimer(code);
-      delete room.speedModeDeadline;
+      // Speed Mode auto-spin removed (#79) — no timer to cancel.
 
       if (room.mode === engine.MODES.ONLINE) {
         const { events, outcome } = bluffPipeline.resolveBluff(room, playerId);
@@ -1741,10 +1613,7 @@ function registerSocketHandlers(io, socket) {
         playerName: actingPlayer?.username || null,
       };
 
-      // v2 Phase E2 — Speed Mode: player took an action, cancel the
-      // 15s deadline. (end_turn re-arms it for the next active player.)
-      cancelSpeedModeTimer(code);
-      delete room.speedModeDeadline;
+      // Speed Mode auto-spin removed (#79) — no timer to cancel.
 
       await saveRoom(room);
       await broadcastRoomState(io, code);
@@ -1770,14 +1639,7 @@ function registerSocketHandlers(io, socket) {
       const result = engine.activatePowerCard(room, socket.userId);
       if (!result.ok) return callback?.({ success: false, error: result.error });
 
-      // v2 Phase E2 — Speed Mode: activating a power IS the player's
-      // action for the turn (they still need to play a card / call
-      // bluff afterwards, but the 15s pressure releases here so they
-      // aren't punished for thinking). Re-arming on follow-up actions
-      // would be defensible too, but spec wording is "take their
-      // action" — activation counts.
-      cancelSpeedModeTimer(code);
-      delete room.speedModeDeadline;
+      // Speed Mode auto-spin removed (#79) — no timer to cancel.
 
       await saveRoom(room);
       await broadcastRoomState(io, code);
@@ -2067,10 +1929,7 @@ function registerSocketHandlers(io, socket) {
         io.to(code).emit('power_card_triggered', suddenDeathBanner);
       }
 
-      // v2 Phase E2 — Speed Mode: reset the per-turn timer for the
-      // new active player. Cancels any in-flight timer for the prior
-      // turn (idempotent) and arms a fresh 15s deadline.
-      armSpeedModeTimer(io, room);
+      // Speed Mode auto-spin removed (#79) — no game mode may auto-fire a player's gun.
 
       callback({ success: true });
     } catch (err) {
@@ -2134,8 +1993,7 @@ function registerSocketHandlers(io, socket) {
         });
       }
 
-      // v2 Phase E2 — Speed Mode: arm timer for round 2's first player.
-      armSpeedModeTimer(io, room);
+      // Speed Mode auto-spin removed (#79) — no game mode may auto-fire a player's gun.
     } catch (err) {
       callback({ success: false, error: err.message });
     }
@@ -2600,10 +2458,7 @@ function registerSocketHandlers(io, socket) {
           // v2 Phase F — clear any open Phase F timers tied to this room.
           _clearBettingTimer(code);
           _clearGhostVoteTimer(code);
-          // v2 Phase E2 — clear any in-flight Speed Mode timer when
-          // the room is torn down so a stale timeout doesn't fire
-          // against a deleted room.
-          cancelSpeedModeTimer(code);
+          // Speed Mode auto-spin removed (#79) — no timer to cancel.
           discardLobbyIdleState(code);
           rooms.delete(code);
           hostDisconnectTimers.delete(code);
