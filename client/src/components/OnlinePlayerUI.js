@@ -1424,7 +1424,14 @@ export function OnlinePlayerUI({
         {/* Leave game — always available. Mid-game prompts to confirm
             because leave-mid-game forfeits (server marks the player
             eliminated; can't rejoin this game). Lobby and game_over
-            leave with no prompt. */}
+            leave with no prompt.
+
+            Issue #60: alignSelf must NOT be 'flex-start' (left edge)
+            in this layout — the Centralize button below is fixed at
+            left:16/bottom:16 and would overlap a left-aligned Leave
+            link when the user is scrolled to the bottom of the page.
+            Centred keeps it clear of both Centralize (left) and the
+            chat 💬 button (right). */}
         <button
           onClick={() => {
             const isMidGame = !!phase && !['lobby', 'game_over'].includes(phase);
@@ -1433,7 +1440,7 @@ export function OnlinePlayerUI({
             )) return;
             leaveGame();
           }}
-          style={{ alignSelf: 'flex-start', fontSize: 11, color: 'var(--text-dim)', border: 'none', background: 'none', padding: 0, textDecoration: 'underline', cursor: 'pointer', marginTop: 10 }}
+          style={{ alignSelf: 'center', fontSize: 11, color: 'var(--text-dim)', border: 'none', background: 'none', padding: 0, textDecoration: 'underline', cursor: 'pointer', marginTop: 10, marginBottom: 24 }}
         >
           Leave game
         </button>
