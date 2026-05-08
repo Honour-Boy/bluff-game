@@ -260,7 +260,6 @@ export function LastStandCinematic({
   players,
   myPlayerId,
   onSpin,
-  onEndTurn,
   spinPending,
 }) {
   const finalists = (lastStand?.finalistIds || [])
@@ -355,44 +354,25 @@ export function LastStandCinematic({
       {me && (
         <div style={{ marginTop: 12, display: 'flex', gap: 10 }}>
           {amActive ? (
-            <>
-              <button
-                onClick={onSpin}
-                disabled={spinPending}
-                style={{
-                  padding: '14px 28px',
-                  background: '#ff3552',
-                  color: '#0a0a0b',
-                  border: 'none',
-                  borderRadius: 'var(--radius)',
-                  fontWeight: 700,
-                  fontFamily: "'Bebas Neue', sans-serif",
-                  letterSpacing: '0.16em',
-                  fontSize: 18,
-                  cursor: spinPending ? 'not-allowed' : 'pointer',
-                  boxShadow: '0 0 16px rgba(255,53,82,0.6)',
-                }}
-              >
-                PULL TRIGGER
-              </button>
-              <button
-                onClick={onEndTurn}
-                disabled={spinPending}
-                style={{
-                  padding: '14px 28px',
-                  background: 'var(--surface2)',
-                  color: 'var(--text)',
-                  border: '1px solid var(--border)',
-                  borderRadius: 'var(--radius)',
-                  fontFamily: "'Bebas Neue', sans-serif",
-                  letterSpacing: '0.16em',
-                  fontSize: 16,
-                  cursor: spinPending ? 'not-allowed' : 'pointer',
-                }}
-              >
-                PASS
-              </button>
-            </>
+            <button
+              onClick={onSpin}
+              disabled={spinPending}
+              style={{
+                padding: '14px 28px',
+                background: '#ff3552',
+                color: '#0a0a0b',
+                border: 'none',
+                borderRadius: 'var(--radius)',
+                fontWeight: 700,
+                fontFamily: "'Bebas Neue', sans-serif",
+                letterSpacing: '0.16em',
+                fontSize: 18,
+                cursor: spinPending ? 'not-allowed' : 'pointer',
+                boxShadow: '0 0 16px rgba(255,53,82,0.6)',
+              }}
+            >
+              PULL TRIGGER
+            </button>
           ) : (
             <div style={{ color: 'var(--text-dim)', fontSize: 13, letterSpacing: '0.14em' }}>
               Waiting for {active?.username || 'opponent'}...
