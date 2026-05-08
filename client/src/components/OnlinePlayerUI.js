@@ -1421,15 +1421,22 @@ export function OnlinePlayerUI({
           )
         )}
 
-        {/* Leave game — only in lobby or game_over */}
-        {(!phase || ['lobby', 'game_over'].includes(phase)) && (
-          <button
-            onClick={leaveGame}
-            style={{ alignSelf: 'flex-start', fontSize: 11, color: 'var(--text-dim)', border: 'none', background: 'none', padding: 0, textDecoration: 'underline', cursor: 'pointer', marginTop: 10 }}
-          >
-            Leave game
-          </button>
-        )}
+        {/* Leave game — always available. Mid-game prompts to confirm
+            because leave-mid-game forfeits (server marks the player
+            eliminated; can't rejoin this game). Lobby and game_over
+            leave with no prompt. */}
+        <button
+          onClick={() => {
+            const isMidGame = !!phase && !['lobby', 'game_over'].includes(phase);
+            if (isMidGame && !window.confirm(
+              'Leave the game? You will forfeit and cannot rejoin this round.'
+            )) return;
+            leaveGame();
+          }}
+          style={{ alignSelf: 'flex-start', fontSize: 11, color: 'var(--text-dim)', border: 'none', background: 'none', padding: 0, textDecoration: 'underline', cursor: 'pointer', marginTop: 10 }}
+        >
+          Leave game
+        </button>
       </div>
 
       {/* ── Centralize button (fixed, bottom-left to avoid the chat 💬 at bottom-right) ── */}

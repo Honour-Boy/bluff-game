@@ -611,15 +611,22 @@ export function PlayerUI({
         </div>
       </div>
 
-      {/* Leave game — hidden during active gameplay to prevent accidental disconnect */}
-      {(!roomState?.phase || ['lobby', 'game_over'].includes(roomState?.phase)) && (
-        <button
-          onClick={leaveGame}
-          style={{ alignSelf: 'flex-start', fontSize: 11, color: 'var(--text-dim)', border: 'none', background: 'none', padding: 0, textDecoration: 'underline', cursor: 'pointer' }}
-        >
-          Leave game
-        </button>
-      )}
+      {/* Leave game — always available. Mid-game prompts to confirm
+          because leave-mid-game forfeits (server marks the player
+          eliminated; can't rejoin this game). */}
+      <button
+        onClick={() => {
+          const phase = roomState?.phase;
+          const isMidGame = !!phase && !['lobby', 'game_over'].includes(phase);
+          if (isMidGame && !window.confirm(
+            'Leave the game? You will forfeit and cannot rejoin this round.'
+          )) return;
+          leaveGame();
+        }}
+        style={{ alignSelf: 'flex-start', fontSize: 11, color: 'var(--text-dim)', border: 'none', background: 'none', padding: 0, textDecoration: 'underline', cursor: 'pointer' }}
+      >
+        Leave game
+      </button>
 
       {/* ── Cylinder spin overlay ── */}
       {spinData && (
