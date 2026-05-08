@@ -751,6 +751,7 @@ function startInactivitySweep(io) {
           playerDisconnectTimers.delete(key);
         }
       }
+      discardLobbyIdleState(code);
       rooms.delete(code);
     }
   }, INACTIVITY_SWEEP_INTERVAL_MS);
@@ -768,6 +769,190 @@ function stopInactivitySweep() {
   }
 }
 
+// ─── Lobby host idle timeout (issue #50) ─────────────────────
+//
+// The 45-min GC sweep above is for any phase. This is a tighter
+// per-LOBBY rule for unresponsive hosts — distinct from disconnect
+// (host still connected, just not clicking Start).
+//
+//   4 min idle → broadcast `lobby_idle_warning` so all players see
+//                an "Auto-starting in 60s, host tap to cancel" toast.
+//                Any host-side socket emit during this window cancels
+//                via `lobby_idle_warning_cancelled`.
+//   5 min idle → act:
+//                  players ≥ 2 → reuse start_game logic (auto-start)
+//                  else        → dismiss the room (game_ended)
+//
+// "Idle" = no host-side socket emit while phase === 'lobby'. Heartbeats
+// are below the application layer (engine.io) and don't reach socket.use,
+// so they don't count as activity.
+const HOST_IDLE_WARNING_MS = 4 * 60 * 1000;
+const HOST_IDLE_ACTION_MS  = 5 * 60 * 1000;
+const HOST_IDLE_SWEEP_INTERVAL_MS = 30 * 1000;
+
+const lobbyHostActivity = new Map();   // roomCode → ms timestamp
+const lobbyHostWarnedAt = new Map();   // roomCode → ms timestamp
+
+/**
+ * Pure decision function — classifies what (if anything) should happen
+ * for one lobby on this tick. Exported for testing without timer mocks.
+ */
+function classifyLobbyIdle(now, lastActivityMs, warnedAt, alivePlayerCount, {
+  warningMs = HOST_IDLE_WARNING_MS,
+  actionMs  = HOST_IDLE_ACTION_MS,
+} = {}) {
+  const idle = now - lastActivityMs;
+  if (idle >= actionMs) {
+    return alivePlayerCount >= 2 ? 'auto_start' : 'dismiss';
+  }
+  if (idle >= warningMs && warnedAt == null) return 'warn';
+  return 'idle';
+}
+
+function discardLobbyIdleState(code) {
+  lobbyHostActivity.delete(code);
+  lobbyHostWarnedAt.delete(code);
+}
+
+/**
+ * Bump the host-activity timestamp for every lobby this socket hosts,
+ * and cancel any pending warning. Called from socket.use middleware,
+ * so it runs on every application-level packet from this socket.
+ */
+function bumpLobbyHostActivity(io, socket) {
+  if (!socket.userId) return;
+  const now = Date.now();
+  for (const [code, room] of rooms.entries()) {
+    if (room.hostUserId !== socket.userId) continue;
+    if (room.phase !== 'lobby') continue;
+    lobbyHostActivity.set(code, now);
+    if (lobbyHostWarnedAt.has(code)) {
+      io.to(code).emit('lobby_idle_warning_cancelled');
+      lobbyHostWarnedAt.delete(code);
+    }
+  }
+}
+
+let hostIdleSweepHandle = null;
+
+function startHostIdleSweep(io) {
+  if (hostIdleSweepHandle) return;
+  hostIdleSweepHandle = setInterval(async () => {
+    const now = Date.now();
+    for (const [code, room] of rooms.entries()) {
+      if (room.phase !== 'lobby') {
+        // Phase transitioned out of lobby — drop bookkeeping.
+        discardLobbyIdleState(code);
+        continue;
+      }
+      const lastActivity = lobbyHostActivity.get(code) ?? room.createdAt ?? now;
+      const warnedAt     = lobbyHostWarnedAt.get(code) ?? null;
+      const alive        = room.players.filter(p => p.status === 'alive').length;
+      const verdict      = classifyLobbyIdle(now, lastActivity, warnedAt, alive);
+
+      if (verdict === 'warn') {
+        const secondsUntilAction = Math.max(
+          0,
+          Math.ceil((HOST_IDLE_ACTION_MS - (now - lastActivity)) / 1000),
+        );
+        io.to(code).emit('lobby_idle_warning', {
+          secondsUntilAction,
+          willAutoStart: alive >= 2,
+        });
+        lobbyHostWarnedAt.set(code, now);
+        continue;
+      }
+
+      if (verdict === 'auto_start') {
+        try {
+          await autoStartIdleLobby(io, room);
+        } catch (err) {
+          console.error(`[host_idle] auto-start failed for ${code}:`, err.message);
+          await dismissIdleLobby(io, code, 'Could not auto-start. Lobby closed.');
+        }
+        discardLobbyIdleState(code);
+        continue;
+      }
+
+      if (verdict === 'dismiss') {
+        await dismissIdleLobby(io, code, 'Host idle — lobby closed.');
+        discardLobbyIdleState(code);
+        continue;
+      }
+      // 'idle' — within thresholds, do nothing.
+    }
+  }, HOST_IDLE_SWEEP_INTERVAL_MS);
+  if (typeof hostIdleSweepHandle.unref === 'function') {
+    hostIdleSweepHandle.unref();
+  }
+}
+
+function stopHostIdleSweep() {
+  if (hostIdleSweepHandle) {
+    clearInterval(hostIdleSweepHandle);
+    hostIdleSweepHandle = null;
+  }
+}
+
+/**
+ * Auto-start path for an idle lobby. Mirrors the user-driven
+ * `start_game` socket handler (Mirror Match auto-disable, engine
+ * startGame, broadcast, Speed Mode timer arm) but without the
+ * host-socket-id check — by definition the host is absent here.
+ */
+async function autoStartIdleLobby(io, room) {
+  let mirrorMatchAutoDisabled = false;
+  if (
+    room.mode === engine.MODES.ONLINE
+    && room.config?.roomModifiers?.mirrorMatch
+    && !engine.isMirrorMatchEligibleAtStart(room)
+  ) {
+    room.config.roomModifiers.mirrorMatch = false;
+    mirrorMatchAutoDisabled = true;
+  }
+
+  engine.startGame(room);
+  await saveRoom(room);
+  io.to(room.code).emit('lobby_auto_started', {
+    reason: 'Host idle — game auto-started.',
+  });
+  await broadcastRoomState(io, room.code);
+
+  if (mirrorMatchAutoDisabled) {
+    io.to(room.code).emit('power_card_triggered', {
+      kind: 'system_notice',
+      title: 'Mirror Match disabled',
+      subtitle: 'requires an even player count',
+    });
+  }
+  armSpeedModeTimer(io, room);
+  console.log(`[host_idle] Auto-started ${room.code} (${room.players.length} players)`);
+}
+
+/**
+ * Dismiss a lobby whose host went idle below the 2-player threshold.
+ * Same teardown the 45-min sweep and host-disconnect timer use.
+ */
+async function dismissIdleLobby(io, code, reason) {
+  io.to(code).emit('game_ended', { reason });
+  _clearBettingTimer(code);
+  _clearGhostVoteTimer(code);
+  cancelSpeedModeTimer(code);
+  const hostTimer = hostDisconnectTimers.get(code);
+  if (hostTimer) {
+    clearTimeout(hostTimer);
+    hostDisconnectTimers.delete(code);
+  }
+  for (const [key, timer] of playerDisconnectTimers.entries()) {
+    if (key.startsWith(`${code}:`)) {
+      clearTimeout(timer);
+      playerDisconnectTimers.delete(key);
+    }
+  }
+  rooms.delete(code);
+  console.log(`[host_idle] Dismissed ${code}: ${reason}`);
+}
+
 // ─── Register all handlers ────────────────────────────────────
 
 const hostDisconnectTimers = new Map();
@@ -781,6 +966,18 @@ const dcKey = (code, playerId) => `${code}:${playerId}`;
 function registerSocketHandlers(io, socket) {
   // Idempotent: runs once on first connection, no-ops thereafter.
   startInactivitySweep(io);
+  startHostIdleSweep(io);
+
+  // Issue #50: any application-level packet from a host who's in lobby
+  // counts as activity. Bumps the per-room timestamp + cancels a
+  // pending warning. Heartbeats live below socket.use, so they don't
+  // false-positive here. Guarded for the mock sockets unit tests use.
+  if (typeof socket.use === 'function') {
+    socket.use((packet, next) => {
+      bumpLobbyHostActivity(io, socket);
+      next();
+    });
+  }
 
   // ─── AUTHENTICATE socket with Supabase JWT or guest ──────
   // Must be called once after connecting, before any game events.
@@ -2326,6 +2523,7 @@ function registerSocketHandlers(io, socket) {
           // the room is torn down so a stale timeout doesn't fire
           // against a deleted room.
           cancelSpeedModeTimer(code);
+          discardLobbyIdleState(code);
           rooms.delete(code);
           hostDisconnectTimers.delete(code);
         }, 30000);
@@ -2440,6 +2638,11 @@ module.exports = {
   applyUsernameToRooms,
   startInactivitySweep,
   stopInactivitySweep,
+  startHostIdleSweep,
+  stopHostIdleSweep,
+  classifyLobbyIdle,
+  HOST_IDLE_WARNING_MS,
+  HOST_IDLE_ACTION_MS,
   INACTIVITY_THRESHOLD_MS,
   GUEST_USER_PREFIX,
   GUEST_USERNAME_MIN,

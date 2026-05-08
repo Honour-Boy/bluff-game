@@ -325,6 +325,25 @@ export function useGame(getAccessToken, getGuestAuth, authIdentityKey = null) {
   clearSession();
   notify(reason || 'The game has ended.', 'error');
 };
+    // Issue #50 — lobby host-idle timeout. Three events:
+    //   lobby_idle_warning           — 4 min idle, action in N seconds
+    //   lobby_idle_warning_cancelled — host came back, warning rescinded
+    //   lobby_auto_started           — game auto-started after 5 min idle
+    const onLobbyIdleWarning = ({ secondsUntilAction, willAutoStart } = {}) => {
+      const secs = secondsUntilAction ?? 60;
+      notify(
+        willAutoStart
+          ? `Host idle. Auto-starting in ${secs}s — host: tap anything to cancel.`
+          : `Host idle. Lobby will close in ${secs}s — host: tap anything to cancel.`,
+        'warning',
+      );
+    };
+    const onLobbyIdleWarningCancelled = () => {
+      notify('Host is back. Lobby is safe.', 'info');
+    };
+    const onLobbyAutoStarted = ({ reason } = {}) => {
+      notify(reason || 'Game auto-started.', 'info');
+    };
     socket.on('connect', onConnect);
     socket.on('disconnect', onDisconnect);
     socket.on('room_state', onRoomState);
@@ -334,6 +353,9 @@ export function useGame(getAccessToken, getGuestAuth, authIdentityKey = null) {
     socket.on('host_disconnecting', onHostDisconnecting);
     socket.on('game_ended', onGameEnded);
     socket.on('power_card_triggered', onPowerCardTriggered);
+    socket.on('lobby_idle_warning', onLobbyIdleWarning);
+    socket.on('lobby_idle_warning_cancelled', onLobbyIdleWarningCancelled);
+    socket.on('lobby_auto_started', onLobbyAutoStarted);
 
     return () => {
       socket.off('connect', onConnect);
@@ -345,6 +367,9 @@ export function useGame(getAccessToken, getGuestAuth, authIdentityKey = null) {
       socket.off('host_disconnecting', onHostDisconnecting);
       socket.off('game_ended', onGameEnded);
       socket.off('power_card_triggered', onPowerCardTriggered);
+      socket.off('lobby_idle_warning', onLobbyIdleWarning);
+      socket.off('lobby_idle_warning_cancelled', onLobbyIdleWarningCancelled);
+      socket.off('lobby_auto_started', onLobbyAutoStarted);
     };
   }, [socket, notify, clearSession, authenticateSocket, playChatPing]);
 
