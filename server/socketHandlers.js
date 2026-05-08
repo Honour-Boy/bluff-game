@@ -933,6 +933,47 @@ async function autoStartIdleLobby(io, room) {
  * Dismiss a lobby whose host went idle below the 2-player threshold.
  * Same teardown the 45-min sweep and host-disconnect timer use.
  */
+/**
+ * Resolve any pending pause where `playerId` is the gating actor, so
+ * the room doesn't deadlock when they leave or disconnect mid-pause.
+ * Called from leave_room. The disconnect-grace-timer keeps an inline
+ * copy for this commit; deduping that path is a follow-up.
+ */
+function resolveLeaverPendingPauses(io, code, room, playerId) {
+  // Phase D — Medic save: leaver is the medic mid-decision.
+  if (room.phase === 'medic_pending' && room.pendingMedicSave?.medicId === playerId) {
+    const pending = room.pendingMedicSave;
+    if (typeof pending.finaliseFn === 'function') pending.finaliseFn();
+    room.pendingMedicSave = null;
+    if (room.phase === 'medic_pending') room.phase = 'playing';
+  }
+  // Phase D — Sniper redirect: leaver is the sniper mid-decision.
+  if (room.phase === 'sniper_pending' && room.pendingSniperRedirect?.sniperId === playerId) {
+    const pending = room.pendingSniperRedirect;
+    const outcome = pending.deferredOutcome;
+    room.pendingSniperRedirect = null;
+    applyBluffOutcome(room, outcome);
+  }
+  // Phase H — Swap holder forfeit: original played card stays on top,
+  // resume bluff resolution against it (no-op swap).
+  if (room.phase === 'swap_pending' && room.swapHolderId === playerId) {
+    const accuserId = room.lastAction?.accuserId;
+    const top = room.playedPile?.[room.playedPile.length - 1];
+    if (accuserId && top?.id) {
+      const { events: swapEvents, outcome: swapOutcome } =
+        bluffPipeline.resumeAfterSwap(room, accuserId, top.id);
+      room.swapHolderId = null;
+      if (swapOutcome && swapOutcome.kind !== 'error') {
+        applyBluffOutcome(room, swapOutcome);
+      }
+      emitPowerCardEvents(io, code, swapEvents);
+    } else {
+      room.swapHolderId = null;
+      room.phase = 'playing';
+    }
+  }
+}
+
 async function dismissIdleLobby(io, code, reason) {
   io.to(code).emit('game_ended', { reason });
   _clearBettingTimer(code);
@@ -2303,21 +2344,46 @@ function registerSocketHandlers(io, socket) {
       const idx = room.players.findIndex(p => p.id === playerId);
       if (idx !== -1) {
         const player = room.players[idx];
-        room.players.splice(idx, 1);
-        engine.eliminateFromTurnOrder(room, playerId);
-        console.log(`[Room ${code}] ${player.username} left`);
+        const isMidGame = !['lobby', 'game_over'].includes(room.phase);
 
-        // Issue #55: leaving in lobby must not crown the remaining
-        // player as winner. Without this guard, a 2-person lobby
-        // where one taps "Leave" flipped phase to game_over, locked
-        // the other person into a fake win, and blocked the leaver
-        // from rejoining (join_room rejects when phase != lobby).
-        if (room.phase !== 'lobby') {
+        if (isMidGame) {
+          // Mid-game leave = voluntary forfeit. Mirror the disconnect-
+          // timeout path: keep the player in `players` with status
+          // 'eliminated' so other state references (turnOrder index,
+          // lastAction, swap snapshots) stay coherent. Splicing here
+          // would invalidate currentTurnIndex math the moment the
+          // leaver's slot is the active turn.
+          //
+          // First, clear any pending pause this player was gating —
+          // otherwise the room deadlocks (#deadlock-risk).
+          resolveLeaverPendingPauses(io, code, room, playerId);
+          if (player.status !== 'eliminated') {
+            player.status = 'eliminated';
+            player.isSpectator = true;
+            engine.eliminateFromTurnOrder(room, playerId);
+          }
+          room.lastAction = {
+            type: 'left_game',
+            playerId: player.id,
+            playerName: player.username,
+          };
+          console.log(`[Room ${code}] ${player.username} forfeited mid-game`);
+
+          // Issue #55 guard already lives in the lobby branch; mid-game
+          // win-detection is exactly what we want here.
           const gameOverWinner = engine.checkGameOver(room);
           if (gameOverWinner) {
             room.phase = 'game_over';
             room.lastAction = { type: 'game_over', winnerId: gameOverWinner.id, winnerName: gameOverWinner.username };
           }
+        } else {
+          // Lobby or game_over: clean removal. In lobby this lets the
+          // leaver rejoin (#55). In game_over the room is already
+          // wrapping up — splicing is fine.
+          room.players.splice(idx, 1);
+          engine.eliminateFromTurnOrder(room, playerId);
+          console.log(`[Room ${code}] ${player.username} left (${room.phase})`);
+          // No checkGameOver in lobby (#55). game_over already over.
         }
 
         await saveRoom(room);
