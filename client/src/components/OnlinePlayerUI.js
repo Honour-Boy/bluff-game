@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import { CardShape } from './CardShape';
 import { ShapeIcon, SHAPE_COLORS } from './ShapeIcon';
 
@@ -808,12 +808,15 @@ export function OnlinePlayerUI({
   setPendingCard(card); // opens confirm dialog
 };
 
-  const handleSpectatePlayer = (targetId) => {
+  // Memoised so renderChip's useCallback dep is stable — without
+  // this the chip click handlers re-create on every render and the
+  // memoisation upstream is moot (issue #61).
+  const handleSpectatePlayer = useCallback((targetId) => {
     setSpectatingId(targetId);
     spectatePlayer(targetId, (res) => {
       setSpectatedHand(res.hand || []);
     });
-  };
+  }, [spectatePlayer]);
 
   // ─── v2 Phase B — power card activation prompt visibility ─
   // Only show when:
@@ -972,9 +975,13 @@ export function OnlinePlayerUI({
     && (roomState?.myHand?.length || 0) > 3;
 
   // ─── Top-down player distribution ────────────────────────
-  // Excludes the local player. Calculated each render — small lists.
-  const distributed = distributePlayers(otherPlayers);
-  const renderChip = (p) => (
+  // Excludes the local player. Issue #61: memoise both `distributed`
+  // and `renderChip` so they don't recompute on every room_state
+  // tick. The list is small but it ran the full slice/find/map every
+  // time any field on `roomState` changed, including during the
+  // role-reveal window — contributing to the perceived lag.
+  const distributed = useMemo(() => distributePlayers(otherPlayers), [otherPlayers]);
+  const renderChip = useCallback((p) => (
     <PlayerChip
       key={p.id}
       player={p}
@@ -983,7 +990,7 @@ export function OnlinePlayerUI({
       voice={voice}
       onClick={showSpectatorView ? () => handleSpectatePlayer(p.id) : undefined}
     />
-  );
+  ), [currentPlayerId, isSpinPending, spinTargetId, voice, showSpectatorView, handleSpectatePlayer]);
 
   return (
     <div

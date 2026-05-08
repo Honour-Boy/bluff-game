@@ -1240,8 +1240,13 @@ function registerSocketHandlers(io, socket) {
 
       engine.startGame(room);
       await saveRoom(room);
-      callback({ success: true, mirrorMatchAutoDisabled });
+      // Issue #61: broadcast BEFORE acking so the host's client
+      // never observes the success ACK without the room_state
+      // payload that carries phase=playing + their role. Pre-fix
+      // the order was reversed and a race window let the start-
+      // success handler fire with stale role state.
       await broadcastRoomState(io, roomCode);
+      callback({ success: true, mirrorMatchAutoDisabled });
 
       if (mirrorMatchAutoDisabled) {
         // Surface the auto-disable so the host knows what changed.

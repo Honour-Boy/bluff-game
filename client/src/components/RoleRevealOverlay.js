@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 // ─── RoleRevealOverlay ────────────────────────────────────────
 // Plays once per game, privately, when the local player first
@@ -129,16 +129,27 @@ export function RoleRevealOverlay({ role, onComplete, durationMs = 7500 }) {
 
   const [phase, setPhase] = useState("enter"); // 'enter' | 'hold' | 'exit'
 
+  // Issue #61: previously this effect listed `onComplete` in its deps.
+  // Callers (OnlinePlayerUI.js:2085) pass it as an inline arrow, which
+  // re-creates on every parent render — and the parent re-renders on
+  // every `room_state` socket tick during the game. That cleared and
+  // restarted t1/t2/t3 each tick, so the overlay's exit timer never
+  // fired (the user saw the card stuck on screen indefinitely, which
+  // they reported as "role-screen lag"). Capture the latest callback
+  // in a ref so the effect runs once on mount with stable deps.
+  const onCompleteRef = useRef(onComplete);
+  useEffect(() => { onCompleteRef.current = onComplete; }, [onComplete]);
+
   useEffect(() => {
     const t1 = setTimeout(() => setPhase("hold"), 450);
     const t2 = setTimeout(() => setPhase("exit"), 450 + durationMs);
-    const t3 = setTimeout(() => onComplete && onComplete(), 450 + durationMs + 400);
+    const t3 = setTimeout(() => onCompleteRef.current?.(), 450 + durationMs + 400);
     return () => {
       clearTimeout(t1);
       clearTimeout(t2);
       clearTimeout(t3);
     };
-  }, [durationMs, onComplete]);
+  }, [durationMs]);
 
   const opacity = phase === "enter" ? 0 : phase === "exit" ? 0 : 1;
   const scale = phase === "enter" ? 0.86 : phase === "exit" ? 1.06 : 1;
