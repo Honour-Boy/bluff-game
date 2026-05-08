@@ -585,9 +585,16 @@ export function HostUI({
         </div>
       )}
 
-      {/* Leave */}
+      {/* Leave — host leaving mid-game ends it for everyone (after the
+          30s host-disconnect grace), so prompt to confirm. */}
       <button
-        onClick={leaveGame}
+        onClick={() => {
+          const isMidGame = !isLobby && !isGameOver;
+          if (isMidGame && !window.confirm(
+            'Leave the game? Hosting ends — all players will be returned to the lobby.'
+          )) return;
+          leaveGame();
+        }}
         style={{ alignSelf: 'flex-start', fontSize: 11, color: 'var(--text-dim)', border: 'none', background: 'none', padding: 0, textDecoration: 'underline', cursor: 'pointer' }}
       >
         Leave game
