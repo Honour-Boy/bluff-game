@@ -20,7 +20,7 @@ import { getSocket } from '../lib/socket';
 
 const LIVEKIT_URL = process.env.NEXT_PUBLIC_LIVEKIT_URL || '';
 
-export function useVoice({ roomCode, isAuthenticated }) {
+export function useVoice({ roomCode, isAuthenticated, autoJoin = false }) {
   const socket = getSocket();
   // 'idle' | 'connecting' | 'connected' | 'error'
   const [status, setStatus] = useState('idle');
@@ -144,16 +144,21 @@ export function useVoice({ roomCode, isAuthenticated }) {
 
     try {
       await room.connect(LIVEKIT_URL, tokenResp.token);
-      // Publish the mic — disabled (muted) until user toggles.
-      await room.localParticipant.setMicrophoneEnabled(false);
       roomRef.current = room;
-      // Read back the actual track state instead of trusting the
-      // setMicrophoneEnabled(false) call above. If the publish
-      // raced or got reverted, the read-back catches it.
+      // Try to publish the mic muted. setMicrophoneEnabled(false) on
+      // a not-yet-published mic still calls getUserMedia, which the
+      // browser may reject without a user gesture (auto-join path,
+      // issue #49). Don't fail the whole connect on that — the user
+      // can stay in the LiveKit room as a listener and the publish
+      // retries on first toggleMute, which IS user-gesture-driven.
       try {
+        await room.localParticipant.setMicrophoneEnabled(false);
         setMuted(!room.localParticipant.isMicrophoneEnabled);
-      } catch (_) {
-        setMuted(true); // safe default if the getter throws
+      } catch (publishErr) {
+        // Most likely: NotAllowedError (no permission yet) or
+        // SecurityError (no gesture). Stay connected as listener-only;
+        // toggleMute publishes lazily later.
+        setMuted(true);
       }
       setStatus('connected');
       return true;
@@ -164,6 +169,23 @@ export function useVoice({ roomCode, isAuthenticated }) {
       return false;
     }
   }, [socket, roomCode, isAuthenticated]);
+
+  // ─── Auto-join on room entry (issue #49) ────────────────────
+  // Honour wants players to land in the room voice channel without
+  // an extra click. Default-muted, listener-only on first connect
+  // (mic publish is gesture-deferred via the catch above and the
+  // toggleMute path). Opt-in via autoJoin so existing manual-control
+  // tests stay valid. Skips if voice isn't configured. Won't loop:
+  // status leaves 'idle' on first call and the dep guard stops re-
+  // entry. If connect() fails, status='error' surfaces the manual
+  // retry button rather than silently retrying forever.
+  useEffect(() => {
+    if (!autoJoin) return;
+    if (!LIVEKIT_URL) return;
+    if (!roomCode || !isAuthenticated) return;
+    if (status !== 'idle') return;
+    connect();
+  }, [autoJoin, roomCode, isAuthenticated, status, connect]);
 
   // ─── Disconnect ─────────────────────────────────────────────
   const disconnect = useCallback(async () => {
