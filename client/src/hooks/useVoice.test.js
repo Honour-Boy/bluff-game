@@ -287,3 +287,91 @@ describe('useVoice — disconnect + mute', () => {
     // is the source of truth, not the requested state.
   });
 });
+
+// ─── Auto-join (issue #49) ──────────────────────────────────────
+describe('useVoice — auto-join', () => {
+  it('does NOT auto-connect when autoJoin is omitted (default)', async () => {
+    const { result } = renderHook(() =>
+      useVoice({ roomCode: 'ROOM01', isAuthenticated: true }),
+    );
+    // Give the effect a microtask cycle to misbehave if it's going to.
+    await act(async () => {});
+    expect(result.current.status).toBe('idle');
+    expect(socketHolder.socket.emit).not.toHaveBeenCalled();
+  });
+
+  it('auto-connects on mount when autoJoin=true and prerequisites are met', async () => {
+    socketHolder.socket.emit.mockImplementationOnce((event, payload, cb) => {
+      cb({ success: true, token: 'lk-auto' });
+    });
+    const { result } = renderHook(() =>
+      useVoice({ roomCode: 'ROOM01', isAuthenticated: true, autoJoin: true }),
+    );
+    await waitFor(() => {
+      expect(result.current.status).toBe('connected');
+    });
+    expect(result.current.muted).toBe(true);
+    expect(livekitMock.state.connectArgs).toEqual({
+      url: 'wss://livekit.example.test',
+      token: 'lk-auto',
+    });
+  });
+
+  it('does NOT auto-connect when not authenticated yet', async () => {
+    const { result } = renderHook(() =>
+      useVoice({ roomCode: 'ROOM01', isAuthenticated: false, autoJoin: true }),
+    );
+    await act(async () => {});
+    expect(result.current.status).toBe('idle');
+    expect(socketHolder.socket.emit).not.toHaveBeenCalled();
+  });
+
+  it('does NOT auto-connect when no roomCode (still on landing)', async () => {
+    const { result } = renderHook(() =>
+      useVoice({ roomCode: null, isAuthenticated: true, autoJoin: true }),
+    );
+    await act(async () => {});
+    expect(result.current.status).toBe('idle');
+    expect(socketHolder.socket.emit).not.toHaveBeenCalled();
+  });
+
+  it('stays connected even if mic publish throws (no permission yet)', async () => {
+    // Intercept the FIRST setMicrophoneEnabled call (the publish-muted one)
+    // and make it throw. The hook should swallow and remain connected.
+    const origSet = livekitMock.Room.prototype;
+    socketHolder.socket.emit.mockImplementationOnce((event, payload, cb) => {
+      cb({ success: true, token: 'lk-listener' });
+    });
+
+    // Patch the next constructed Room's setMicrophoneEnabled to reject
+    // exactly once. We do that by monkey-patching the prototype's
+    // localParticipant on first instance via a one-shot.
+    const orig = livekitMock.Room;
+    let patched = false;
+    function PatchedRoom(...args) {
+      const inst = new orig(...args);
+      if (!patched) {
+        patched = true;
+        const realSet = inst.localParticipant.setMicrophoneEnabled;
+        inst.localParticipant.setMicrophoneEnabled = vi.fn(async () => {
+          throw new Error('NotAllowedError');
+        });
+      }
+      return inst;
+    }
+    PatchedRoom.prototype = orig.prototype;
+    livekitMock.Room = PatchedRoom;
+
+    try {
+      const { result } = renderHook(() =>
+        useVoice({ roomCode: 'ROOM01', isAuthenticated: true, autoJoin: true }),
+      );
+      await waitFor(() => {
+        expect(result.current.status).toBe('connected');
+      });
+      expect(result.current.muted).toBe(true);
+    } finally {
+      livekitMock.Room = orig;
+    }
+  });
+});

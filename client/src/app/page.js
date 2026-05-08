@@ -61,8 +61,11 @@ function HomeContent() {
     lastStandEndTurn,
   } = game;
 
-  // Voice — opt-in via Join Voice button. Hook tears down on roomCode change.
-  const voice = useVoice({ roomCode, isAuthenticated: authenticated });
+  // Voice — auto-joins muted on room entry (issue #49). Mic stays
+  // unpublished until first user-gesture toggle, so first-time visitors
+  // don't get a permission prompt before they ask for one. Hook tears
+  // down on roomCode change.
+  const voice = useVoice({ roomCode, isAuthenticated: authenticated, autoJoin: true });
 
   // ─── Loading splash ────────────────────────────────────────
   if (loading) {
