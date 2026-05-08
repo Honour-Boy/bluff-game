@@ -318,10 +318,17 @@ function PlayerChip({
   voice,
   onClick,
   compact = false,
+  bettingEnabled = false,
 }) {
   const alive = player.status === 'alive';
   const w = compact ? 64 : 80;
   const h = compact ? 88 : 110;
+  // Issue #80 — betting streak badge. Visible publicly to all
+  // clients (including spectators) when the Betting system is on
+  // and the player has a non-zero correct-bet streak. Server resets
+  // this to 0 after the -1-bullet reward fires at streak 3.
+  const streak = player.consecutiveCorrectBets || 0;
+  const showStreak = bettingEnabled && streak > 0;
 
   const name = player.username || '';
   const truncated = name.length > 12 ? name.slice(0, 11) + '…' : name;
@@ -405,6 +412,27 @@ function PlayerChip({
         <span style={{ overflow: 'hidden', textOverflow: 'ellipsis' }}>
           {truncated}
         </span>
+        {/* Issue #80 — betting streak badge. Public to all clients
+            when Betting system is enabled and streak > 0. */}
+        {showStreak && (
+          <span
+            title={`Correct bet streak: ${streak}`}
+            style={{
+              fontSize: compact ? 8 : 9,
+              fontWeight: 700,
+              color: 'var(--accent)',
+              background: 'rgba(232,255,74,0.12)',
+              border: '1px solid var(--accent)',
+              borderRadius: 6,
+              padding: compact ? '0 3px' : '0 4px',
+              lineHeight: 1.4,
+              letterSpacing: 0,
+              flexShrink: 0,
+            }}
+          >
+            🎯×{streak}
+          </span>
+        )}
       </div>
 
       {/* Card count */}
@@ -981,6 +1009,9 @@ export function OnlinePlayerUI({
   // time any field on `roomState` changed, including during the
   // role-reveal window — contributing to the perceived lag.
   const distributed = useMemo(() => distributePlayers(otherPlayers), [otherPlayers]);
+  // Issue #80 — Betting system flag from room config. Drives whether
+  // PlayerChip renders the 🎯×N streak badge.
+  const bettingEnabled = !!roomState?.config?.systems?.betting;
   const renderChip = useCallback((p) => (
     <PlayerChip
       key={p.id}
@@ -989,8 +1020,9 @@ export function OnlinePlayerUI({
       isSpinTarget={isSpinPending && p.id === spinTargetId}
       voice={voice}
       onClick={showSpectatorView ? () => handleSpectatePlayer(p.id) : undefined}
+      bettingEnabled={bettingEnabled}
     />
-  ), [currentPlayerId, isSpinPending, spinTargetId, voice, showSpectatorView, handleSpectatePlayer]);
+  ), [currentPlayerId, isSpinPending, spinTargetId, voice, showSpectatorView, handleSpectatePlayer, bettingEnabled]);
 
   return (
     <div
