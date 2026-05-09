@@ -8,7 +8,7 @@ import { ActionLog } from './ActionLog';
 import { HowToPlayModal } from './HowToPlayModal';
 import { TurnActionModal, WaitingForPlayerBanner } from './TurnActionModal';
 import { VoicePanel, VoiceIndicator } from './VoicePanel';
-import { PowerCard, POWER_META } from './PowerCard';
+import { PowerCard, POWER_META, POWER_ICONS } from './PowerCard';
 import { AnnouncementBanner } from './AnnouncementBanner';
 import { ActiveConfigPanel } from './ActiveConfigPanel';
 import { PreGameSettingsPanel } from './PreGameSettingsPanel';
@@ -146,11 +146,38 @@ function CardHand({ hand, selectedCardId, onCardClick, interactive = true }) {
       }}>
         {hand.map((card, i) => {
           const isSelected = selectedCardId === card.id;
-          const isWhot = card.shape === 'whot';
+          const isPower = card.type === 'power';
+          const isWhot = !isPower && card.shape === 'whot';
+          const powerMeta = isPower ? POWER_META[card.power] : null;
+          const powerColor = powerMeta?.color || 'var(--accent)';
+          const drawPowerIcon = isPower ? (POWER_ICONS[card.power] || POWER_ICONS.shield) : null;
+
+          const borderColor = isPower
+            ? powerColor
+            : isWhot
+              ? 'var(--accent)'
+              : isSelected
+                ? 'var(--accent)'
+                : 'var(--border)';
+
+          const boxShadow = isSelected
+            ? '0 6px 20px rgba(0,0,0,0.6)'
+            : isPower
+              ? `0 0 8px ${powerColor}55, inset 0 0 6px ${powerColor}22`
+              : isWhot
+                ? '0 0 8px rgba(232,255,74,0.3)'
+                : 'none';
+
+          const tooltip = isPower && powerMeta
+            ? `${powerMeta.label} — ${powerMeta.flavor}`
+            : undefined;
+
           return (
             <div
               key={card.id}
               onClick={() => interactive && onCardClick && onCardClick(card.id)}
+              title={tooltip}
+              aria-label={isPower && powerMeta ? `Power card: ${powerMeta.label}` : undefined}
               style={{
                 width: 58,
                 height: 82,
@@ -159,35 +186,61 @@ function CardHand({ hand, selectedCardId, onCardClick, interactive = true }) {
                 zIndex: isSelected ? 100 : i + 1,
                 cursor: interactive ? 'pointer' : 'default',
                 transition: 'transform 0.15s ease',
-                background: 'var(--surface2)',
-                border: `2px solid ${isWhot ? 'var(--accent)' : isSelected ? 'var(--accent)' : 'var(--border)'}`,
+                background: isPower
+                  ? 'linear-gradient(160deg, #0d0d10 0%, #08080a 55%, #050507 100%)'
+                  : 'var(--surface2)',
+                border: `2px solid ${borderColor}`,
                 borderRadius: 8,
                 display: 'flex',
                 flexDirection: 'column',
                 alignItems: 'center',
                 justifyContent: 'center',
                 gap: 4,
-                boxShadow: isSelected
-                  ? '0 6px 20px rgba(0,0,0,0.6)'
-                  : isWhot
-                    ? '0 0 8px rgba(232,255,74,0.3)'
-                    : 'none',
+                boxShadow,
                 userSelect: 'none',
+                overflow: 'hidden',
               }}
             >
-              <ShapeIcon
-                shape={card.shape}
-                size={22}
-                color={isWhot ? 'var(--accent)' : undefined}
-              />
-              <div style={{
-                fontSize: 10,
-                color: isWhot ? 'var(--accent)' : 'var(--text-dim)',
-                fontWeight: 700,
-                letterSpacing: '0.05em',
-              }}>
-                {isWhot ? 'WHOT' : card.number}
-              </div>
+              {isPower ? (
+                <>
+                  <svg
+                    viewBox="0 0 100 100"
+                    width={28}
+                    height={28}
+                    aria-hidden
+                    style={{ filter: `drop-shadow(0 0 4px ${powerColor}aa)` }}
+                  >
+                    {drawPowerIcon(powerColor)}
+                  </svg>
+                  <div style={{
+                    fontFamily: "'Bebas Neue', sans-serif",
+                    fontSize: 10,
+                    letterSpacing: '0.12em',
+                    color: powerColor,
+                    textTransform: 'uppercase',
+                    textShadow: `0 0 6px ${powerColor}aa`,
+                    lineHeight: 1,
+                  }}>
+                    {powerMeta?.label ?? 'Power'}
+                  </div>
+                </>
+              ) : (
+                <>
+                  <ShapeIcon
+                    shape={card.shape}
+                    size={22}
+                    color={isWhot ? 'var(--accent)' : undefined}
+                  />
+                  <div style={{
+                    fontSize: 10,
+                    color: isWhot ? 'var(--accent)' : 'var(--text-dim)',
+                    fontWeight: 700,
+                    letterSpacing: '0.05em',
+                  }}>
+                    {isWhot ? 'WHOT' : card.number}
+                  </div>
+                </>
+              )}
             </div>
           );
         })}
