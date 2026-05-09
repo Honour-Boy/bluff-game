@@ -1148,8 +1148,8 @@ function registerSocketHandlers(io, socket) {
       const room = await getRoom(roomCode);
       if (!room) return callback({ success: false, error: 'Room not found' });
       if (room.hostSocketId !== socket.id) return callback({ success: false, error: 'Not the host' });
-      // Physical-mode only: online uses end_turn / start_next_round
-      if (room.mode !== engine.MODES.PHYSICAL) return callback({ success: false, error: 'Use end_turn / start_next_round in online mode' });
+      // Physical-mode only: online uses end_turn
+      if (room.mode !== engine.MODES.PHYSICAL) return callback({ success: false, error: 'Use end_turn in online mode' });
       // Only valid from these phases — playing or round_end
       if (!['playing', 'round_end'].includes(room.phase)) {
         return callback({ success: false, error: `Cannot advance turn from phase '${room.phase}'` });
@@ -1883,10 +1883,20 @@ function registerSocketHandlers(io, socket) {
       if (room.mode === engine.MODES.ONLINE) {
         const hand = room.hands?.get(playerId);
         if (hand && hand.length === 0) {
-          engine.declareRoundWinner(room, playerId);
+          // Online mode is single-round-per-game (#70): a player emptying
+          // their hand wins the game outright. We skip the intermediate
+          // round_end phase + Next Round button entirely. "Play Again"
+          // (restart_room) is the only way to start a fresh game.
+          const winner = room.players.find(p => p.id === playerId);
+          room.phase = 'game_over';
+          room.lastAction = {
+            type: 'game_over',
+            winnerId: playerId,
+            winnerName: winner?.username || null,
+          };
           await saveRoom(room);
           await broadcastRoomState(io, code);
-          return callback({ success: true, roundWin: true });
+          return callback({ success: true, gameOver: true });
         }
       }
 
@@ -1932,68 +1942,6 @@ function registerSocketHandlers(io, socket) {
       // Speed Mode auto-spin removed (#79) — no game mode may auto-fire a player's gun.
 
       callback({ success: true });
-    } catch (err) {
-      callback({ success: false, error: err.message });
-    }
-  });
-
-  // ─── HOST: Start next round (online) ─────────────────────
-  socket.on('start_next_round', async ({ roomCode } = {}, callback) => {
-    try {
-      const room = await getRoom(roomCode);
-      if (!room) return callback({ success: false, error: 'Room not found' });
-      if (room.hostSocketId !== socket.id) return callback({ success: false, error: 'Not the host' });
-      if (room.mode !== engine.MODES.ONLINE) return callback({ success: false, error: 'Online mode only' });
-      if (room.phase !== 'round_end') return callback({ success: false, error: 'Not in round_end phase' });
-
-      // v2 Phase E1 — Redemption Spin candidates are picked BEFORE
-      // resetRoundOnline so we know who got the second-chance shot
-      // for this round. The spins themselves run AFTER reset so
-      // survivors get their 3-card fresh hand from the freshly-built
-      // deck (resetRoundOnline rebuilds the deck and deals only to
-      // alive players; redemption survivors revive into the alive set
-      // afterwards and get their own 3-card deal).
-      const redemptionCandidateIds = engine.pickRedemptionCandidates(room);
-
-      engine.resetRoundOnline(room);
-
-      const redemptionResults = [];
-      for (const playerId of redemptionCandidateIds) {
-        // Re-validate at run time — game-over could've been triggered
-        // by something between pick + run. (In this handler that's
-        // not really possible, but defensive.)
-        const winnerYet = engine.checkGameOver(room);
-        if (winnerYet) break;
-        const result = engine.runRedemptionSpin(room, playerId);
-        if (result) redemptionResults.push(result);
-      }
-
-      const gameOverWinner = engine.checkGameOver(room);
-      if (gameOverWinner) {
-        room.phase = 'game_over';
-        room.lastAction = { type: 'game_over', winnerId: gameOverWinner.id, winnerName: gameOverWinner.username };
-      }
-
-      await saveRoom(room);
-      callback({ success: true, redemptionResults });
-      await broadcastRoomState(io, roomCode);
-
-      // Emit one redemption_spin event per spin so clients can replay
-      // each one with the existing spin animation.
-      for (const r of redemptionResults) {
-        const player = room.players.find(p => p.id === r.playerId);
-        io.to(roomCode).emit('redemption_spin', {
-          playerId: r.playerId,
-          playerName: player?.username || null,
-          eliminated: r.eliminated,
-          spinIndex: r.spinIndex,
-          chamber: r.chamber,
-          chamberAfter: r.chamberAfter,
-          riskLevel: r.riskLevel,
-        });
-      }
-
-      // Speed Mode auto-spin removed (#79) — no game mode may auto-fire a player's gun.
     } catch (err) {
       callback({ success: false, error: err.message });
     }
@@ -2281,7 +2229,7 @@ function registerSocketHandlers(io, socket) {
       engine.resetRoomForReplay(room);
       // Host's socket may have reconnected since the room was created;
       // refresh hostSocketId so phase-based broadcasts target the live
-      // socket (start_next_round, etc. read this).
+      // socket (host-only handlers read this).
       room.hostSocketId = socket.id;
 
       await saveRoom(room);

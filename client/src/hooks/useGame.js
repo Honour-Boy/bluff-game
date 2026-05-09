@@ -478,12 +478,6 @@ export function useGame(getAccessToken, getGuestAuth, authIdentityKey = null) {
     });
   }, [socket, roomCode, playerId]);
 
-  const startNextRound = useCallback(() => {
-    socket.emit('start_next_round', { roomCode }, (res) => {
-      if (!res.success) failError(res);
-    });
-  }, [socket, roomCode]);
-
   const spectatePlayer = useCallback((targetPlayerId, callback) => {
     socket.emit('spectate_player', { roomCode, targetPlayerId }, (res) => {
       if (res.success) callback(res);
@@ -703,7 +697,6 @@ export function useGame(getAccessToken, getGuestAuth, authIdentityKey = null) {
     declareRoundWin,
     callBluff,
     playCardOnline,
-    startNextRound,
     spectatePlayer,
     sendChatMessage,
     openChat,

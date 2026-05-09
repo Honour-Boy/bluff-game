@@ -40,7 +40,7 @@ function HomeContent() {
     nextTurn, resolveBluff,
     playCard, endTurn, playerSpin,
     declareRoundWin, callBluff,
-    playCardOnline, startNextRound, spectatePlayer,
+    playCardOnline, spectatePlayer,
     acknowledgeSpinResult, spinDismissed,
     chatMessages, chatUnread, chatOpen,
     sendChatMessage, openChat, closeChat,
@@ -156,7 +156,6 @@ function HomeContent() {
           callBluff={callBluff}
           endTurn={endTurn}
           playerSpin={playerSpin}
-          startNextRound={startNextRound}
           spectatePlayer={spectatePlayer}
           leaveGame={leaveGame}
           restartRoom={restartRoom}
@@ -210,7 +209,6 @@ function HomeContent() {
           callBluff={callBluff}
           endTurn={endTurn}
           playerSpin={playerSpin}
-          startNextRound={startNextRound}
           spectatePlayer={spectatePlayer}
           leaveGame={leaveGame}
           restartRoom={restartRoom}
