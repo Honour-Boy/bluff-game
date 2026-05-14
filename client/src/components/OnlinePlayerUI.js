@@ -10,6 +10,7 @@ import { TurnActionModal, WaitingForPlayerBanner } from './TurnActionModal';
 import { VoicePanel, VoiceIndicator } from './VoicePanel';
 import { PowerCard, POWER_META } from './PowerCard';
 import { AnnouncementBanner } from './AnnouncementBanner';
+import { ActiveConfigPanel } from './ActiveConfigPanel';
 import { RoleRevealOverlay, ROLE_META } from './RoleRevealOverlay';
 import {
   useAnnouncementSpeech,
@@ -1417,6 +1418,9 @@ export function OnlinePlayerUI({
           Leave game
         </button>
       </div>
+
+      {/* ── Active config panel (#68): collapsible top-left badge ── */}
+      <ActiveConfigPanel config={roomState?.config} />
 
       {/* ── Centralize button (fixed, bottom-left to avoid the chat 💬 at bottom-right) ── */}
       <button
