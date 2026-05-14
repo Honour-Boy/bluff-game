@@ -2534,6 +2534,16 @@ function registerSocketHandlers(io, socket) {
         if (winner) {
           room.pendingGameOver = { id: winner.id, name: winner.username };
         }
+      } else {
+        // ─── Auto-pass on survive (#69) ────────────────────
+        // Survival in Last Stand always passes the gun to the
+        // opponent — there is no "stay on the trigger" option.
+        // The lastStandEndTurn engine call flips activeFinalistId
+        // and currentTurnIndex; the broadcastRoomState below
+        // carries the new state to clients. We deliberately do
+        // NOT overwrite lastAction here (the spin_result lastAction
+        // drives the bullet/chamber animation on the client).
+        engine.lastStandEndTurn(room, socket.userId);
       }
 
       await saveRoom(room);

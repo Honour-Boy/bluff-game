@@ -2423,10 +2423,6 @@ export function OnlinePlayerUI({
             try { await lastStandSpin?.(); }
             finally { setLastStandSpinBusy(false); }
           }}
-          onEndTurn={async () => {
-            if (lastStandSpinBusy) return;
-            await lastStandEndTurn?.();
-          }}
         />
       )}
 
