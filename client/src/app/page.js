@@ -47,7 +47,6 @@ function HomeContent() {
     leaveGame, restartRoom, setError,
     activatePowerCard,
     swapPick,
-    assassinDecision,
     medicDecide,
     saboteurTransfer,
     sniperRedirect,
@@ -163,7 +162,6 @@ function HomeContent() {
           spinDismissed={spinDismissed}
           activatePowerCard={activatePowerCard}
           swapPick={swapPick}
-          assassinDecision={assassinDecision}
           medicDecide={medicDecide}
           saboteurTransfer={saboteurTransfer}
           sniperRedirect={sniperRedirect}
@@ -216,7 +214,6 @@ function HomeContent() {
           spinDismissed={spinDismissed}
           activatePowerCard={activatePowerCard}
           swapPick={swapPick}
-          assassinDecision={assassinDecision}
           medicDecide={medicDecide}
           saboteurTransfer={saboteurTransfer}
           sniperRedirect={sniperRedirect}

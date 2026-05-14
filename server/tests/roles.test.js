@@ -346,10 +346,12 @@ describe('Sheriff — Assassin immunity', () => {
   });
 
   it('Assassin still fires against non-Sheriff accuser', () => {
-    const { room, p1 } = buildBluffScenario({
+    // Wrong bluff (matching card) → Assassin strike. We use a non-
+    // Sheriff accuser to confirm the immunity is role-specific.
+    const { room } = buildBluffScenario({
       accusedArmed: { power: 'assassin', cardId: 'k-A' },
       accuserRole: ROLES.BAREHAND,
-      lastPlayedShape: 'square',
+      lastPlayedShape: 'circle',
       currentCardType: 'circle',
     });
     const { outcome } = resolveBluff(room, 'p1');

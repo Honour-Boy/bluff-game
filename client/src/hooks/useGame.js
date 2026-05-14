@@ -514,18 +514,6 @@ export function useGame(getAccessToken, getGuestAuth, authIdentityKey = null) {
     });
   }, [socket, roomCode]);
 
-  // ─── v2 Phase C — Assassin re-arm decision ────────────────
-  // Spec: if no bluff was called on the Assassin holder before their
-  // next activation prompt, they choose to re-arm or take +4 cards.
-  const assassinDecision = useCallback((rearm) => {
-    return new Promise((resolve) => {
-      socket.emit('assassin_decision', { roomCode, rearm: !!rearm }, (res) => {
-        if (!res?.success) failError(res);
-        resolve(res);
-      });
-    });
-  }, [socket, roomCode]);
-
   // ─── v2 Phase D — Medic save / decline ────────────────────
   // Server pauses an elimination flow (spin or Assassin) when an
   // alive Medic with hand-room exists. The Medic resolves via this
@@ -705,7 +693,6 @@ export function useGame(getAccessToken, getGuestAuth, authIdentityKey = null) {
     restartRoom,
     activatePowerCard,
     swapPick,
-    assassinDecision,
     medicDecide,
     saboteurTransfer,
     sniperRedirect,

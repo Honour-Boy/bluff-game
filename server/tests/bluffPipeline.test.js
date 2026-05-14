@@ -15,7 +15,7 @@ import {
   createRoom,
   createPlayer,
   defaultRoomConfig,
-  applyAssassinDeclinePenalty,
+  applyAssassinBackfirePenalty,
   MODES,
 } from '../gameEngine.js';
 import { resolveBluff, resumeAfterSwap } from '../bluffPipeline.js';
@@ -143,13 +143,12 @@ describe('pipeline / Shield', () => {
 // ─── Stage 2 — Assassin ──────────────────────────────────────
 
 describe('pipeline / Assassin', () => {
-  it('eliminates the bluff caller regardless of correctness (correct bluff)', () => {
-    // Accused played a wrong-shape card → bluff would be correct →
-    // accused would normally spin. With Assassin armed, accuser dies
-    // INSTEAD, regardless.
-    const { room, p0, p1 } = buildBluffScenario({
+  it('eliminates the bluff caller on a WRONG bluff (accused told truth)', () => {
+    // Accused played a matching-shape card → bluff is WRONG → accuser
+    // would normally spin. With Assassin armed, accuser dies instead.
+    const { room, p0 } = buildBluffScenario({
       accusedArmed: { power: 'assassin', cardId: 'kill-A' },
-      lastPlayedShape: 'square',
+      lastPlayedShape: 'circle',
       currentCardType: 'circle',
     });
 
@@ -163,15 +162,30 @@ describe('pipeline / Assassin', () => {
     expect(room.discardPile.find(c => c.id === 'kill-A')).toBeTruthy();
   });
 
-  it('also eliminates the caller on a WRONG bluff', () => {
-    const { room } = buildBluffScenario({
+  it('backfires on a CORRECT bluff — accused draws +3, no elimination, no spin (#63)', () => {
+    // Accused played a wrong-shape card → bluff is CORRECT → accused
+    // would normally spin. With Assassin armed, the strike backfires:
+    // the holder takes the +3 penalty and no one spins.
+    const { room, p0 } = buildBluffScenario({
       accusedArmed: { power: 'assassin', cardId: 'kill-A' },
-      lastPlayedShape: 'circle',
+      lastPlayedShape: 'square',
       currentCardType: 'circle',
     });
-    const { outcome } = resolveBluff(room, 'p1');
-    expect(outcome.kind).toBe('eliminated');
-    expect(outcome.eliminatedPlayerId).toBe('p1');
+
+    const { events, outcome } = resolveBluff(room, 'p1');
+
+    expect(outcome.kind).toBe('assassin_backfire');
+    expect(outcome.accusedId).toBe('p0');
+    expect(outcome.accuserId).toBe('p1');
+    expect(outcome.cardsToDrawForAccused).toBe(3);
+    const evt = events.find(e => e.kind === 'assassin_backfire');
+    expect(evt).toBeTruthy();
+    expect(evt.cardsDrawn).toBe(3);
+    expect(evt.holderId).toBe('p0');
+    expect(evt.accuserId).toBe('p1');
+    // Card consumed regardless of branch.
+    expect(p0.armedPowerCard).toBeNull();
+    expect(room.discardPile.find(c => c.id === 'kill-A')).toBeTruthy();
   });
 });
 
@@ -467,10 +481,10 @@ describe('pipeline / default behaviour', () => {
   });
 });
 
-// ─── Assassin decline penalty ────────────────────────────────
+// ─── Assassin backfire penalty (#63) ─────────────────────────
 
-describe('applyAssassinDeclinePenalty', () => {
-  function setupArmedAssassin() {
+describe('applyAssassinBackfirePenalty', () => {
+  function setupHolder() {
     const cfg = configWith({ assassin: true });
     const room = createRoom('host', MODES.ONLINE, cfg);
     const p0 = createPlayer('p0', 'Holder', 'sock-0');
@@ -480,53 +494,40 @@ describe('applyAssassinDeclinePenalty', () => {
     room.currentTurnIndex = 0;
     room.phase = 'playing';
     room.hands = new Map();
-    // Hand of 5 + 1 armed Assassin (= 6 total).
-    const assassinCard = { id: 'k', type: 'power', power: 'assassin', armed: true };
-    const fillers = Array.from({ length: 5 }).map((_, i) => ({
+    // Hand of 4 shape cards — Assassin already consumed by the
+    // pipeline before this helper runs.
+    const fillers = Array.from({ length: 4 }).map((_, i) => ({
       id: `s-${i}`, type: 'shape', shape: 'circle', number: i + 1,
     }));
-    room.hands.set('p0', [...fillers, assassinCard]);
+    room.hands.set('p0', [...fillers]);
     room.hands.set('p1', []);
     room.deck = Array.from({ length: 20 }).map((_, i) => ({
       id: `d-${i}`, type: 'shape', shape: 'square', number: (i % 14) + 1,
     }));
     room.playedPile = [];
     room.discardPile = [];
-    p0.armedPowerCard = {
-      power: 'assassin',
-      cardId: 'k',
-      activatedAtTurn: 0,
-      activatedAtRound: 1,
-    };
     return { room, p0, p1 };
   }
 
-  it('consumes the Assassin and deals +4 shape cards on decline', () => {
-    const { room, p0 } = setupArmedAssassin();
+  it('deals +3 shape cards to the holder', () => {
+    const { room } = setupHolder();
     const handSizeBefore = room.hands.get('p0').length;
-    const res = applyAssassinDeclinePenalty(room, 'p0');
-    expect(res.ok).toBe(true);
-    expect(res.dealt).toHaveLength(4);
-    expect(res.dealt.every(c => c.type === 'shape')).toBe(true);
-
-    expect(p0.armedPowerCard).toBeNull();
-    // Hand: 5 fillers + 4 penalty - 1 consumed Assassin = 9. Cap > 6
-    // is allowed (locked spec decision).
-    expect(room.hands.get('p0').length).toBe(handSizeBefore - 1 + 4);
-    expect(room.discardPile.find(c => c.id === 'k')).toBeTruthy();
+    const dealt = applyAssassinBackfirePenalty(room, 'p0', 3);
+    expect(dealt).toHaveLength(3);
+    expect(dealt.every(c => c.type === 'shape')).toBe(true);
+    expect(room.hands.get('p0').length).toBe(handSizeBefore + 3);
   });
 
-  it('rejects when no armed Assassin', () => {
-    const { room, p0 } = setupArmedAssassin();
-    p0.armedPowerCard = null;
-    const res = applyAssassinDeclinePenalty(room, 'p0');
-    expect(res.ok).toBe(false);
-  });
-
-  it('rejects in physical mode', () => {
-    const { room } = setupArmedAssassin();
+  it('returns an empty array in physical mode', () => {
+    const { room } = setupHolder();
     room.mode = MODES.PHYSICAL;
-    const res = applyAssassinDeclinePenalty(room, 'p0');
-    expect(res.ok).toBe(false);
+    const dealt = applyAssassinBackfirePenalty(room, 'p0', 3);
+    expect(dealt).toEqual([]);
+  });
+
+  it('returns an empty array for an unknown player', () => {
+    const { room } = setupHolder();
+    const dealt = applyAssassinBackfirePenalty(room, 'ghost', 3);
+    expect(dealt).toEqual([]);
   });
 });
