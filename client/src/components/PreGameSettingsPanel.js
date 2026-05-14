@@ -122,17 +122,60 @@ function ToggleRow({ id, label, desc, checked, onChange }) {
   );
 }
 
+// ─── Section header buttons (Select All / Deselect All) ───
+// Plain "link"-style buttons; minHeight respects mobile tap target.
+function SectionButton({ children, onClick, ariaLabel }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      aria-label={ariaLabel}
+      style={{
+        minHeight: 32,
+        padding: '4px 10px',
+        background: 'transparent',
+        border: '1px solid var(--border)',
+        borderRadius: 999,
+        color: 'var(--text-dim)',
+        fontSize: 10,
+        letterSpacing: '0.1em',
+        textTransform: 'uppercase',
+        cursor: 'pointer',
+      }}
+    >
+      {children}
+    </button>
+  );
+}
+
 // ─── Section wrapper ──────────────────────────────────────
-function Section({ title, children, footer }) {
+function Section({ title, children, footer, onSelectAll, onDeselectAll }) {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
       <div style={{
-        fontSize: 10,
-        color: 'var(--text-dim)',
-        letterSpacing: '0.18em',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        gap: 8,
         marginTop: 4,
       }}>
-        {title}
+        <div style={{
+          fontSize: 10,
+          color: 'var(--text-dim)',
+          letterSpacing: '0.18em',
+        }}>
+          {title}
+        </div>
+        {(onSelectAll || onDeselectAll) && (
+          <div style={{ display: 'flex', gap: 6 }}>
+            {onSelectAll && (
+              <SectionButton onClick={onSelectAll} ariaLabel={`Enable all in ${title}`}>All</SectionButton>
+            )}
+            {onDeselectAll && (
+              <SectionButton onClick={onDeselectAll} ariaLabel={`Disable all in ${title}`}>None</SectionButton>
+            )}
+          </div>
+        )}
       </div>
       <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
         {children}
@@ -140,6 +183,12 @@ function Section({ title, children, footer }) {
       {footer}
     </div>
   );
+}
+
+function setAllInGroup(items, value) {
+  const out = {};
+  for (const { key } of items) out[key] = value;
+  return out;
 }
 
 // ─── Main component ───────────────────────────────────────
@@ -181,6 +230,35 @@ export function PreGameSettingsPanel({ config, onChange }) {
 
   const setSystem = (key, value) => {
     onChange({ ...config, systems: { ...config.systems, [key]: value } });
+  };
+
+  // ─── #66 — Select All / Deselect All helpers ─────────────
+  const setAllPowerCards = (value) => {
+    onChange({
+      ...config,
+      powerCards: {
+        ...config.powerCards,
+        enabled: setAllInGroup(POWER_CARDS, value),
+      },
+    });
+  };
+  const setAllRisk = (value) => {
+    onChange({ ...config, riskModifiers: setAllInGroup(RISK_MODS, value) });
+  };
+  const setAllRoom = (value) => {
+    onChange({ ...config, roomModifiers: setAllInGroup(ROOM_MODS, value) });
+  };
+  const setAllSystems = (value) => {
+    onChange({ ...config, systems: setAllInGroup(SYSTEMS, value) });
+  };
+  const setAllGlobal = (value) => {
+    onChange({
+      ...config,
+      powerCards: { ...config.powerCards, enabled: setAllInGroup(POWER_CARDS, value) },
+      riskModifiers: setAllInGroup(RISK_MODS, value),
+      roomModifiers: setAllInGroup(ROOM_MODS, value),
+      systems: setAllInGroup(SYSTEMS, value),
+    });
   };
 
   return (
@@ -240,9 +318,35 @@ export function PreGameSettingsPanel({ config, onChange }) {
           maxHeight: '60vh',
           overflowY: 'auto',
         }}>
+          {/* Global Enable/Disable bar */}
+          <div style={{
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            gap: 8,
+            padding: '8px 12px',
+            background: 'var(--surface2)',
+            border: '1px solid var(--border)',
+            borderRadius: 'var(--radius)',
+          }}>
+            <div style={{ fontSize: 10, color: 'var(--text-dim)', letterSpacing: '0.12em' }}>
+              ALL SETTINGS
+            </div>
+            <div style={{ display: 'flex', gap: 6 }}>
+              <SectionButton onClick={() => setAllGlobal(true)} ariaLabel="Enable everything">
+                Enable Everything
+              </SectionButton>
+              <SectionButton onClick={() => setAllGlobal(false)} ariaLabel="Disable everything">
+                Disable Everything
+              </SectionButton>
+            </div>
+          </div>
+
           {/* Power Cards */}
           <Section
             title="POWER CARDS"
+            onSelectAll={() => setAllPowerCards(true)}
+            onDeselectAll={() => setAllPowerCards(false)}
             footer={
               <div style={{
                 display: 'flex',
@@ -297,7 +401,11 @@ export function PreGameSettingsPanel({ config, onChange }) {
           </Section>
 
           {/* Risk Modifiers */}
-          <Section title="RISK MODIFIERS">
+          <Section
+            title="RISK MODIFIERS"
+            onSelectAll={() => setAllRisk(true)}
+            onDeselectAll={() => setAllRisk(false)}
+          >
             {RISK_MODS.map(({ key, label, desc }) => (
               <ToggleRow
                 key={key}
@@ -311,7 +419,11 @@ export function PreGameSettingsPanel({ config, onChange }) {
           </Section>
 
           {/* Room Modifiers */}
-          <Section title="ROOM MODIFIERS">
+          <Section
+            title="ROOM MODIFIERS"
+            onSelectAll={() => setAllRoom(true)}
+            onDeselectAll={() => setAllRoom(false)}
+          >
             {ROOM_MODS.map(({ key, label, desc }) => (
               <ToggleRow
                 key={key}
@@ -327,6 +439,8 @@ export function PreGameSettingsPanel({ config, onChange }) {
           {/* Special Systems */}
           <Section
             title="SPECIAL SYSTEMS"
+            onSelectAll={() => setAllSystems(true)}
+            onDeselectAll={() => setAllSystems(false)}
             footer={
               <div style={{
                 fontSize: 10,

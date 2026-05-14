@@ -11,6 +11,8 @@ import { VoicePanel, VoiceIndicator } from './VoicePanel';
 import { PowerCard, POWER_META } from './PowerCard';
 import { AnnouncementBanner } from './AnnouncementBanner';
 import { ActiveConfigPanel } from './ActiveConfigPanel';
+import { PreGameSettingsPanel } from './PreGameSettingsPanel';
+import { LobbyConfigSummary } from './LobbyConfigSummary';
 import { RoleRevealOverlay, ROLE_META } from './RoleRevealOverlay';
 import {
   useAnnouncementSpeech,
@@ -528,6 +530,7 @@ export function OnlinePlayerUI({
   spinDismissed,
   activatePowerCard,
   swapPick,
+  updateRoomConfig,
   medicDecide,
   saboteurTransfer,
   sniperRedirect,
@@ -1098,17 +1101,25 @@ export function OnlinePlayerUI({
 
           {/* Lobby card sits at the table center */}
           {isLobby && (
-            <div className="card" style={{ textAlign: 'center' }}>
-              <div style={{ fontSize: 10, color: 'var(--text-dim)', letterSpacing: '0.12em', marginBottom: 14 }}>
+            <div className="card" style={{ textAlign: 'center', display: 'flex', flexDirection: 'column', gap: 14 }}>
+              <div style={{ fontSize: 10, color: 'var(--text-dim)', letterSpacing: '0.12em' }}>
                 LOBBY — {alivePlayers.length} player{alivePlayers.length !== 1 ? 's' : ''} joined
               </div>
               {isHost ? (
                 <>
+                  {/* #66 — settings live here now; host edits and every */}
+                  {/* lobby member sees the change via room_state. */}
+                  {roomState?.config && (
+                    <PreGameSettingsPanel
+                      config={roomState.config}
+                      onChange={updateRoomConfig}
+                    />
+                  )}
                   <button
                     className="primary"
                     onClick={startGame}
                     disabled={alivePlayers.length < 2}
-                    style={{ width: '100%', padding: '14px', fontSize: 13, marginBottom: 10 }}
+                    style={{ width: '100%', padding: '14px', fontSize: 13 }}
                   >
                     ▶ Start Game ({alivePlayers.length} players)
                   </button>
@@ -1119,9 +1130,12 @@ export function OnlinePlayerUI({
                   )}
                 </>
               ) : (
-                <div style={{ fontSize: 12, color: 'var(--text-dim)' }}>
-                  Waiting for the host to start the game...
-                </div>
+                <>
+                  {roomState?.config && <LobbyConfigSummary config={roomState.config} />}
+                  <div style={{ fontSize: 12, color: 'var(--text-dim)' }}>
+                    Waiting for the host to start the game...
+                  </div>
+                </>
               )}
             </div>
           )}

@@ -1113,6 +1113,32 @@ function registerSocketHandlers(io, socket) {
     }
   });
 
+  // ─── HOST: Update lobby config (#66) ──────────────────────
+  // Lets the host tweak power-card / modifier / system toggles AFTER
+  // the room has been created but BEFORE the game starts. We re-run
+  // the incoming payload through engine.normalizeRoomConfig so unknown
+  // keys are stripped and copiesPerDeck is clamped — same guarantees
+  // the create_room path gives us. Locked the instant phase leaves
+  // 'lobby'.
+  socket.on('update_room_config', async ({ roomCode, config } = {}, callback) => {
+    try {
+      const code = roomCode?.toUpperCase();
+      const room = await getRoom(code);
+      if (!room) return callback?.({ success: false, error: 'Room not found' });
+      if (room.hostSocketId !== socket.id) return callback?.({ success: false, error: 'Not the host' });
+      if (room.phase !== 'lobby') return callback?.({ success: false, error: 'Game already started' });
+      if (room.mode !== engine.MODES.ONLINE) return callback?.({ success: false, error: 'Online mode only' });
+
+      room.config = engine.normalizeRoomConfig(config);
+      await saveRoom(room);
+      await broadcastRoomState(io, code);
+      callback?.({ success: true });
+    } catch (err) {
+      console.error('[update_room_config]', err);
+      callback?.({ success: false, error: err.message });
+    }
+  });
+
   // ─── HOST: Start the game ─────────────────────────────────
   socket.on('start_game', async ({ roomCode } = {}, callback) => {
     try {

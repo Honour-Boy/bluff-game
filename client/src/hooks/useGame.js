@@ -514,6 +514,18 @@ export function useGame(getAccessToken, getGuestAuth, authIdentityKey = null) {
     });
   }, [socket, roomCode]);
 
+  // ─── #66 — Host edits lobby config ────────────────────────
+  // Wraps `update_room_config`. Server normalises + broadcasts.
+  // No-ops cleanly when not host / not in lobby (server rejects).
+  const updateRoomConfig = useCallback((nextConfig) => {
+    return new Promise((resolve) => {
+      socket.emit('update_room_config', { roomCode, config: nextConfig }, (res) => {
+        if (!res?.success) failError(res);
+        resolve(res);
+      });
+    });
+  }, [socket, roomCode]);
+
   // ─── v2 Phase D — Medic save / decline ────────────────────
   // Server pauses an elimination flow (spin or Assassin) when an
   // alive Medic with hand-room exists. The Medic resolves via this
@@ -693,6 +705,7 @@ export function useGame(getAccessToken, getGuestAuth, authIdentityKey = null) {
     restartRoom,
     activatePowerCard,
     swapPick,
+    updateRoomConfig,
     medicDecide,
     saboteurTransfer,
     sniperRedirect,
