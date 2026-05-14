@@ -520,7 +520,6 @@ export function OnlinePlayerUI({
   callBluff,
   endTurn,
   playerSpin,
-  startNextRound,
   spectatePlayer,
   leaveGame,
   restartRoom,
@@ -1260,25 +1259,7 @@ export function OnlinePlayerUI({
             </div>
           )}
 
-          {/* Round end + game over banners over the table */}
-          {isRoundEnd && (
-            <div className="card" style={{ textAlign: 'center', border: '1px solid var(--alive)' }}>
-              <div style={{ fontFamily: "'Bebas Neue', sans-serif", fontSize: 28, color: 'var(--alive)', marginBottom: 8 }}>
-                {lastAction?.winnerId === myPlayer.id ? '🏆 You Won This Round!' : `🏆 ${lastAction?.winnerName ?? '?'} Won This Round!`}
-              </div>
-              {isHost && (
-                <button className="primary" onClick={startNextRound} style={{ marginTop: 12 }}>
-                  ▶ Next Round
-                </button>
-              )}
-              {!isHost && (
-                <div style={{ fontSize: 11, color: 'var(--text-dim)', marginTop: 8 }}>
-                  Waiting for host to start the next round...
-                </div>
-              )}
-            </div>
-          )}
-
+          {/* Game over banner over the table */}
           {isGameOver && (
             <div className="card" style={{ textAlign: 'center', border: '1px solid var(--accent)' }}>
               <div style={{ fontFamily: "'Bebas Neue', sans-serif", fontSize: 32, color: 'var(--accent)', marginBottom: 8 }}>
