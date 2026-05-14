@@ -1,8 +1,17 @@
-import { describe, it, expect } from 'vitest';
-import { distributePlayers, orderClockwiseFromLocal } from './OnlinePlayerUI';
+import { describe, it, expect, vi } from 'vitest';
+import { render, screen, fireEvent } from '@testing-library/react';
+import { distributePlayers, orderClockwiseFromLocal, CardHand } from './OnlinePlayerUI';
 
 // Compact fixture helper — only the fields seating cares about.
 const mkPlayers = (...ids) => ids.map((id) => ({ id, username: id.toUpperCase(), status: 'alive' }));
+
+// Compact card factory — only the fields CardHand looks at.
+const card = (id, overrides = {}) => ({
+  id,
+  shape: overrides.shape ?? 'circle',
+  number: overrides.number ?? 5,
+  ...overrides,
+});
 
 describe('orderClockwiseFromLocal — issue #82', () => {
   it('returns the input unchanged when turnOrder is missing or empty', () => {
@@ -138,5 +147,102 @@ describe('clockwise seating reflows on elimination (issue #82)', () => {
       'me',
     );
     expect(after.map(p => p.id)).toEqual(['a', 'c', 'd']);
+  });
+});
+
+describe('CardHand — armed power-card visual state (issue #64)', () => {
+  it('renders the placeholder when the hand is empty', () => {
+    render(<CardHand hand={[]} />);
+    expect(screen.getByText(/No cards in hand/i)).toBeInTheDocument();
+  });
+
+  it('does NOT mark a normal (un-armed) card with the lock badge', () => {
+    const onCardClick = vi.fn();
+    render(<CardHand hand={[card('c1')]} onCardClick={onCardClick} />);
+    expect(screen.queryByLabelText(/Activated — awaiting trigger/i)).toBeNull();
+    // Clicks on a normal card go through.
+    fireEvent.click(screen.getByText('5'));
+    expect(onCardClick).toHaveBeenCalledWith('c1');
+  });
+
+  it('shows the lock badge for an armed card', () => {
+    render(
+      <CardHand hand={[card('p1', { type: 'power', power: 'assassin', armed: true })]} />,
+    );
+    expect(screen.getByLabelText(/Activated — awaiting trigger/i)).toBeInTheDocument();
+  });
+
+  it('halves the inner-card opacity when armed', () => {
+    render(
+      <CardHand
+        hand={[
+          card('plain'),
+          card('armed-card', { type: 'power', power: 'shield', armed: true }),
+        ]}
+      />,
+    );
+    const lock = screen.getByLabelText(/Activated — awaiting trigger/i);
+    // The lock badge is a sibling of the dimmed inner. The dimmed
+    // inner is its previousElementSibling — assert opacity ~0.5.
+    const inner = lock.previousElementSibling;
+    expect(inner).not.toBeNull();
+    expect(inner.style.opacity).toBe('0.5');
+  });
+
+  it('disables pointer events on the armed card so it cannot be re-clicked', () => {
+    const onCardClick = vi.fn();
+    render(
+      <CardHand
+        hand={[card('p1', { type: 'power', power: 'assassin', armed: true })]}
+        onCardClick={onCardClick}
+        interactive
+      />,
+    );
+    const lock = screen.getByLabelText(/Activated — awaiting trigger/i);
+    const outer = lock.parentElement; // the per-card wrapper
+    expect(outer.style.pointerEvents).toBe('none');
+
+    // Defence in depth — even if the test fires click directly,
+    // the onClick guard (`cardInteractive && onCardClick`) ignores it.
+    fireEvent.click(outer);
+    expect(onCardClick).not.toHaveBeenCalled();
+  });
+
+  it('exposes a hover tooltip via the title attribute on the armed card', () => {
+    render(
+      <CardHand hand={[card('p1', { type: 'power', power: 'shield', armed: true })]} />,
+    );
+    const lock = screen.getByLabelText(/Activated — awaiting trigger/i);
+    const outer = lock.parentElement;
+    expect(outer.getAttribute('title')).toBe('Activated — awaiting trigger');
+  });
+
+  it('non-armed cards in the same hand stay clickable when one card is armed', () => {
+    const onCardClick = vi.fn();
+    render(
+      <CardHand
+        hand={[
+          card('normal', { shape: 'square', number: 7 }),
+          card('armed-card', { type: 'power', power: 'assassin', armed: true }),
+        ]}
+        onCardClick={onCardClick}
+        interactive
+      />,
+    );
+    fireEvent.click(screen.getByText('7'));
+    expect(onCardClick).toHaveBeenCalledWith('normal');
+  });
+
+  it('does not invoke onCardClick when the hand is non-interactive even for normal cards', () => {
+    const onCardClick = vi.fn();
+    render(
+      <CardHand
+        hand={[card('c1')]}
+        onCardClick={onCardClick}
+        interactive={false}
+      />,
+    );
+    fireEvent.click(screen.getByText('5'));
+    expect(onCardClick).not.toHaveBeenCalled();
   });
 });
