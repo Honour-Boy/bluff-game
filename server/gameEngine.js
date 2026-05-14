@@ -470,32 +470,6 @@ function advanceTurn(room) {
 }
 
 /**
- * Did `playerId` survive a full circuit of the table without anyone
- * calling bluff on them since they armed `armedPowerCard`? Returns
- * true when their next turn comes around and the armed card is the
- * same one they armed last time. Used by the Assassin "decide to
- * re-arm or take penalty" flow at turn start.
- *
- * Specifically: if the active turn just rotated back to a player
- * whose armedPowerCard.activatedAtTurn !== currentTurnIndex, we
- * know the activation has aged through one full rotation.
- */
-function isArmedFromPriorTurn(room, playerId) {
-  const player = room.players.find(p => p.id === playerId);
-  if (!player?.armedPowerCard) return false;
-  // We armed at activatedAtTurn, and the turn index has advanced
-  // (and wrapped) at least once. The simple check: turnIndex
-  // changed since arming. NOTE: turn index can be the SAME on the
-  // next visit if no eliminations and the modulo math lines up,
-  // so we additionally compare roundNumber as a tiebreaker.
-  return (
-    player.armedPowerCard.activatedAtTurn !== room.currentTurnIndex
-    || (player.armedPowerCard.activatedAtRound !== undefined
-        && player.armedPowerCard.activatedAtRound !== room.roundNumber)
-  );
-}
-
-/**
  * Walk every Swap card in every hand and remove `playerId` from its
  * pending-set (the set of "alive players who must still take a turn
  * before this Swap is activatable"). When the set empties, the Swap
@@ -901,50 +875,34 @@ function _findPowerCardInHand(hand) {
 }
 
 /**
- * Assassin "decline to re-arm" penalty (Phase C, locked):
- *   The holder armed Assassin on a previous turn but no bluff was
- *   called on them. At their next turn the activation prompt fires
- *   again. If they DECLINE to re-arm, they take +4 shape cards as
- *   penalty (drawn via drawCardForPlayer; hand cap is honoured).
- *   Either way, the Assassin is consumed.
+ * Assassin backfire penalty (#63):
+ *   When a bluff is *correctly* called on an Assassin holder, the
+ *   holder takes the +3 shape-card penalty instead of being spun.
+ *   The armed Assassin card has already been consumed by the bluff
+ *   pipeline by the time this helper runs; we only handle the draw.
  *
  *   Hand cap > 6 IS allowed here (Section 7 hand reset will wash it
  *   on next survival, per the locked roadmap decision).
  *
- *   Returns:
- *     { ok: true, dealt: Card[] }       — penalty applied successfully
- *     { ok: false, error: string }      — couldn't apply (no armed
- *                                         Assassin, wrong mode, etc.)
+ *   Returns: Card[] — the freshly-drawn cards (empty array if the
+ *   deck was exhausted).
  */
-function applyAssassinDeclinePenalty(room, playerId) {
-  if (room.mode !== MODES.ONLINE) return { ok: false, error: 'Online mode only' };
+function applyAssassinBackfirePenalty(room, playerId, count = 3) {
+  if (room.mode !== MODES.ONLINE) return [];
   const player = room.players.find(p => p.id === playerId);
-  if (!player) return { ok: false, error: 'Player not found' };
-  if (!player.armedPowerCard || player.armedPowerCard.power !== 'assassin') {
-    return { ok: false, error: 'No armed Assassin to decline' };
-  }
+  if (!player) return [];
 
-  const hand = room.hands?.get(playerId) || [];
-  const cardId = player.armedPowerCard.cardId;
-  const idx = hand.findIndex(c => c?.id === cardId);
-  if (idx !== -1) {
-    const [card] = hand.splice(idx, 1);
-    if (!room.discardPile) room.discardPile = [];
-    room.discardPile.push(card);
-  }
-  player.armedPowerCard = null;
-
-  // Draw 4 cards. Hand cap is enforced per-card by drawCardForPlayer
-  // (power cards over the cap go to discardPile and are replaced
-  // with shapes — exactly what we want for a "regular shape cards"
-  // penalty). Hand size > 6 is allowed by spec.
+  // Draw `count` cards. Hand cap is enforced per-card by
+  // drawCardForPlayer (power cards over the cap go to discardPile and
+  // are replaced with shapes — exactly what we want for a "regular
+  // shape cards" penalty). Hand size > 6 is allowed by spec.
   const dealt = [];
-  for (let i = 0; i < 4; i++) {
+  for (let i = 0; i < count; i++) {
     const card = drawCardForPlayer(room, playerId);
     if (card) dealt.push(card);
     else break;
   }
-  return { ok: true, dealt };
+  return dealt;
 }
 
 // ─── v2 Phase D — Role helpers ───────────────────────────────
@@ -2543,10 +2501,9 @@ module.exports = {
   drawCardForPlayer,
   resetRoundOnline,
   activatePowerCard,
-  applyAssassinDeclinePenalty,
+  applyAssassinBackfirePenalty,
   consumeFreezeOnTurnEnd,
   isSwapActivatable,
-  isArmedFromPriorTurn,
   serializeRoom,
   getCurrentPlayer,
   appendChatMessage,

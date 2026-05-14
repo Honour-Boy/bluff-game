@@ -527,7 +527,6 @@ export function OnlinePlayerUI({
   spinDismissed,
   activatePowerCard,
   swapPick,
-  assassinDecision,
   medicDecide,
   saboteurTransfer,
   sniperRedirect,
@@ -591,14 +590,6 @@ export function OnlinePlayerUI({
   // The Swap holder is shown an anonymised picker of cards in the
   // played pile. Each option is just an id; no shape, no number.
   const [swapping, setSwapping] = useState(false);
-
-  // ─── v2 Phase C — Assassin re-arm decision state ─────────
-  // When the holder's next turn comes around without any bluff
-  // having been called on them, we re-prompt: re-arm or take +4
-  // shape cards penalty. We dismiss-per-turn just like the regular
-  // activation prompt so the user can't get stuck in a loop.
-  const [assassinDeciding, setAssassinDeciding] = useState(false);
-  const [assassinPromptDismissedFor, setAssassinPromptDismissedFor] = useState(null);
 
   // ─── v2 Phase D — Role reveal state ──────────────────────
   // Plays once at the start of the first round. Local-only flag —
@@ -876,23 +867,6 @@ export function OnlinePlayerUI({
   const amSwapHolder = isSwapPending && roomState?.swapHolderId === myPlayer?.id;
   const swapPickOptions = roomState?.swapPickOptions || [];
 
-  // ─── v2 Phase C — Assassin re-arm prompt visibility ──────
-  // When my next turn starts and I still have an armed Assassin
-  // (no one called bluff on me last cycle), the spec says I must
-  // decide: re-arm (no-op) or take +4 cards penalty. We re-key
-  // dismissal on the same turn key so the prompt re-fires per turn.
-  const showAssassinReprompt =
-    isMyTurn &&
-    !isEliminated &&
-    !showSpectatorView &&
-    roomState?.phase === 'playing' &&
-    !roomState?.cardPlayedThisTurn &&
-    !roomState?.bluffUsedThisTurn &&
-    armedPowerCard?.power === 'assassin' &&
-    assassinPromptDismissedFor !== powerPromptTurnKey &&
-    !spinData &&
-    !justEliminated;
-
   const handleActivatePower = async () => {
     if (!activatePowerCard || activating) return;
     setActivating(true);
@@ -924,28 +898,6 @@ export function OnlinePlayerUI({
       await swapPick(cardId);
     } finally {
       setSwapping(false);
-    }
-  };
-
-  // ─── v2 Phase C — Assassin re-arm decision handlers ─────
-  const handleAssassinRearm = async () => {
-    if (!assassinDecision || assassinDeciding) return;
-    setAssassinDeciding(true);
-    try {
-      await assassinDecision(true);
-      setAssassinPromptDismissedFor(powerPromptTurnKey);
-    } finally {
-      setAssassinDeciding(false);
-    }
-  };
-  const handleAssassinDecline = async () => {
-    if (!assassinDecision || assassinDeciding) return;
-    setAssassinDeciding(true);
-    try {
-      await assassinDecision(false);
-      setAssassinPromptDismissedFor(powerPromptTurnKey);
-    } finally {
-      setAssassinDeciding(false);
     }
   };
 
@@ -1742,7 +1694,7 @@ export function OnlinePlayerUI({
           Suppressed while the power-card prompt is up so the player
           decides activation FIRST (per spec). */}
       <TurnActionModal
-        visible={showTurnModal && !isEliminated && !showPowerPrompt && !showAssassinReprompt && !amSwapHolder && !peekedCard}
+        visible={showTurnModal && !isEliminated && !showPowerPrompt && !amSwapHolder && !peekedCard}
         isFirstTurn={isFirstTurn}
         bluffUsed={bluffUsedThisTurn}
         cardPlayed={cardPlayedThisTurn}
@@ -1879,6 +1831,7 @@ export function OnlinePlayerUI({
             case 'shield_blocked':   return 'bluff_blocked';
             case 'mirror_reflected': return 'bluff_reflected';
             case 'assassin_strike':  return 'assassin';
+            case 'assassin_backfire': return 'bluff_blocked';
             case 'swap_resolved':    return 'bluff_blocked';
             case 'freeze_skip':      return 'sudden_death'; // ice-blue preset
             // v2 Phase D — role banners.
@@ -1894,6 +1847,7 @@ export function OnlinePlayerUI({
           shield_blocked:   'BLUFF BLOCKED',
           mirror_reflected: 'BLUFF REFLECTED',
           assassin_strike:  'ASSASSIN STRIKE',
+          assassin_backfire: 'ASSASSIN BACKFIRES',
           swap_resolved:    'SWAP RESOLVED',
           freeze_skip:      'FREEZE',
           gambler_caught:   'GAMBLER CAUGHT',
@@ -1908,6 +1862,10 @@ export function OnlinePlayerUI({
           }
           if (evt.kind === 'assassin_strike') {
             return evt.eliminatedName ? `${evt.eliminatedName} eliminated` : '';
+          }
+          if (evt.kind === 'assassin_backfire') {
+            const n = evt.cardsDrawn || 3;
+            return `${evt.holderName || 'Holder'} draws +${n}`;
           }
           if (evt.kind === 'swap_resolved') return 'card swapped';
           if (evt.kind === 'freeze_skip') {
@@ -2035,64 +1993,6 @@ export function OnlinePlayerUI({
             </div>
             <div style={{ fontSize: 12, color: 'var(--text-dim)' }}>
               {players?.find(p => p.id === roomState?.swapHolderId)?.username || 'Player'} is choosing a card…
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* ── v2 Phase C — Assassin re-arm decision prompt ── */}
-      {showAssassinReprompt && (
-        <div style={{
-          position: 'fixed', inset: 0,
-          background: 'rgba(0,0,0,0.88)',
-          display: 'flex', alignItems: 'center', justifyContent: 'center',
-          zIndex: 8350, padding: 24,
-        }}>
-          <div className="card fade-in" style={{
-            maxWidth: 360, width: '100%', textAlign: 'center',
-            padding: '28px 24px',
-            border: `1px solid ${POWER_META.assassin.color}`,
-          }}>
-            <div style={{ fontSize: 10, color: 'var(--text-dim)', letterSpacing: '0.15em', marginBottom: 10 }}>
-              ASSASSIN — STILL ARMED
-            </div>
-            <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 16 }}>
-              <PowerCard type="assassin" size="md" />
-            </div>
-            <div style={{
-              fontFamily: "'Bebas Neue', sans-serif",
-              fontSize: 20, letterSpacing: '0.06em',
-              color: POWER_META.assassin.color, marginBottom: 8,
-            }}>
-              No one called your bluff.
-            </div>
-            <div style={{ fontSize: 12, color: 'var(--text-dim)', marginBottom: 18, lineHeight: 1.5 }}>
-              Re-arm to keep the threat alive, or stand down and take the +4 card penalty.
-            </div>
-            <div style={{ display: 'flex', gap: 10 }}>
-              <button
-                className="primary"
-                onClick={handleAssassinRearm}
-                disabled={assassinDeciding}
-                style={{ flex: 1, padding: '12px', minHeight: 44 }}
-              >
-                {assassinDeciding ? '…' : 'Re-arm'}
-              </button>
-              <button
-                onClick={handleAssassinDecline}
-                disabled={assassinDeciding}
-                style={{
-                  flex: 1, padding: '12px', minHeight: 44,
-                  background: 'var(--surface2)',
-                  border: '1px solid var(--border)',
-                  borderRadius: 'var(--radius)',
-                  color: 'var(--text-dim)',
-                  cursor: assassinDeciding ? 'wait' : 'pointer',
-                  fontSize: 13,
-                }}
-              >
-                Stand down (+4)
-              </button>
             </div>
           </div>
         </div>

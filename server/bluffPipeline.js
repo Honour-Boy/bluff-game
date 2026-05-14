@@ -26,7 +26,7 @@
 //     → {
 //         events:  PowerCardEvent[],   // announce-banner payloads
 //         outcome: {
-//           kind: 'spin' | 'blocked' | 'eliminated' | 'swap_pending',
+//           kind: 'spin' | 'blocked' | 'eliminated' | 'assassin_backfire' | 'swap_pending',
 //           // for 'spin':
 //           spinTargetId?: string,
 //           bluffIsCorrect?: boolean,
@@ -35,9 +35,11 @@
 //           revealedCard?: Card | null,
 //           // for 'blocked':
 //           // (no extras — caller advances turn normally)
-//           // for 'eliminated' (Assassin path):
+//           // for 'eliminated' (Assassin path, wrong bluff):
 //           eliminatedPlayerId?: string,
 //           eliminatedReason?: 'assassin',
+//           // for 'assassin_backfire' (Assassin path, correct bluff):
+//           cardsToDrawForAccused?: number,
 //           // for 'swap_pending':
 //           swapHolderId?: string,
 //         },
@@ -45,9 +47,11 @@
 //
 // Pipeline stages, in order:
 //   1. Shield check on accused → blocked (consume Shield)
-//   2. Assassin check on accused → eliminate accuser (consume Assassin)
-//      • Sheriff role exemption hook (Phase D)
-//   3. Determine bluff correctness
+//   2. Determine bluff correctness
+//   3. Assassin check on accused → branch on correctness (consume Assassin)
+//      • Wrong bluff (accused told truth) → eliminate accuser
+//      • Correct bluff (accused was bluffing) → backfire: accused draws +3
+//      • Sheriff role exemption hook (Phase D) bypasses both branches
 //   4. Mirror check on accused → redirect spin to accuser (consume Mirror)
 //   5. Swap check on accused → return swap_pending (caller pauses for pick)
 //   6. Default: spin target = correct caller or wrong caller per existing rules
@@ -159,12 +163,29 @@ function _stageShield(room, state) {
   state.shortCircuit = true;
 }
 
-// ─── Stage 2: Assassin ────────────────────────────────────────
+// ─── Stage 2: Determine bluff correctness ────────────────────
 //
-// Assassin fires regardless of whether the bluff was correct. Caller
-// is eliminated. Spec note: Shield > Assassin (handled by stage 1
-// short-circuiting before we reach this stage). Sheriff > Assassin
-// is wired in as a Phase D hook below.
+// Cached on state so the Assassin stage (which branches on it) and
+// stages 4 + 6 can read it without recomputing.
+function _stageBluffCorrectness(room, state) {
+  state.bluffIsCorrect = _isBluffCorrect(room);
+  state.revealedCard = room.lastPlayedCard || null;
+}
+
+// ─── Stage 3: Assassin ────────────────────────────────────────
+//
+// Per #63, Assassin no longer fires unconditionally. The branch depends
+// on whether the bluff call was correct:
+//   • Wrong bluff (accused told truth) → caller is eliminated.
+//   • Correct bluff (accused was bluffing) → caller does NOT spin and
+//     accused does NOT spin; instead the Assassin backfires and the
+//     holder draws +3 cards. Card is consumed either way.
+//
+// Spec notes: Shield > Assassin (stage 1 short-circuits us). Sheriff
+// > Assassin is a Phase D hook — when the accuser is the Sheriff, the
+// Assassin doesn't fire at all (no strike, no backfire); the bluff
+// falls through to normal resolution so a correct Sheriff call still
+// spins the accused and earns its risk-drop.
 function _stageAssassin(room, state) {
   const { accuser, accused } = state;
   if (!accused?.armedPowerCard || accused.armedPowerCard.power !== 'assassin') return;
@@ -189,30 +210,47 @@ function _stageAssassin(room, state) {
     return;
   }
 
+  // Wrong bluff → caller dies.
+  if (state.bluffIsCorrect === false) {
+    _consumeArmedCard(room, accused);
+    state.events.push({
+      kind: 'assassin_strike',
+      holderId: accused.id,
+      holderName: accused.username,
+      eliminatedId: accuser?.id || null,
+      eliminatedName: accuser?.username || null,
+    });
+    state.outcome = {
+      kind: 'eliminated',
+      eliminatedPlayerId: accuser?.id || null,
+      eliminatedReason: 'assassin',
+      accuserId: accuser?.id || null,
+      accusedId: accused.id,
+    };
+    state.shortCircuit = true;
+    return;
+  }
+
+  // Correct bluff → backfire: holder takes +3 penalty cards, no spin,
+  // no elimination. Card consumed. Caller goes to a normal post-bluff
+  // turn advance (handled by the socket layer's `assassin_backfire`
+  // branch).
   _consumeArmedCard(room, accused);
   state.events.push({
-    kind: 'assassin_strike',
+    kind: 'assassin_backfire',
     holderId: accused.id,
     holderName: accused.username,
-    eliminatedId: accuser?.id || null,
-    eliminatedName: accuser?.username || null,
+    accuserId: accuser?.id || null,
+    accuserName: accuser?.username || null,
+    cardsDrawn: 3,
   });
   state.outcome = {
-    kind: 'eliminated',
-    eliminatedPlayerId: accuser?.id || null,
-    eliminatedReason: 'assassin',
+    kind: 'assassin_backfire',
     accuserId: accuser?.id || null,
     accusedId: accused.id,
+    cardsToDrawForAccused: 3,
   };
   state.shortCircuit = true;
-}
-
-// ─── Stage 3: Determine bluff correctness ────────────────────
-//
-// Cached on state so stages 4 and 6 can read it without recomputing.
-function _stageBluffCorrectness(room, state) {
-  state.bluffIsCorrect = _isBluffCorrect(room);
-  state.revealedCard = room.lastPlayedCard || null;
 }
 
 // ─── Stage 4: Mirror ─────────────────────────────────────────
@@ -450,8 +488,8 @@ function resolveBluff(room, accuserId) {
 
   _runStages(room, state, [
     _stageShield,
-    _stageAssassin,
     _stageBluffCorrectness,
+    _stageAssassin,
     _stageMirror,
     _stageSwap,
     _stageDefaultSpin,
@@ -553,13 +591,13 @@ function resumeAfterSwap(room, accuserId, pickedCardId) {
     swappedCard: room.lastPlayedCard,
   };
 
-  // Re-run stages 3 (correctness) + 4 (Mirror) + 6 (default spin)
-  // on the post-swap world. Stages 1 (Shield) and 2 (Assassin) DO
-  // NOT re-run — they were already evaluated against the original
-  // accused state. Their armed cards have either been consumed or
-  // were never present, so re-running would be a no-op anyway, but
-  // we still skip them deliberately to keep the spec-implied
-  // sequencing: "Swap resolves first, then bluff check, then Mirror".
+  // Re-run BluffCorrectness + Mirror + default spin on the post-swap
+  // world. Shield and Assassin do NOT re-run — they were already
+  // evaluated against the original accused state. Their armed cards
+  // have either been consumed or were never present, so re-running
+  // would be a no-op anyway, but we still skip them deliberately to
+  // keep the spec-implied sequencing: "Swap resolves first, then
+  // bluff check, then Mirror".
   const state = {
     events: [swapEvent],
     accuser,

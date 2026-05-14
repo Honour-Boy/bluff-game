@@ -46,6 +46,8 @@ function buildPhrase(evt) {
       return `${evt.holderName || 'A player'} swapped the card!`;
     case 'assassin_strike':
       return `Assassin strikes! ${evt.eliminatedName || 'A player'} eliminated`;
+    case 'assassin_backfire':
+      return `Assassin backfires! ${evt.holderName || 'Holder'} draws ${evt.cardsDrawn || 3} cards`;
     case 'freeze_skip':
       return `Freeze! ${evt.skippedName || 'A player'}'s turn is skipped`;
     case 'sheriff_protected':

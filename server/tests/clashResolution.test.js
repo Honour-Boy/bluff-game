@@ -158,16 +158,22 @@ describe('clash 1 — Assassin > Mirror', () => {
     expect(p0.armedPowerCard).toBeNull();
   });
 
-  it('Assassin fires even on a CORRECT bluff with Mirror on accuser', () => {
-    const { room } = buildRoom({
+  it('Assassin backfires on a CORRECT bluff and Mirror on accuser stays armed (#63)', () => {
+    // Per #63, a correct bluff against an Assassin holder backfires
+    // (holder takes +3). Mirror should never run because Assassin
+    // short-circuited the pipeline.
+    const { room, p1 } = buildRoom({
       accusedArmed: { power: 'assassin', cardId: 'kill-A' },
       accuserArmed: { power: 'mirror',   cardId: 'mir-A' },
       lastPlayedShape: 'square', // bluff is correct
       currentCardType: 'circle',
     });
-    const { outcome } = resolveBluff(room, 'p1');
-    expect(outcome.kind).toBe('eliminated');
-    expect(outcome.eliminatedPlayerId).toBe('p1');
+    const { outcome, events } = resolveBluff(room, 'p1');
+    expect(outcome.kind).toBe('assassin_backfire');
+    expect(outcome.accusedId).toBe('p0');
+    expect(events.find(e => e.kind === 'mirror_reflected')).toBeFalsy();
+    // Mirror stayed armed.
+    expect(p1.armedPowerCard).not.toBeNull();
   });
 });
 
@@ -261,10 +267,11 @@ describe('clash 3 — Mirror > Sniper Role', () => {
 describe('clash 4 — Medic > Assassin', () => {
   it('Medic save reverts an Assassin elimination', () => {
     // Build a bluff scenario where Assassin will fire on the accuser.
-    // The Medic is a third player, alive, with hand-room.
+    // Per #63 the Assassin strike requires a WRONG bluff, so we
+    // override the defaults to use a matching card on the table.
     const { room, p1 } = buildRoom({
       accusedArmed: { power: 'assassin', cardId: 'k-A' },
-      lastPlayedShape: 'square',
+      lastPlayedShape: 'circle',
       currentCardType: 'circle',
       extraPlayers: [{ id: 'medic', name: 'Doc', role: ROLES.MEDIC }],
     });
@@ -296,6 +303,8 @@ describe('clash 4 — Medic > Assassin', () => {
   it('Medic blocked at 6+ cards → no save available', () => {
     const { room, p1 } = buildRoom({
       accusedArmed: { power: 'assassin', cardId: 'k-A' },
+      lastPlayedShape: 'circle',
+      currentCardType: 'circle',
       extraPlayers: [{ id: 'medic', name: 'Doc', role: ROLES.MEDIC }],
     });
     // Medic at 6 cards — at the cap.
@@ -557,10 +566,12 @@ describe('clash 9 — Sheriff > Assassin', () => {
   });
 
   it('Assassin DOES fire on a non-Sheriff accuser (control)', () => {
+    // Wrong bluff (matching card) → Assassin strike. We use a non-
+    // Sheriff accuser to confirm the Sheriff exemption is role-gated.
     const { room } = buildRoom({
       accusedArmed: { power: 'assassin', cardId: 'k-A' },
       accuserRole: ROLES.BAREHAND,
-      lastPlayedShape: 'square',
+      lastPlayedShape: 'circle',
       currentCardType: 'circle',
     });
     const { outcome } = resolveBluff(room, 'p1');
@@ -696,8 +707,12 @@ describe('regression — pipeline never drops events on short-circuit', () => {
   });
 
   it('Assassin elim → only assassin_strike event, no Mirror or default-spin events', () => {
+    // Wrong bluff (matching card) so Assassin actually fires; per #63
+    // a correct call would backfire instead.
     const { room } = buildRoom({
       accusedArmed: { power: 'assassin', cardId: 'k-A' },
+      lastPlayedShape: 'circle',
+      currentCardType: 'circle',
     });
     const { events } = resolveBluff(room, 'p1');
     expect(events).toHaveLength(1);

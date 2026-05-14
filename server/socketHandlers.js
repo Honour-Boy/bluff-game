@@ -416,6 +416,27 @@ function applyBluffOutcome(room, outcome) {
     return outcome;
   }
 
+  if (outcome.kind === 'assassin_backfire') {
+    // Per #63: a correct bluff against an armed Assassin holder
+    // backfires — no spin, no elimination. The holder draws +3 cards
+    // (handled by the caller via engine.applyAssassinBackfirePenalty
+    // BEFORE invoking applyBluffOutcome, so we only stamp lastAction
+    // and clear spin state here). The accuser's bluff is fully spent;
+    // the turn advances at the call site after broadcast.
+    room.phase = 'playing';
+    room.spinTargetId = null;
+    room.cardPlayedThisTurn = false;
+    room.lastAction = {
+      type: 'assassin_backfire',
+      accusedId: outcome.accusedId,
+      accusedName: room.players.find(p => p.id === outcome.accusedId)?.username || null,
+      accuserId: outcome.accuserId,
+      accuserName: room.players.find(p => p.id === outcome.accuserId)?.username || null,
+      cardsDrawn: outcome.cardsToDrawForAccused || 0,
+    };
+    return outcome;
+  }
+
   if (outcome.kind === 'swap_pending') {
     room.phase = 'swap_pending';
     room.swapHolderId = outcome.swapHolderId;
@@ -1444,6 +1465,18 @@ function registerSocketHandlers(io, socket) {
           return callback({ success: true });
         }
 
+        // #63 — Assassin backfire: holder takes +3 penalty cards
+        // BEFORE applyBluffOutcome stamps lastAction. No spin, no
+        // elimination — the bluff is fully resolved here so we
+        // advance the turn after broadcasting.
+        if (outcome.kind === 'assassin_backfire' && outcome.accusedId) {
+          engine.applyAssassinBackfirePenalty(
+            room,
+            outcome.accusedId,
+            outcome.cardsToDrawForAccused || 3,
+          );
+        }
+
         applyBluffOutcome(room, outcome);
 
         // v2 Phase F — post-elim systems (Assassin path with no Medic).
@@ -1453,6 +1486,12 @@ function registerSocketHandlers(io, socket) {
             _bountyOnElimination(room, outcome.eliminatedPlayerId);
           }
           applyPostElimSystemHooks(io, room);
+        }
+
+        // #63 — backfire: advance turn after broadcast so the accuser's
+        // bluff (which was their action this turn) cleanly ends.
+        if (outcome.kind === 'assassin_backfire') {
+          engine.advanceTurn(room);
         }
 
         // v2 Phase F — open betting window when entering spin_pending.
@@ -1665,53 +1704,6 @@ function registerSocketHandlers(io, socket) {
       });
     } catch (err) {
       console.error('[activate_power_card]', err);
-      callback?.({ success: false, error: err.message });
-    }
-  });
-
-  // ─── PLAYER: Assassin re-arm decision (v2 Phase C) ───────
-  // Spec: if no bluff was called on the Assassin holder before their
-  // NEXT activation prompt, they decide whether to re-arm. If they
-  // re-arm, the card stays armed (no-op). If they decline, the card
-  // is consumed AND they take +4 shape cards as penalty.
-  // Holder can also choose never to activate it at all — for that
-  // path, this handler is never called and no penalty applies.
-  socket.on('assassin_decision', async ({ roomCode, rearm } = {}, callback) => {
-    try {
-      if (!socket.userId) return callback?.({ success: false, error: 'Not authenticated' });
-
-      const code = roomCode?.toUpperCase();
-      const room = await getRoom(code);
-      if (!room) return callback?.({ success: false, error: 'Room not found' });
-      if (room.mode !== engine.MODES.ONLINE) return callback?.({ success: false, error: 'Online mode only' });
-      if (room.phase !== 'playing') return callback?.({ success: false, error: 'Wrong phase' });
-
-      const currentPlayerId = room.turnOrder[room.currentTurnIndex];
-      if (currentPlayerId !== socket.userId) return callback?.({ success: false, error: 'Not your turn' });
-
-      const player = room.players.find(p => p.id === socket.userId);
-      if (!player?.armedPowerCard || player.armedPowerCard.power !== 'assassin') {
-        return callback?.({ success: false, error: 'No armed Assassin' });
-      }
-
-      if (rearm) {
-        // Re-arm = stamp the activation timer on the new turn so the
-        // prompt won't re-fire instantly next loop. Card stays armed.
-        player.armedPowerCard.activatedAtTurn = room.currentTurnIndex;
-        player.armedPowerCard.activatedAtRound = room.roundNumber;
-        await saveRoom(room);
-        await broadcastRoomState(io, code);
-        return callback?.({ success: true, rearmed: true });
-      }
-
-      // Decline → consume + +4 shape penalty.
-      const res = engine.applyAssassinDeclinePenalty(room, socket.userId);
-      if (!res.ok) return callback?.({ success: false, error: res.error });
-      await saveRoom(room);
-      await broadcastRoomState(io, code);
-      callback?.({ success: true, rearmed: false, penaltyDealt: res.dealt.length });
-    } catch (err) {
-      console.error('[assassin_decision]', err);
       callback?.({ success: false, error: err.message });
     }
   });

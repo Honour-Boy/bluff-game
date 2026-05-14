@@ -25,7 +25,7 @@ const POWER_TRIGGERS = {
   swap: "Activates at turn start, but only after a full round has passed since you drew it. Trade your played card with one from the round's pile, then re-judge the bluff.",
   peek: "Activates at turn start. You privately see the previous player's card before deciding to call bluff.",
   freeze: "Activates at turn start. Pick a player — their next turn is skipped entirely.",
-  assassin: "Multi-turn arming. While armed, anyone who calls bluff on you is eliminated on the spot. Sheriff is immune. Decline to re-arm and you eat +4 cards.",
+  assassin: "Activates at turn start; stays armed until a bluff lands on you. Wrong bluff call → the caller is eliminated. Correct bluff call → no spin, but you draw +3 penalty cards. Sheriff is immune.",
 };
 
 const ROLE_ORDER = [
