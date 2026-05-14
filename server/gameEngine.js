@@ -650,6 +650,11 @@ function startGame(room) {
     // the top of the remaining deck (option (b) in the Phase B spec).
     _normalisePowerCardHandCap(room);
 
+    // #77 — guarantee every player has at least one power card after
+    // the initial deal (when any power-card type is enabled). Runs
+    // AFTER cap normalisation so it doesn't push anyone overcap.
+    _guaranteeMinPowerCardPerPlayer(room);
+
     // Snapshot Swap "every alive player took a turn since the card
     // entered the hand" tracker on every Swap that landed in a hand.
     _snapshotSwapHolders(room);
@@ -737,6 +742,66 @@ function _normalisePowerCardHandCap(room) {
       hand.push(shape);
       powerCount = _countPowerCardsInHand(hand);
     }
+  }
+}
+
+/**
+ * Per #77 — guarantee that every player ends the initial deal with at
+ * least one power card. Runs AFTER `_normalisePowerCardHandCap` so the
+ * cap is already enforced; any player still holding zero power cards
+ * gets one swapped in.
+ *
+ * Power-card source priority:
+ *   1. `room.deck` — undealt cards.
+ *   2. `room.discardPile` — extras the cap-normalisation step trimmed
+ *      a moment earlier. Pulling these back in is exactly the "recycle
+ *      over-cap extras into under-min hands" recipe, so we don't end
+ *      up warning about an empty deck while the discard pile holds
+ *      ten freshly-trimmed power cards.
+ *
+ * The displaced shape goes back into `room.deck` so total in-play card
+ * counts stay stable and hand size remains 6.
+ *
+ * Best-effort: if no power card is enabled, or there's no power card
+ * anywhere in the room, the player keeps a zero-power-card hand and
+ * we warn. The first branch is the "all powers disabled" config; the
+ * second is unreachable in a sane enabled-config regime.
+ */
+function _guaranteeMinPowerCardPerPlayer(room) {
+  if (!room.hands || !Array.isArray(room.deck)) return;
+  const enabled = room.config?.powerCards?.enabled;
+  if (!enabled) return;
+  if (!Object.values(enabled).some(Boolean)) return;
+  if (!Array.isArray(room.discardPile)) room.discardPile = [];
+
+  for (const [pid, hand] of room.hands.entries()) {
+    if (!hand) continue;
+    if (_hasPowerCardInHand(hand)) continue;
+
+    // Source: deck first, then the cap-normalisation discard pile.
+    let source = room.deck;
+    let powerIdx = source.findIndex(c => c?.type === 'power');
+    if (powerIdx === -1) {
+      source = room.discardPile;
+      powerIdx = source.findIndex(c => c?.type === 'power');
+    }
+    if (powerIdx === -1) {
+      console.warn('[engine] _guaranteeMinPowerCardPerPlayer: no power card available for', pid);
+      break;
+    }
+
+    const handShapeIdx = hand.findIndex(c => c?.type === 'shape');
+    if (handShapeIdx === -1) {
+      // Defensive: post-deal hands have ≥1 shape card unless we're
+      // already at the cap (which means ≥1 power card, contradicting
+      // the outer check). Skip rather than corrupt state.
+      continue;
+    }
+
+    const [power] = source.splice(powerIdx, 1);
+    const [shape] = hand.splice(handShapeIdx, 1);
+    hand.push(power);
+    room.deck.push(shape);
   }
 }
 
@@ -1305,6 +1370,10 @@ function resetRoundOnline(room) {
   // Same hand-cap normalisation as startGame — power cards never
   // stack, even on round reset.
   _normalisePowerCardHandCap(room);
+  // #77 — same guaranteed-minimum as startGame so every alive player
+  // restarts the round with at least one power card when any type is
+  // enabled.
+  _guaranteeMinPowerCardPerPlayer(room);
   _snapshotSwapHolders(room);
 
   // Round reset clears any armed power cards — armed state does not
