@@ -14,7 +14,7 @@
 //    shape cards from the top of the remaining deck.
 // ============================================================
 
-import { describe, it, expect, vi } from 'vitest';
+import { describe, it, expect, vi, afterAll } from 'vitest';
 import {
   buildDeck,
   buildPowerCards,
@@ -295,6 +295,111 @@ describe('startGame initial-deal hand cap', () => {
     // just verify that whenever a Swap landed in a hand, the snapshot
     // existed. Hits across 30 trials are virtually guaranteed but we
     // don't gate on count to keep the test robust.
+  });
+});
+
+// ─── Initial-deal guaranteed minimum (#77) ───────────────────
+
+describe('startGame guarantees ≥1 power card per player (#77)', () => {
+  // Silence the engine's "deck out of power cards" warn — some tests
+  // intentionally starve the deck to exercise the best-effort branch.
+  const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+  afterAll(() => warnSpy.mockRestore());
+
+  function runDealInitialHandsGuarantees(trials, { players, copiesPerDeck }) {
+    let allCovered = 0;
+    let barehandWithPower = 0;
+    let barehandTotal = 0;
+    for (let i = 0; i < trials; i++) {
+      const cfg = configWith({
+        shield: true, mirror: true, swap: true, peek: true, freeze: true, assassin: true,
+      }, copiesPerDeck);
+      const room = makeOnlineRoomWithPlayers(players, cfg);
+      startGame(room);
+
+      let everyoneHasOne = true;
+      for (const p of room.players) {
+        const hand = room.hands.get(p.id) || [];
+        const powerCount = hand.filter(c => c?.type === 'power').length;
+        if (powerCount < 1) everyoneHasOne = false;
+        if (p.role === 'barehand') {
+          barehandTotal++;
+          if (powerCount >= 1) barehandWithPower++;
+        }
+        // Hand size + cap invariants must STILL hold.
+        expect(hand.length).toBe(6);
+        const cap = p.role === 'collector' ? 3 : 1;
+        expect(powerCount).toBeLessThanOrEqual(cap);
+      }
+      if (everyoneHasOne) allCovered++;
+    }
+    return { allCovered, barehandWithPower, barehandTotal };
+  }
+
+  it('every player at a 6-power, copies=2 table receives ≥1 power card across 50 trials', () => {
+    const { allCovered } = runDealInitialHandsGuarantees(50, { players: 5, copiesPerDeck: 2 });
+    expect(allCovered).toBe(50);
+  });
+
+  it('every Barehand player receives ≥1 power card across 50 trials (named bug)', () => {
+    // <9 alive → assignRoles makes everyone Barehand, so this stresses
+    // exactly the scenario reported in #77.
+    const { barehandWithPower, barehandTotal } = runDealInitialHandsGuarantees(
+      50, { players: 5, copiesPerDeck: 2 },
+    );
+    expect(barehandTotal).toBeGreaterThanOrEqual(50 * 5);
+    expect(barehandWithPower).toBe(barehandTotal);
+  });
+
+  it('Collector still gets up to 3 power cards (cap unchanged)', () => {
+    // Run enough trials that Collector lands in a hand at least once
+    // (alive >= 9 → Collector role exists in the assignment).
+    let collectorTrials = 0;
+    for (let i = 0; i < 30; i++) {
+      const cfg = configWith({
+        shield: true, mirror: true, swap: true, peek: true, freeze: true, assassin: true,
+      }, 2);
+      const room = makeOnlineRoomWithPlayers(10, cfg);
+      startGame(room);
+      const collector = room.players.find(p => p.role === 'collector');
+      if (!collector) continue;
+      collectorTrials++;
+      const hand = room.hands.get(collector.id) || [];
+      const powerCount = hand.filter(c => c?.type === 'power').length;
+      expect(powerCount).toBeGreaterThanOrEqual(1);
+      expect(powerCount).toBeLessThanOrEqual(3);
+    }
+    expect(collectorTrials).toBeGreaterThan(0);
+  });
+
+  it('no-op when every power-card type is disabled (no power cards anywhere)', () => {
+    const cfg = configWith({}, 1); // all disabled
+    const room = makeOnlineRoomWithPlayers(4, cfg);
+    startGame(room);
+    for (const p of room.players) {
+      const hand = room.hands.get(p.id) || [];
+      expect(hand.filter(c => c?.type === 'power').length).toBe(0);
+      expect(hand.length).toBe(6);
+    }
+  });
+
+  it('best-effort when the deck has no power cards left to draft', () => {
+    // Single-deck, 1 copy each, only ONE power-card type enabled →
+    // exactly 1 power card in a 4-player game. The guarantee can
+    // cover at most 1 player; the rest fall through cleanly.
+    const cfg = configWith({ shield: true }, 1);
+    const room = makeOnlineRoomWithPlayers(4, cfg);
+    startGame(room);
+    const covered = room.players.filter(p => {
+      const hand = room.hands.get(p.id) || [];
+      return hand.some(c => c?.type === 'power');
+    });
+    expect(covered.length).toBeGreaterThanOrEqual(1);
+    // Hand size invariant holds even when guarantee can't reach all.
+    for (const p of room.players) {
+      const hand = room.hands.get(p.id) || [];
+      expect(hand.length).toBe(6);
+    }
   });
 });
 
