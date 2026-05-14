@@ -30,8 +30,18 @@ export function useVoice({ roomCode, isAuthenticated, autoJoin = false }) {
 
   const roomRef = useRef(null);
 
+  // Tracks whether the user has explicitly clicked Leave Voice this
+  // room session. When true, auto-join must NOT re-engage on status
+  // returning to 'idle' — otherwise the user is silently reconnected
+  // and the Join Voice button never reappears (issue #78). Cleared on
+  // an explicit connect() (re-opt-in) and on roomCode change (fresh
+  // session). A ref, not state, so flipping it doesn't re-render.
+  const manualLeaveRef = useRef(false);
+
   // ─── Tear down on unmount or roomCode change ────────────────
   useEffect(() => {
+    // Entering a new room is a fresh opt-in for auto-join.
+    manualLeaveRef.current = false;
     return () => {
       const room = roomRef.current;
       if (room) {
@@ -54,6 +64,11 @@ export function useVoice({ roomCode, isAuthenticated, autoJoin = false }) {
       return false;
     }
     if (roomRef.current) return true; // already connected
+
+    // Explicit connect (manual Join Voice click or initial auto-join)
+    // re-opts the user in. Clearing here makes the Join Voice button
+    // resume auto-join semantics on subsequent room sessions too.
+    manualLeaveRef.current = false;
 
     setStatus('connecting');
     setError(null);
@@ -175,21 +190,28 @@ export function useVoice({ roomCode, isAuthenticated, autoJoin = false }) {
   // an extra click. Default-muted, listener-only on first connect
   // (mic publish is gesture-deferred via the catch above and the
   // toggleMute path). Opt-in via autoJoin so existing manual-control
-  // tests stay valid. Skips if voice isn't configured. Won't loop:
-  // status leaves 'idle' on first call and the dep guard stops re-
-  // entry. If connect() fails, status='error' surfaces the manual
-  // retry button rather than silently retrying forever.
+  // tests stay valid. Skips if voice isn't configured, or if the
+  // user has manually clicked Leave Voice this session (issue #78 —
+  // otherwise status returning to 'idle' on disconnect would re-fire
+  // this effect and silently reconnect them). If connect() fails,
+  // status='error' surfaces the manual retry button rather than
+  // silently retrying forever.
   useEffect(() => {
     if (!autoJoin) return;
     if (!LIVEKIT_URL) return;
     if (!roomCode || !isAuthenticated) return;
     if (status !== 'idle') return;
+    if (manualLeaveRef.current) return;
     connect();
   }, [autoJoin, roomCode, isAuthenticated, status, connect]);
 
   // ─── Disconnect ─────────────────────────────────────────────
   const disconnect = useCallback(async () => {
     const room = roomRef.current;
+    // Mark intent first so the LiveKit Disconnected event handler
+    // (which flips status to 'idle') can't race the auto-join effect
+    // and silently reconnect us before we've recorded the opt-out.
+    manualLeaveRef.current = true;
     if (!room) return;
     try { await room.disconnect(); } catch {}
     roomRef.current = null;
