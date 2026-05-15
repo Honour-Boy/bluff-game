@@ -88,56 +88,60 @@ afterEach(() => {
 // ============================================================
 
 describe('Risk modifier — Double Barrel', () => {
-  it('takes the higher of two spin indices', () => {
-    // Math.random sequence: first call = d1 in [0, 1), second = d2.
-    // d1 = 0.0 → index 0; d2 = 0.83 → index 5. Take max → 5.
-    pinRandom([0.0, 0.9, 0.0]);
+  // Issue #67: Double Barrel is now "two trigger pulls" — eliminated
+  // if EITHER curve roll lands a kill (effective p = 1-(1-p)^2).
+  // Math.random draw order: [0] roll1, [1] roll2 (doubleBarrel only),
+  // [n] spinIndex slot pick, [n+] addBullet pick(s) on survival.
+
+  it('survives only when BOTH pulls miss the curve', () => {
+    // 1 bullet → p=0.15. roll1=0.9 miss, roll2=0.9 miss → survive.
+    pinRandom([0.9, 0.9, 0, 0]);
     const chamber = ['bullet', null, null, null, null, null];
     const r = pullTrigger(chamber, { doubleBarrel: true });
-    expect(r.spinIndex).toBe(5);
     expect(r.eliminated).toBe(false);
+    expect(chamber[r.spinIndex]).toBeNull(); // spinIndex agrees with verdict
   });
 
-  it('without doubleBarrel, only one die rolls', () => {
-    pinRandom([0.0, 0.9, 0.0]);
+  it('eliminates when the FIRST pull kills even if the second would miss', () => {
+    // roll1=0.05 < 0.15 → die (|| short-circuits, roll2 irrelevant).
+    pinRandom([0.05, 0.9, 0]);
+    const chamber = ['bullet', null, null, null, null, null];
+    const r = pullTrigger(chamber, { doubleBarrel: true });
+    expect(r.eliminated).toBe(true);
+    expect(chamber[r.spinIndex]).toBe('bullet');
+  });
+
+  it('eliminates when only the SECOND pull kills', () => {
+    // roll1=0.9 miss, roll2=0.05 < 0.15 → die.
+    pinRandom([0.9, 0.05, 0]);
+    const chamber = ['bullet', null, null, null, null, null];
+    const r = pullTrigger(chamber, { doubleBarrel: true });
+    expect(r.eliminated).toBe(true);
+    expect(chamber[r.spinIndex]).toBe('bullet');
+  });
+
+  it('without doubleBarrel only one roll is consumed (the second value is not an outcome roll)', () => {
+    // [0]=outcome 0.9 → survive. 0.05 is NOT a second outcome roll;
+    // it is consumed by the spinIndex slot pick instead.
+    pinRandom([0.9, 0.05, 0]);
     const chamber = ['bullet', null, null, null, null, null];
     const r = pullTrigger(chamber, { doubleBarrel: false });
-    // Without doubleBarrel, index 0 hits and the player is eliminated.
-    expect(r.spinIndex).toBe(0);
-    expect(r.eliminated).toBe(true);
+    expect(r.eliminated).toBe(false);
+    expect(chamber[r.spinIndex]).toBeNull();
   });
 
-  it('eliminates only when the higher of two dice hits a bullet', () => {
-    // d1=0 (idx 0), d2=0.34 (idx 2). Max = 2. Bullet at 2 → die.
-    pinRandom([0.0, 0.34]);
-    const chamber = [null, null, 'bullet', null, null, null];
-    const r = pullTrigger(chamber, { doubleBarrel: true });
-    expect(r.spinIndex).toBe(2);
-    expect(r.eliminated).toBe(true);
-  });
-
-  it('over many runs survival rate is higher than vanilla on a single-bullet-low chamber', () => {
-    // Statistical sanity check — bullet at slot 0, every other slot
-    // empty. Vanilla survival ≈ 5/6. Double Barrel survival = P(both
-    // dice >= 1) = 25/36 ≈ 0.694 — actually LOWER. Wait — taking max
-    // makes the higher slot more likely. Vanilla: P(spinIndex == 0)
-    // = 1/6. Double Barrel: P(max == 0) = (1/6)^2 = 1/36. So Double
-    // Barrel survives MORE often when bullet is at slot 0. Verify.
+  it('over many runs Double Barrel is strictly DEADLIER than a single pull', () => {
+    // Two pulls vs one → P(die) = 1-(1-p)^2 > p. So fewer survivals.
     let vanillaSurvived = 0;
     let dbSurvived = 0;
     const ITER = 5000;
-    const chamber = ['bullet', null, null, null, null, null];
-    // Restore real Math.random for the statistical test.
+    const chamber = ['bullet', null, 'bullet', null, null, null]; // 2 bullets → p=0.24
     vi.restoreAllMocks();
     for (let i = 0; i < ITER; i++) {
-      const v = pullTrigger([...chamber]);
-      if (!v.eliminated) vanillaSurvived++;
-      const d = pullTrigger([...chamber], { doubleBarrel: true });
-      if (!d.eliminated) dbSurvived++;
+      if (!pullTrigger([...chamber]).eliminated) vanillaSurvived++;
+      if (!pullTrigger([...chamber], { doubleBarrel: true }).eliminated) dbSurvived++;
     }
-    // Double Barrel should survive more often when bullet is at low
-    // index. Allow some statistical noise.
-    expect(dbSurvived).toBeGreaterThan(vanillaSurvived);
+    expect(dbSurvived).toBeLessThan(vanillaSurvived);
   });
 });
 
