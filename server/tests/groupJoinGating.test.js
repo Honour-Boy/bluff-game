@@ -51,13 +51,18 @@ describe('join_room group gating', () => {
     const groupsRepo = {
       getActiveGroupByCode: vi.fn().mockResolvedValue(null),
     };
+    const groupSettingsRepo = {
+      DEFAULT_SETTINGS: { version: 1 },
+      getGroupSettings: vi.fn(),
+    };
 
-    registerSocketHandlers(io, socket, { groupsRepo });
+    registerSocketHandlers(io, socket, { groupsRepo, groupSettingsRepo });
     const joinRoom = socket.handlers.get('join_room');
     const cb = vi.fn();
 
     await joinRoom({ roomCode: 'ABC234' }, cb);
 
+    expect(groupSettingsRepo.getGroupSettings).not.toHaveBeenCalled();
     expect(cb).toHaveBeenCalledWith({
       success: true,
       playerId: socket.userId,
@@ -81,8 +86,18 @@ describe('join_room group gating', () => {
       }),
       isGroupMember: vi.fn().mockResolvedValue(true),
     };
+    const groupSettingsRepo = {
+      DEFAULT_SETTINGS: {
+        version: 1,
+        powerCards: { enabled: { shield: false }, copiesPerDeck: 1 },
+        riskModifiers: { hotPotato: false },
+        roomModifiers: { speedMode: false },
+        systems: { betting: false },
+      },
+      getGroupSettings: vi.fn().mockResolvedValue(null),
+    };
 
-    registerSocketHandlers(io, socket, { groupsRepo });
+    registerSocketHandlers(io, socket, { groupsRepo, groupSettingsRepo });
     const joinRoom = socket.handlers.get('join_room');
     const cb = vi.fn();
 
@@ -92,6 +107,7 @@ describe('join_room group gating', () => {
     expect(room).toBeTruthy();
     expect(room.groupId).toBe('group-1');
     expect(room.hostUserId).toBe('33333333-3333-3333-3333-333333333333');
+    expect(room.config.version).toBe(1);
     expect(cb).toHaveBeenCalledWith({
       success: true,
       playerId: socket.userId,
@@ -116,8 +132,12 @@ describe('join_room group gating', () => {
       }),
       isGroupMember: vi.fn().mockResolvedValue(true),
     };
+    const groupSettingsRepo = {
+      DEFAULT_SETTINGS: { version: 1 },
+      getGroupSettings: vi.fn().mockResolvedValue(null),
+    };
 
-    registerSocketHandlers(io, socket, { groupsRepo });
+    registerSocketHandlers(io, socket, { groupsRepo, groupSettingsRepo });
     const joinRoom = socket.handlers.get('join_room');
     const cb = vi.fn();
 
@@ -145,8 +165,12 @@ describe('join_room group gating', () => {
       }),
       isGroupMember: vi.fn().mockResolvedValue(false),
     };
+    const groupSettingsRepo = {
+      DEFAULT_SETTINGS: { version: 1 },
+      getGroupSettings: vi.fn().mockResolvedValue(null),
+    };
 
-    registerSocketHandlers(io, socket, { groupsRepo });
+    registerSocketHandlers(io, socket, { groupsRepo, groupSettingsRepo });
     const joinRoom = socket.handlers.get('join_room');
     const cb = vi.fn();
 
@@ -156,5 +180,72 @@ describe('join_room group gating', () => {
       success: false,
       error: 'not_a_group_member',
     });
+  });
+
+  it('seeds a group room from persisted settings when they exist', async () => {
+    const io = makeFakeIo();
+    const socket = makeFakeSocket({
+      userId: '66666666-6666-6666-6666-666666666666',
+      username: 'PersistedBob',
+    });
+    const groupsRepo = {
+      getActiveGroupByCode: vi.fn().mockResolvedValue({
+        id: 'group-4',
+        code: 'SAVE44',
+        host_user_id: '77777777-7777-7777-7777-777777777777',
+      }),
+      isGroupMember: vi.fn().mockResolvedValue(true),
+    };
+    const groupSettingsRepo = {
+      DEFAULT_SETTINGS: { version: 1 },
+      getGroupSettings: vi.fn().mockResolvedValue({
+        payload: {
+          version: 1,
+          powerCards: {
+            enabled: {
+              shield: true,
+              mirror: false,
+              swap: false,
+              peek: false,
+              freeze: false,
+              assassin: false,
+            },
+            copiesPerDeck: 2,
+          },
+          riskModifiers: {
+            doubleBarrel: false,
+            russianRoulette: false,
+            hotPotato: false,
+            redemptionSpin: false,
+          },
+          roomModifiers: {
+            speedMode: false,
+            suddenDeath: false,
+            mirrorMatch: false,
+          },
+          systems: {
+            bounty: false,
+            betting: true,
+            deadMansHand: false,
+            lastStand: false,
+          },
+        },
+        updatedAt: '2026-05-15T20:00:00.000Z',
+        updatedByUserId: '77777777-7777-7777-7777-777777777777',
+        updatedByUsername: 'SavedHost',
+      }),
+    };
+
+    registerSocketHandlers(io, socket, { groupsRepo, groupSettingsRepo });
+    const joinRoom = socket.handlers.get('join_room');
+    const cb = vi.fn();
+
+    await joinRoom({ roomCode: 'SAVE44' }, cb);
+
+    const room = rooms.get('SAVE44');
+    expect(room.config.powerCards.enabled.shield).toBe(true);
+    expect(room.config.powerCards.copiesPerDeck).toBe(2);
+    expect(room.config.systems.betting).toBe(true);
+    expect(room.groupSettingsMeta?.updatedByUsername).toBe('SavedHost');
   });
 });

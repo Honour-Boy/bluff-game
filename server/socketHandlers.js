@@ -11,6 +11,9 @@ const {
   createGroupsRepo,
   isPersistentUserId,
 } = require('./groupsRepo');
+const {
+  createGroupSettingsRepo,
+} = require('./groupSettingsRepo');
 
 // ─── Supabase admin client (server-side only) ─────────────────
 // Used to verify JWT tokens and look up profiles.
@@ -21,6 +24,7 @@ const supabase = createClient(
   { auth: { autoRefreshToken: false, persistSession: false } }
 );
 const defaultGroupsRepo = createGroupsRepo(supabase);
+const defaultGroupSettingsRepo = createGroupSettingsRepo(supabase);
 
 // ─── Guest auth helpers ───────────────────────────────────────
 // Anonymous players can join with a typed display name. Their
@@ -122,12 +126,28 @@ async function buildAdHocRoom(socket, mode, config, groupsRepo) {
   throw new Error('Failed to create a unique room code');
 }
 
-function buildPersistentGroupRoom(group, hostSocketId = null) {
-  const room = engine.createRoom(hostSocketId, engine.MODES.ONLINE, null);
+function buildPersistentGroupRoom(group, opts = {}) {
+  const {
+    hostSocketId = null,
+    settingsRecord = null,
+    defaultSettings = defaultGroupSettingsRepo.DEFAULT_SETTINGS,
+  } = opts;
+  const room = engine.createRoom(
+    hostSocketId,
+    engine.MODES.ONLINE,
+    settingsRecord?.payload || defaultSettings,
+  );
   room.code = group.code;
   room.groupId = group.id;
   room.hostUserId = group.host_user_id;
   room.hostSocketId = hostSocketId;
+  room.groupSettingsMeta = settingsRecord
+    ? {
+        updatedAt: settingsRecord.updatedAt,
+        updatedByUserId: settingsRecord.updatedByUserId,
+        updatedByUsername: settingsRecord.updatedByUsername,
+      }
+    : null;
   room.cardPlayedThisTurn = false;
   room.bluffUsedThisTurn = false;
   return room;
@@ -942,6 +962,7 @@ const dcKey = (code, playerId) => `${code}:${playerId}`;
 
 function registerSocketHandlers(io, socket, deps = {}) {
   const groupsRepo = deps.groupsRepo || defaultGroupsRepo;
+  const groupSettingsRepo = deps.groupSettingsRepo || defaultGroupSettingsRepo;
   // Idempotent: runs once on first connection, no-ops thereafter.
   startInactivitySweep(io);
   startHostIdleSweep(io);
@@ -1056,6 +1077,7 @@ function registerSocketHandlers(io, socket, deps = {}) {
         groupId,
         userId: socket.userId,
       });
+      socket.join(`group:${group.id}`);
       callback?.({ success: true, group });
     } catch (err) {
       callback?.({ success: false, error: err.message });
@@ -1230,8 +1252,13 @@ function registerSocketHandlers(io, socket, deps = {}) {
 
       if (group) {
         if (!room) {
+          const settingsRecord = await groupSettingsRepo.getGroupSettings(group.id);
           const hostSocketId = group.host_user_id === socket.userId ? socket.id : null;
-          room = buildPersistentGroupRoom(group, hostSocketId);
+          room = buildPersistentGroupRoom(group, {
+            hostSocketId,
+            settingsRecord,
+            defaultSettings: groupSettingsRepo.DEFAULT_SETTINGS,
+          });
           await saveRoom(room);
         }
         room.groupId = group.id;
@@ -1273,6 +1300,7 @@ function registerSocketHandlers(io, socket, deps = {}) {
 
       await saveRoom(room);
       socket.join(code);
+      if (room.groupId) socket.join(`group:${room.groupId}`);
       callback({
         success: true,
         playerId: player.id,
@@ -1396,6 +1424,28 @@ function registerSocketHandlers(io, socket, deps = {}) {
       }
 
       engine.startGame(room);
+
+      if (room.groupId) {
+        try {
+          const persisted = await groupSettingsRepo.upsertGroupSettings(
+            room.groupId,
+            room.config,
+            socket.userId,
+          );
+          room.groupSettingsMeta = {
+            updatedAt: persisted.updatedAt,
+            updatedByUserId: socket.userId,
+            updatedByUsername: socket.username || null,
+          };
+          io.to(`group:${room.groupId}`).emit('group_settings_updated', {
+            groupId: room.groupId,
+            updatedAt: persisted.updatedAt,
+          });
+        } catch (persistErr) {
+          console.error('[start_game] failed to persist group settings', persistErr);
+        }
+      }
+
       await saveRoom(room);
       // Issue #61: broadcast BEFORE acking so the host's client
       // never observes the success ACK without the room_state

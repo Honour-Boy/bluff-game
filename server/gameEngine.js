@@ -57,6 +57,7 @@ const MODES = {
 
 function defaultRoomConfig() {
   return {
+    version: 1,
     powerCards: {
       enabled: {
         shield: false,
@@ -95,6 +96,11 @@ function defaultRoomConfig() {
 function normalizeRoomConfig(input) {
   const base = defaultRoomConfig();
   if (!input || typeof input !== 'object') return base;
+
+  const version = Number(input.version);
+  if (Number.isFinite(version) && version >= 1) {
+    base.version = Math.floor(version);
+  }
 
   const pickBool = (val, fallback) => (typeof val === 'boolean' ? val : fallback);
 
@@ -2401,6 +2407,8 @@ function resetRoomForReplay(room) {
   const hostUserId   = room.hostUserId;
   const mode         = room.mode;
   const config       = room.config;
+  const groupId      = room.groupId;
+  const groupSettingsMeta = room.groupSettingsMeta || null;
   const createdAt    = room.createdAt;
   const chatLog      = room.chatLog || [];
 
@@ -2422,6 +2430,8 @@ function resetRoomForReplay(room) {
   // Restore preserved bits.
   room.code           = code;
   room.hostUserId     = hostUserId;
+  room.groupId        = groupId;
+  room.groupSettingsMeta = groupSettingsMeta;
   room.createdAt      = createdAt;
   room.lastActivityAt = Date.now();
   room.chatLog        = chatLog;
@@ -2486,6 +2496,7 @@ function serializeRoom(room, requestingPlayerId = null, opts = {}) {
 
   return {
     code: room.code,
+    groupId: room.groupId || null,
     mode: room.mode,
     players: room.players.map(p => ({
       id: p.id,
@@ -2559,6 +2570,7 @@ function serializeRoom(room, requestingPlayerId = null, opts = {}) {
     currentPromptTarget,
     chatLog: room.chatLog || [],
     config: room.config || null,
+    groupSettingsMeta: room.groupId ? (room.groupSettingsMeta || null) : null,
     // v2 Phase C — Swap pause: holderId is set while phase ===
     // 'swap_pending' so the holder's UI can render the picker. The
     // anonymised pile of options is computed client-side from

@@ -14,6 +14,7 @@
 import { useState } from 'react';
 
 export const DEFAULT_V2_CONFIG = {
+  version: 1,
   powerCards: {
     enabled: {
       shield: false,
@@ -191,8 +192,24 @@ function setAllInGroup(items, value) {
   return out;
 }
 
+function formatSavedMeta(savedMeta) {
+  if (!savedMeta?.updatedAt) return null;
+  try {
+    const timestamp = new Date(savedMeta.updatedAt).toLocaleString();
+    if (savedMeta.updatedByUsername) {
+      return `Settings saved - updated ${timestamp} by @${savedMeta.updatedByUsername}`;
+    }
+    return `Settings saved - updated ${timestamp}`;
+  } catch (_) {
+    if (savedMeta.updatedByUsername) {
+      return `Settings saved by @${savedMeta.updatedByUsername}`;
+    }
+    return 'Settings saved';
+  }
+}
+
 // ─── Main component ───────────────────────────────────────
-export function PreGameSettingsPanel({ config, onChange }) {
+export function PreGameSettingsPanel({ config, onChange, isGroupRoom = false, savedMeta = null }) {
   const [open, setOpen] = useState(false);
 
   // Active count for collapsed-state hint
@@ -260,6 +277,10 @@ export function PreGameSettingsPanel({ config, onChange }) {
       systems: setAllInGroup(SYSTEMS, value),
     });
   };
+  const resetToDefaults = () => {
+    onChange({ ...DEFAULT_V2_CONFIG });
+  };
+  const savedMetaText = isGroupRoom ? formatSavedMeta(savedMeta) : null;
 
   return (
     <div style={{
@@ -298,6 +319,11 @@ export function PreGameSettingsPanel({ config, onChange }) {
               ? 'Defaults — all extras off'
               : `${activeCount} ${activeCount === 1 ? 'option' : 'options'} enabled`}
           </span>
+          {savedMetaText && (
+            <span style={{ fontSize: 10, color: 'var(--text-dim)', letterSpacing: '0.02em' }}>
+              {savedMetaText}
+            </span>
+          )}
         </span>
         <span style={{
           fontSize: 16,
@@ -467,6 +493,31 @@ export function PreGameSettingsPanel({ config, onChange }) {
               />
             ))}
           </Section>
+          {isGroupRoom && (
+            <div style={{
+              display: 'flex',
+              justifyContent: 'flex-end',
+              paddingTop: 4,
+            }}>
+              <button
+                type="button"
+                onClick={resetToDefaults}
+                style={{
+                  minHeight: 36,
+                  padding: '8px 12px',
+                  background: 'transparent',
+                  border: '1px solid var(--border)',
+                  borderRadius: 'var(--radius)',
+                  color: 'var(--text-dim)',
+                  fontSize: 11,
+                  letterSpacing: '0.08em',
+                  cursor: 'pointer',
+                }}
+              >
+                Reset to defaults
+              </button>
+            </div>
+          )}
         </div>
       )}
     </div>
