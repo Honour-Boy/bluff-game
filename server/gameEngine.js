@@ -1462,11 +1462,13 @@ function spinGun(player, modifiers = {}) {
  *   - Redemption Spin survival → 3 fresh cards (caller passes 3).
  *
  *   Hand-cap rule applies during the fresh deal — `drawCardForPlayer`
- *   already discards over-cap power cards onto room.discardPile and
- *   reaches for shapes instead.
+ *   already honours the per-player power cap, so the deal will fill
+ *   shape cards (any power card off the deck while the player is at
+ *   cap is discarded and a shape is drawn instead).
  *
- *   Armed power card is cleared on survival (the card was held in
- *   the now-discarded hand and the spec says hand reset is total).
+ *   Power cards retained: only the SHAPE portion of the hand is
+ *   discarded + refreshed. Existing power cards stay (issue #62), and
+ *   `armedPowerCard` is preserved if the armed card is still in hand.
  *
  *   Returns the array of fresh cards dealt (caller can broadcast).
  */
@@ -1481,18 +1483,30 @@ function resetHandOnSurvival(room, playerId, cardsToDeal = null) {
   if (!room.discardPile) room.discardPile = [];
 
   const oldHand = room.hands.get(playerId) || [];
-  // null/undefined → match the surviving hand size. Explicit numbers
+  // Split: power cards survive the spin; shape cards are discarded
+  // and replaced (issue #62).
+  const retainedPowerCards = oldHand.filter(c => c?.type === 'power');
+  const shapeCards = oldHand.filter(c => c?.type !== 'power');
+  // null/undefined → match the surviving SHAPE count (so the survivor
+  // ends up with the same number of shapes they had pre-spin, plus
+  // any power cards they were already holding). Explicit numbers
   // (e.g. 3 for Redemption Spin) override.
-  const targetCount = cardsToDeal == null ? oldHand.length : cardsToDeal;
-  // Surface any power cards the player had into the discard pile too.
-  // The spec is "discard the existing hand" — power cards included.
-  for (const card of oldHand) {
+  const targetCount = cardsToDeal == null ? shapeCards.length : cardsToDeal;
+
+  for (const card of shapeCards) {
     room.discardPile.push(card);
   }
-  room.hands.set(playerId, []);
+  // New hand starts with the retained power cards; deal back to fill.
+  room.hands.set(playerId, retainedPowerCards.slice());
 
-  // Armed power state is cleared: the card vanished with the hand.
-  player.armedPowerCard = null;
+  // Preserve armedPowerCard only if the armed card is still in hand
+  // (it should be, since we kept all power cards). Clear otherwise.
+  if (player.armedPowerCard) {
+    const armedId = player.armedPowerCard.id;
+    if (!retainedPowerCards.some(c => c.id === armedId)) {
+      player.armedPowerCard = null;
+    }
+  }
 
   const dealt = [];
   for (let i = 0; i < targetCount; i++) {
