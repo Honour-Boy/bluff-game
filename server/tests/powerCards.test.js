@@ -575,34 +575,56 @@ describe('resetHandOnSurvival (Section 7)', () => {
     return room;
   }
 
-  it('discards the existing hand and deals 6 fresh cards on normal survival', () => {
+  it('discards shape cards and deals 6 fresh shapes on normal survival; retains held power cards (#62)', () => {
     const room = setupSurvivor();
     const before = room.hands.get('p0').slice();
+    const retainedPowers = before.filter(c => c.type === 'power');
+    const shapesBefore = before.filter(c => c.type !== 'power');
     const dealt = resetHandOnSurvival(room, 'p0', 6);
     expect(dealt).toHaveLength(6);
     const after = room.hands.get('p0');
-    expect(after).toHaveLength(6);
-    // The new hand is composed of the dealt cards.
-    expect(after).toEqual(dealt);
-    // The old hand landed in the discard pile.
-    for (const card of before) {
+    // After = retained power cards + 6 freshly dealt shape cards.
+    expect(after).toHaveLength(retainedPowers.length + 6);
+    // Retained power cards are still present.
+    for (const pc of retainedPowers) {
+      expect(after.find(c => c.id === pc.id)).toBeTruthy();
+    }
+    // The old SHAPE cards landed in the discard pile (power cards did not).
+    for (const card of shapesBefore) {
       expect(room.discardPile.find(c => c.id === card.id)).toBeTruthy();
+    }
+    for (const pc of retainedPowers) {
+      expect(room.discardPile.find(c => c.id === pc.id)).toBeFalsy();
     }
   });
 
-  it('clears any armedPowerCard on survival (hand reset is total)', () => {
+  it('preserves armedPowerCard on survival when the armed card is still in hand (#62)', () => {
     const room = setupSurvivor();
     const player = room.players.find(p => p.id === 'p0');
-    player.armedPowerCard = { power: 'shield', cardId: 'whatever', activatedAtTurn: 0 };
+    // Pick a real power card from the player's hand to arm.
+    const heldPower = room.hands.get('p0').find(c => c.type === 'power');
+    if (!heldPower) return; // setup didn't deal a power card; nothing to assert
+    player.armedPowerCard = { id: heldPower.id, power: heldPower.power, activatedAtTurn: 0 };
+    resetHandOnSurvival(room, 'p0', 6);
+    expect(player.armedPowerCard).not.toBeNull();
+    expect(player.armedPowerCard.id).toBe(heldPower.id);
+  });
+
+  it('clears armedPowerCard if the armed card is no longer in hand', () => {
+    const room = setupSurvivor();
+    const player = room.players.find(p => p.id === 'p0');
+    // Armed card with an id that doesn't match any held power card.
+    player.armedPowerCard = { id: 'ghost-card-id', power: 'shield', activatedAtTurn: 0 };
     resetHandOnSurvival(room, 'p0', 6);
     expect(player.armedPowerCard).toBeNull();
   });
 
-  it('Redemption Spin path (3 cards) — parameter wired for Phase E1', () => {
+  it('Redemption Spin path (3 cards) — deals 3 shapes and keeps held power cards (#62)', () => {
     const room = setupSurvivor();
+    const retainedPowers = room.hands.get('p0').filter(c => c.type === 'power');
     const dealt = resetHandOnSurvival(room, 'p0', 3);
     expect(dealt).toHaveLength(3);
-    expect(room.hands.get('p0')).toHaveLength(3);
+    expect(room.hands.get('p0')).toHaveLength(retainedPowers.length + 3);
   });
 
   it('does nothing for an eliminated player', () => {
@@ -617,14 +639,18 @@ describe('resetHandOnSurvival (Section 7)', () => {
 
   // Issue #56 — pre-fix this dealt 6 cards regardless of hand size,
   // so hands stayed full forever and the deck never drained.
-  it('omitted cardsToDeal defaults to surviving hand size (#56)', () => {
+  // After #62, "surviving hand size" applies to the SHAPE count only —
+  // power cards are kept on top of the dealt shapes.
+  it('omitted cardsToDeal defaults to surviving shape count + retained power cards (#56, #62)', () => {
     const room = setupSurvivor();
     // Trim the player's hand down so we can verify size-matching.
     const trimmed = room.hands.get('p0').slice(0, 4);
     room.hands.set('p0', trimmed);
+    const trimmedShapeCount = trimmed.filter(c => c.type !== 'power').length;
+    const trimmedPowerCount = trimmed.filter(c => c.type === 'power').length;
     const dealt = resetHandOnSurvival(room, 'p0');
-    expect(dealt).toHaveLength(4);
-    expect(room.hands.get('p0')).toHaveLength(4);
+    expect(dealt).toHaveLength(trimmedShapeCount);
+    expect(room.hands.get('p0')).toHaveLength(trimmedShapeCount + trimmedPowerCount);
   });
 
   it('omitted cardsToDeal with empty hand deals zero (#56 edge case)', () => {
