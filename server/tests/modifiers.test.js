@@ -4,14 +4,20 @@
 // Covers, per the locked roadmap (sections 3 + 4):
 //
 //   Risk:
-//     - Double Barrel: spinIndex = max(d1, d2); preserved survival /
-//       elimination semantics
-//     - Russian Roulette: every chamber starts with 3 bullets at
-//       startGame
+//     - Double Barrel: two trigger pulls against the curve; eliminated
+//       if EITHER pull lands a kill (issue #67 — was max-of-two-indices)
+//     - Russian Roulette: every chamber starts with 2 bullets at
+//       startGame (issue #67 — was 3, ≈24% first-spin on the new curve)
 //     - Hot Potato: +2 bullets on survival; clamps at 6
 //     - Redemption Spin: K-by-table selection, fresh 3-card hand on
 //       success, chamber resets to 1 bullet on success, stays dead on
 //       failure
+//
+//   Issue #67 — Math.random() draw order assumed in tests below:
+//     [0]   outcome roll (vs DEATH_CURVE[bulletCount])
+//     [1]   second outcome roll — ONLY when doubleBarrel is set
+//     [n]   spinIndex slot pick within the consistent slot subset
+//     [n+]  addBulletToChamber slot pick(s) on survival (1, or 2 w/ HP)
 //
 //   Room:
 //     - Speed Mode: 15s timer plumbing (state-only — no real timer in
@@ -88,56 +94,60 @@ afterEach(() => {
 // ============================================================
 
 describe('Risk modifier — Double Barrel', () => {
-  it('takes the higher of two spin indices', () => {
-    // Math.random sequence: first call = d1 in [0, 1), second = d2.
-    // d1 = 0.0 → index 0; d2 = 0.83 → index 5. Take max → 5.
-    pinRandom([0.0, 0.9, 0.0]);
+  // Issue #67: Double Barrel is now "two trigger pulls" — eliminated
+  // if EITHER curve roll lands a kill (effective p = 1-(1-p)^2).
+  // Math.random draw order: [0] roll1, [1] roll2 (doubleBarrel only),
+  // [n] spinIndex slot pick, [n+] addBullet pick(s) on survival.
+
+  it('survives only when BOTH pulls miss the curve', () => {
+    // 1 bullet → p=0.15. roll1=0.9 miss, roll2=0.9 miss → survive.
+    pinRandom([0.9, 0.9, 0, 0]);
     const chamber = ['bullet', null, null, null, null, null];
     const r = pullTrigger(chamber, { doubleBarrel: true });
-    expect(r.spinIndex).toBe(5);
     expect(r.eliminated).toBe(false);
+    expect(chamber[r.spinIndex]).toBeNull(); // spinIndex agrees with verdict
   });
 
-  it('without doubleBarrel, only one die rolls', () => {
-    pinRandom([0.0, 0.9, 0.0]);
+  it('eliminates when the FIRST pull kills even if the second would miss', () => {
+    // roll1=0.05 < 0.15 → die (|| short-circuits, roll2 irrelevant).
+    pinRandom([0.05, 0.9, 0]);
+    const chamber = ['bullet', null, null, null, null, null];
+    const r = pullTrigger(chamber, { doubleBarrel: true });
+    expect(r.eliminated).toBe(true);
+    expect(chamber[r.spinIndex]).toBe('bullet');
+  });
+
+  it('eliminates when only the SECOND pull kills', () => {
+    // roll1=0.9 miss, roll2=0.05 < 0.15 → die.
+    pinRandom([0.9, 0.05, 0]);
+    const chamber = ['bullet', null, null, null, null, null];
+    const r = pullTrigger(chamber, { doubleBarrel: true });
+    expect(r.eliminated).toBe(true);
+    expect(chamber[r.spinIndex]).toBe('bullet');
+  });
+
+  it('without doubleBarrel only one roll is consumed (the second value is not an outcome roll)', () => {
+    // [0]=outcome 0.9 → survive. 0.05 is NOT a second outcome roll;
+    // it is consumed by the spinIndex slot pick instead.
+    pinRandom([0.9, 0.05, 0]);
     const chamber = ['bullet', null, null, null, null, null];
     const r = pullTrigger(chamber, { doubleBarrel: false });
-    // Without doubleBarrel, index 0 hits and the player is eliminated.
-    expect(r.spinIndex).toBe(0);
-    expect(r.eliminated).toBe(true);
+    expect(r.eliminated).toBe(false);
+    expect(chamber[r.spinIndex]).toBeNull();
   });
 
-  it('eliminates only when the higher of two dice hits a bullet', () => {
-    // d1=0 (idx 0), d2=0.34 (idx 2). Max = 2. Bullet at 2 → die.
-    pinRandom([0.0, 0.34]);
-    const chamber = [null, null, 'bullet', null, null, null];
-    const r = pullTrigger(chamber, { doubleBarrel: true });
-    expect(r.spinIndex).toBe(2);
-    expect(r.eliminated).toBe(true);
-  });
-
-  it('over many runs survival rate is higher than vanilla on a single-bullet-low chamber', () => {
-    // Statistical sanity check — bullet at slot 0, every other slot
-    // empty. Vanilla survival ≈ 5/6. Double Barrel survival = P(both
-    // dice >= 1) = 25/36 ≈ 0.694 — actually LOWER. Wait — taking max
-    // makes the higher slot more likely. Vanilla: P(spinIndex == 0)
-    // = 1/6. Double Barrel: P(max == 0) = (1/6)^2 = 1/36. So Double
-    // Barrel survives MORE often when bullet is at slot 0. Verify.
+  it('over many runs Double Barrel is strictly DEADLIER than a single pull', () => {
+    // Two pulls vs one → P(die) = 1-(1-p)^2 > p. So fewer survivals.
     let vanillaSurvived = 0;
     let dbSurvived = 0;
     const ITER = 5000;
-    const chamber = ['bullet', null, null, null, null, null];
-    // Restore real Math.random for the statistical test.
+    const chamber = ['bullet', null, 'bullet', null, null, null]; // 2 bullets → p=0.24
     vi.restoreAllMocks();
     for (let i = 0; i < ITER; i++) {
-      const v = pullTrigger([...chamber]);
-      if (!v.eliminated) vanillaSurvived++;
-      const d = pullTrigger([...chamber], { doubleBarrel: true });
-      if (!d.eliminated) dbSurvived++;
+      if (!pullTrigger([...chamber]).eliminated) vanillaSurvived++;
+      if (!pullTrigger([...chamber], { doubleBarrel: true }).eliminated) dbSurvived++;
     }
-    // Double Barrel should survive more often when bullet is at low
-    // index. Allow some statistical noise.
-    expect(dbSurvived).toBeGreaterThan(vanillaSurvived);
+    expect(dbSurvived).toBeLessThan(vanillaSurvived);
   });
 });
 
@@ -146,14 +156,14 @@ describe('Risk modifier — Double Barrel', () => {
 // ============================================================
 
 describe('Risk modifier — Russian Roulette', () => {
-  it('startGame leaves chambers at 3 bullets when enabled', () => {
+  it('startGame leaves chambers at 2 bullets when enabled (issue #67)', () => {
     const cfg = configWith({ risk: { russianRoulette: true } });
     const room = makeOnlineRoom(4, cfg);
     startGame(room);
     for (const p of room.players) {
       if (p.status !== 'alive') continue;
-      expect(countBullets(p.chamber)).toBe(3);
-      expect(p.riskLevel).toBe(3);
+      expect(countBullets(p.chamber)).toBe(2);
+      expect(p.riskLevel).toBe(2);
     }
   });
 
@@ -192,7 +202,8 @@ describe('Risk modifier — Russian Roulette', () => {
 
 describe('Risk modifier — Hot Potato', () => {
   it('adds 2 bullets on survival', () => {
-    pinRandom([0.0, 0.5, 0.5]);
+    // 1 bullet → p=0.15. [0]=0.9 ≥ 0.15 → survive; [1..] slot picks.
+    pinRandom([0.9, 0, 0, 0]);
     const chamber = [null, null, null, null, null, 'bullet'];
     const r = pullTrigger(chamber, { hotPotato: true });
     expect(r.eliminated).toBe(false);
@@ -201,7 +212,8 @@ describe('Risk modifier — Hot Potato', () => {
   });
 
   it('adds 1 bullet without hotPotato (vanilla survival rule preserved)', () => {
-    pinRandom([0.0, 0.5]);
+    // 1 bullet → p=0.15. [0]=0.9 ≥ 0.15 → survive; [1..] slot picks.
+    pinRandom([0.9, 0, 0]);
     const chamber = [null, null, null, null, null, 'bullet'];
     const r = pullTrigger(chamber);
     expect(r.eliminated).toBe(false);
@@ -209,8 +221,10 @@ describe('Risk modifier — Hot Potato', () => {
   });
 
   it('clamps at chamber capacity (5/6 + Hot Potato survival → 6/6, not error)', () => {
-    pinRandom([0.0, 0.0]);
-    // 5/6 chamber, miss at idx 0 → would survive → +2 wants to overflow
+    // 5 bullets → p=0.75. [0]=0.99 ≥ 0.75 → survive; the only empty
+    // slot is idx 0 → spinIndex 0. Hot Potato wants +2 but only 1
+    // empty slot remains → second addBullet is a no-op → 6/6.
+    pinRandom([0.99, 0, 0, 0]);
     const chamber = [null, 'bullet', 'bullet', 'bullet', 'bullet', 'bullet'];
     const r = pullTrigger(chamber, { hotPotato: true });
     expect(r.eliminated).toBe(false);
@@ -218,7 +232,9 @@ describe('Risk modifier — Hot Potato', () => {
   });
 
   it('does not add bullets on elimination', () => {
-    pinRandom([0.0]);
+    // 1 bullet → p=0.15. [0]=0.0 < 0.15 → die; [1] slot pick (only
+    // bullet slot is idx 0).
+    pinRandom([0.0, 0]);
     const chamber = ['bullet', null, null, null, null, null];
     const r = pullTrigger(chamber, { hotPotato: true });
     expect(r.eliminated).toBe(true);
@@ -311,8 +327,8 @@ describe('Risk modifier — Redemption Spin', () => {
     victim.status = 'eliminated';
     victim.chamber = [null, 'bullet', 'bullet', null, null, null]; // 2 bullets pre-spin
     eliminateFromTurnOrder(room, victim.id);
-    // Force a survival spin: index 0 (empty)
-    pinRandom([0.0, 0.5]);
+    // 2 bullets → p=0.24. [0]=0.9 ≥ 0.24 → survive; [1..] slot picks.
+    pinRandom([0.9, 0, 0]);
     const result = runRedemptionSpin(room, victim.id);
     expect(result.eliminated).toBe(false);
     expect(victim.status).toBe('alive');
@@ -331,7 +347,8 @@ describe('Risk modifier — Redemption Spin', () => {
     victim.status = 'eliminated';
     victim.chamber = ['bullet', null, null, null, null, null];
     eliminateFromTurnOrder(room, victim.id);
-    pinRandom([0.0]); // hit bullet at idx 0
+    // 1 bullet → p=0.15. [0]=0.0 < 0.15 → die.
+    pinRandom([0.0, 0]);
     const result = runRedemptionSpin(room, victim.id);
     expect(result.eliminated).toBe(true);
     expect(victim.status).toBe('eliminated');
@@ -346,7 +363,8 @@ describe('Risk modifier — Redemption Spin', () => {
     const victim = room.players[1];
     victim.status = 'eliminated';
     victim.chamber = ['bullet', null, null, null, null, null];
-    pinRandom([0.0]); // first spin: die
+    // 1 bullet → p=0.15. [0]=0.0 < 0.15 → die.
+    pinRandom([0.0, 0]);
     runRedemptionSpin(room, victim.id);
     // Second pick → already consumed flag
     const cands = pickRedemptionCandidates(room);
@@ -614,7 +632,8 @@ describe('getSpinModifiers', () => {
 
 describe('spinGun forwards modifiers', () => {
   it('Hot Potato survival: player chamber gains 2 bullets', () => {
-    pinRandom([0.0, 0.5, 0.5]);
+    // 1 bullet → p=0.15. [0]=0.9 ≥ 0.15 → survive; [1..] slot picks.
+    pinRandom([0.9, 0, 0, 0]);
     const player = {
       id: 'p1',
       status: 'alive',
@@ -629,7 +648,8 @@ describe('spinGun forwards modifiers', () => {
   });
 
   it('Gambler still ignores survival bullets even with Hot Potato', () => {
-    pinRandom([0.0, 0.5, 0.5]);
+    // 1 bullet → p=0.15. [0]=0.9 ≥ 0.15 → survive.
+    pinRandom([0.9, 0, 0, 0]);
     const player = {
       id: 'p1',
       status: 'alive',
@@ -643,20 +663,41 @@ describe('spinGun forwards modifiers', () => {
     expect(player.riskLevel).toBe(1); // Gambler revert wins over Hot Potato
   });
 
-  it('Double Barrel: spin index is the higher of two rolls', () => {
-    pinRandom([0.0, 0.9, 0.5]);
+  it('Double Barrel: a kill on EITHER pull eliminates (issue #67)', () => {
+    // 1 bullet → p=0.15. roll1=0.9 (miss), roll2=0.05 (kill) → die.
+    // spinIndex MUST point at the bullet slot for visual consistency.
+    pinRandom([0.9, 0.05, 0]);
+    const preSpinChamber = ['bullet', null, null, null, null, null];
     const player = {
       id: 'p1',
       status: 'alive',
       isSpectator: false,
-      chamber: [null, null, null, null, null, null], // empty for clarity
-      riskLevel: 0,
+      chamber: [...preSpinChamber],
+      riskLevel: 1,
       role: 'barehand',
     };
-    // Manually load 1 bullet at slot 0; doubleBarrel should pick max(0,5)=5
-    player.chamber[0] = 'bullet';
     const r = spinGun(player, { doubleBarrel: true });
-    expect(r.spinIndex).toBe(5);
+    expect(r.eliminated).toBe(true);
+    // Verify against the PRE-spin chamber — survival path mutates
+    // player.chamber by adding a bullet, which can land on spinIndex.
+    expect(preSpinChamber[r.spinIndex]).toBe('bullet');
+  });
+
+  it('Double Barrel: BOTH pulls must miss to survive', () => {
+    // 1 bullet → p=0.15. roll1=0.9 miss, roll2=0.9 miss → survive.
+    pinRandom([0.9, 0.9, 0, 0]);
+    const preSpinChamber = ['bullet', null, null, null, null, null];
+    const player = {
+      id: 'p1',
+      status: 'alive',
+      isSpectator: false,
+      chamber: [...preSpinChamber],
+      riskLevel: 1,
+      role: 'barehand',
+    };
+    const r = spinGun(player, { doubleBarrel: true });
     expect(r.eliminated).toBe(false);
+    // Pre-spin slot at spinIndex must be empty (chamber realism).
+    expect(preSpinChamber[r.spinIndex]).toBeNull();
   });
 });
