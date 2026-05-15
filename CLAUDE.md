@@ -2,10 +2,6 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
-## Before implementing — always offer a plan first
-
-Before editing **any** file for an implementation task, stop and ask the user whether they want a plan proposed first. Do not begin editing until the user has responded. If the user wants a plan, present it and wait for approval before touching any file. This applies to every implementation request regardless of size — trivial-looking changes included.
-
 ## Repo layout
 
 Two-process app, no monorepo tooling — each side has its own `package.json`:
