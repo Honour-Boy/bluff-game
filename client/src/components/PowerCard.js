@@ -55,7 +55,7 @@ export const POWER_TYPES = Object.keys(POWER_META);
 // Drawn in a 100×100 viewBox to match ShapeIcon's pattern.
 // All icons are simple, glyph-like, and use stroke-based geometry
 // so a single colour renders cleanly at any size.
-const ICONS = {
+export const POWER_ICONS = {
   // Crested shield silhouette
   shield: (c) => (
     <g fill="none" stroke={c} strokeWidth="6" strokeLinejoin="round" strokeLinecap="round">
@@ -126,7 +126,7 @@ const SIZES = {
 export function PowerCard({ type, size = "md", style }) {
   const meta = POWER_META[type] || POWER_META.shield;
   const s = SIZES[size] || SIZES.md;
-  const draw = ICONS[type] || ICONS.shield;
+  const draw = POWER_ICONS[type] || POWER_ICONS.shield;
 
   // Glow intensity scales subtly with size for visual weight
   const glowOuter = size === "lg" ? 28 : size === "md" ? 16 : 8;
