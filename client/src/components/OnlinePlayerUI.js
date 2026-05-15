@@ -786,14 +786,17 @@ export function OnlinePlayerUI({
     }
   }, [spinDismissed, spinComplete]); // eslint-disable-line
 
-  // Auto-refresh spectated hand when action changes
+  // Issue #81 — the server now streams the spectated hand inside
+  // every room_state for spectator callers (`roomState.spectatedHand`),
+  // so we no longer need to poll `spectate_player` on every lastAction.
+  // Keep `setSpectatedHand` updated from the live snapshot so the
+  // existing CardHand consumer below stays in sync. The initial
+  // `spectate_player` call still happens in handleSpectatePlayer to
+  // tell the server which target this socket is watching.
   useEffect(() => {
-    if (spectatingId && spectatePlayer) {
-      spectatePlayer(spectatingId, (res) => {
-        if (res.hand) setSpectatedHand(res.hand);
-      });
-    }
-  }, [roomState?.lastAction]); // eslint-disable-line
+    const live = roomState?.spectatedHand;
+    if (Array.isArray(live)) setSpectatedHand(live);
+  }, [roomState?.spectatedHand]);
 
   // Detect alive → eliminated, hold until spin overlay is dismissed
   useEffect(() => {
@@ -2386,6 +2389,133 @@ export function OnlinePlayerUI({
           </div>
         </div>
       )}
+
+      {/* ── Issue #81 — Spectator ghost prompts ──
+            When the local player is spectating and their selected
+            target is the one currently being prompted, render a
+            dimmed read-only copy of the prompt so spectators can
+            follow what their player is seeing. `currentPromptTarget`
+            is only sent to eliminated callers (secret-role privacy
+            stays intact for living players).
+        */}
+      {showSpectatorView && spectatingId && (() => {
+        const promptTarget = roomState?.currentPromptTarget;
+        if (!promptTarget || promptTarget.playerId !== spectatingId) return null;
+
+        const targetPlayer = players?.find(p => p.id === spectatingId);
+        const ghostFrame = {
+          position: 'fixed', inset: 0,
+          background: 'rgba(0,0,0,0.78)',
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          zIndex: 9050, padding: 24,
+          pointerEvents: 'none',
+        };
+
+        if (promptTarget.kind === 'medic_save_pending' && medicPending) {
+          return (
+            <div style={ghostFrame} data-testid="spectator-ghost-medic">
+              <div className="card" style={{
+                maxWidth: 380, width: '100%', textAlign: 'center',
+                padding: '28px 24px',
+                border: `1px solid ${ROLE_META.medic.color}`,
+                opacity: 0.55,
+              }}>
+                <div style={{ fontSize: 10, color: ROLE_META.medic.color, letterSpacing: '0.18em', marginBottom: 8 }}>
+                  👁 SPECTATING · {targetPlayer?.username || 'Player'}
+                </div>
+                <div style={{ fontSize: 10, color: ROLE_META.medic.color, letterSpacing: '0.18em', marginBottom: 12 }}>
+                  MEDIC — SAVE THEM?
+                </div>
+                <div style={{
+                  fontFamily: "'Bebas Neue', sans-serif",
+                  fontSize: 22, color: 'var(--text)', marginBottom: 8, letterSpacing: '0.05em',
+                }}>
+                  {medicPending.eliminatedPlayerName || 'A player'} is about to be eliminated.
+                </div>
+                <div style={{ fontSize: 11, color: 'var(--text-dim)' }}>
+                  They are choosing whether to save them.
+                </div>
+              </div>
+            </div>
+          );
+        }
+
+        if (promptTarget.kind === 'sniper_redirect_pending' && sniperPending) {
+          return (
+            <div style={ghostFrame} data-testid="spectator-ghost-sniper">
+              <div className="card" style={{
+                maxWidth: 420, width: '100%', textAlign: 'center',
+                padding: '24px 20px',
+                border: `1px solid ${ROLE_META.sniper.color}`,
+                opacity: 0.55,
+              }}>
+                <div style={{ fontSize: 10, color: ROLE_META.sniper.color, letterSpacing: '0.18em', marginBottom: 8 }}>
+                  👁 SPECTATING · {targetPlayer?.username || 'Player'}
+                </div>
+                <div style={{
+                  fontFamily: "'Bebas Neue', sans-serif",
+                  fontSize: 20, letterSpacing: '0.12em',
+                  color: ROLE_META.sniper.color, marginBottom: 6,
+                }}>
+                  SNIPER — REDIRECT THE SHOT?
+                </div>
+                <div style={{ fontSize: 11, color: 'var(--text-dim)' }}>
+                  Aimed at <strong style={{ color: 'var(--text)' }}>{sniperPending.originalSpinTargetName || 'someone'}</strong>. They are picking a new target.
+                </div>
+              </div>
+            </div>
+          );
+        }
+
+        return null;
+      })()}
+
+      {/* ── Issue #81 — Spectator ghost Activate/Skip prompt ──
+            Derived (not server-pushed): the spectated player's turn
+            is open in 'playing' phase, they haven't acted yet, and
+            their hand (visible via spectatedHand) contains a power
+            card that isn't already armed. Mirror of the local
+            `showPowerPrompt` derivation, but viewed from outside.
+        */}
+      {showSpectatorView && spectatingId && (() => {
+        if (roomState?.phase !== 'playing') return null;
+        if (roomState?.currentPlayerId !== spectatingId) return null;
+        if (roomState?.cardPlayedThisTurn || roomState?.bluffUsedThisTurn) return null;
+        const targetPlayer = players?.find(p => p.id === spectatingId);
+        if (!targetPlayer || targetPlayer.armedPowerCard) return null;
+        const targetHand = roomState?.spectatedHand || spectatedHand || [];
+        const targetPower = targetHand.find(c => c?.type === 'power');
+        if (!targetPower) return null;
+        return (
+          <div
+            data-testid="spectator-ghost-activate"
+            style={{
+              position: 'fixed', inset: 0,
+              background: 'rgba(0,0,0,0.65)',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              zIndex: 9020, padding: 24,
+              pointerEvents: 'none',
+            }}
+          >
+            <div className="card" style={{
+              maxWidth: 360, width: '100%', textAlign: 'center',
+              padding: '22px 20px',
+              border: '1px solid var(--accent)',
+              opacity: 0.55,
+            }}>
+              <div style={{ fontSize: 10, color: 'var(--accent)', letterSpacing: '0.18em', marginBottom: 8 }}>
+                👁 SPECTATING · {targetPlayer?.username || 'Player'}
+              </div>
+              <div style={{ fontFamily: "'Bebas Neue', sans-serif", fontSize: 20, color: 'var(--text)', letterSpacing: '0.06em', marginBottom: 6 }}>
+                ACTIVATE POWER CARD?
+              </div>
+              <div style={{ fontSize: 11, color: 'var(--text-dim)' }}>
+                {targetPlayer?.username || 'They'} are deciding whether to use {targetPower.power || 'their power'}.
+              </div>
+            </div>
+          </div>
+        );
+      })()}
 
       {/* ── v2 Phase D — Sniper deciding banner (everyone else) ── */}
       {sniperPending && !amTargetSniper && (

@@ -510,7 +510,12 @@ async function broadcastRoomState(io, roomCode) {
     for (const s of sockets) {
       const player = room.players.find(p => p.socketId === s.id);
       const playerId = player ? player.id : null;
-      s.emit('room_state', engine.serializeRoom(room, playerId));
+      // Issue #81 — pass the per-socket spectator target so the
+      // engine can attach `spectatedHand` + `currentPromptTarget`
+      // gated to spectator callers only. Living players never see
+      // these fields regardless of any client-side claim.
+      const spectatingTargetId = s.data?.spectatingTargetId || null;
+      s.emit('room_state', engine.serializeRoom(room, playerId, { spectatingTargetId }));
     }
   } else {
     io.to(roomCode).emit('room_state', engine.serializeRoom(room));
@@ -1965,18 +1970,40 @@ function registerSocketHandlers(io, socket) {
     }
   });
 
-  // ─── HOST: Spectate a player's hand ─────────────────────
+  // ─── Spectate a player's hand (#81) ─────────────────────
+  // Any room member (host or eliminated player) can spectate an alive
+  // teammate. The selected target is stamped on `socket.data` so the
+  // next `broadcastRoomState` includes the live `spectatedHand` and
+  // `currentPromptTarget` fields in this socket's serializeRoom view.
+  // Living players cannot spectate — the engine-side gate in
+  // serializeRoom drops the fields for non-eliminated callers.
+  // Passing `targetPlayerId: null` clears the selection.
   socket.on('spectate_player', async ({ roomCode, targetPlayerId } = {}, callback) => {
     try {
-      const room = await getRoom(roomCode);
-      if (!room) return callback({ success: false, error: 'Room not found' });
-      if (room.hostSocketId !== socket.id) return callback({ success: false, error: 'Not the host' });
+      const code = roomCode?.toUpperCase();
+      const room = await getRoom(code);
+      if (!room) return callback?.({ success: false, error: 'Room not found' });
+
+      const isHost = room.hostUserId === socket.userId;
+      const isMember = room.players.some(p => p.id === socket.userId);
+      if (!isHost && !isMember) return callback?.({ success: false, error: 'Not a member of this room' });
+
+      // Clear selection.
+      if (!targetPlayerId) {
+        if (socket.data) socket.data.spectatingTargetId = null;
+        return callback?.({ success: true, hand: [] });
+      }
 
       const hand = room.hands?.get(targetPlayerId);
-      if (!hand) return callback({ success: false, error: 'Player has no hand' });
-      callback({ success: true, hand });
+      if (!hand) return callback?.({ success: false, error: 'Player has no hand' });
+
+      // Stamp on socket.data so fetchSockets()-driven broadcasts see it.
+      socket.data = socket.data || {};
+      socket.data.spectatingTargetId = targetPlayerId;
+
+      callback?.({ success: true, hand });
     } catch (err) {
-      callback({ success: false, error: err.message });
+      callback?.({ success: false, error: err.message });
     }
   });
 

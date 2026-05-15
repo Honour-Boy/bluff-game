@@ -2366,8 +2366,51 @@ function resetRoomForReplay(room) {
 
 // ─── Serialization ─────────────────────────────────────────────
 
-function serializeRoom(room, requestingPlayerId = null) {
+function serializeRoom(room, requestingPlayerId = null, opts = {}) {
   const isOnline = room.mode === MODES.ONLINE;
+  const { spectatingTargetId = null } = opts;
+
+  // Spectator gating (issue #81): a caller is treated as a spectator
+  // ONLY if their own player record is eliminated / isSpectator.
+  // Living players — including a host who is also playing — never
+  // receive `spectatedHand` or `currentPromptTarget`, regardless of
+  // any client-side claim to a target id; that would leak secret-role
+  // identities (Medic / Sniper) mid-game.
+  const requestingPlayer = requestingPlayerId
+    ? room.players.find(p => p.id === requestingPlayerId)
+    : null;
+  const isSpectatorCaller =
+    !!requestingPlayer
+    && (requestingPlayer.status === 'eliminated' || requestingPlayer.isSpectator);
+  const spectatedPlayer =
+    isOnline && isSpectatorCaller && spectatingTargetId
+      ? room.players.find(p => p.id === spectatingTargetId) || null
+      : null;
+  // Only return a hand snapshot if the target is alive — eliminated
+  // players' hands are already cleared and would just be `[]` noise.
+  const spectatedHand =
+    spectatedPlayer && room.hands && spectatedPlayer.status !== 'eliminated'
+      ? (room.hands.get(spectatingTargetId) || [])
+      : undefined;
+  // Build a per-socket prompt-target hint so the spectator UI can
+  // ghost-render Medic/Sniper prompts on the right player. Gated to
+  // spectator callers ONLY — living players continue to see only the
+  // existing `amTargetMedic` / `amTargetSniper` flags, which keeps
+  // the secret-role privacy invariant intact.
+  let currentPromptTarget = null;
+  if (isOnline && isSpectatorCaller) {
+    if (room.phase === 'medic_pending' && room.pendingMedicSave) {
+      currentPromptTarget = {
+        playerId: room.pendingMedicSave.medicId,
+        kind: 'medic_save_pending',
+      };
+    } else if (room.phase === 'sniper_pending' && room.pendingSniperRedirect) {
+      currentPromptTarget = {
+        playerId: room.pendingSniperRedirect.sniperId,
+        kind: 'sniper_redirect_pending',
+      };
+    }
+  }
 
   return {
     code: room.code,
@@ -2430,6 +2473,18 @@ function serializeRoom(room, requestingPlayerId = null) {
     myHand: isOnline && requestingPlayerId && room.hands
       ? (room.hands.get(requestingPlayerId) || [])
       : undefined,
+    // Issue #81 — spectator hand visibility. Only set on snapshots
+    // destined for a spectator caller who has selected a target via
+    // `spectate_player`. Living players never get this field; that
+    // would leak hand contents.
+    spectatedHand,
+    spectatedPlayerId: spectatedPlayer ? spectatingTargetId : undefined,
+    // Issue #81 — spectator prompt ghosting. Tells the spectator
+    // which player is currently being prompted (Medic save / Sniper
+    // redirect) so their UI can render the ghosted prompt on the
+    // right seat. Not emitted to living players to preserve the
+    // secret-role privacy invariant.
+    currentPromptTarget,
     chatLog: room.chatLog || [],
     config: room.config || null,
     // v2 Phase C — Swap pause: holderId is set while phase ===
