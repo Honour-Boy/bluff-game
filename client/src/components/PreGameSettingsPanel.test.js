@@ -88,3 +88,52 @@ describe('PreGameSettingsPanel — Select All controls (#66)', () => {
     expect(Object.values(next.systems).some(Boolean)).toBe(false);
   });
 });
+
+describe('PreGameSettingsPanel - group settings affordances', () => {
+  it('shows the saved-settings indicator for persisted group rooms', () => {
+    render(
+      <PreGameSettingsPanel
+        config={DEFAULT_V2_CONFIG}
+        onChange={() => {}}
+        isGroupRoom
+        savedMeta={{
+          updatedAt: '2026-05-15T20:00:00.000Z',
+          updatedByUsername: 'HostUser',
+        }}
+      />,
+    );
+
+    expect(screen.getByText(/Settings saved - updated/i)).toBeInTheDocument();
+    expect(screen.getByText(/@HostUser/)).toBeInTheDocument();
+  });
+
+  it('renders reset to defaults only for group rooms and routes through onChange', () => {
+    const onChange = vi.fn();
+    render(
+      <PreGameSettingsPanel
+        config={{
+          ...DEFAULT_V2_CONFIG,
+          powerCards: {
+            ...DEFAULT_V2_CONFIG.powerCards,
+            enabled: {
+              ...DEFAULT_V2_CONFIG.powerCards.enabled,
+              shield: true,
+            },
+          },
+        }}
+        onChange={onChange}
+        isGroupRoom
+      />,
+    );
+
+    fireEvent.click(screen.getByText(/V2 GAME SETTINGS/i));
+    fireEvent.click(screen.getByRole('button', { name: /Reset to defaults/i }));
+
+    expect(onChange).toHaveBeenCalledWith(expect.objectContaining({
+      version: 1,
+      powerCards: expect.objectContaining({
+        enabled: expect.objectContaining({ shield: false }),
+      }),
+    }));
+  });
+});

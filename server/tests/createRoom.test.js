@@ -153,6 +153,12 @@ describe('resetRoomForReplay', () => {
     });
     room.code = 'TESTAB';
     room.hostUserId = 'host:abc';
+    room.groupId = 'group-123';
+    room.groupSettingsMeta = {
+      updatedAt: '2026-05-15T18:00:00.000Z',
+      updatedByUserId: 'host:abc',
+      updatedByUsername: 'HostUser',
+    };
     room.players.push(createPlayer('p1', 'Alice', 'sock-1'));
     room.players.push(createPlayer('p2', 'Bob',   'sock-2'));
     // Pollute with end-of-game state.
@@ -182,13 +188,15 @@ describe('resetRoomForReplay', () => {
     expect(room.hands).toBeNull();
   });
 
-  it('preserves room identity (code, host, mode, config) and chat log', () => {
+  it('preserves room identity (code, host, mode, group, config) and chat log', () => {
     const room = buildFinishedRoom();
     resetRoomForReplay(room);
     expect(room.code).toBe('TESTAB');
     expect(room.hostUserId).toBe('host:abc');
+    expect(room.groupId).toBe('group-123');
     expect(room.mode).toBe(MODES.ONLINE);
     expect(room.config.powerCards.enabled.shield).toBe(true);
+    expect(room.groupSettingsMeta?.updatedByUsername).toBe('HostUser');
     expect(room.chatLog).toHaveLength(1);
   });
 

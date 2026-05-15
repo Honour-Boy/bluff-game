@@ -1273,6 +1273,8 @@ export function OnlinePlayerUI({
                     <PreGameSettingsPanel
                       config={roomState.config}
                       onChange={updateRoomConfig}
+                      isGroupRoom={!!roomState?.groupId}
+                      savedMeta={roomState?.groupSettingsMeta}
                     />
                   )}
                   <button
