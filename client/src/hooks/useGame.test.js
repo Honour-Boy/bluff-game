@@ -266,6 +266,43 @@ describe('useGame - groups', () => {
     expect(response?.invites).toHaveLength(1);
     expect(response.invites[0].group.code).toBe('QWERT2');
   });
+
+  it('getGroupLeaderboard emits the expected payload and resolves rows', async () => {
+    const { result } = renderHook(() => useGame(null));
+    socketHolder.socket.emit.mockImplementationOnce((event, payload, cb) => {
+      expect(event).toBe('get_group_leaderboard');
+      expect(payload).toEqual({ groupId: 'group-76' });
+      cb({
+        success: true,
+        leaderboard: [
+          { userId: 'u1', username: 'alice', wins: 4, gamesPlayed: 6 },
+        ],
+      });
+    });
+
+    let response;
+    await act(async () => {
+      response = await result.current.getGroupLeaderboard('group-76');
+    });
+
+    expect(response.leaderboard[0].wins).toBe(4);
+  });
+
+  it('increments leaderboardUpdateNonce when the server broadcasts an update', async () => {
+    const { result } = renderHook(() => useGame(null));
+
+    expect(result.current.leaderboardUpdateNonce).toBe(0);
+
+    act(() => {
+      socketHolder.socket.__emit('group_leaderboard_updated', {
+        groupId: 'group-76',
+        winnerUserId: 'u1',
+        newWins: 3,
+      });
+    });
+
+    await waitFor(() => expect(result.current.leaderboardUpdateNonce).toBe(1));
+  });
 });
 
 describe('useGame — connection lifecycle', () => {

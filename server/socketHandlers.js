@@ -14,6 +14,9 @@ const {
 const {
   createGroupSettingsRepo,
 } = require('./groupSettingsRepo');
+const {
+  createLeaderboardRepo,
+} = require('./leaderboardRepo');
 
 // ─── Supabase admin client (server-side only) ─────────────────
 // Used to verify JWT tokens and look up profiles.
@@ -25,6 +28,7 @@ const supabase = createClient(
 );
 const defaultGroupsRepo = createGroupsRepo(supabase);
 const defaultGroupSettingsRepo = createGroupSettingsRepo(supabase);
+const defaultLeaderboardRepo = createLeaderboardRepo(supabase);
 
 // ─── Guest auth helpers ───────────────────────────────────────
 // Anonymous players can join with a typed display name. Their
@@ -151,6 +155,43 @@ function buildPersistentGroupRoom(group, opts = {}) {
   room.cardPlayedThisTurn = false;
   room.bluffUsedThisTurn = false;
   return room;
+}
+
+function getWinnerFromRoom(room) {
+  const winnerId = room?.lastAction?.winnerId;
+  if (!winnerId) return null;
+  const winner = room.players.find((player) => player.id === winnerId);
+  return {
+    id: winnerId,
+    username: winner?.username || room.lastAction?.winnerName || null,
+  };
+}
+
+async function maybeRecordGroupWinner(io, room, leaderboardRepo) {
+  if (!room?.groupId) return null;
+  if (room.phase !== 'game_over') return null;
+  if (room.groupLeaderboardWinnerRecorded) return null;
+
+  const winner = getWinnerFromRoom(room);
+  if (!winner?.id) return null;
+
+  try {
+    const persisted = await leaderboardRepo.recordWinner(
+      room.groupId,
+      winner.id,
+      new Date().toISOString(),
+    );
+    room.groupLeaderboardWinnerRecorded = true;
+    io.to(`group:${room.groupId}`).emit('group_leaderboard_updated', {
+      groupId: room.groupId,
+      winnerUserId: winner.id,
+      newWins: persisted.wins,
+    });
+    return persisted;
+  } catch (err) {
+    console.error('[leaderboard] failed to record winner', err);
+    return null;
+  }
 }
 
 // ─── Broadcast helpers ────────────────────────────────────────
@@ -963,6 +1004,7 @@ const dcKey = (code, playerId) => `${code}:${playerId}`;
 function registerSocketHandlers(io, socket, deps = {}) {
   const groupsRepo = deps.groupsRepo || defaultGroupsRepo;
   const groupSettingsRepo = deps.groupSettingsRepo || defaultGroupSettingsRepo;
+  const leaderboardRepo = deps.leaderboardRepo || defaultLeaderboardRepo;
   // Idempotent: runs once on first connection, no-ops thereafter.
   startInactivitySweep(io);
   startHostIdleSweep(io);
@@ -1079,6 +1121,28 @@ function registerSocketHandlers(io, socket, deps = {}) {
       });
       socket.join(`group:${group.id}`);
       callback?.({ success: true, group });
+    } catch (err) {
+      callback?.({ success: false, error: err.message });
+    }
+  });
+
+  socket.on('get_group_leaderboard', async ({ groupId } = {}, callback) => {
+    try {
+      const authError = getGroupAuthError(socket);
+      if (authError) return callback?.({ success: false, error: authError });
+
+      const group = await groupsRepo.getActiveGroupById(groupId);
+      if (!group) {
+        return callback?.({ success: false, error: 'not_a_group_member' });
+      }
+
+      const isMember = await groupsRepo.isGroupMember(groupId, socket.userId);
+      if (!isMember) {
+        return callback?.({ success: false, error: 'not_a_group_member' });
+      }
+
+      const leaderboard = await leaderboardRepo.getLeaderboard(groupId);
+      callback?.({ success: true, leaderboard });
     } catch (err) {
       callback?.({ success: false, error: err.message });
     }
@@ -1423,6 +1487,7 @@ function registerSocketHandlers(io, socket, deps = {}) {
         mirrorMatchAutoDisabled = true;
       }
 
+      delete room.groupLeaderboardWinnerRecorded;
       engine.startGame(room);
 
       if (room.groupId) {
@@ -1443,6 +1508,16 @@ function registerSocketHandlers(io, socket, deps = {}) {
           });
         } catch (persistErr) {
           console.error('[start_game] failed to persist group settings', persistErr);
+        }
+
+        try {
+          await leaderboardRepo.recordGameStart(
+            room.groupId,
+            room.turnOrder.filter(Boolean),
+            new Date().toISOString(),
+          );
+        } catch (leaderboardErr) {
+          console.error('[start_game] failed to record group leaderboard participants', leaderboardErr);
         }
       }
 
@@ -1491,6 +1566,7 @@ function registerSocketHandlers(io, socket, deps = {}) {
       if (gameOverWinner) {
         room.phase = 'game_over';
         room.lastAction = { type: 'game_over', winnerId: gameOverWinner.id, winnerName: gameOverWinner.username };
+        await maybeRecordGroupWinner(io, room, leaderboardRepo);
       }
 
       await saveRoom(room);
@@ -1795,6 +1871,7 @@ function registerSocketHandlers(io, socket, deps = {}) {
             _bountyOnElimination(room, outcome.eliminatedPlayerId);
           }
           applyPostElimSystemHooks(io, room);
+          await maybeRecordGroupWinner(io, room, leaderboardRepo);
         }
 
         // #63 — backfire: advance turn after broadcast so the accuser's
@@ -1889,6 +1966,7 @@ function registerSocketHandlers(io, socket, deps = {}) {
           _bountyOnElimination(room, outcome.eliminatedPlayerId);
         }
         applyPostElimSystemHooks(io, room);
+        await maybeRecordGroupWinner(io, room, leaderboardRepo);
       }
 
       if (room.phase === 'spin_pending') {
@@ -2042,6 +2120,7 @@ function registerSocketHandlers(io, socket, deps = {}) {
           if (typeof pending.finaliseFn === 'function') pending.finaliseFn();
           room.pendingMedicSave = null;
           if (room.phase === 'medic_pending') room.phase = 'playing';
+          await maybeRecordGroupWinner(io, room, leaderboardRepo);
           await saveRoom(room);
           await broadcastRoomState(io, code);
           return callback?.({ success: false, error: res.error });
@@ -2074,6 +2153,7 @@ function registerSocketHandlers(io, socket, deps = {}) {
       if (typeof pending.finaliseFn === 'function') pending.finaliseFn();
       room.pendingMedicSave = null;
       if (room.phase === 'medic_pending') room.phase = 'playing';
+      await maybeRecordGroupWinner(io, room, leaderboardRepo);
       await saveRoom(room);
       await broadcastRoomState(io, code);
       callback?.({ success: true, saved: false });
@@ -2195,6 +2275,7 @@ function registerSocketHandlers(io, socket, deps = {}) {
             winnerId: playerId,
             winnerName: winner?.username || null,
           };
+          await maybeRecordGroupWinner(io, room, leaderboardRepo);
           await saveRoom(room);
           await broadcastRoomState(io, code);
           return callback({ success: true, gameOver: true });
@@ -2226,6 +2307,7 @@ function registerSocketHandlers(io, socket, deps = {}) {
       if (gameOverWinner) {
         room.phase = 'game_over';
         room.lastAction = { type: 'game_over', winnerId: gameOverWinner.id, winnerName: gameOverWinner.username };
+        await maybeRecordGroupWinner(io, room, leaderboardRepo);
       }
 
       await saveRoom(room);
@@ -2302,6 +2384,7 @@ function registerSocketHandlers(io, socket, deps = {}) {
       // A pending Mirror Match spin would be moot if the game just
       // ended — discard it.
       delete room.pendingMirrorMatchSpin;
+      await maybeRecordGroupWinner(io, room, leaderboardRepo);
       await saveRoom(room);
       io.to(code).emit('spin_acknowledged');
       await broadcastRoomState(io, code);
@@ -2509,6 +2592,7 @@ function registerSocketHandlers(io, socket, deps = {}) {
           if (gameOverWinner) {
             room.phase = 'game_over';
             room.lastAction = { type: 'game_over', winnerId: gameOverWinner.id, winnerName: gameOverWinner.username };
+            await maybeRecordGroupWinner(io, room, leaderboardRepo);
           }
         } else {
           // Lobby or game_over: clean removal. In lobby this lets the
@@ -2822,6 +2906,7 @@ function registerSocketHandlers(io, socket, deps = {}) {
               if (winner) {
                 room.phase = 'game_over';
                 room.lastAction = { type: 'game_over', winnerId: winner.id, winnerName: winner.username };
+                await maybeRecordGroupWinner(io, room, leaderboardRepo);
               }
               await saveRoom(room);
               await broadcastRoomState(io, code);

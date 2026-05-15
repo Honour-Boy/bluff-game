@@ -48,7 +48,7 @@ function HomeContent() {
     createGroup, listMyGroups, getGroup,
     inviteToGroup, listMyInvites, respondToInvite,
     revokeInvite, removeMember, transferHost,
-    deleteGroup, leaveGroup,
+    deleteGroup, leaveGroup, getGroupLeaderboard,
     nextTurn, resolveBluff,
     playCard, endTurn, playerSpin,
     declareRoundWin, callBluff,
@@ -67,6 +67,7 @@ function HomeContent() {
     sniperPrompt,
     powerEventQueue,
     consumePowerEvent,
+    leaderboardUpdateNonce,
     placeBet,
     ghostVote,
     lastStandSpin,
@@ -332,6 +333,8 @@ function HomeContent() {
           activatePowerCard={activatePowerCard}
           swapPick={swapPick}
           updateRoomConfig={updateRoomConfig}
+          getGroupLeaderboard={getGroupLeaderboard}
+          leaderboardUpdateNonce={leaderboardUpdateNonce}
           medicDecide={medicDecide}
           saboteurTransfer={saboteurTransfer}
           sniperRedirect={sniperRedirect}
@@ -385,6 +388,8 @@ function HomeContent() {
           activatePowerCard={activatePowerCard}
           swapPick={swapPick}
           updateRoomConfig={updateRoomConfig}
+          getGroupLeaderboard={getGroupLeaderboard}
+          leaderboardUpdateNonce={leaderboardUpdateNonce}
           medicDecide={medicDecide}
           saboteurTransfer={saboteurTransfer}
           sniperRedirect={sniperRedirect}
