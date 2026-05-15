@@ -397,7 +397,6 @@ export function useGame(getAccessToken, getGuestAuth, authIdentityKey = null) {
     const payload = config ? { mode, config } : { mode };
     socket.emit('create_room', payload, (res) => {
       if (res.success) {
-        setError(null);
         setRoomCode(res.roomCode);
         setIsHost(true);
         if (res.playerId) setPlayerId(res.playerId);
@@ -410,125 +409,14 @@ export function useGame(getAccessToken, getGuestAuth, authIdentityKey = null) {
   const joinRoom = useCallback((code) => {
     socket.emit('join_room', { roomCode: code.toUpperCase() }, (res) => {
       if (res.success) {
-        setError(null);
         setRoomCode(res.roomCode);
         setPlayerId(res.playerId);
-        setIsHost(!!res.isHost);
+        setIsHost(false);
       } else {
         setError(res.error);
       }
     });
   }, [socket]);
-
-  const createGroup = useCallback((name) => {
-    return new Promise((resolve) => {
-      socket.emit('create_group', { name }, (res) => {
-        if (!res?.success) failError(res);
-        else setError(null);
-        resolve(res);
-      });
-    });
-  }, [socket, failError]);
-
-  const listMyGroups = useCallback(() => {
-    return new Promise((resolve) => {
-      socket.emit('list_my_groups', {}, (res) => {
-        if (!res?.success) failError(res);
-        else setError(null);
-        resolve(res);
-      });
-    });
-  }, [socket, failError]);
-
-  const getGroup = useCallback((groupId) => {
-    return new Promise((resolve) => {
-      socket.emit('get_group', { groupId }, (res) => {
-        if (!res?.success) failError(res);
-        else setError(null);
-        resolve(res);
-      });
-    });
-  }, [socket, failError]);
-
-  const inviteToGroup = useCallback((groupId, identifier) => {
-    return new Promise((resolve) => {
-      socket.emit('invite_to_group', { groupId, identifier }, (res) => {
-        if (!res?.success) failError(res);
-        else setError(null);
-        resolve(res);
-      });
-    });
-  }, [socket, failError]);
-
-  const listMyInvites = useCallback(() => {
-    return new Promise((resolve) => {
-      socket.emit('list_my_invites', {}, (res) => {
-        if (!res?.success) failError(res);
-        else setError(null);
-        resolve(res);
-      });
-    });
-  }, [socket, failError]);
-
-  const respondToInvite = useCallback((inviteId, accept) => {
-    return new Promise((resolve) => {
-      socket.emit('respond_to_invite', { inviteId, accept: !!accept }, (res) => {
-        if (!res?.success) failError(res);
-        else setError(null);
-        resolve(res);
-      });
-    });
-  }, [socket, failError]);
-
-  const revokeInvite = useCallback((inviteId) => {
-    return new Promise((resolve) => {
-      socket.emit('revoke_invite', { inviteId }, (res) => {
-        if (!res?.success) failError(res);
-        else setError(null);
-        resolve(res);
-      });
-    });
-  }, [socket, failError]);
-
-  const removeMember = useCallback((groupId, userId) => {
-    return new Promise((resolve) => {
-      socket.emit('remove_member', { groupId, userId }, (res) => {
-        if (!res?.success) failError(res);
-        else setError(null);
-        resolve(res);
-      });
-    });
-  }, [socket, failError]);
-
-  const transferHost = useCallback((groupId, newHostUserId) => {
-    return new Promise((resolve) => {
-      socket.emit('transfer_host', { groupId, newHostUserId }, (res) => {
-        if (!res?.success) failError(res);
-        else setError(null);
-        resolve(res);
-      });
-    });
-  }, [socket, failError]);
-
-  const deleteGroup = useCallback((groupId) => {
-    return new Promise((resolve) => {
-      socket.emit('delete_group', { groupId }, (res) => {
-        if (!res?.success) failError(res);
-        else setError(null);
-        resolve(res);
-      });
-    });
-  }, [socket, failError]);
-
-  const leaveGroup = useCallback((groupId) => {
-    return new Promise((resolve) => {
-      socket.emit('leave_group', { groupId }, (res) => {
-        if (!res?.success) failError(res);
-        else setError(null);
-        resolve(res);
-      });
-    });
-  }, [socket, failError]);
 
   const startGame = useCallback(() => {
     socket.emit('start_game', { roomCode }, (res) => {
@@ -799,17 +687,6 @@ export function useGame(getAccessToken, getGuestAuth, authIdentityKey = null) {
     // Actions
     createRoom,
     joinRoom,
-    createGroup,
-    listMyGroups,
-    getGroup,
-    inviteToGroup,
-    listMyInvites,
-    respondToInvite,
-    revokeInvite,
-    removeMember,
-    transferHost,
-    deleteGroup,
-    leaveGroup,
     startGame,
     nextTurn,
     resolveBluff,

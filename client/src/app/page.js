@@ -2,14 +2,11 @@
 
 import { Suspense } from 'react';
 import { useSearchParams } from 'next/navigation';
-import { useCallback, useState } from 'react';
 import { useAuth } from '../hooks/useAuth';
 import { useGame } from '../hooks/useGame';
 import { useVoice } from '../hooks/useVoice';
 import { AuthScreen } from '../components/AuthScreen';
 import { LandingScreen } from '../components/LandingScreen';
-import { GroupsScreen } from '../components/GroupsScreen';
-import { GroupDetailScreen } from '../components/GroupDetailScreen';
 import { HostUI } from '../components/HostUI';
 import { PlayerUI } from '../components/PlayerUI';
 import { OnlinePlayerUI } from '../components/OnlinePlayerUI';
@@ -20,11 +17,6 @@ import { ChatPanel } from '../components/ChatPanel';
 function HomeContent() {
   const searchParams = useSearchParams();
   const initialJoinCode = searchParams.get('join') || null;
-  const [homeView, setHomeView] = useState('landing');
-  const [groupsLoading, setGroupsLoading] = useState(false);
-  const [groupsList, setGroupsList] = useState([]);
-  const [groupInvites, setGroupInvites] = useState([]);
-  const [selectedGroup, setSelectedGroup] = useState(null);
 
   const {
     user, profile, loading, authError, setAuthError,
@@ -45,10 +37,6 @@ function HomeContent() {
     roomState, myPlayer, isMyTurn, currentPlayer,
     gameMode, error, connected, authenticated, notification,
     createRoom, joinRoom, startGame,
-    createGroup, listMyGroups, getGroup,
-    inviteToGroup, listMyInvites, respondToInvite,
-    revokeInvite, removeMember, transferHost,
-    deleteGroup, leaveGroup,
     nextTurn, resolveBluff,
     playCard, endTurn, playerSpin,
     declareRoundWin, callBluff,
@@ -72,118 +60,6 @@ function HomeContent() {
     lastStandSpin,
     lastStandEndTurn,
   } = game;
-
-  const refreshGroupsHome = useCallback(async () => {
-    setGroupsLoading(true);
-    const [groupsRes, invitesRes] = await Promise.all([
-      listMyGroups(),
-      listMyInvites(),
-    ]);
-    if (groupsRes?.success) setGroupsList(groupsRes.groups || []);
-    if (invitesRes?.success) setGroupInvites(invitesRes.invites || []);
-    setGroupsLoading(false);
-    return { groupsRes, invitesRes };
-  }, [listMyGroups, listMyInvites]);
-
-  const openGroupsHome = useCallback(async () => {
-    setError(null);
-    setSelectedGroup(null);
-    setHomeView('groups');
-    await refreshGroupsHome();
-  }, [refreshGroupsHome, setError]);
-
-  const openGroupDetail = useCallback(async (groupId) => {
-    setError(null);
-    setGroupsLoading(true);
-    const res = await getGroup(groupId);
-    if (res?.success) {
-      setSelectedGroup(res.group);
-      setHomeView('group');
-    }
-    setGroupsLoading(false);
-    return res;
-  }, [getGroup, setError]);
-
-  const handleCreateGroup = useCallback(async (name) => {
-    const res = await createGroup(name);
-    if (res?.success && res.group?.id) {
-      await refreshGroupsHome();
-      await openGroupDetail(res.group.id);
-    }
-    return res;
-  }, [createGroup, openGroupDetail, refreshGroupsHome]);
-
-  const handleRespondToInvite = useCallback(async (inviteId, accept) => {
-    const res = await respondToInvite(inviteId, accept);
-    if (res?.success) {
-      await refreshGroupsHome();
-    }
-    return res;
-  }, [refreshGroupsHome, respondToInvite]);
-
-  const handleInviteToGroup = useCallback(async (identifier) => {
-    if (!selectedGroup?.id) return { success: false, error: 'Group not found' };
-    const res = await inviteToGroup(selectedGroup.id, identifier);
-    if (res?.success) await openGroupDetail(selectedGroup.id);
-    return res;
-  }, [inviteToGroup, openGroupDetail, selectedGroup?.id]);
-
-  const handleTransferHost = useCallback(async (newHostUserId) => {
-    if (!selectedGroup?.id) return { success: false, error: 'Group not found' };
-    const res = await transferHost(selectedGroup.id, newHostUserId);
-    if (res?.success) {
-      await Promise.all([
-        refreshGroupsHome(),
-        openGroupDetail(selectedGroup.id),
-      ]);
-    }
-    return res;
-  }, [openGroupDetail, refreshGroupsHome, selectedGroup?.id, transferHost]);
-
-  const handleRemoveMember = useCallback(async (userId) => {
-    if (!selectedGroup?.id) return { success: false, error: 'Group not found' };
-    const res = await removeMember(selectedGroup.id, userId);
-    if (res?.success) {
-      await Promise.all([
-        refreshGroupsHome(),
-        openGroupDetail(selectedGroup.id),
-      ]);
-    }
-    return res;
-  }, [openGroupDetail, refreshGroupsHome, removeMember, selectedGroup?.id]);
-
-  const handleRevokeInvite = useCallback(async (inviteId) => {
-    const res = await revokeInvite(inviteId);
-    if (res?.success && selectedGroup?.id) {
-      await Promise.all([
-        refreshGroupsHome(),
-        openGroupDetail(selectedGroup.id),
-      ]);
-    }
-    return res;
-  }, [openGroupDetail, refreshGroupsHome, revokeInvite, selectedGroup?.id]);
-
-  const handleDeleteGroup = useCallback(async () => {
-    if (!selectedGroup?.id) return { success: false, error: 'Group not found' };
-    const res = await deleteGroup(selectedGroup.id);
-    if (res?.success) {
-      setSelectedGroup(null);
-      setHomeView('groups');
-      await refreshGroupsHome();
-    }
-    return res;
-  }, [deleteGroup, refreshGroupsHome, selectedGroup?.id]);
-
-  const handleLeaveGroup = useCallback(async () => {
-    if (!selectedGroup?.id) return { success: false, error: 'Group not found' };
-    const res = await leaveGroup(selectedGroup.id);
-    if (res?.success) {
-      setSelectedGroup(null);
-      setHomeView('groups');
-      await refreshGroupsHome();
-    }
-    return res;
-  }, [leaveGroup, refreshGroupsHome, selectedGroup?.id]);
 
   // Voice — auto-joins muted on room entry (issue #49). Mic stays
   // unpublished until first user-gesture toggle, so first-time visitors
@@ -248,56 +124,12 @@ function HomeContent() {
 
   // ─── Landing ────────────────────────────────────────────────
   if (!roomCode) {
-    if (homeView === 'groups' && !isGuest) {
-      return wrap(
-        <GroupsScreen
-          username={username}
-          groups={groupsList}
-          invites={groupInvites}
-          loading={groupsLoading}
-          error={error}
-          onBack={() => {
-            setSelectedGroup(null);
-            setError(null);
-            setHomeView('landing');
-          }}
-          onCreateGroup={handleCreateGroup}
-          onOpenGroup={openGroupDetail}
-          onRespondToInvite={handleRespondToInvite}
-        />
-      );
-    }
-
-    if (homeView === 'group' && selectedGroup && !isGuest) {
-      return wrap(
-        <GroupDetailScreen
-          group={selectedGroup}
-          currentUserId={user?.id}
-          loading={groupsLoading}
-          error={error}
-          onBack={async () => {
-            setError(null);
-            setHomeView('groups');
-            await refreshGroupsHome();
-          }}
-          onEnterRoom={() => joinRoom(selectedGroup.code)}
-          onInvite={handleInviteToGroup}
-          onTransferHost={handleTransferHost}
-          onRemoveMember={handleRemoveMember}
-          onDeleteGroup={handleDeleteGroup}
-          onLeaveGroup={handleLeaveGroup}
-          onRevokeInvite={handleRevokeInvite}
-        />
-      );
-    }
-
     return wrap(
       <LandingScreen
         username={username}
         isGuest={isGuest}
         onCreateRoom={createRoom}
         onJoinRoom={joinRoom}
-        onOpenGroups={openGroupsHome}
         onSignOut={signOut}
         onSignOutGuest={signOutGuest}
         onUpdateUsername={updateUsername}

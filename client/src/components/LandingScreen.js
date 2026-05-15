@@ -10,7 +10,6 @@ export function LandingScreen({
   isGuest = false,           // true when current identity is a guest (no Supabase user)
   onCreateRoom,
   onJoinRoom,
-  onOpenGroups,
   onSignOut,
   onSignOutGuest,            // optional — clears guest sessionStorage so AuthScreen
                              // can render again. Used by the "sign in to save" CTA.
@@ -227,36 +226,12 @@ export function LandingScreen({
             >
               🚪 Join Room (Player)
             </button>
-            {!isGuest && (
-              <button
-                style={{ padding: '16px', fontSize: 13, letterSpacing: '0.15em' }}
-                onClick={() => {
-                  setError(null);
-                  onOpenGroups?.();
-                }}
-                disabled={!connected}
-              >
-                My Groups
-              </button>
-            )}
             <button
               style={{ padding: '12px', fontSize: 12, letterSpacing: '0.1em', borderColor: 'var(--border)', color: 'var(--text-dim)' }}
               onClick={() => setShowHowToPlay(true)}
             >
               ? How to Play
             </button>
-            {isGuest && (
-              <div style={{
-                padding: '10px 12px',
-                borderRadius: 'var(--radius)',
-                border: '1px dashed var(--border)',
-                color: 'var(--text-dim)',
-                fontSize: 11,
-                lineHeight: 1.6,
-              }}>
-                Persistent groups need a signed-in account. Use the save-your-name sign-in button above to unlock them.
-              </div>
-            )}
           </div>
         )}
 
