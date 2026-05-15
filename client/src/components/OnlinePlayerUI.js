@@ -522,6 +522,34 @@ function PlayerChip({
   );
 }
 
+// ─── Order other players clockwise from the local seat ──────
+// Local user is at the bottom; clockwise around the table is
+// next-in-turn → … → previous-in-turn. Returns the `others` list
+// re-sorted so element 0 is the player who plays immediately after
+// the local user, and the last element is the player who plays
+// immediately before. Players that are present but missing from
+// `turnOrder` (spectators, eliminated mid-game) are appended at the
+// end in their original order. If turnOrder is missing/empty or the
+// local user isn't in it, returns `others` unchanged.
+export function orderClockwiseFromLocal(others, turnOrder, localId) {
+  const list = Array.isArray(others) ? others : [];
+  if (list.length === 0) return list;
+  if (!Array.isArray(turnOrder) || turnOrder.length === 0) return list;
+  const myIdx = turnOrder.indexOf(localId);
+  if (myIdx === -1) return list;
+
+  const byId = new Map(list.map(p => [p.id, p]));
+  const ordered = [];
+  const seen = new Set();
+  for (let i = 1; i < turnOrder.length; i++) {
+    const id = turnOrder[(myIdx + i) % turnOrder.length];
+    const p = byId.get(id);
+    if (p) { ordered.push(p); seen.add(id); }
+  }
+  for (const p of list) if (!seen.has(p.id)) ordered.push(p);
+  return ordered;
+}
+
 // ─── Distribute other players around the table ──────────────
 // Excludes the local player. Returns { top, left, right }.
 //
@@ -534,6 +562,19 @@ function PlayerChip({
 // When a side ends up with more than 6 players the chip strip wraps
 // into a second inner row — handled by `flexWrap: 'wrap'` in the
 // renderer, not here.
+//
+// Issue #82: `others` is expected to be clockwise-ordered from the
+// local seat (use `orderClockwiseFromLocal` upstream). Seats are
+// then filled clockwise starting at the right column nearest the
+// local user, across the top right-to-left, and down the left
+// column. The returned arrays match the JSX rendering order of each
+// container so that:
+//   - right column (flex column, top→bottom): chip closest to "you"
+//     ends up at the bottom (last in array)
+//   - top row (flex row, left→right): chip nearest to the right
+//     side ends up rightmost (last in array)
+//   - left column (flex column, top→bottom): chip closest to "you"
+//     ends up at the bottom (last in array)
 export function distributePlayers(others) {
   const list = Array.isArray(others) ? others : [];
   const n = list.length;
@@ -553,13 +594,26 @@ export function distributePlayers(others) {
   }
 
   const remaining = n - topCount;
-  const leftCount = Math.ceil(remaining / 2);
-  const rightCount = remaining - leftCount;
+  // Right side fills first (clockwise sweep starts there). For odd
+  // counts the extra goes to the right so the next-in-turn player
+  // is guaranteed a right-side seat.
+  const rightCount = Math.ceil(remaining / 2);
+  const leftCount = remaining - rightCount;
+
+  const rightSlice = list.slice(0, rightCount);
+  const topSlice = list.slice(rightCount, rightCount + topCount);
+  const leftSlice = list.slice(rightCount + topCount, rightCount + topCount + leftCount);
 
   return {
-    top: list.slice(0, topCount),
-    left: list.slice(topCount, topCount + leftCount),
-    right: list.slice(topCount + leftCount, topCount + leftCount + rightCount),
+    // Right column is read bottom→top in clockwise order (closest
+    // neighbour at the bottom). CSS renders top→bottom, so reverse.
+    right: rightSlice.slice().reverse(),
+    // Top row is read right→left in clockwise order (continuation
+    // from the right column). CSS renders left→right, so reverse.
+    top: topSlice.slice().reverse(),
+    // Left column is read top→bottom in clockwise order, matching
+    // CSS default — no reverse needed.
+    left: leftSlice,
   };
 }
 
@@ -847,7 +901,15 @@ export function OnlinePlayerUI({
   const spinTargetPlayer = players?.find(p => p.id === spinTargetId);
   const isSpinTarget = spinData?.spinTargetId === myPlayer.id;
   const currentPlayer = players?.find(p => p.id === currentPlayerId);
-  const otherPlayers = players?.filter(p => p.id !== myPlayer.id) || [];
+  // Sort "other players" clockwise from the local seat so the
+  // top-down layout reflects actual turn order (issue #82). Memoised
+  // so downstream `distributed`/`renderChip` memoisation (issue #61)
+  // stays valid across renders where neither players nor turnOrder
+  // change identity.
+  const otherPlayers = useMemo(() => {
+    const others = players?.filter(p => p.id !== myPlayer.id) || [];
+    return orderClockwiseFromLocal(others, turnOrder, myPlayer.id);
+  }, [players, turnOrder, myPlayer.id]);
   const alivePlayers = players?.filter(p => p.status === 'alive') || [];
 
   // Previous player in turn order (for "Call X's bluff" label)
