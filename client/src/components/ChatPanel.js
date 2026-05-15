@@ -44,6 +44,10 @@ export function ChatPanel({
   onClose,
   onSend,
   myUserId,
+  // Issue #102 — on mobile the chat trigger lives inside the
+  // MobileFabMenu sheet, so the floating 💬 button is suppressed.
+  // The slide-in panel itself still mounts when `open` is true.
+  hideTrigger = false,
 }) {
   const [draft, setDraft] = useState('');
   const listRef = useRef(null);
@@ -68,8 +72,9 @@ export function ChatPanel({
 
   return (
     <>
-      {/* Floating button */}
-      {!open && (
+      {/* Floating button — suppressed on mobile when the FAB sheet
+          owns the chat trigger (issue #102). */}
+      {!open && !hideTrigger && (
         <button
           type="button"
           onClick={onOpen}

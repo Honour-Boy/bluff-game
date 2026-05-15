@@ -15,6 +15,8 @@ import { LeaderboardPanel } from './LeaderboardPanel';
 import { PreGameSettingsPanel } from './PreGameSettingsPanel';
 import { LobbyConfigSummary } from './LobbyConfigSummary';
 import { RoleRevealOverlay, ROLE_META } from './RoleRevealOverlay';
+import { MobileFabMenu } from './MobileFabMenu';
+import { useIsMobile } from '../hooks/useIsMobile';
 import {
   useAnnouncementSpeech,
   loadSpeechEnabled,
@@ -696,7 +698,13 @@ export function OnlinePlayerUI({
   lastStandSpin,
   lastStandEndTurn,
   voice,
+  // Issue #102 — chat trigger lives in the mobile FAB sheet, so the
+  // panel needs to know how to open it. Defaults keep desktop callers
+  // (which still show ChatPanel's own floating button) compatible.
+  openChat,
+  chatUnread = 0,
 }) {
+  const isMobile = useIsMobile();
   const [showHowToPlay, setShowHowToPlay] = useState(false);
   const [selectedCardId, setSelectedCardId] = useState(null);
   const [pendingCard, setPendingCard] = useState(null);
@@ -1188,7 +1196,11 @@ export function OnlinePlayerUI({
           {isLobby && myPlayer && (
             <ShareButton roomCode={roomCode} senderName={myPlayer.username} />
           )}
-          {voice && <VoicePanel {...voice} />}
+          {/* Issue #102 — desktop keeps the inline VoicePanel here.
+              On mobile it would push the top-right alive/howto cluster
+              onto a new line on every join/leave, so the FAB sheet is
+              the only voice-control entry point on small screens. */}
+          {voice && !isMobile && <VoicePanel {...voice} />}
         </div>
         <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 5 }}>
           <span className={`tag ${isEliminated ? 'eliminated' : 'alive'}`}>
@@ -1619,66 +1631,88 @@ export function OnlinePlayerUI({
         </button>
       </div>
 
-      {/* ── Active config panel (#68): collapsible top-left badge ── */}
-      <ActiveConfigPanel config={roomState?.config} />
+      {/* ── Active config panel (#68): collapsible top-left badge.
+            Issue #102 — desktop only. On mobile the same data is
+            surfaced inside the FAB sheet (Settings section). ── */}
+      {!isMobile && <ActiveConfigPanel config={roomState?.config} />}
 
-      {/* ── Centralize button (fixed, bottom-left to avoid the chat 💬 at bottom-right) ── */}
-      <button
-        type="button"
-        onClick={scrollToCenter}
-        title="Centre on the table"
-        aria-label="Centre on the table"
-        style={{
-          position: 'fixed',
-          left: 16,
-          bottom: 'calc(env(safe-area-inset-bottom, 0px) + 16px)',
-          width: 44, height: 44,
-          borderRadius: '50%',
-          background: 'var(--surface2)',
-          border: '1px solid var(--accent)',
-          color: 'var(--accent)',
-          fontSize: 18,
-          display: 'flex', alignItems: 'center', justifyContent: 'center',
-          cursor: 'pointer',
-          boxShadow: '0 4px 14px rgba(0,0,0,0.45)',
-          zIndex: 7900,
-          WebkitTapHighlightColor: 'transparent',
-        }}
-      >
-        ↻
-      </button>
+      {/* ── Centralize button (fixed, bottom-left to avoid the chat 💬 at bottom-right).
+            Desktop only — mobile gets it inside the FAB sheet. ── */}
+      {!isMobile && (
+        <button
+          type="button"
+          onClick={scrollToCenter}
+          title="Centre on the table"
+          aria-label="Centre on the table"
+          style={{
+            position: 'fixed',
+            left: 16,
+            bottom: 'calc(env(safe-area-inset-bottom, 0px) + 16px)',
+            width: 44, height: 44,
+            borderRadius: '50%',
+            background: 'var(--surface2)',
+            border: '1px solid var(--accent)',
+            color: 'var(--accent)',
+            fontSize: 18,
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            cursor: 'pointer',
+            boxShadow: '0 4px 14px rgba(0,0,0,0.45)',
+            zIndex: 7900,
+            WebkitTapHighlightColor: 'transparent',
+          }}
+        >
+          ↻
+        </button>
+      )}
 
       {/* ── Speech toggle (fixed, bottom-right, stacked above chat 💬). The
             chat button is 56px tall + 16px from the bottom; we sit at
             ~84px above that so they don't overlap. Persists to
-            localStorage via toggleSpeech. ── */}
-      <button
-        type="button"
-        onClick={toggleSpeech}
-        title={speechEnabled ? 'Mute spoken announcements' : 'Unmute spoken announcements'}
-        aria-label={speechEnabled ? 'Mute spoken announcements' : 'Unmute spoken announcements'}
-        aria-pressed={speechEnabled}
-        style={{
-          position: 'fixed',
-          right: 'max(22px, env(safe-area-inset-right))',
-          // Sit above the 56px chat button (which is 16px from bottom).
-          // 16 + 56 + 12 gap = 84.
-          bottom: 'calc(env(safe-area-inset-bottom, 0px) + 84px)',
-          width: 44, height: 44,
-          borderRadius: '50%',
-          background: 'var(--surface2)',
-          border: `1px solid ${speechEnabled ? 'var(--accent)' : 'var(--border)'}`,
-          color: speechEnabled ? 'var(--accent)' : 'var(--text-dim)',
-          fontSize: 18,
-          display: 'flex', alignItems: 'center', justifyContent: 'center',
-          cursor: 'pointer',
-          boxShadow: '0 4px 14px rgba(0,0,0,0.45)',
-          zIndex: 7900,
-          WebkitTapHighlightColor: 'transparent',
-        }}
-      >
-        {speechEnabled ? '🔊' : '🔇'}
-      </button>
+            localStorage via toggleSpeech. Desktop only — mobile uses
+            the FAB sheet. ── */}
+      {!isMobile && (
+        <button
+          type="button"
+          onClick={toggleSpeech}
+          title={speechEnabled ? 'Mute spoken announcements' : 'Unmute spoken announcements'}
+          aria-label={speechEnabled ? 'Mute spoken announcements' : 'Unmute spoken announcements'}
+          aria-pressed={speechEnabled}
+          style={{
+            position: 'fixed',
+            right: 'max(22px, env(safe-area-inset-right))',
+            // Sit above the 56px chat button (which is 16px from bottom).
+            // 16 + 56 + 12 gap = 84.
+            bottom: 'calc(env(safe-area-inset-bottom, 0px) + 84px)',
+            width: 44, height: 44,
+            borderRadius: '50%',
+            background: 'var(--surface2)',
+            border: `1px solid ${speechEnabled ? 'var(--accent)' : 'var(--border)'}`,
+            color: speechEnabled ? 'var(--accent)' : 'var(--text-dim)',
+            fontSize: 18,
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            cursor: 'pointer',
+            boxShadow: '0 4px 14px rgba(0,0,0,0.45)',
+            zIndex: 7900,
+            WebkitTapHighlightColor: 'transparent',
+          }}
+        >
+          {speechEnabled ? '🔊' : '🔇'}
+        </button>
+      )}
+
+      {/* ── Issue #102 — single mobile FAB consolidating Centralize,
+            speech toggle, chat trigger, voice, and active settings. ── */}
+      {isMobile && (
+        <MobileFabMenu
+          config={roomState?.config}
+          voice={voice}
+          speechEnabled={speechEnabled}
+          onCentralize={scrollToCenter}
+          onToggleSpeech={toggleSpeech}
+          onOpenChat={openChat}
+          chatUnread={chatUnread}
+        />
+      )}
 
       {/* ── Spin overlay ── */}
       {spinData && (
