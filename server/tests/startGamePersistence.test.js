@@ -75,8 +75,13 @@ describe('start_game group settings persistence', () => {
         updatedAt: '2026-05-15T20:30:00.000Z',
       }),
     };
+    const leaderboardRepo = {
+      recordGameStart: vi.fn().mockResolvedValue({ participantCount: 2 }),
+      recordWinner: vi.fn(),
+      getLeaderboard: vi.fn(),
+    };
 
-    registerSocketHandlers(io, socket, { groupSettingsRepo });
+    registerSocketHandlers(io, socket, { groupSettingsRepo, leaderboardRepo });
     const startGame = socket.handlers.get('start_game');
     const cb = vi.fn();
 
@@ -116,8 +121,13 @@ describe('start_game group settings persistence', () => {
       getGroupSettings: vi.fn(),
       upsertGroupSettings: vi.fn(),
     };
+    const leaderboardRepo = {
+      recordGameStart: vi.fn(),
+      recordWinner: vi.fn(),
+      getLeaderboard: vi.fn(),
+    };
 
-    registerSocketHandlers(io, socket, { groupSettingsRepo });
+    registerSocketHandlers(io, socket, { groupSettingsRepo, leaderboardRepo });
     const startGame = socket.handlers.get('start_game');
     const cb = vi.fn();
 
@@ -142,9 +152,14 @@ describe('start_game group settings persistence', () => {
       getGroupSettings: vi.fn(),
       upsertGroupSettings: vi.fn().mockRejectedValue(new Error('db down')),
     };
+    const leaderboardRepo = {
+      recordGameStart: vi.fn().mockResolvedValue({ participantCount: 2 }),
+      recordWinner: vi.fn(),
+      getLeaderboard: vi.fn(),
+    };
     const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
 
-    registerSocketHandlers(io, socket, { groupSettingsRepo });
+    registerSocketHandlers(io, socket, { groupSettingsRepo, leaderboardRepo });
     const startGame = socket.handlers.get('start_game');
     const cb = vi.fn();
 

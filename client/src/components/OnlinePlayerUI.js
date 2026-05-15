@@ -11,6 +11,7 @@ import { VoicePanel, VoiceIndicator } from './VoicePanel';
 import { PowerCard, POWER_META, POWER_ICONS } from './PowerCard';
 import { AnnouncementBanner } from './AnnouncementBanner';
 import { ActiveConfigPanel } from './ActiveConfigPanel';
+import { LeaderboardPanel } from './LeaderboardPanel';
 import { PreGameSettingsPanel } from './PreGameSettingsPanel';
 import { LobbyConfigSummary } from './LobbyConfigSummary';
 import { RoleRevealOverlay, ROLE_META } from './RoleRevealOverlay';
@@ -680,6 +681,8 @@ export function OnlinePlayerUI({
   activatePowerCard,
   swapPick,
   updateRoomConfig,
+  getGroupLeaderboard,
+  leaderboardUpdateNonce = 0,
   medicDecide,
   saboteurTransfer,
   sniperRedirect,
@@ -1299,6 +1302,15 @@ export function OnlinePlayerUI({
                   </div>
                 </>
               )}
+
+              {roomState?.groupId && (
+                <LeaderboardPanel
+                  groupId={roomState.groupId}
+                  currentUserId={myPlayer?.id || null}
+                  getGroupLeaderboard={getGroupLeaderboard}
+                  leaderboardUpdateNonce={leaderboardUpdateNonce}
+                />
+              )}
             </div>
           )}
 
@@ -1403,6 +1415,18 @@ export function OnlinePlayerUI({
               ) : (
                 <div style={{ fontSize: 11, color: 'var(--text-dim)' }}>
                   Waiting for host to start a new game...
+                </div>
+              )}
+
+              {roomState?.groupId && (
+                <div style={{ marginTop: 16, textAlign: 'left' }}>
+                  <LeaderboardPanel
+                    groupId={roomState.groupId}
+                    currentUserId={myPlayer?.id || null}
+                    highlightUserId={lastAction?.winnerId || null}
+                    getGroupLeaderboard={getGroupLeaderboard}
+                    leaderboardUpdateNonce={leaderboardUpdateNonce}
+                  />
                 </div>
               )}
             </div>

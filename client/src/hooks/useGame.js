@@ -20,6 +20,7 @@ export function useGame(getAccessToken, getGuestAuth, authIdentityKey = null) {
   const [authenticated, setAuthenticated] = useState(false);
   // Shared spin-overlay dismiss signal
   const [spinDismissed, setSpinDismissed] = useState(false);
+  const [leaderboardUpdateNonce, setLeaderboardUpdateNonce] = useState(0);
 
   // Chat — local mirror of room.chatLog plus live-arrival messages.
   // We dedupe by id so room_state replays (on reconnect) don't double-add.
@@ -317,6 +318,9 @@ export function useGame(getAccessToken, getGuestAuth, authIdentityKey = null) {
       const id = `${evt.kind}:${evt.holderId || '?'}:${Date.now()}:${Math.random().toString(36).slice(2, 8)}`;
       setPowerEventQueue((q) => [...q, { id, ...evt }]);
     };
+    const onGroupLeaderboardUpdated = () => {
+      setLeaderboardUpdateNonce((n) => n + 1);
+    };
     const onHostDisconnecting = ({ countdown } = {}) => {
       notify(`Host disconnected. Game ends in ${countdown ?? 30}s if they don't return.`, 'error');
     };
@@ -353,6 +357,7 @@ export function useGame(getAccessToken, getGuestAuth, authIdentityKey = null) {
     socket.on('host_disconnecting', onHostDisconnecting);
     socket.on('game_ended', onGameEnded);
     socket.on('power_card_triggered', onPowerCardTriggered);
+    socket.on('group_leaderboard_updated', onGroupLeaderboardUpdated);
     socket.on('lobby_idle_warning', onLobbyIdleWarning);
     socket.on('lobby_idle_warning_cancelled', onLobbyIdleWarningCancelled);
     socket.on('lobby_auto_started', onLobbyAutoStarted);
@@ -367,6 +372,7 @@ export function useGame(getAccessToken, getGuestAuth, authIdentityKey = null) {
       socket.off('host_disconnecting', onHostDisconnecting);
       socket.off('game_ended', onGameEnded);
       socket.off('power_card_triggered', onPowerCardTriggered);
+      socket.off('group_leaderboard_updated', onGroupLeaderboardUpdated);
       socket.off('lobby_idle_warning', onLobbyIdleWarning);
       socket.off('lobby_idle_warning_cancelled', onLobbyIdleWarningCancelled);
       socket.off('lobby_auto_started', onLobbyAutoStarted);
@@ -523,6 +529,16 @@ export function useGame(getAccessToken, getGuestAuth, authIdentityKey = null) {
   const leaveGroup = useCallback((groupId) => {
     return new Promise((resolve) => {
       socket.emit('leave_group', { groupId }, (res) => {
+        if (!res?.success) failError(res);
+        else setError(null);
+        resolve(res);
+      });
+    });
+  }, [socket, failError]);
+
+  const getGroupLeaderboard = useCallback((groupId) => {
+    return new Promise((resolve) => {
+      socket.emit('get_group_leaderboard', { groupId }, (res) => {
         if (!res?.success) failError(res);
         else setError(null);
         resolve(res);
@@ -793,6 +809,7 @@ export function useGame(getAccessToken, getGuestAuth, authIdentityKey = null) {
     authenticated,
     notification,
     spinDismissed,
+    leaderboardUpdateNonce,
     chatMessages,
     chatUnread,
     chatOpen,
@@ -810,6 +827,7 @@ export function useGame(getAccessToken, getGuestAuth, authIdentityKey = null) {
     transferHost,
     deleteGroup,
     leaveGroup,
+    getGroupLeaderboard,
     startGame,
     nextTurn,
     resolveBluff,
