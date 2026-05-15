@@ -122,7 +122,7 @@ function FaceDownStack({ count, label, warning = false }) {
 // ─── Flat horizontal card hand ────────────────────────────────
 // Cards are left-aligned so the scroll area always starts at the first card.
 // No rotation/fan — eliminates left-side clipping on small screens.
-function CardHand({ hand, selectedCardId, onCardClick, interactive = true }) {
+export function CardHand({ hand, selectedCardId, onCardClick, interactive = true }) {
   const n = hand.length;
   if (n === 0) {
     return (
@@ -168,78 +168,120 @@ function CardHand({ hand, selectedCardId, onCardClick, interactive = true }) {
                 ? '0 0 8px rgba(232,255,74,0.3)'
                 : 'none';
 
-          const tooltip = isPower && powerMeta
+          const powerTooltip = isPower && powerMeta
             ? `${powerMeta.label} — ${powerMeta.flavor}`
             : undefined;
+
+          // Issue #64 — once a power card is activated/armed the
+          // backend sets `card.armed = true` on it (gameEngine.js,
+          // activatePowerCard). The card must persist in the hand
+          // until its trigger fires (e.g. Assassin waiting for a
+          // bluff call), but it should look + behave inert: half
+          // opacity on the card body, lock badge on top, no pointer
+          // events, no click handler. The lock badge is kept as a
+          // sibling outside the dimmed inner div so it stays vivid —
+          // child opacity multiplies with parent, so nesting the
+          // badge under the dimmed card would fade it too.
+          const isArmed = card.armed === true;
+          const cardInteractive = interactive && !isArmed;
 
           return (
             <div
               key={card.id}
-              onClick={() => interactive && onCardClick && onCardClick(card.id)}
-              title={tooltip}
+              onClick={() => cardInteractive && onCardClick && onCardClick(card.id)}
+              title={isArmed ? 'Activated — awaiting trigger' : powerTooltip}
               aria-label={isPower && powerMeta ? `Power card: ${powerMeta.label}` : undefined}
+              data-armed={isArmed ? 'true' : undefined}
               style={{
+                position: 'relative',
                 width: 58,
                 height: 82,
                 flexShrink: 0,
                 transform: isSelected ? 'translateY(-16px) scale(1.05)' : 'none',
                 zIndex: isSelected ? 100 : i + 1,
-                cursor: interactive ? 'pointer' : 'default',
+                cursor: cardInteractive ? 'pointer' : 'default',
+                pointerEvents: isArmed ? 'none' : 'auto',
                 transition: 'transform 0.15s ease',
-                background: isPower
-                  ? 'linear-gradient(160deg, #0d0d10 0%, #08080a 55%, #050507 100%)'
-                  : 'var(--surface2)',
-                border: `2px solid ${borderColor}`,
-                borderRadius: 8,
-                display: 'flex',
-                flexDirection: 'column',
-                alignItems: 'center',
-                justifyContent: 'center',
-                gap: 4,
-                boxShadow,
-                userSelect: 'none',
-                overflow: 'hidden',
               }}
             >
-              {isPower ? (
-                <>
-                  <svg
-                    viewBox="0 0 100 100"
-                    width={28}
-                    height={28}
-                    aria-hidden
-                    style={{ filter: `drop-shadow(0 0 4px ${powerColor}aa)` }}
-                  >
-                    {drawPowerIcon(powerColor)}
-                  </svg>
-                  <div style={{
-                    fontFamily: "'Bebas Neue', sans-serif",
-                    fontSize: 10,
-                    letterSpacing: '0.12em',
-                    color: powerColor,
-                    textTransform: 'uppercase',
-                    textShadow: `0 0 6px ${powerColor}aa`,
+              <div
+                style={{
+                  width: '100%',
+                  height: '100%',
+                  background: isPower
+                    ? 'linear-gradient(160deg, #0d0d10 0%, #08080a 55%, #050507 100%)'
+                    : 'var(--surface2)',
+                  border: `2px solid ${borderColor}`,
+                  borderRadius: 8,
+                  display: 'flex',
+                  flexDirection: 'column',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: 4,
+                  boxShadow,
+                  opacity: isArmed ? 0.5 : 1,
+                  transition: 'opacity 0.15s ease',
+                  userSelect: 'none',
+                  overflow: 'hidden',
+                }}
+              >
+                {isPower ? (
+                  <>
+                    <svg
+                      viewBox="0 0 100 100"
+                      width={28}
+                      height={28}
+                      aria-hidden
+                      style={{ filter: `drop-shadow(0 0 4px ${powerColor}aa)` }}
+                    >
+                      {drawPowerIcon(powerColor)}
+                    </svg>
+                    <div style={{
+                      fontFamily: "'Bebas Neue', sans-serif",
+                      fontSize: 10,
+                      letterSpacing: '0.12em',
+                      color: powerColor,
+                      textTransform: 'uppercase',
+                      textShadow: `0 0 6px ${powerColor}aa`,
+                      lineHeight: 1,
+                    }}>
+                      {powerMeta?.label ?? 'Power'}
+                    </div>
+                  </>
+                ) : (
+                  <>
+                    <ShapeIcon
+                      shape={card.shape}
+                      size={22}
+                      color={isWhot ? 'var(--accent)' : undefined}
+                    />
+                    <div style={{
+                      fontSize: 10,
+                      color: isWhot ? 'var(--accent)' : 'var(--text-dim)',
+                      fontWeight: 700,
+                      letterSpacing: '0.05em',
+                    }}>
+                      {isWhot ? 'WHOT' : card.number}
+                    </div>
+                  </>
+                )}
+              </div>
+              {isArmed && (
+                <span
+                  aria-label="Activated — awaiting trigger"
+                  role="img"
+                  style={{
+                    position: 'absolute',
+                    top: 2,
+                    right: 2,
+                    fontSize: 12,
                     lineHeight: 1,
-                  }}>
-                    {powerMeta?.label ?? 'Power'}
-                  </div>
-                </>
-              ) : (
-                <>
-                  <ShapeIcon
-                    shape={card.shape}
-                    size={22}
-                    color={isWhot ? 'var(--accent)' : undefined}
-                  />
-                  <div style={{
-                    fontSize: 10,
-                    color: isWhot ? 'var(--accent)' : 'var(--text-dim)',
-                    fontWeight: 700,
-                    letterSpacing: '0.05em',
-                  }}>
-                    {isWhot ? 'WHOT' : card.number}
-                  </div>
-                </>
+                    pointerEvents: 'none',
+                    filter: 'drop-shadow(0 1px 2px rgba(0,0,0,0.7))',
+                  }}
+                >
+                  🔒
+                </span>
               )}
             </div>
           );
