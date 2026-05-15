@@ -375,3 +375,66 @@ describe('useVoice — auto-join', () => {
     }
   });
 });
+
+// ─── Manual leave after auto-join (issue #78) ──────────────────
+describe('useVoice — manual leave with autoJoin', () => {
+  it('does NOT silently reconnect after the user manually leaves voice', async () => {
+    // Auto-join completes.
+    socketHolder.socket.emit.mockImplementationOnce((event, payload, cb) => {
+      cb({ success: true, token: 'lk-auto' });
+    });
+    const { result } = renderHook(() =>
+      useVoice({ roomCode: 'ROOM01', isAuthenticated: true, autoJoin: true }),
+    );
+    await waitFor(() => {
+      expect(result.current.status).toBe('connected');
+    });
+    const emitCallsBeforeLeave = socketHolder.socket.emit.mock.calls.length;
+
+    // Make any further token request explode so we'd notice an
+    // unintended reconnect attempt.
+    socketHolder.socket.emit.mockImplementation(() => {
+      throw new Error('auto-join should not refire after manual leave');
+    });
+
+    await act(async () => {
+      await result.current.disconnect();
+    });
+    expect(result.current.status).toBe('idle');
+
+    // Flush any deferred effects — the auto-join effect re-runs on
+    // status changing back to 'idle'. Before the fix it would call
+    // connect() again here, triggering the throwing emit above.
+    await act(async () => {});
+    expect(result.current.status).toBe('idle');
+    expect(socketHolder.socket.emit.mock.calls.length).toBe(emitCallsBeforeLeave);
+  });
+
+  it('reconnects when the user explicitly clicks Join Voice after leaving', async () => {
+    // Auto-join completes.
+    socketHolder.socket.emit.mockImplementationOnce((event, payload, cb) => {
+      cb({ success: true, token: 'lk-auto' });
+    });
+    const { result } = renderHook(() =>
+      useVoice({ roomCode: 'ROOM01', isAuthenticated: true, autoJoin: true }),
+    );
+    await waitFor(() => {
+      expect(result.current.status).toBe('connected');
+    });
+
+    await act(async () => {
+      await result.current.disconnect();
+    });
+    expect(result.current.status).toBe('idle');
+
+    // Explicit Join Voice click — should reconnect and clear the opt-out.
+    socketHolder.socket.emit.mockImplementationOnce((event, payload, cb) => {
+      cb({ success: true, token: 'lk-rejoin' });
+    });
+    await act(async () => {
+      await result.current.connect();
+    });
+    expect(result.current.status).toBe('connected');
+    expect(livekitMock.state.connectArgs.token).toBe('lk-rejoin');
+  });
+});
