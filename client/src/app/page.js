@@ -15,6 +15,7 @@ import { PlayerUI } from '../components/PlayerUI';
 import { OnlinePlayerUI } from '../components/OnlinePlayerUI';
 import { Notification } from '../components/Notification';
 import { ChatPanel } from '../components/ChatPanel';
+import { useIsMobile } from '../hooks/useIsMobile';
 
 // Inner component that safely calls useSearchParams inside a Suspense boundary
 function HomeContent() {
@@ -192,6 +193,11 @@ function HomeContent() {
   // down on roomCode change.
   const voice = useVoice({ roomCode, isAuthenticated: authenticated, autoJoin: true });
 
+  // Issue #102 — drives mobile-only consolidation: hide the
+  // ChatPanel floating trigger so the new MobileFabMenu owns the
+  // single entry point on small screens.
+  const isMobile = useIsMobile();
+
   // ─── Loading splash ────────────────────────────────────────
   if (loading) {
     return (
@@ -242,6 +248,7 @@ function HomeContent() {
           onClose={closeChat}
           onSend={sendChatMessage}
           myUserId={user?.id}
+          hideTrigger={isMobile}
         />
       )}
     </div>
@@ -347,6 +354,8 @@ function HomeContent() {
           lastStandSpin={lastStandSpin}
           lastStandEndTurn={lastStandEndTurn}
           voice={voice}
+          openChat={openChat}
+          chatUnread={chatUnread}
         />
       );
     }
@@ -402,6 +411,8 @@ function HomeContent() {
           lastStandSpin={lastStandSpin}
           lastStandEndTurn={lastStandEndTurn}
           voice={voice}
+          openChat={openChat}
+          chatUnread={chatUnread}
         />
       );
     }

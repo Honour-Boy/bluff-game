@@ -84,6 +84,65 @@ describe('VoicePanel', () => {
   });
 });
 
+describe('VoicePanel — layout invariant (issue #102)', () => {
+  // Voice toggling between idle/connecting/connected MUST NOT change
+  // the wrapper slot's footprint. Anything that changes the slot's
+  // width or display reflows the parent flex header and pushes the
+  // top-right info HUD onto a new line.
+  const widthOf = (el) => el?.style?.width;
+  const displayOf = (el) => el?.style?.display;
+
+  it('idle, connecting, and connected all share the same slot width and display', () => {
+    const cases = [
+      { props: { status: 'idle', muted: true, isConnected: false } },
+      { props: { status: 'connecting', muted: true, isConnected: false } },
+      { props: { status: 'connected', muted: false, isConnected: true } },
+      { props: { status: 'connected', muted: true, isConnected: true } },
+      { props: { status: 'error', error: 'Mic permission denied', muted: true, isConnected: false } },
+    ];
+
+    let baselineWidth = null;
+    let baselineDisplay = null;
+    for (const { props } of cases) {
+      const { unmount, getByTestId } = render(
+        <VoicePanel
+          {...props}
+          connect={() => {}}
+          disconnect={() => {}}
+          toggleMute={() => {}}
+        />,
+      );
+      const slot = getByTestId('voice-panel-slot');
+      const w = widthOf(slot);
+      const d = displayOf(slot);
+      expect(w).toBeTruthy();
+      expect(d).toBe('flex');
+      if (baselineWidth == null) {
+        baselineWidth = w;
+        baselineDisplay = d;
+      } else {
+        expect(w).toBe(baselineWidth);
+        expect(d).toBe(baselineDisplay);
+      }
+      unmount();
+    }
+  });
+
+  it('slot is flex-shrink: 0 so a wider parent never compresses it', () => {
+    const { getByTestId } = render(
+      <VoicePanel
+        status="connected"
+        muted={false}
+        isConnected
+        connect={() => {}}
+        disconnect={() => {}}
+        toggleMute={() => {}}
+      />,
+    );
+    expect(getByTestId('voice-panel-slot').style.flexShrink).toBe('0');
+  });
+});
+
 describe('VoiceIndicator', () => {
   it('renders nothing when voice is not connected', () => {
     const { container } = render(

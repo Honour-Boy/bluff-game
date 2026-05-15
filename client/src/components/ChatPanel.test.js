@@ -49,6 +49,19 @@ describe('ChatPanel — closed', () => {
     fireEvent.click(screen.getByRole('button', { name: /Open chat/i }));
     expect(onOpen).toHaveBeenCalledOnce();
   });
+
+  // Issue #102 — on mobile the FAB sheet owns the chat trigger, so
+  // the floating button must be suppressible while the slide-in panel
+  // can still mount when the parent opens it.
+  it('suppresses the floating button when hideTrigger is true', () => {
+    render(<ChatPanel {...baseProps} hideTrigger />);
+    expect(screen.queryByRole('button', { name: /Open chat/i })).toBeNull();
+  });
+
+  it('still renders the slide-in panel when hideTrigger is true and open is true', () => {
+    render(<ChatPanel {...baseProps} hideTrigger open />);
+    expect(screen.getByRole('dialog', { name: /Chat/i })).toBeInTheDocument();
+  });
 });
 
 describe('ChatPanel — open', () => {
