@@ -169,6 +169,16 @@ describe('useGame — room state + actions', () => {
     );
   });
 
+  it('joinRoom respects host membership returned by the server', async () => {
+    const { result } = renderHook(() => useGame(null));
+    socketHolder.socket.emit.mockImplementationOnce((event, payload, cb) => {
+      cb({ success: true, roomCode: 'GROUP1', playerId: 'p1', isHost: true });
+    });
+    act(() => result.current.joinRoom('group1'));
+    await waitFor(() => expect(result.current.roomCode).toBe('GROUP1'));
+    expect(result.current.isHost).toBe(true);
+  });
+
   it('room_state updates roomState and clears spinDismissed on spin_result', async () => {
     const { result } = renderHook(() => useGame(null));
     act(() => {
@@ -207,6 +217,54 @@ describe('useGame — room state + actions', () => {
     act(() => result.current.leaveGame());
     expect(result.current.roomCode).toBeNull();
     expect(sessionStorage.getItem('bluff_session')).toBeNull();
+  });
+});
+
+describe('useGame - groups', () => {
+  it('createGroup emits the expected payload and resolves the server response', async () => {
+    const { result } = renderHook(() => useGame(null));
+    socketHolder.socket.emit.mockImplementationOnce((event, payload, cb) => {
+      expect(event).toBe('create_group');
+      expect(payload).toEqual({ name: 'Friday Night' });
+      cb({ success: true, group: { id: 'g1', code: 'ABC234', name: 'Friday Night', role: 'host' } });
+    });
+
+    let response;
+    await act(async () => {
+      response = await result.current.createGroup('Friday Night');
+    });
+
+    expect(response).toEqual({
+      success: true,
+      group: { id: 'g1', code: 'ABC234', name: 'Friday Night', role: 'host' },
+    });
+  });
+
+  it('listMyInvites resolves invite rows from the socket callback', async () => {
+    const { result } = renderHook(() => useGame(null));
+    socketHolder.socket.emit.mockImplementationOnce((event, payload, cb) => {
+      expect(event).toBe('list_my_invites');
+      expect(payload).toEqual({});
+      cb({
+        success: true,
+        invites: [
+          {
+            id: 'i1',
+            group: { id: 'g1', name: 'Weekend Crew', code: 'QWERT2' },
+            invitedByUsername: 'HostUser',
+            createdAt: '2026-05-15T12:00:00.000Z',
+          },
+        ],
+      });
+    });
+
+    let response;
+    await act(async () => {
+      response = await result.current.listMyInvites();
+    });
+
+    expect(response?.invites).toHaveLength(1);
+    expect(response.invites[0].group.code).toBe('QWERT2');
   });
 });
 

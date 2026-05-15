@@ -7,6 +7,10 @@ const { createClient } = require('@supabase/supabase-js');
 const { AccessToken } = require('livekit-server-sdk');
 const engine = require('./gameEngine');
 const bluffPipeline = require('./bluffPipeline');
+const {
+  createGroupsRepo,
+  isPersistentUserId,
+} = require('./groupsRepo');
 
 // ─── Supabase admin client (server-side only) ─────────────────
 // Used to verify JWT tokens and look up profiles.
@@ -16,6 +20,7 @@ const supabase = createClient(
   process.env.SUPABASE_SERVICE_ROLE_KEY,
   { auth: { autoRefreshToken: false, persistSession: false } }
 );
+const defaultGroupsRepo = createGroupsRepo(supabase);
 
 // ─── Guest auth helpers ───────────────────────────────────────
 // Anonymous players can join with a typed display name. Their
@@ -98,6 +103,34 @@ async function saveRoom(room) {
   // therefore don't bump.
   room.lastActivityAt = Date.now();
   rooms.set(room.code, room);
+}
+
+function getGroupAuthError(socket) {
+  if (!socket.userId) return 'Not authenticated';
+  if (socket.isGuest || !isPersistentUserId(socket.userId)) {
+    return 'Groups require a signed-in account';
+  }
+  return null;
+}
+
+async function buildAdHocRoom(socket, mode, config, groupsRepo) {
+  for (let attempt = 0; attempt < 5; attempt++) {
+    const room = engine.createRoom(socket.id, mode, config || null);
+    const collision = await groupsRepo.getActiveGroupByCode(room.code);
+    if (!collision) return room;
+  }
+  throw new Error('Failed to create a unique room code');
+}
+
+function buildPersistentGroupRoom(group, hostSocketId = null) {
+  const room = engine.createRoom(hostSocketId, engine.MODES.ONLINE, null);
+  room.code = group.code;
+  room.groupId = group.id;
+  room.hostUserId = group.host_user_id;
+  room.hostSocketId = hostSocketId;
+  room.cardPlayedThisTurn = false;
+  room.bluffUsedThisTurn = false;
+  return room;
 }
 
 // ─── Broadcast helpers ────────────────────────────────────────
@@ -907,7 +940,8 @@ const hostDisconnectTimers = new Map();
 const playerDisconnectTimers = new Map();
 const dcKey = (code, playerId) => `${code}:${playerId}`;
 
-function registerSocketHandlers(io, socket) {
+function registerSocketHandlers(io, socket, deps = {}) {
+  const groupsRepo = deps.groupsRepo || defaultGroupsRepo;
   // Idempotent: runs once on first connection, no-ops thereafter.
   startInactivitySweep(io);
   startHostIdleSweep(io);
@@ -988,6 +1022,169 @@ function registerSocketHandlers(io, socket) {
     }
   });
 
+  // ─── Groups: persistent social rooms (FR1-P1) ───────────────
+  socket.on('create_group', async ({ name } = {}, callback) => {
+    try {
+      const authError = getGroupAuthError(socket);
+      if (authError) return callback?.({ success: false, error: authError });
+      const group = await groupsRepo.createGroup({
+        hostUserId: socket.userId,
+        name,
+      });
+      callback?.({ success: true, group });
+    } catch (err) {
+      callback?.({ success: false, error: err.message });
+    }
+  });
+
+  socket.on('list_my_groups', async (_payload = {}, callback) => {
+    try {
+      const authError = getGroupAuthError(socket);
+      if (authError) return callback?.({ success: false, error: authError });
+      const groups = await groupsRepo.listMyGroups({ userId: socket.userId });
+      callback?.({ success: true, groups });
+    } catch (err) {
+      callback?.({ success: false, error: err.message });
+    }
+  });
+
+  socket.on('get_group', async ({ groupId } = {}, callback) => {
+    try {
+      const authError = getGroupAuthError(socket);
+      if (authError) return callback?.({ success: false, error: authError });
+      const group = await groupsRepo.getGroup({
+        groupId,
+        userId: socket.userId,
+      });
+      callback?.({ success: true, group });
+    } catch (err) {
+      callback?.({ success: false, error: err.message });
+    }
+  });
+
+  socket.on('delete_group', async ({ groupId } = {}, callback) => {
+    try {
+      const authError = getGroupAuthError(socket);
+      if (authError) return callback?.({ success: false, error: authError });
+      await groupsRepo.deleteGroup({
+        groupId,
+        hostUserId: socket.userId,
+      });
+      callback?.({ success: true });
+    } catch (err) {
+      callback?.({ success: false, error: err.message });
+    }
+  });
+
+  socket.on('transfer_host', async ({ groupId, newHostUserId } = {}, callback) => {
+    try {
+      const authError = getGroupAuthError(socket);
+      if (authError) return callback?.({ success: false, error: authError });
+      await groupsRepo.transferHost({
+        groupId,
+        hostUserId: socket.userId,
+        newHostUserId,
+      });
+
+      for (const room of rooms.values()) {
+        if (room.groupId !== groupId) continue;
+        room.hostUserId = newHostUserId;
+        const nextHostPlayer = room.players.find((player) => player.id === newHostUserId);
+        room.hostSocketId = nextHostPlayer?.socketId || null;
+        await saveRoom(room);
+        await broadcastRoomState(io, room.code);
+      }
+
+      callback?.({ success: true });
+    } catch (err) {
+      callback?.({ success: false, error: err.message });
+    }
+  });
+
+  socket.on('invite_to_group', async ({ groupId, identifier } = {}, callback) => {
+    try {
+      const authError = getGroupAuthError(socket);
+      if (authError) return callback?.({ success: false, error: authError });
+      const invite = await groupsRepo.inviteToGroup({
+        groupId,
+        hostUserId: socket.userId,
+        identifier,
+      });
+      callback?.({ success: true, invite });
+    } catch (err) {
+      callback?.({ success: false, error: err.message });
+    }
+  });
+
+  socket.on('list_my_invites', async (_payload = {}, callback) => {
+    try {
+      const authError = getGroupAuthError(socket);
+      if (authError) return callback?.({ success: false, error: authError });
+      const invites = await groupsRepo.listMyInvites({ userId: socket.userId });
+      callback?.({ success: true, invites });
+    } catch (err) {
+      callback?.({ success: false, error: err.message });
+    }
+  });
+
+  socket.on('respond_to_invite', async ({ inviteId, accept } = {}, callback) => {
+    try {
+      const authError = getGroupAuthError(socket);
+      if (authError) return callback?.({ success: false, error: authError });
+      const result = await groupsRepo.respondToInvite({
+        inviteId,
+        inviteeUserId: socket.userId,
+        accept: !!accept,
+      });
+      callback?.(result);
+    } catch (err) {
+      callback?.({ success: false, error: err.message });
+    }
+  });
+
+  socket.on('revoke_invite', async ({ inviteId } = {}, callback) => {
+    try {
+      const authError = getGroupAuthError(socket);
+      if (authError) return callback?.({ success: false, error: authError });
+      await groupsRepo.revokeInvite({
+        inviteId,
+        hostUserId: socket.userId,
+      });
+      callback?.({ success: true });
+    } catch (err) {
+      callback?.({ success: false, error: err.message });
+    }
+  });
+
+  socket.on('remove_member', async ({ groupId, userId } = {}, callback) => {
+    try {
+      const authError = getGroupAuthError(socket);
+      if (authError) return callback?.({ success: false, error: authError });
+      await groupsRepo.removeMember({
+        groupId,
+        hostUserId: socket.userId,
+        userId,
+      });
+      callback?.({ success: true });
+    } catch (err) {
+      callback?.({ success: false, error: err.message });
+    }
+  });
+
+  socket.on('leave_group', async ({ groupId } = {}, callback) => {
+    try {
+      const authError = getGroupAuthError(socket);
+      if (authError) return callback?.({ success: false, error: authError });
+      await groupsRepo.leaveGroup({
+        groupId,
+        userId: socket.userId,
+      });
+      callback?.({ success: true });
+    } catch (err) {
+      callback?.({ success: false, error: err.message });
+    }
+  });
+
   // ─── HOST: Create a new room ─────────────────────────────
   socket.on('create_room', async ({ mode, config } = {}, callback) => {
     if (!socket.userId) return callback({ success: false, error: 'Not authenticated' });
@@ -995,7 +1192,7 @@ function registerSocketHandlers(io, socket) {
     try {
       const roomMode = mode === engine.MODES.ONLINE ? engine.MODES.ONLINE : engine.MODES.PHYSICAL;
       // engine.createRoom normalises the config; safe defaults when omitted.
-      const room = engine.createRoom(socket.id, roomMode, config || null);
+      const room = await buildAdHocRoom(socket, roomMode, config, groupsRepo);
       room.hostUserId = socket.userId;
       room.cardPlayedThisTurn = false;
       room.bluffUsedThisTurn = false;
@@ -1026,13 +1223,38 @@ function registerSocketHandlers(io, socket) {
 
     try {
       const code = roomCode?.toUpperCase();
-      const room = await getRoom(code);
-      if (!room) return callback({ success: false, error: 'Room not found' });
+      if (!code) return callback({ success: false, error: 'Room not found' });
+
+      let room = await getRoom(code);
+      const group = await groupsRepo.getActiveGroupByCode(code);
+
+      if (group) {
+        if (!room) {
+          const hostSocketId = group.host_user_id === socket.userId ? socket.id : null;
+          room = buildPersistentGroupRoom(group, hostSocketId);
+          await saveRoom(room);
+        }
+        room.groupId = group.id;
+        room.hostUserId = group.host_user_id;
+        if (group.host_user_id === socket.userId) {
+          room.hostSocketId = socket.id;
+        }
+
+        const allowed = await groupsRepo.isGroupMember(group.id, socket.userId);
+        if (!allowed) {
+          return callback({ success: false, error: 'not_a_group_member' });
+        }
+      } else if (!room) {
+        return callback({ success: false, error: 'Room not found' });
+      }
+
       if (room.phase !== 'lobby') return callback({ success: false, error: 'Game already started' });
-      if (room.players.length >= engine.MAX_PLAYERS) return callback({ success: false, error: 'Room is full' });
 
       // Reconnect if already in room
       let player = room.players.find(p => p.id === socket.userId);
+      if (!player && room.players.length >= engine.MAX_PLAYERS) {
+        return callback({ success: false, error: 'Room is full' });
+      }
       if (player) {
         engine.reconnectPlayer(room, player.id, socket.id);
         console.log(`[Room ${code}] Reconnected: ${player.username}`);
@@ -1051,7 +1273,13 @@ function registerSocketHandlers(io, socket) {
 
       await saveRoom(room);
       socket.join(code);
-      callback({ success: true, playerId: player.id, roomCode: code, mode: room.mode });
+      callback({
+        success: true,
+        playerId: player.id,
+        roomCode: code,
+        mode: room.mode,
+        isHost: room.hostUserId === socket.userId,
+      });
       await broadcastRoomState(io, code);
     } catch (err) {
       callback({ success: false, error: err.message });
