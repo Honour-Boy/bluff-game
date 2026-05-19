@@ -1,0 +1,166 @@
+// ============================================================
+// HANDLERS — Role abilities (v2 Phase D)
+// ============================================================
+// Covers: medic_decide, saboteur_transfer, sniper_redirect.
+
+const engine = require('../gameEngine');
+const { getRoom, saveRoom } = require('../lib/state');
+const { broadcastRoomState } = require('../lib/broadcast');
+const { maybeRecordGroupWinner } = require('../lib/roomBuilders');
+const { applyBluffOutcome, _maybeOpenBetting } = require('../lib/orchestration');
+
+function register(io, socket, deps) {
+  const { leaderboardRepo } = deps;
+
+  // ─── PLAYER: Medic decision ─────────────────────────────
+  // While room.phase === 'medic_pending', the Medic chooses save or
+  // decline. On save: revert the elimination + 2 cards to Medic.
+  // On decline: replay the deferred finalisation closure.
+  socket.on('medic_decide', async ({ roomCode, save } = {}, callback) => {
+    try {
+      if (!socket.userId) return callback?.({ success: false, error: 'Not authenticated' });
+
+      const code = roomCode?.toUpperCase();
+      const room = await getRoom(code);
+      if (!room) return callback?.({ success: false, error: 'Room not found' });
+      if (room.mode !== engine.MODES.ONLINE) return callback?.({ success: false, error: 'Online mode only' });
+      if (room.phase !== 'medic_pending') return callback?.({ success: false, error: 'No Medic save pending' });
+
+      const pending = room.pendingMedicSave;
+      if (!pending) return callback?.({ success: false, error: 'Lost Medic context' });
+      if (pending.medicId !== socket.userId) return callback?.({ success: false, error: 'Not the Medic' });
+
+      if (save) {
+        const res = engine.applyMedicSave(room, pending.eliminatedPlayerId, pending.source);
+        if (!res.ok) {
+          // e.g. 6+ cards now — finalise instead.
+          if (typeof pending.finaliseFn === 'function') pending.finaliseFn();
+          room.pendingMedicSave = null;
+          if (room.phase === 'medic_pending') room.phase = 'playing';
+          await maybeRecordGroupWinner(io, room, leaderboardRepo);
+          await saveRoom(room);
+          await broadcastRoomState(io, code);
+          return callback?.({ success: false, error: res.error });
+        }
+
+        // Medic save banner — public.
+        io.to(code).emit('power_card_triggered', {
+          kind: 'medic_save',
+          holderId: res.medicId,
+          revivedPlayerId: res.revivedPlayerId,
+          revivedPlayerName: pending.eliminatedPlayerName,
+        });
+
+        room.lastAction = {
+          type: 'medic_save',
+          revivedPlayerId: res.revivedPlayerId,
+          revivedPlayerName: pending.eliminatedPlayerName,
+        };
+        room.pendingMedicSave = null;
+        room.phase = 'playing';
+        await saveRoom(room);
+        await broadcastRoomState(io, code);
+        return callback?.({ success: true, saved: true, dealt: res.dealt.length });
+      }
+
+      // Decline → run the deferred finalisation closure.
+      if (typeof pending.finaliseFn === 'function') pending.finaliseFn();
+      room.pendingMedicSave = null;
+      if (room.phase === 'medic_pending') room.phase = 'playing';
+      await maybeRecordGroupWinner(io, room, leaderboardRepo);
+      await saveRoom(room);
+      await broadcastRoomState(io, code);
+      callback?.({ success: true, saved: false });
+    } catch (err) {
+      console.error('[medic_decide]', err);
+      callback?.({ success: false, error: err.message });
+    }
+  });
+
+  // ─── PLAYER: Saboteur transfer ──────────────────────────
+  // Once-per-game silent move of one random card from the holder's
+  // hand into the target's. No banner — only handSize updates.
+  socket.on('saboteur_transfer', async ({ roomCode, targetPlayerId } = {}, callback) => {
+    try {
+      if (!socket.userId) return callback?.({ success: false, error: 'Not authenticated' });
+
+      const code = roomCode?.toUpperCase();
+      const room = await getRoom(code);
+      if (!room) return callback?.({ success: false, error: 'Room not found' });
+      if (room.mode !== engine.MODES.ONLINE) return callback?.({ success: false, error: 'Online mode only' });
+      if (!['playing', 'spin_pending', 'bluff_resolution'].includes(room.phase)) {
+        return callback?.({ success: false, error: `Cannot use ability in phase ${room.phase}` });
+      }
+
+      const res = engine.applySaboteurTransfer(room, socket.userId, targetPlayerId);
+      if (!res.ok) return callback?.({ success: false, error: res.error });
+
+      await saveRoom(room);
+      await broadcastRoomState(io, code);
+      callback?.({ success: true });
+    } catch (err) {
+      console.error('[saboteur_transfer]', err);
+      callback?.({ success: false, error: err.message });
+    }
+  });
+
+  // ─── PLAYER: Sniper redirect ────────────────────────────
+  // Resumes a paused bluff resolution where the spin target was about
+  // to be locked in. Sniper picks a new alive target (not self, not
+  // Mirror holder) — or passes by sending newTargetId=null.
+  socket.on('sniper_redirect', async ({ roomCode, newTargetId } = {}, callback) => {
+    try {
+      if (!socket.userId) return callback?.({ success: false, error: 'Not authenticated' });
+
+      const code = roomCode?.toUpperCase();
+      const room = await getRoom(code);
+      if (!room) return callback?.({ success: false, error: 'Room not found' });
+      if (room.mode !== engine.MODES.ONLINE) return callback?.({ success: false, error: 'Online mode only' });
+      if (room.phase !== 'sniper_pending') return callback?.({ success: false, error: 'No Sniper redirect pending' });
+
+      const pending = room.pendingSniperRedirect;
+      if (!pending) return callback?.({ success: false, error: 'Lost Sniper context' });
+      if (pending.sniperId !== socket.userId) return callback?.({ success: false, error: 'Not the Sniper' });
+
+      const outcome = pending.deferredOutcome;
+      let banner = null;
+
+      if (newTargetId) {
+        if (!pending.eligibleTargetIds.includes(newTargetId)) {
+          return callback?.({ success: false, error: 'Target not eligible' });
+        }
+        const res = engine.applySniperRedirect(room, socket.userId, newTargetId);
+        if (!res.ok) return callback?.({ success: false, error: res.error });
+
+        outcome.spinTargetId = res.newSpinTargetId;
+        const newTarget = room.players.find(p => p.id === res.newSpinTargetId);
+        const oldTarget = room.players.find(p => p.id === pending.originalSpinTargetId);
+        banner = {
+          kind: 'sniper_redirect',
+          holderId: socket.userId,
+          fromId: oldTarget?.id || null,
+          fromName: oldTarget?.username || null,
+          toId: newTarget?.id || null,
+          toName: newTarget?.username || null,
+        };
+      }
+
+      room.pendingSniperRedirect = null;
+      applyBluffOutcome(room, outcome);
+
+      if (room.phase === 'spin_pending') {
+        _maybeOpenBetting(io, room);
+      }
+
+      await saveRoom(room);
+      if (banner) io.to(code).emit('power_card_triggered', banner);
+      await broadcastRoomState(io, code);
+      callback?.({ success: true, redirected: !!newTargetId });
+    } catch (err) {
+      console.error('[sniper_redirect]', err);
+      callback?.({ success: false, error: err.message });
+    }
+  });
+}
+
+module.exports = { register };
