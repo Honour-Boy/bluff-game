@@ -100,7 +100,7 @@ export function GroupDetailScreen({
 
   return (
     <div
-      className="fade-in"
+      className="fade-in group-detail"
       style={{
         width: '100%',
         maxWidth: 980,
@@ -110,12 +110,16 @@ export function GroupDetailScreen({
         gap: 18,
       }}
     >
-      <div style={{ display: 'flex', justifyContent: 'space-between', gap: 16, flexWrap: 'wrap' }}>
-        <div>
+      <div
+        className="group-detail__header"
+        style={{ display: 'flex', justifyContent: 'space-between', gap: 16, flexWrap: 'wrap' }}
+      >
+        <div className="group-detail__header-text">
           <div style={{ fontSize: 11, color: 'var(--text-dim)', letterSpacing: '0.18em', marginBottom: 8 }}>
             GROUP DETAIL
           </div>
           <h1
+            className="group-detail__title"
             style={{
               margin: 0,
               fontFamily: "'Bebas Neue', sans-serif",
@@ -123,6 +127,7 @@ export function GroupDetailScreen({
               letterSpacing: '0.08em',
               color: 'var(--accent)',
               lineHeight: 0.92,
+              overflowWrap: 'anywhere',
             }}
           >
             {group.name}
@@ -131,7 +136,10 @@ export function GroupDetailScreen({
             Permanent code {group.code}. {isHost ? 'You manage access for this room.' : 'You can enter the room whenever the group is gathering.'}
           </div>
         </div>
-        <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', alignItems: 'flex-start' }}>
+        <div
+          className="group-detail__header-actions"
+          style={{ display: 'flex', gap: 10, flexWrap: 'wrap', alignItems: 'flex-start' }}
+        >
           <button type="button" onClick={onBack}>
             Back to Groups
           </button>
@@ -157,13 +165,14 @@ export function GroupDetailScreen({
       )}
 
       <div
+        className="group-detail__grid"
         style={{
           display: 'grid',
           gridTemplateColumns: 'minmax(0, 1.45fr) minmax(300px, 0.9fr)',
           gap: 18,
         }}
       >
-        <section style={panelStyle}>
+        <section className="group-detail__panel" style={panelStyle}>
           <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, alignItems: 'center', marginBottom: 14 }}>
             <div>
               <div style={{ fontSize: 11, color: 'var(--text-dim)', letterSpacing: '0.14em' }}>MEMBERS</div>
@@ -188,7 +197,10 @@ export function GroupDetailScreen({
                     background: 'rgba(255, 255, 255, 0.03)',
                   }}
                 >
-                  <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap' }}>
+                  <div
+                    className="group-detail__member-row"
+                    style={{ display: 'flex', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap' }}
+                  >
                     <div>
                       <div
                         style={{
@@ -207,7 +219,10 @@ export function GroupDetailScreen({
                     </div>
 
                     {isHost && !isMe && (
-                      <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
+                      <div
+                        className="group-detail__member-actions"
+                        style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}
+                      >
                         {!isMemberHost && (
                           <button
                             type="button"
@@ -236,16 +251,18 @@ export function GroupDetailScreen({
         </section>
 
         <div style={{ display: 'flex', flexDirection: 'column', gap: 18 }}>
-          <section style={panelStyle}>
+          <section className="group-detail__panel" style={panelStyle}>
             <div style={{ fontSize: 11, color: 'var(--text-dim)', letterSpacing: '0.14em', marginBottom: 12 }}>
               ROOM CODE
             </div>
             <div
+              className="group-detail__room-code"
               style={{
                 fontFamily: "'Bebas Neue', sans-serif",
                 fontSize: 42,
                 letterSpacing: '0.18em',
                 color: 'var(--text)',
+                overflowWrap: 'anywhere',
               }}
             >
               {group.code}
@@ -259,7 +276,7 @@ export function GroupDetailScreen({
           </section>
 
           {isHost && (
-            <section style={panelStyle}>
+            <section className="group-detail__panel" style={panelStyle}>
               <div style={{ fontSize: 11, color: 'var(--text-dim)', letterSpacing: '0.14em', marginBottom: 12 }}>
                 INVITE MEMBER
               </div>
@@ -282,7 +299,7 @@ export function GroupDetailScreen({
           )}
 
           {isHost && (
-            <section style={panelStyle}>
+            <section className="group-detail__panel" style={panelStyle}>
               <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, alignItems: 'center', marginBottom: 12 }}>
                 <div style={{ fontSize: 11, color: 'var(--text-dim)', letterSpacing: '0.14em' }}>PENDING INVITES</div>
                 <div style={{ fontSize: 11, color: 'var(--text-dim)' }}>{group.pendingInvites?.length || 0}</div>
@@ -341,7 +358,7 @@ export function GroupDetailScreen({
             </section>
           )}
 
-          <section style={panelStyle}>
+          <section className="group-detail__panel" style={panelStyle}>
             <div style={{ fontSize: 11, color: 'var(--text-dim)', letterSpacing: '0.14em', marginBottom: 12 }}>
               DANGER ZONE
             </div>
@@ -350,7 +367,12 @@ export function GroupDetailScreen({
                 <div style={{ fontSize: 12, color: 'var(--text-dim)', lineHeight: 1.6 }}>
                   Deleting the group removes access to this permanent room code for everyone. The code becomes reusable after deletion.
                 </div>
-                <button type="button" onClick={handleDeleteGroup} disabled={busyAction === 'delete'}>
+                <button
+                  type="button"
+                  onClick={handleDeleteGroup}
+                  disabled={busyAction === 'delete'}
+                  className="group-detail__danger-btn"
+                >
                   {busyAction === 'delete' ? 'Deleting...' : 'Delete Group'}
                 </button>
               </div>
@@ -359,7 +381,12 @@ export function GroupDetailScreen({
                 <div style={{ fontSize: 12, color: 'var(--text-dim)', lineHeight: 1.6 }}>
                   Leaving removes your membership. You can be invited back later if needed.
                 </div>
-                <button type="button" onClick={handleLeaveGroup} disabled={busyAction === 'leave'}>
+                <button
+                  type="button"
+                  onClick={handleLeaveGroup}
+                  disabled={busyAction === 'leave'}
+                  className="group-detail__danger-btn"
+                >
                   {busyAction === 'leave' ? 'Leaving...' : 'Leave Group'}
                 </button>
               </div>
@@ -367,6 +394,47 @@ export function GroupDetailScreen({
           </section>
         </div>
       </div>
+
+      <style>{`
+        @media (max-width: 640px) {
+          .group-detail__header {
+            flex-direction: column !important;
+            align-items: stretch !important;
+          }
+          .group-detail__header-actions {
+            width: 100% !important;
+          }
+          .group-detail__header-actions button {
+            flex: 1 1 auto !important;
+          }
+          .group-detail__title {
+            font-size: clamp(32px, 11vw, 52px) !important;
+          }
+          .group-detail__grid {
+            grid-template-columns: 1fr !important;
+          }
+          .group-detail__panel {
+            padding: 12px !important;
+          }
+          .group-detail__room-code {
+            font-size: clamp(28px, 9vw, 42px) !important;
+            letter-spacing: 0.12em !important;
+          }
+          .group-detail__member-row {
+            flex-direction: column !important;
+            align-items: stretch !important;
+          }
+          .group-detail__member-actions {
+            width: 100% !important;
+          }
+          .group-detail__member-actions button {
+            flex: 1 1 auto !important;
+          }
+          .group-detail__danger-btn {
+            width: 100% !important;
+          }
+        }
+      `}</style>
     </div>
   );
 }

@@ -56,7 +56,7 @@ export function GroupsScreen({
 
   return (
     <div
-      className="fade-in"
+      className="fade-in groups-screen"
       style={{
         width: '100%',
         maxWidth: 960,
@@ -66,12 +66,16 @@ export function GroupsScreen({
         gap: 18,
       }}
     >
-      <div style={{ display: 'flex', justifyContent: 'space-between', gap: 16, flexWrap: 'wrap' }}>
+      <div
+        className="groups-screen__header"
+        style={{ display: 'flex', justifyContent: 'space-between', gap: 16, flexWrap: 'wrap' }}
+      >
         <div>
           <div style={{ fontSize: 11, color: 'var(--text-dim)', letterSpacing: '0.18em', marginBottom: 8 }}>
             PERSISTENT GROUPS
           </div>
           <h1
+            className="groups-screen__title"
             style={{
               margin: 0,
               fontFamily: "'Bebas Neue', sans-serif",
@@ -87,11 +91,19 @@ export function GroupsScreen({
             Reusable room codes live here. Create a group, manage invitations, and reopen the same room whenever your crew is ready.
           </div>
         </div>
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 10, alignItems: 'flex-end' }}>
+        <div
+          className="groups-screen__header-actions"
+          style={{ display: 'flex', flexDirection: 'column', gap: 10, alignItems: 'flex-end' }}
+        >
           <div style={{ fontSize: 12, color: 'var(--text-dim)' }}>
             Signed in as <strong style={{ color: 'var(--text)' }}>{username}</strong>
           </div>
-          <button type="button" onClick={onBack} style={{ minWidth: 140 }}>
+          <button
+            type="button"
+            onClick={onBack}
+            className="groups-screen__back-btn"
+            style={{ minWidth: 140 }}
+          >
             Back to Home
           </button>
         </div>
@@ -113,13 +125,14 @@ export function GroupsScreen({
       )}
 
       <div
+        className="groups-screen__grid"
         style={{
           display: 'grid',
           gridTemplateColumns: 'minmax(0, 1.45fr) minmax(320px, 1fr)',
           gap: 18,
         }}
       >
-        <section style={panelStyle}>
+        <section className="groups-screen__panel" style={panelStyle}>
           <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, alignItems: 'center', marginBottom: 14 }}>
             <div>
               <div style={{ fontSize: 11, color: 'var(--text-dim)', letterSpacing: '0.14em' }}>GROUPS</div>
@@ -198,7 +211,7 @@ export function GroupsScreen({
         </section>
 
         <div style={{ display: 'flex', flexDirection: 'column', gap: 18 }}>
-          <section style={panelStyle}>
+          <section className="groups-screen__panel" style={panelStyle}>
             <div style={{ fontSize: 11, color: 'var(--text-dim)', letterSpacing: '0.14em', marginBottom: 12 }}>
               CREATE GROUP
             </div>
@@ -220,7 +233,7 @@ export function GroupsScreen({
             </form>
           </section>
 
-          <section style={panelStyle}>
+          <section className="groups-screen__panel" style={panelStyle}>
             <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, alignItems: 'center', marginBottom: 12 }}>
               <div style={{ fontSize: 11, color: 'var(--text-dim)', letterSpacing: '0.14em' }}>PENDING INVITES</div>
               <div style={{ fontSize: 11, color: 'var(--text-dim)' }}>{invites?.length || 0}</div>
@@ -290,6 +303,34 @@ export function GroupsScreen({
           </section>
         </div>
       </div>
+
+      <style>{`
+        @media (max-width: 640px) {
+          .groups-screen__header {
+            flex-direction: column !important;
+            align-items: stretch !important;
+          }
+          .groups-screen__header-actions {
+            align-items: flex-start !important;
+            flex-direction: row !important;
+            justify-content: space-between !important;
+            width: 100% !important;
+            flex-wrap: wrap !important;
+          }
+          .groups-screen__title {
+            font-size: clamp(32px, 11vw, 48px) !important;
+          }
+          .groups-screen__back-btn {
+            min-width: 0 !important;
+          }
+          .groups-screen__grid {
+            grid-template-columns: 1fr !important;
+          }
+          .groups-screen__panel {
+            padding: 12px !important;
+          }
+        }
+      `}</style>
     </div>
   );
 }
