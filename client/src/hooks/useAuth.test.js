@@ -216,6 +216,52 @@ describe('useAuth', () => {
     expect(token).toBeNull();
   });
 
+  // ─── Issue #106 — profile cache ─────────────────────────────
+  it('does not re-fetch the profile when TOKEN_REFRESHED fires for the same user', async () => {
+    supabaseMock.auth.getSession.mockResolvedValueOnce({
+      data: { session: { user: { id: 'u1', email: 'x@y.com' } } },
+    });
+    supabaseMock.fromBuilder.single.mockResolvedValue({
+      data: { id: 'u1', username: 'chris' },
+      error: null,
+    });
+
+    const { result } = renderHook(() => useAuth());
+    await waitFor(() => expect(result.current.username).toBe('chris'));
+    // Bootstrap loadProfile counts as one `from('profiles')` call.
+    const callsAfterBootstrap = supabaseMock.from.mock.calls.length;
+    expect(callsAfterBootstrap).toBeGreaterThanOrEqual(1);
+
+    // Fire TOKEN_REFRESHED for the same user — should be a no-op.
+    const stateChangeListener = supabaseMock.auth.onAuthStateChange.mock.calls[0][0];
+    await act(async () => {
+      stateChangeListener('TOKEN_REFRESHED', { user: { id: 'u1', email: 'x@y.com' } });
+    });
+
+    expect(supabaseMock.from.mock.calls.length).toBe(callsAfterBootstrap);
+    expect(result.current.username).toBe('chris');
+  });
+
+  it('re-fetches the profile when a different user signs in', async () => {
+    supabaseMock.auth.getSession.mockResolvedValueOnce({
+      data: { session: { user: { id: 'u1' } } },
+    });
+    supabaseMock.fromBuilder.single
+      .mockResolvedValueOnce({ data: { id: 'u1', username: 'one' }, error: null })
+      .mockResolvedValueOnce({ data: { id: 'u2', username: 'two' }, error: null });
+
+    const { result } = renderHook(() => useAuth());
+    await waitFor(() => expect(result.current.username).toBe('one'));
+    const before = supabaseMock.from.mock.calls.length;
+
+    const stateChangeListener = supabaseMock.auth.onAuthStateChange.mock.calls[0][0];
+    await act(async () => {
+      stateChangeListener('SIGNED_IN', { user: { id: 'u2' } });
+    });
+    await waitFor(() => expect(result.current.username).toBe('two'));
+    expect(supabaseMock.from.mock.calls.length).toBeGreaterThan(before);
+  });
+
   it('getAccessToken returns the access_token when session exists', async () => {
     supabaseMock.auth.getSession
       // first call inside the bootstrap effect

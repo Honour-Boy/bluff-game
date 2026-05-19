@@ -17,7 +17,7 @@
 
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { supabase } from '../lib/supabase';
 import { getSocket } from '../lib/socket';
 
@@ -92,14 +92,28 @@ export function useAuth() {
   // wins so a stale guest entry can't shadow a fresh sign-in.
   const [guestUser, setGuestUser] = useState(null);
 
+  // Tracks the userId of the most recently *successfully* loaded
+  // profile so `onAuthStateChange` events like TOKEN_REFRESHED (which
+  // fire roughly hourly with the same user) don't re-hit Supabase.
+  // Cleared on signOut and on updateUsername success so the next
+  // bootstrap or refresh re-fetches the canonical row.
+  const profileLoadedForRef = useRef(null);
+
   // ─── Load profile from DB ──────────────────────────────────
-  const loadProfile = useCallback(async (userId) => {
+  // `force` bypasses the cache check and is used when we know the
+  // row has changed (post-updateUsername) or want to recover from a
+  // missing profile after sign-out → sign-in for a different user.
+  const loadProfile = useCallback(async (userId, { force = false } = {}) => {
+    if (!force && profileLoadedForRef.current === userId) {
+      return undefined;
+    }
     const { data } = await supabase
       .from('profiles')
       .select('id, username')
       .eq('id', userId)
       .single();
     setProfile(data || null);
+    if (data) profileLoadedForRef.current = userId;
     return data;
   }, []);
 
@@ -139,8 +153,11 @@ export function useAuth() {
       if (u) {
         clearGuestFromStorage();
         setGuestUser(null);
+        // Cached: skips the Supabase round-trip on TOKEN_REFRESHED
+        // (fires ~hourly) when the same user is already loaded.
         loadProfile(u.id);
       } else {
+        profileLoadedForRef.current = null;
         setProfile(null);
       }
     });
@@ -198,6 +215,7 @@ export function useAuth() {
     await supabase.auth.signOut();
     setUser(null);
     setProfile(null);
+    profileLoadedForRef.current = null;
     clearGuestFromStorage();
     setGuestUser(null);
   }, []);
@@ -248,6 +266,10 @@ export function useAuth() {
 
     if (error) return { error: error.message };
     setProfile(prev => ({ ...prev, username: trimmed }));
+    // We just wrote a new username; clear the cache key so the next
+    // auth-state event re-reads the canonical row (no-op normally,
+    // since setProfile above is already authoritative).
+    profileLoadedForRef.current = null;
 
     // Best-effort socket sync. If the socket isn't authenticated
     // (e.g. user is signed out or transport just dropped), the next

@@ -1,11 +1,15 @@
 'use client';
 
-import { useState, useEffect, useRef, useMemo, useCallback } from 'react';
+import { useState, useEffect, useRef, useMemo, useCallback, lazy, Suspense } from 'react';
 import { CardShape } from './CardShape';
 import { ShapeIcon, SHAPE_COLORS } from './ShapeIcon';
 
 import { ActionLog } from './ActionLog';
-import { HowToPlayModal } from './HowToPlayModal';
+// Issue #106 — lazy-load the ~19KB HowToPlay modal so it stays out of
+// the initial bundle. Most sessions never open it.
+const HowToPlayModal = lazy(() =>
+  import('./HowToPlayModal').then((m) => ({ default: m.HowToPlayModal })),
+);
 import { TurnActionModal, WaitingForPlayerBanner } from './TurnActionModal';
 import { VoicePanel, VoiceIndicator } from './VoicePanel';
 import { PowerCard, POWER_META, POWER_ICONS } from './PowerCard';
@@ -1926,7 +1930,11 @@ export function OnlinePlayerUI({
       )}
 
       {/* How to Play modal */}
-      {showHowToPlay && <HowToPlayModal onClose={() => setShowHowToPlay(false)} initialTab="online" />}
+      {showHowToPlay && (
+        <Suspense fallback={null}>
+          <HowToPlayModal onClose={() => setShowHowToPlay(false)} initialTab="online" />
+        </Suspense>
+      )}
 
       {/* Turn action modal — shown to active player at turn start.
           Suppressed while the power-card prompt is up so the player
