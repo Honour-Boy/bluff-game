@@ -5,6 +5,7 @@
 const crypto = require('node:crypto');
 const { supabase } = require('../lib/supabaseClient');
 const { rooms, saveRoom } = require('../lib/state');
+const { socketRateLimit } = require('../lib/rateLimiter');
 const { broadcastRoomState } = require('../lib/broadcast');
 const {
   sanitizeGuestUsername,
@@ -19,6 +20,9 @@ function register(io, socket) {
   // ─── AUTHENTICATE socket with Supabase JWT or guest ──────
   // Must be called once after connecting, before any game events.
   socket.on('authenticate', async ({ token, guest } = {}, callback) => {
+    if (!socketRateLimit(socket, 'authenticate', 5, 10_000).allowed) {
+      return callback?.({ success: false, error: 'Rate limit exceeded' });
+    }
     // Guest path — typed username, no Supabase verification.
     if (!token && guest && typeof guest === 'object') {
       const cleanUsername = sanitizeGuestUsername(guest.username);

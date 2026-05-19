@@ -8,6 +8,7 @@
 const engine = require('../gameEngine');
 const { getRoom, saveRoom } = require('../lib/state');
 const { broadcastRoomState } = require('../lib/broadcast');
+const { socketRateLimit } = require('../lib/rateLimiter');
 const { maybeRecordGroupWinner } = require('../lib/roomBuilders');
 const { runMirrorMatchSpin } = require('../lib/orchestration');
 
@@ -16,6 +17,9 @@ function register(io, socket, deps) {
 
   // ─── HOST: Start the game ─────────────────────────────────
   socket.on('start_game', async ({ roomCode } = {}, callback) => {
+    if (!socketRateLimit(socket, 'start_game', 3, 10_000).allowed) {
+      return callback({ success: false, error: 'Rate limit exceeded' });
+    }
     try {
       const room = await getRoom(roomCode);
       if (!room) return callback({ success: false, error: 'Room not found' });
