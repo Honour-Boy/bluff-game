@@ -97,6 +97,14 @@ export function useGame(getAccessToken, getGuestAuth, authIdentityKey = null) {
     setPowerEventQueue((q) => q.slice(1));
   }, []);
 
+  // ─── Leaderboard cache (issue #106) ────────────────────────
+  // Per-groupId 30s TTL. Cleared per group when the server emits
+  // `group_leaderboard_updated` for that group, so a stale read is
+  // never served after a winner is recorded. Stored in a ref so
+  // cache writes don't trigger re-renders of useGame consumers.
+  const LEADERBOARD_TTL_MS = 30_000;
+  const leaderboardCacheRef = useRef(new Map()); // groupId → { data, loadedAt }
+
   // ─── Show transient notification ──────────────────────────
   // Use a ref-tracked timer so back-to-back notifications don't
   // wipe each other (older setTimeout firing on the newer message).
@@ -318,7 +326,13 @@ export function useGame(getAccessToken, getGuestAuth, authIdentityKey = null) {
       const id = `${evt.kind}:${evt.holderId || '?'}:${Date.now()}:${Math.random().toString(36).slice(2, 8)}`;
       setPowerEventQueue((q) => [...q, { id, ...evt }]);
     };
-    const onGroupLeaderboardUpdated = () => {
+    const onGroupLeaderboardUpdated = (payload = {}) => {
+      // Drop the cache entry for the affected group so the next
+      // getGroupLeaderboard call always sees the fresh winner. If
+      // the server omits groupId, clear the whole map defensively.
+      const gid = payload?.groupId;
+      if (gid) leaderboardCacheRef.current.delete(gid);
+      else leaderboardCacheRef.current.clear();
       setLeaderboardUpdateNonce((n) => n + 1);
     };
     const onHostDisconnecting = ({ countdown } = {}) => {
@@ -538,9 +552,22 @@ export function useGame(getAccessToken, getGuestAuth, authIdentityKey = null) {
 
   const getGroupLeaderboard = useCallback((groupId) => {
     return new Promise((resolve) => {
+      if (groupId) {
+        const cached = leaderboardCacheRef.current.get(groupId);
+        if (cached && Date.now() - cached.loadedAt < LEADERBOARD_TTL_MS) {
+          setError(null);
+          resolve(cached.data);
+          return;
+        }
+      }
       socket.emit('get_group_leaderboard', { groupId }, (res) => {
         if (!res?.success) failError(res);
-        else setError(null);
+        else {
+          setError(null);
+          if (groupId) {
+            leaderboardCacheRef.current.set(groupId, { data: res, loadedAt: Date.now() });
+          }
+        }
         resolve(res);
       });
     });

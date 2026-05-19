@@ -2,7 +2,7 @@
 
 import { Suspense } from 'react';
 import { useSearchParams } from 'next/navigation';
-import { useCallback, useState } from 'react';
+import { useCallback, useRef, useState } from 'react';
 import { useAuth } from '../hooks/useAuth';
 import { useGame } from '../hooks/useGame';
 import { useVoice } from '../hooks/useVoice';
@@ -75,117 +75,204 @@ function HomeContent() {
     lastStandEndTurn,
   } = game;
 
-  const refreshGroupsHome = useCallback(async () => {
-    setGroupsLoading(true);
+  // ─── Groups cache (issue #106) ─────────────────────────────
+  // In-memory only (sessionStorage is overkill for socket payloads
+  // and they shouldn't survive tab close). Two scopes:
+  //   list.loadedAt    — most recent successful list_my_groups +
+  //                      list_my_invites pair; rendered state in
+  //                      groupsList / groupInvites is the payload.
+  //   detail (Map)     — per-groupId snapshots of get_group plus
+  //                      their loadedAt; lets us re-render the
+  //                      detail screen instantly when revisiting
+  //                      the same group within the TTL.
+  // SWR: <30s = serve cache only. 30-60s = serve cache + refresh
+  // in background. >60s or invalidated = blocking refresh.
+  const GROUPS_CACHE_TTL_MS = 60_000;
+  const GROUPS_SWR_AFTER_MS = 30_000;
+  const groupsCacheRef = useRef({
+    list: { loadedAt: 0 },
+    detail: new Map(), // groupId → { group, loadedAt }
+  });
+
+  const invalidateGroupsCache = useCallback((scope = 'all', groupId = null) => {
+    const cache = groupsCacheRef.current;
+    if (scope === 'list' || scope === 'all') cache.list.loadedAt = 0;
+    if (scope === 'detail' || scope === 'all') {
+      if (groupId) cache.detail.delete(groupId);
+      else cache.detail.clear();
+    }
+  }, []);
+
+  // Always emits and updates state on success. Returns the raw
+  // server responses so callers (mutations) can react to errors.
+  const fetchGroupsList = useCallback(async () => {
     const [groupsRes, invitesRes] = await Promise.all([
       listMyGroups(),
       listMyInvites(),
     ]);
     if (groupsRes?.success) setGroupsList(groupsRes.groups || []);
     if (invitesRes?.success) setGroupInvites(invitesRes.invites || []);
-    setGroupsLoading(false);
+    if (groupsRes?.success && invitesRes?.success) {
+      groupsCacheRef.current.list.loadedAt = Date.now();
+    }
     return { groupsRes, invitesRes };
   }, [listMyGroups, listMyInvites]);
+
+  const refreshGroupsHome = useCallback(async ({ force = false } = {}) => {
+    setGroupsLoading(true);
+    try {
+      if (force) invalidateGroupsCache('list');
+      return await fetchGroupsList();
+    } finally {
+      setGroupsLoading(false);
+    }
+  }, [fetchGroupsList, invalidateGroupsCache]);
 
   const openGroupsHome = useCallback(async () => {
     setError(null);
     setSelectedGroup(null);
     setHomeView('groups');
+    const age = Date.now() - groupsCacheRef.current.list.loadedAt;
+    if (groupsCacheRef.current.list.loadedAt && age < GROUPS_CACHE_TTL_MS) {
+      // Cache hit: render rendered state (already in groupsList /
+      // groupInvites). Kick a background refresh if we're past the
+      // SWR threshold so the next visit is fresh too.
+      if (age >= GROUPS_SWR_AFTER_MS) fetchGroupsList();
+      return;
+    }
     await refreshGroupsHome();
-  }, [refreshGroupsHome, setError]);
+  }, [fetchGroupsList, refreshGroupsHome, setError]);
+
+  // Returns the raw `get_group` response shape: { success, group, ... }
+  // so callers don't have to know the cache exists.
+  const fetchGroupDetail = useCallback(async (groupId) => {
+    const res = await getGroup(groupId);
+    if (res?.success && res.group) {
+      setSelectedGroup(res.group);
+      groupsCacheRef.current.detail.set(groupId, {
+        group: res.group,
+        loadedAt: Date.now(),
+      });
+    }
+    return res;
+  }, [getGroup]);
 
   const openGroupDetail = useCallback(async (groupId) => {
     setError(null);
-    setGroupsLoading(true);
-    const res = await getGroup(groupId);
-    if (res?.success) {
-      setSelectedGroup(res.group);
+    const cached = groupsCacheRef.current.detail.get(groupId);
+    const age = cached ? Date.now() - cached.loadedAt : Infinity;
+    if (cached && age < GROUPS_CACHE_TTL_MS) {
+      setSelectedGroup(cached.group);
       setHomeView('group');
+      if (age >= GROUPS_SWR_AFTER_MS) {
+        // Background refresh — don't block the screen transition,
+        // just update once the response arrives.
+        fetchGroupDetail(groupId);
+      }
+      return { success: true, group: cached.group };
     }
-    setGroupsLoading(false);
-    return res;
-  }, [getGroup, setError]);
+    setGroupsLoading(true);
+    try {
+      const res = await fetchGroupDetail(groupId);
+      if (res?.success) setHomeView('group');
+      return res;
+    } finally {
+      setGroupsLoading(false);
+    }
+  }, [fetchGroupDetail, setError]);
+
+  // ─── Mutations: each one invalidates the slices it touches and
+  // re-fetches blockingly (the UI already shows a busy state during
+  // these). The cache exists to skip *spontaneous* fetches, not
+  // mutation follow-ups.
 
   const handleCreateGroup = useCallback(async (name) => {
     const res = await createGroup(name);
     if (res?.success && res.group?.id) {
+      invalidateGroupsCache('list');
       await refreshGroupsHome();
       await openGroupDetail(res.group.id);
     }
     return res;
-  }, [createGroup, openGroupDetail, refreshGroupsHome]);
+  }, [createGroup, invalidateGroupsCache, openGroupDetail, refreshGroupsHome]);
 
   const handleRespondToInvite = useCallback(async (inviteId, accept) => {
     const res = await respondToInvite(inviteId, accept);
     if (res?.success) {
+      invalidateGroupsCache('all');
       await refreshGroupsHome();
     }
     return res;
-  }, [refreshGroupsHome, respondToInvite]);
+  }, [invalidateGroupsCache, refreshGroupsHome, respondToInvite]);
 
   const handleInviteToGroup = useCallback(async (identifier) => {
     if (!selectedGroup?.id) return { success: false, error: 'Group not found' };
     const res = await inviteToGroup(selectedGroup.id, identifier);
-    if (res?.success) await openGroupDetail(selectedGroup.id);
+    if (res?.success) {
+      invalidateGroupsCache('detail', selectedGroup.id);
+      await fetchGroupDetail(selectedGroup.id);
+    }
     return res;
-  }, [inviteToGroup, openGroupDetail, selectedGroup?.id]);
+  }, [fetchGroupDetail, inviteToGroup, invalidateGroupsCache, selectedGroup?.id]);
 
   const handleTransferHost = useCallback(async (newHostUserId) => {
     if (!selectedGroup?.id) return { success: false, error: 'Group not found' };
     const res = await transferHost(selectedGroup.id, newHostUserId);
     if (res?.success) {
+      invalidateGroupsCache('all', selectedGroup.id);
       await Promise.all([
         refreshGroupsHome(),
-        openGroupDetail(selectedGroup.id),
+        fetchGroupDetail(selectedGroup.id),
       ]);
     }
     return res;
-  }, [openGroupDetail, refreshGroupsHome, selectedGroup?.id, transferHost]);
+  }, [fetchGroupDetail, invalidateGroupsCache, refreshGroupsHome, selectedGroup?.id, transferHost]);
 
   const handleRemoveMember = useCallback(async (userId) => {
     if (!selectedGroup?.id) return { success: false, error: 'Group not found' };
     const res = await removeMember(selectedGroup.id, userId);
     if (res?.success) {
+      invalidateGroupsCache('all', selectedGroup.id);
       await Promise.all([
         refreshGroupsHome(),
-        openGroupDetail(selectedGroup.id),
+        fetchGroupDetail(selectedGroup.id),
       ]);
     }
     return res;
-  }, [openGroupDetail, refreshGroupsHome, removeMember, selectedGroup?.id]);
+  }, [fetchGroupDetail, invalidateGroupsCache, refreshGroupsHome, removeMember, selectedGroup?.id]);
 
   const handleRevokeInvite = useCallback(async (inviteId) => {
     const res = await revokeInvite(inviteId);
     if (res?.success && selectedGroup?.id) {
-      await Promise.all([
-        refreshGroupsHome(),
-        openGroupDetail(selectedGroup.id),
-      ]);
+      invalidateGroupsCache('detail', selectedGroup.id);
+      await fetchGroupDetail(selectedGroup.id);
     }
     return res;
-  }, [openGroupDetail, refreshGroupsHome, revokeInvite, selectedGroup?.id]);
+  }, [fetchGroupDetail, invalidateGroupsCache, revokeInvite, selectedGroup?.id]);
 
   const handleDeleteGroup = useCallback(async () => {
     if (!selectedGroup?.id) return { success: false, error: 'Group not found' };
     const res = await deleteGroup(selectedGroup.id);
     if (res?.success) {
+      invalidateGroupsCache('all', selectedGroup.id);
       setSelectedGroup(null);
       setHomeView('groups');
       await refreshGroupsHome();
     }
     return res;
-  }, [deleteGroup, refreshGroupsHome, selectedGroup?.id]);
+  }, [deleteGroup, invalidateGroupsCache, refreshGroupsHome, selectedGroup?.id]);
 
   const handleLeaveGroup = useCallback(async () => {
     if (!selectedGroup?.id) return { success: false, error: 'Group not found' };
     const res = await leaveGroup(selectedGroup.id);
     if (res?.success) {
+      invalidateGroupsCache('all', selectedGroup.id);
       setSelectedGroup(null);
       setHomeView('groups');
       await refreshGroupsHome();
     }
     return res;
-  }, [leaveGroup, refreshGroupsHome, selectedGroup?.id]);
+  }, [invalidateGroupsCache, leaveGroup, refreshGroupsHome, selectedGroup?.id]);
 
   // Voice — auto-joins muted on room entry (issue #49). Mic stays
   // unpublished until first user-gesture toggle, so first-time visitors

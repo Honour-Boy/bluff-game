@@ -1,7 +1,10 @@
 'use client';
 
-import { useState, useEffect } from 'react';
-import { HowToPlayModal } from './HowToPlayModal';
+import { useState, useEffect, lazy, Suspense } from 'react';
+// Lazy-loaded so the ~19KB modal stays out of the initial bundle (#106).
+const HowToPlayModal = lazy(() =>
+  import('./HowToPlayModal').then((m) => ({ default: m.HowToPlayModal })),
+);
 import { UserProfile } from './UserProfile';
 import { ShapeIcon } from './ShapeIcon';
 
@@ -415,7 +418,11 @@ export function LandingScreen({
         )}
       </div>
 
-      {showHowToPlay && <HowToPlayModal onClose={() => setShowHowToPlay(false)} />}
+      {showHowToPlay && (
+        <Suspense fallback={null}>
+          <HowToPlayModal onClose={() => setShowHowToPlay(false)} />
+        </Suspense>
+      )}
 
       {showProfile && (
         <UserProfile

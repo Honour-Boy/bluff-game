@@ -1,11 +1,14 @@
 'use client';
 
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, lazy, Suspense } from 'react';
 import { CardShape } from './CardShape';
 import { ShapeIcon } from './ShapeIcon';
 import { PlayerList } from './PlayerList';
 import { ActionLog } from './ActionLog';
-import { HowToPlayModal } from './HowToPlayModal';
+// Lazy-loaded so the ~19KB modal stays out of the initial bundle (#106).
+const HowToPlayModal = lazy(() =>
+  import('./HowToPlayModal').then((m) => ({ default: m.HowToPlayModal })),
+);
 import { VoicePanel } from './VoicePanel';
 
 const CYL = 200, CX = 100, CY = 100, ORBIT = 58, CHAM_R = 20;
@@ -601,7 +604,11 @@ export function HostUI({
       </button>
 
       {/* How to Play modal */}
-      {showHowToPlay && <HowToPlayModal onClose={() => setShowHowToPlay(false)} />}
+      {showHowToPlay && (
+        <Suspense fallback={null}>
+          <HowToPlayModal onClose={() => setShowHowToPlay(false)} />
+        </Suspense>
+      )}
 
       {/* ── Host cylinder spin overlay ── */}
       {spinData && (

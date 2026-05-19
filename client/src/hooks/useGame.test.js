@@ -288,6 +288,71 @@ describe('useGame - groups', () => {
     expect(response.leaderboard[0].wins).toBe(4);
   });
 
+  // ─── Issue #106 — leaderboard cache ────────────────────────
+  it('serves a cached leaderboard within the TTL without re-emitting', async () => {
+    const { result } = renderHook(() => useGame(null));
+    socketHolder.socket.emit.mockImplementation((event, payload, cb) => {
+      if (event === 'get_group_leaderboard') {
+        cb({
+          success: true,
+          leaderboard: [{ userId: 'u1', username: 'alice', wins: 1, gamesPlayed: 1 }],
+        });
+      }
+    });
+
+    let first;
+    await act(async () => {
+      first = await result.current.getGroupLeaderboard('group-42');
+    });
+    expect(first?.leaderboard[0].wins).toBe(1);
+    const callsAfterFirst = socketHolder.socket.emit.mock.calls.filter(
+      ([e]) => e === 'get_group_leaderboard',
+    ).length;
+
+    let second;
+    await act(async () => {
+      second = await result.current.getGroupLeaderboard('group-42');
+    });
+    expect(second?.leaderboard[0].wins).toBe(1);
+    const callsAfterSecond = socketHolder.socket.emit.mock.calls.filter(
+      ([e]) => e === 'get_group_leaderboard',
+    ).length;
+
+    expect(callsAfterSecond).toBe(callsAfterFirst);
+  });
+
+  it('drops the cached leaderboard entry when group_leaderboard_updated fires for that group', async () => {
+    const { result } = renderHook(() => useGame(null));
+    socketHolder.socket.emit.mockImplementation((event, payload, cb) => {
+      if (event === 'get_group_leaderboard') {
+        cb({
+          success: true,
+          leaderboard: [{ userId: 'u1', username: 'alice', wins: 1, gamesPlayed: 1 }],
+        });
+      }
+    });
+
+    await act(async () => {
+      await result.current.getGroupLeaderboard('group-42');
+    });
+    const beforeInvalidation = socketHolder.socket.emit.mock.calls.filter(
+      ([e]) => e === 'get_group_leaderboard',
+    ).length;
+
+    act(() => {
+      socketHolder.socket.__emit('group_leaderboard_updated', { groupId: 'group-42' });
+    });
+
+    await act(async () => {
+      await result.current.getGroupLeaderboard('group-42');
+    });
+    const afterInvalidation = socketHolder.socket.emit.mock.calls.filter(
+      ([e]) => e === 'get_group_leaderboard',
+    ).length;
+
+    expect(afterInvalidation).toBeGreaterThan(beforeInvalidation);
+  });
+
   it('increments leaderboardUpdateNonce when the server broadcasts an update', async () => {
     const { result } = renderHook(() => useGame(null));
 

@@ -2,12 +2,15 @@
 
 'use client';
 
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, lazy, Suspense } from 'react';
 import { CardShape } from './CardShape';
 import { ShapeIcon } from './ShapeIcon';
 
 import { ActionLog } from './ActionLog';
-import { HowToPlayModal } from './HowToPlayModal';
+// Lazy-loaded so the ~19KB modal stays out of the initial bundle (#106).
+const HowToPlayModal = lazy(() =>
+  import('./HowToPlayModal').then((m) => ({ default: m.HowToPlayModal })),
+);
 import { VoicePanel } from './VoicePanel';
 
 // SVG cylinder constants
@@ -723,7 +726,11 @@ export function PlayerUI({
       )}
 
       {/* How to Play modal */}
-      {showHowToPlay && <HowToPlayModal onClose={() => setShowHowToPlay(false)} />}
+      {showHowToPlay && (
+        <Suspense fallback={null}>
+          <HowToPlayModal onClose={() => setShowHowToPlay(false)} />
+        </Suspense>
+      )}
 
       <style>{`
         @keyframes pulse {
