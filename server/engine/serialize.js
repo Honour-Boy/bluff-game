@@ -90,6 +90,9 @@ function serializeRoom(room, requestingPlayerId = null, opts = {}) {
     myHand: isOnline && requestingPlayerId && room.hands
       ? (room.hands.get(requestingPlayerId) || [])
       : undefined,
+    myPowerCardSlot: isOnline && requestingPlayerId && room.powerCardSlot
+      ? (room.powerCardSlot[requestingPlayerId] || [])
+      : undefined,
     spectatedHand,
     spectatedPlayerId: spectatedPlayer ? spectatingTargetId : undefined,
     currentPromptTarget,

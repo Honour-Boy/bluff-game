@@ -119,17 +119,39 @@ function _snapshotSwapHolders(room) {
 }
 
 /**
+ * After the initial deal and cap normalisation, move every power card
+ * out of room.hands into room.powerCardSlot[playerId] (an array).
+ * From this point on, room.hands contains shape cards only.
+ */
+function _extractPowerCardsToSlot(room) {
+  if (!room.hands) return;
+  if (!room.powerCardSlot) room.powerCardSlot = {};
+  for (const [pid, hand] of room.hands.entries()) {
+    if (!Array.isArray(hand)) continue;
+    const powers = [];
+    const shapes = [];
+    for (const card of hand) {
+      if (card?.type === 'power') powers.push(card);
+      else shapes.push(card);
+    }
+    hand.length = 0;
+    hand.push(...shapes);
+    room.powerCardSlot[pid] = powers;
+  }
+}
+
+/**
  * Walk every Swap card in every hand and remove `playerId` from its
  * pending-set (the set of "alive players who must still take a turn
  * before this Swap is activatable"). Called when a player ends their
  * turn.
  */
 function _creditSwapTurnFor(room, playerId) {
-  if (!room.hands) return;
-  for (const hand of room.hands.values()) {
-    if (!hand) continue;
-    for (const card of hand) {
-      if (card?.type === 'power' && card.power === 'swap' && Array.isArray(card.swapPendingPlayerIds)) {
+  if (!room.powerCardSlot) return;
+  for (const slot of Object.values(room.powerCardSlot)) {
+    if (!Array.isArray(slot)) continue;
+    for (const card of slot) {
+      if (card?.power === 'swap' && Array.isArray(card.swapPendingPlayerIds)) {
         card.swapPendingPlayerIds = card.swapPendingPlayerIds.filter(id => id !== playerId);
       }
     }
@@ -142,11 +164,11 @@ function _creditSwapTurnFor(room, playerId) {
  * a Swap mechanically).
  */
 function _removePlayerFromSwapSnapshots(room, playerId) {
-  if (!room.hands) return;
-  for (const hand of room.hands.values()) {
-    if (!hand) continue;
-    for (const card of hand) {
-      if (card?.type === 'power' && card.power === 'swap' && Array.isArray(card.swapPendingPlayerIds)) {
+  if (!room.powerCardSlot) return;
+  for (const slot of Object.values(room.powerCardSlot)) {
+    if (!Array.isArray(slot)) continue;
+    for (const card of slot) {
+      if (card?.power === 'swap' && Array.isArray(card.swapPendingPlayerIds)) {
         card.swapPendingPlayerIds = card.swapPendingPlayerIds.filter(id => id !== playerId);
       }
     }
@@ -198,8 +220,8 @@ function activatePowerCard(room, playerId) {
   if (player.status !== 'alive') return { ok: false, error: 'Player not alive' };
   if (player.armedPowerCard)    return { ok: false, error: 'Already armed' };
 
-  const hand = room.hands?.get(playerId);
-  const powerCard = _findPowerCardInHand(hand);
+  const slot = room.powerCardSlot?.[playerId] || [];
+  const powerCard = slot[0] ?? null;
   if (!powerCard) return { ok: false, error: 'No power card in hand' };
 
   if (powerCard.power === 'swap' && !isSwapActivatable(powerCard)) {
@@ -208,10 +230,9 @@ function activatePowerCard(room, playerId) {
 
   if (!room.discardPile) room.discardPile = [];
 
-  // Peek: consumed-on-use.
+  // Peek: consumed-on-use — remove from slot immediately.
   if (powerCard.power === 'peek') {
-    const idx = hand.indexOf(powerCard);
-    if (idx !== -1) hand.splice(idx, 1);
+    room.powerCardSlot[playerId] = slot.filter(c => c.id !== powerCard.id);
     room.discardPile.push(powerCard);
     const peekedCard = room.lastPlayedCard || null;
     return {
@@ -263,14 +284,13 @@ function consumeFreezeOnTurnEnd(room, holderId) {
   const skipped = room.players.find(p => p.id === skippedId) || null;
 
   if (!room.discardPile) room.discardPile = [];
-  const hand = room.hands?.get(holderId);
-  if (hand) {
-    let idx = armed.cardId
-      ? hand.findIndex(c => c?.id === armed.cardId)
-      : -1;
-    if (idx === -1) idx = hand.findIndex(c => c?.type === 'power' && c.power === 'freeze');
-    if (idx !== -1) {
-      const [card] = hand.splice(idx, 1);
+  const slot = room.powerCardSlot?.[holderId];
+  if (Array.isArray(slot)) {
+    const cardIdx = armed.cardId
+      ? slot.findIndex(c => c?.id === armed.cardId)
+      : slot.findIndex(c => c?.power === 'freeze');
+    if (cardIdx !== -1) {
+      const [card] = slot.splice(cardIdx, 1);
       room.discardPile.push(card);
     }
   }
@@ -291,6 +311,7 @@ module.exports = {
   _normalisePowerCardHandCap,
   _guaranteeMinPowerCardPerPlayer,
   _snapshotSwapHolders,
+  _extractPowerCardsToSlot,
   _creditSwapTurnFor,
   _removePlayerFromSwapSnapshots,
   applyAssassinBackfirePenalty,

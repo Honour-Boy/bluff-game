@@ -21,6 +21,7 @@ const {
   _normalisePowerCardHandCap,
   _guaranteeMinPowerCardPerPlayer,
   _snapshotSwapHolders,
+  _extractPowerCardsToSlot,
 } = require('./powerCards');
 
 function generateRoomCode() {
@@ -50,6 +51,7 @@ function createRoom(hostSocketId, mode = MODES.PHYSICAL, config = null) {
     deck: null,
     playedPile: null,
     hands: null,
+    powerCardSlot: null,
     currentCard: null,
     lastPlayedCard: null,
     chatLog: [],
@@ -115,10 +117,12 @@ function startGame(room) {
     room.hands = hands;
     room.deck = remainingDeck;
     room.playedPile = [];
+    room.powerCardSlot = {};
 
     _normalisePowerCardHandCap(room);
     _guaranteeMinPowerCardPerPlayer(room);
     _snapshotSwapHolders(room);
+    _extractPowerCardsToSlot(room);
 
     let startIdx = room.deck.findIndex(c => c.type === 'shape' && c.shape !== 'whot');
     if (startIdx === -1) startIdx = room.deck.findIndex(c => c.type === 'shape');

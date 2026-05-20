@@ -55,6 +55,7 @@ export function OnlinePlayerUI({
   chatUnread = 0,
 }) {
   const myHand = roomState?.myHand || [];
+  const myPowerCardSlot = roomState?.myPowerCardSlot || [];
   const ui = useOnlinePlayerUiController({
     roomState,
     myPlayer,
@@ -100,7 +101,7 @@ export function OnlinePlayerUI({
   const isEliminated = myPlayer.status === 'eliminated';
   const isSpectator = myPlayer.isSpectator;
   const showSpectatorView = isEliminated || isSpectator;
-  const heldPowerCard = myHand.find((card) => card?.type === 'power') || null;
+  const heldPowerCard = myPowerCardSlot[0] || null;
   const armedPowerCard = myPlayer?.armedPowerCard || null;
   const isPlaying = phase === 'playing';
   const isSpinPending = phase === 'spin_pending';
@@ -271,6 +272,7 @@ export function OnlinePlayerUI({
         spectatedHand={ui.spectatedHand}
         handleSpectatePlayer={ui.handleSpectatePlayer}
         myHand={myHand}
+        myPowerCardSlot={myPowerCardSlot}
         selectedCardId={ui.selectedCardId}
         handleCardClick={ui.handleCardClick}
         phase={phase}

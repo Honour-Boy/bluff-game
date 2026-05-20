@@ -6,7 +6,7 @@
 
 const { CARD_TYPES, SHAPES, MODES } = require('./constants');
 const { shuffleDeck } = require('./deck');
-const { _powerCardCapForPlayer, _countPowerCardsInHand } = require('./handHelpers');
+const { _powerCardCapForPlayer } = require('./handHelpers');
 
 function randomCardType() {
   return CARD_TYPES[Math.floor(Math.random() * CARD_TYPES.length)];
@@ -67,6 +67,9 @@ function drawCardForPlayer(room, playerId) {
   const player = room.players.find(p => p.id === playerId);
   const cap = _powerCardCapForPlayer(player); // Collector → 3, default → 1
 
+  if (!room.powerCardSlot) room.powerCardSlot = {};
+  const slot = room.powerCardSlot[playerId] || (room.powerCardSlot[playerId] = []);
+
   let safety = (room.deck?.length || 0) + (room.playedPile?.length || 0) + 4;
   while (safety-- > 0) {
     ensureDrawPile(room);
@@ -76,20 +79,22 @@ function drawCardForPlayer(room, playerId) {
     }
     const card = room.deck.shift();
 
-    if (card?.type === 'power' && _countPowerCardsInHand(hand) >= cap) {
-      room.discardPile.push(card);
-      continue;
+    if (card?.type === 'power') {
+      if (slot.length >= cap) {
+        // Slot full — discard silently; caller may emit power_card_discarded.
+        room.discardPile.push(card);
+        continue;
+      }
+      // Stamp swap snapshot before routing to slot.
+      if (card.power === 'swap' && !card.swapPendingPlayerIds) {
+        const aliveIds = room.players.filter(p => p.status === 'alive').map(p => p.id);
+        card.swapPendingPlayerIds = aliveIds.filter(id => id !== playerId);
+      }
+      slot.push(card);
+      return card;
     }
 
     hand.push(card);
-
-    // If we just placed a Swap into this hand, snapshot the alive
-    // playerIds at this moment for activation gating.
-    if (card?.type === 'power' && card.power === 'swap' && !card.swapPendingPlayerIds) {
-      const aliveIds = room.players.filter(p => p.status === 'alive').map(p => p.id);
-      card.swapPendingPlayerIds = aliveIds.filter(id => id !== playerId);
-    }
-
     return card;
   }
   console.warn('[engine] drawCardForPlayer: safety bound exceeded');

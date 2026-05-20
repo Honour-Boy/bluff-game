@@ -76,11 +76,11 @@ function _consumeArmedCard(room, player) {
   if (!player) return null;
   const armed = player.armedPowerCard;
   if (!armed) return null;
-  const hand = room.hands?.get(player.id);
-  if (hand) {
-    const idx = hand.findIndex(c => c?.id === armed.cardId);
+  const slot = room.powerCardSlot?.[player.id];
+  if (Array.isArray(slot)) {
+    const idx = slot.findIndex(c => c?.id === armed.cardId);
     if (idx !== -1) {
-      const [card] = hand.splice(idx, 1);
+      const [card] = slot.splice(idx, 1);
       if (!room.discardPile) room.discardPile = [];
       room.discardPile.push(card);
     }
