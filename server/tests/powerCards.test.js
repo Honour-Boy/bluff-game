@@ -12,6 +12,8 @@
 //  - Initial deal hand-cap normalisation uses option (b): deal
 //    naturally, then move extras to discardPile and replace with
 //    shape cards from the top of the remaining deck.
+//  - After startGame, power cards live in room.powerCardSlot[pid]
+//    (not room.hands). Hands contain shape cards only.
 // ============================================================
 
 import { describe, it, expect, vi, afterAll } from 'vitest';
@@ -173,6 +175,7 @@ describe('drawCardForPlayer power-card hand cap', () => {
     room.hands = new Map();
     room.hands.set('p0', []);
     room.hands.set('p1', []);
+    room.powerCardSlot = { p0: [], p1: [] };
     // Trailing shape pool — large enough to feed any test.
     const filler = generateDeck().slice(0, 30);
     room.deck = [...headCards, ...filler];
@@ -187,24 +190,25 @@ describe('drawCardForPlayer power-card hand cap', () => {
     ]);
     const drawn = drawCardForPlayer(room, 'p0');
     expect(drawn).toEqual(expect.objectContaining({ type: 'power', power: 'shield' }));
-    expect(room.hands.get('p0')).toHaveLength(1);
+    // Power card routes to slot, not hand.
+    expect(room.powerCardSlot['p0']).toHaveLength(1);
+    expect(room.hands.get('p0')).toHaveLength(0);
     expect(room.discardPile).toHaveLength(0);
   });
 
   it('discards a second power card and gives a shape replacement', () => {
     const room = setupRoomWithDeckHead([
-      // p0 already holds a power → next power should be discarded.
+      // p0 already holds a power in slot → next power should be discarded.
       { id: 'p-shield-B', type: 'power', power: 'shield' },
     ]);
-    // Pre-load p0 with one power card so the next draw collides.
-    room.hands.get('p0').push({ id: 'pre-power', type: 'power', power: 'shield' });
+    // Pre-load p0 slot with one power card so the next draw collides.
+    room.powerCardSlot['p0'].push({ id: 'pre-power', type: 'power', power: 'shield' });
     const drawn = drawCardForPlayer(room, 'p0');
     expect(drawn?.type).toBe('shape');
     expect(room.discardPile.find(c => c.id === 'p-shield-B')).toBeTruthy();
-    // Hand still has exactly one power card and now also a shape.
-    const hand = room.hands.get('p0');
-    expect(hand.filter(c => c.type === 'power')).toHaveLength(1);
-    expect(hand.filter(c => c.type === 'shape')).toHaveLength(1);
+    // Slot still has exactly one power card; hand received a shape.
+    expect(room.powerCardSlot['p0']).toHaveLength(1);
+    expect(room.hands.get('p0').filter(c => c.type === 'shape')).toHaveLength(1);
   });
 
   it('discards multiple consecutive power cards then deals a shape', () => {
@@ -213,7 +217,7 @@ describe('drawCardForPlayer power-card hand cap', () => {
       { id: 'p-2', type: 'power', power: 'mirror' },
       { id: 'p-3', type: 'power', power: 'peek' },
     ]);
-    room.hands.get('p0').push({ id: 'pre', type: 'power', power: 'shield' });
+    room.powerCardSlot['p0'].push({ id: 'pre', type: 'power', power: 'shield' });
     const drawn = drawCardForPlayer(room, 'p0');
     expect(drawn?.type).toBe('shape');
     // All three head power cards landed in the discard pile.
@@ -223,8 +227,13 @@ describe('drawCardForPlayer power-card hand cap', () => {
   it('returns null when deck has no eligible card and the player is capped', () => {
     const room = makeOnlineRoomWithPlayers(2);
     room.hands = new Map();
-    room.hands.set('p0', [{ id: 'pre', type: 'power', power: 'shield' }]);
+    room.hands.set('p0', []);
     room.hands.set('p1', []);
+    // p0 slot is at cap (1 power card); deck has only more power cards.
+    room.powerCardSlot = {
+      p0: [{ id: 'pre', type: 'power', power: 'shield' }],
+      p1: [],
+    };
     room.deck = [
       { id: 'p-x', type: 'power', power: 'mirror' },
       { id: 'p-y', type: 'power', power: 'peek' },
@@ -249,9 +258,12 @@ describe('startGame initial-deal hand cap', () => {
     startGame(room);
 
     for (const [pid, hand] of room.hands.entries()) {
-      const powers = hand.filter(c => c.type === 'power');
-      expect(powers.length).toBeLessThanOrEqual(1);
-      expect(hand.length).toBe(6);
+      // Hands contain shape cards only after extraction.
+      expect(hand.filter(c => c.type === 'power')).toHaveLength(0);
+      const slot = room.powerCardSlot?.[pid] || [];
+      expect(slot.length).toBeLessThanOrEqual(1);
+      // Total cards across hand (shapes) + slot (powers) = 6.
+      expect(hand.length + slot.length).toBe(6);
     }
   });
 
@@ -269,21 +281,22 @@ describe('startGame initial-deal hand cap', () => {
     }
   });
 
-  it('configures swapPendingPlayerIds for any Swap card that lands in a hand', () => {
+  it('configures swapPendingPlayerIds for any Swap card that lands in a slot', () => {
     // Across many shuffled startGames with swap enabled, every Swap
-    // card that ends up in a hand should have a snapshot stamped on
+    // card that ends up in a slot should have a snapshot stamped on
     // it. Probabilistic but stable — 30 trials, 3 players each.
-    let trialsWithSwapInHand = 0;
+    let trialsWithSwapInSlot = 0;
     let trialsTotal = 0;
     for (let trial = 0; trial < 30; trial++) {
       const cfg = configWith({ swap: true }, 2);
       const room = makeOnlineRoomWithPlayers(3, cfg);
       startGame(room);
       trialsTotal++;
-      for (const [pid, hand] of room.hands.entries()) {
-        for (const card of hand) {
+      // After extraction, swap cards live in powerCardSlot.
+      for (const [pid, slot] of Object.entries(room.powerCardSlot || {})) {
+        for (const card of slot) {
           if (card?.power === 'swap') {
-            trialsWithSwapInHand++;
+            trialsWithSwapInSlot++;
             expect(Array.isArray(card.swapPendingPlayerIds)).toBe(true);
             expect(card.swapPendingPlayerIds).not.toContain(pid);
           }
@@ -292,7 +305,7 @@ describe('startGame initial-deal hand cap', () => {
     }
     expect(trialsTotal).toBeGreaterThan(0);
     // We don't assert a minimum hit count — it's probabilistic. We
-    // just verify that whenever a Swap landed in a hand, the snapshot
+    // just verify that whenever a Swap landed in a slot, the snapshot
     // existed. Hits across 30 trials are virtually guaranteed but we
     // don't gate on count to keep the test robust.
   });
@@ -320,14 +333,16 @@ describe('startGame guarantees ≥1 power card per player (#77)', () => {
       let everyoneHasOne = true;
       for (const p of room.players) {
         const hand = room.hands.get(p.id) || [];
-        const powerCount = hand.filter(c => c?.type === 'power').length;
+        // Power cards live in slot after extraction; hand has shapes only.
+        const slot = room.powerCardSlot?.[p.id] || [];
+        const powerCount = slot.length;
         if (powerCount < 1) everyoneHasOne = false;
         if (p.role === 'barehand') {
           barehandTotal++;
           if (powerCount >= 1) barehandWithPower++;
         }
-        // Hand size + cap invariants must STILL hold.
-        expect(hand.length).toBe(6);
+        // Total cards = hand (shapes) + slot (powers) = 6.
+        expect(hand.length + slot.length).toBe(6);
         const cap = p.role === 'collector' ? 3 : 1;
         expect(powerCount).toBeLessThanOrEqual(cap);
       }
@@ -364,8 +379,8 @@ describe('startGame guarantees ≥1 power card per player (#77)', () => {
       const collector = room.players.find(p => p.role === 'collector');
       if (!collector) continue;
       collectorTrials++;
-      const hand = room.hands.get(collector.id) || [];
-      const powerCount = hand.filter(c => c?.type === 'power').length;
+      const slot = room.powerCardSlot?.[collector.id] || [];
+      const powerCount = slot.length;
       expect(powerCount).toBeGreaterThanOrEqual(1);
       expect(powerCount).toBeLessThanOrEqual(3);
     }
@@ -378,8 +393,9 @@ describe('startGame guarantees ≥1 power card per player (#77)', () => {
     startGame(room);
     for (const p of room.players) {
       const hand = room.hands.get(p.id) || [];
-      expect(hand.filter(c => c?.type === 'power').length).toBe(0);
-      expect(hand.length).toBe(6);
+      const slot = room.powerCardSlot?.[p.id] || [];
+      expect(slot.filter(c => c?.type === 'power').length).toBe(0);
+      expect(hand.length + slot.length).toBe(6);
     }
   });
 
@@ -391,14 +407,15 @@ describe('startGame guarantees ≥1 power card per player (#77)', () => {
     const room = makeOnlineRoomWithPlayers(4, cfg);
     startGame(room);
     const covered = room.players.filter(p => {
-      const hand = room.hands.get(p.id) || [];
-      return hand.some(c => c?.type === 'power');
+      const slot = room.powerCardSlot?.[p.id] || [];
+      return slot.some(c => c?.type === 'power');
     });
     expect(covered.length).toBeGreaterThanOrEqual(1);
-    // Hand size invariant holds even when guarantee can't reach all.
+    // Hand + slot size invariant holds even when guarantee can't reach all.
     for (const p of room.players) {
       const hand = room.hands.get(p.id) || [];
-      expect(hand.length).toBe(6);
+      const slot = room.powerCardSlot?.[p.id] || [];
+      expect(hand.length + slot.length).toBe(6);
     }
   });
 });
@@ -414,9 +431,14 @@ describe('activatePowerCard', () => {
     room.turnOrder = ['p0', 'p1'];
     room.currentTurnIndex = 0;
     room.hands = new Map([
-      ['p0', holding ? [holding] : []],
+      ['p0', []],
       ['p1', []],
     ]);
+    // Power cards live in powerCardSlot, not hands.
+    room.powerCardSlot = {
+      p0: holding ? [holding] : [],
+      p1: [],
+    };
     room.deck = [];
     room.playedPile = [];
     room.discardPile = [];
@@ -438,7 +460,7 @@ describe('activatePowerCard', () => {
     expect(result.error).toMatch(/no power card/i);
   });
 
-  it('arms the player when activating shield (card stays in hand, marked armed)', () => {
+  it('arms the player when activating shield (card stays in slot, marked armed)', () => {
     const card = { id: 'a', type: 'power', power: 'shield' };
     const room = setupActiveRoom({ holding: card });
     const result = activatePowerCard(room, 'p0');
@@ -450,13 +472,13 @@ describe('activatePowerCard', () => {
       power: 'shield',
       cardId: 'a',
     }));
-    // Card is still in hand and marked armed.
-    const hand = room.hands.get('p0');
-    expect(hand).toContain(card);
+    // Card is still in slot and marked armed.
+    const slot = room.powerCardSlot['p0'];
+    expect(slot).toContain(card);
     expect(card.armed).toBe(true);
   });
 
-  it('peek is consumed-on-use, returns lastPlayedCard, removes the card from hand', () => {
+  it('peek is consumed-on-use, returns lastPlayedCard, removes the card from slot', () => {
     const card = { id: 'pk', type: 'power', power: 'peek' };
     const lastPlayed = { id: 'shape-1', type: 'shape', shape: 'circle', number: 4 };
     const room = setupActiveRoom({ holding: card, lastPlayedCard: lastPlayed });
@@ -467,7 +489,8 @@ describe('activatePowerCard', () => {
 
     const player = room.players.find(p => p.id === 'p0');
     expect(player.armedPowerCard).toBeNull();
-    expect(room.hands.get('p0')).not.toContain(card);
+    // Card removed from slot, moved to discard.
+    expect(room.powerCardSlot['p0']).not.toContain(card);
     expect(room.discardPile).toContain(card);
   });
 
@@ -544,7 +567,7 @@ describe('isSwapActivatable', () => {
 // ─── Swap pending-set shrinks as players take turns ──────────
 
 describe('swap pending-set credit on advanceTurn', () => {
-  it('removes the finishing player from every Swap card in any hand', () => {
+  it('removes the finishing player from every Swap card in any slot', () => {
     const room = makeOnlineRoomWithPlayers(3);
     room.turnOrder = ['p0', 'p1', 'p2'];
     room.currentTurnIndex = 0;
@@ -555,10 +578,16 @@ describe('swap pending-set credit on advanceTurn', () => {
       swapPendingPlayerIds: ['p0', 'p1', 'p2'],
     };
     room.hands = new Map([
-      ['p0', [swap]],
+      ['p0', []],
       ['p1', []],
       ['p2', []],
     ]);
+    // Swap card lives in powerCardSlot, not hands.
+    room.powerCardSlot = {
+      p0: [swap],
+      p1: [],
+      p2: [],
+    };
     advanceTurn(room); // p0 finished
     expect(swap.swapPendingPlayerIds).toEqual(expect.arrayContaining(['p1', 'p2']));
     expect(swap.swapPendingPlayerIds).not.toContain('p0');
