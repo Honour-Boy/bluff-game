@@ -1,6 +1,6 @@
 import { describe, it, expect, vi } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
-import { distributePlayers, orderClockwiseFromLocal, CardHand } from './OnlinePlayerUI';
+import { distributePlayers, orderClockwiseFromLocal, CardHand } from '../OnlinePlayerUI';
 
 // Compact fixture helper — only the fields seating cares about.
 const mkPlayers = (...ids) => ids.map((id) => ({ id, username: id.toUpperCase(), status: 'alive' }));

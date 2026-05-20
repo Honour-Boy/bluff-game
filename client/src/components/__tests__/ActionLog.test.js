@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { render, screen } from '@testing-library/react';
-import { ActionLog } from './ActionLog';
+import { ActionLog } from '../ActionLog';
 
 describe('ActionLog', () => {
   it('returns null when no lastAction', () => {

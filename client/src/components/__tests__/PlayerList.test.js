@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { render, screen } from '@testing-library/react';
-import { PlayerList } from './PlayerList';
+import { PlayerList } from '../PlayerList';
 
 const players = [
   { id: 'p1', username: 'Alice', status: 'alive', riskLevel: 1 },

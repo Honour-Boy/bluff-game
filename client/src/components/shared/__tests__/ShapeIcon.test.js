@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { render } from '@testing-library/react';
-import { ShapeIcon, SHAPE_COLORS, SHAPE_META } from './ShapeIcon';
+import { ShapeIcon, SHAPE_COLORS, SHAPE_META } from '../ShapeIcon';
 
 describe('ShapeIcon', () => {
   it.each(['circle', 'triangle', 'cross', 'square', 'star', 'whot'])(

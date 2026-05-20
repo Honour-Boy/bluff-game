@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { render, screen } from '@testing-library/react';
-import { LobbyConfigSummary } from './LobbyConfigSummary';
+import { LobbyConfigSummary } from '../LobbyConfigSummary';
 
 function configWith({ powers = {}, risk = {}, room = {}, systems = {} } = {}) {
   return {

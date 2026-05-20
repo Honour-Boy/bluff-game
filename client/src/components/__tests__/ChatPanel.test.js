@@ -1,7 +1,7 @@
 import { describe, it, expect, vi } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { ChatPanel } from './ChatPanel';
+import { ChatPanel } from '../ChatPanel';
 
 const baseProps = {
   messages: [],

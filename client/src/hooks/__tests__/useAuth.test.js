@@ -36,7 +36,7 @@ const supabaseMock = vi.hoisted(() => {
   };
 });
 
-vi.mock('../lib/supabase', () => ({
+vi.mock('../../lib/supabase', () => ({
   supabase: {
     auth: supabaseMock.auth,
     from: (...args) => {
@@ -55,7 +55,7 @@ vi.mock('../lib/supabase', () => ({
   },
 }));
 
-import { useAuth } from './useAuth';
+import { useAuth } from '../useAuth';
 
 beforeEach(() => {
   // Reset stubs back to default no-session, no-error state.
