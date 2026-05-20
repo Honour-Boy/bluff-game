@@ -1,10 +1,10 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { useIsMobile } from '../../hooks/useIsMobile';
+import { useIsMobile } from './useIsMobile';
 import {
   useAnnouncementSpeech,
   loadSpeechEnabled,
   saveSpeechEnabled,
-} from '../../hooks/useAnnouncementSpeech';
+} from './useAnnouncementSpeech';
 
 export function useOnlinePlayerUiController({
   roomState,
