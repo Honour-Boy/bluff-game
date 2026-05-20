@@ -326,9 +326,9 @@ function _stageSwap(room, state) {
   const { accused } = state;
   if (!accused?.armedPowerCard || accused.armedPowerCard.power !== 'swap') return;
 
-  // Find the swap card in the hand to verify activatability.
-  const hand = room.hands?.get(accused.id) || [];
-  const swapCard = hand.find(c => c?.id === accused.armedPowerCard.cardId);
+  // Find the swap card in the slot to verify activatability.
+  const slot = room.powerCardSlot?.[accused.id] || [];
+  const swapCard = slot.find(c => c?.id === accused.armedPowerCard.cardId);
   // Phase B's isSwapActivatable considers an unset pendingPlayerIds
   // as "no gate, activatable". By Phase C we only ever arm a Swap
   // through activatePowerCard which itself enforces the gate, so by
