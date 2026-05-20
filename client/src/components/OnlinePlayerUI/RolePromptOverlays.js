@@ -4,6 +4,7 @@ import { SpectatorGhostOverlays } from './SpectatorGhostOverlays';
 export function RolePromptOverlays({
   showRoleReveal,
   myRole,
+  barehandVisible = true,
   setRoleRevealSeen,
   saboteurAvailable,
   showRoleRevealBlock,
@@ -32,7 +33,11 @@ export function RolePromptOverlays({
   return (
     <>
       {showRoleReveal && (
-        <RoleRevealOverlay role={myRole} onComplete={() => setRoleRevealSeen(true)} />
+        <RoleRevealOverlay
+          role={myRole}
+          barehandVisible={barehandVisible}
+          onComplete={() => setRoleRevealSeen(true)}
+        />
       )}
 
       {saboteurAvailable && !showRoleRevealBlock && (

@@ -9,6 +9,7 @@ import { CoreGameOverlays } from './CoreGameOverlays';
 import { PowerFlowOverlays } from './PowerFlowOverlays';
 import { RolePromptOverlays } from './RolePromptOverlays';
 import { SystemsLayer } from './SystemsLayer';
+import { PreGameSelectionModal } from '../PreGameSelectionModal';
 import {
   distributePlayers,
   GAME_UI_STYLE,
@@ -36,6 +37,8 @@ export function OnlinePlayerUI({
   spinDismissed,
   activatePowerCard,
   swapPick,
+  preGameSelect,
+  pregame,
   updateRoomConfig,
   getGroupLeaderboard,
   leaderboardUpdateNonce = 0,
@@ -159,7 +162,12 @@ export function OnlinePlayerUI({
   const amSwapHolder = isSwapPending && roomState?.swapHolderId === myPlayer?.id;
   const swapPickOptions = roomState?.swapPickOptions || [];
   const myRole = myPlayer?.role || 'barehand';
-  const showRoleReveal = !ui.roleRevealSeen && roomState?.phase === 'playing' && roomState?.roundNumber === 1 && !!myPlayer?.role;
+  // #116 — role reveal is now server-sequenced during the pre_game
+  // phase, BEFORE the selection popup. Once the server opens selection
+  // (pregame.selectionOpen) the reveal gives way to the picker.
+  const inPreGame = phase === 'pre_game';
+  const showRoleReveal = inPreGame && !pregame?.selectionOpen && !!myPlayer?.role;
+  const showPreGameSelection = inPreGame && !!pregame?.selectionOpen;
   const isSaboteur = myRole === 'saboteur';
   const medicPending = roomState?.pendingMedicSave || null;
   const sniperPending = roomState?.pendingSniperRedirect || null;
@@ -336,9 +344,21 @@ export function OnlinePlayerUI({
         swapHolderId={roomState?.swapHolderId}
       />
 
+      {showPreGameSelection && (
+        <PreGameSelectionModal
+          pool={pregame?.myPool || []}
+          deadline={pregame?.deadline || null}
+          pendingCount={pregame?.pendingCount || 0}
+          totalCount={pregame?.totalCount || 0}
+          selectedId={pregame?.mySelectionId || null}
+          onSelect={preGameSelect}
+        />
+      )}
+
       <RolePromptOverlays
         showRoleReveal={showRoleReveal}
         myRole={myRole}
+        barehandVisible={pregame?.barehandVisible !== false}
         setRoleRevealSeen={ui.setRoleRevealSeen}
         saboteurAvailable={saboteurAvailable}
         showRoleRevealBlock={showRoleReveal}

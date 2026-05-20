@@ -19,6 +19,7 @@ const handHelpers = require('./engine/handHelpers');
 const powerCards = require('./engine/powerCards');
 const players = require('./engine/players');
 const roles = require('./engine/roles');
+const pregame = require('./engine/pregame');
 const spin = require('./engine/spin');
 const bluff = require('./engine/bluff');
 const modifiers = require('./engine/modifiers');
@@ -36,6 +37,8 @@ module.exports = {
   ROLE_TYPES: constants.ROLE_TYPES,
   ROLES_AT_MIN_ALIVE: constants.ROLES_AT_MIN_ALIVE,
   COLLECTOR_POWER_CARD_CAP: constants.COLLECTOR_POWER_CARD_CAP,
+  ROLE_REVEAL_DISPLAY_MS: constants.ROLE_REVEAL_DISPLAY_MS,
+  PRE_GAME_SELECTION_TIMEOUT_MS: constants.PRE_GAME_SELECTION_TIMEOUT_MS,
   MAX_PLAYERS: constants.MAX_PLAYERS,
   CHAMBER_SIZE: constants.CHAMBER_SIZE,
   CHAT_TEXT_MAX: constants.CHAT_TEXT_MAX,
@@ -61,6 +64,7 @@ module.exports = {
   buildDeck: deck.buildDeck,
   buildPowerCards: deck.buildPowerCards,
   dealCards: deck.dealCards,
+  _appendExtraCards: deck._appendExtraCards,
 
   // ─── Card-type helpers + online card play ────────────────
   randomCardType: cards.randomCardType,
@@ -89,11 +93,19 @@ module.exports = {
   // ─── Roles ───────────────────────────────────────────────
   assignRoles: roles.assignRoles,
   getRole: roles.getRole,
+  isBarehandVisible: roles.isBarehandVisible,
   findAvailableMedic: roles.findAvailableMedic,
   findAvailableSniper: roles.findAvailableSniper,
   applyMedicSave: roles.applyMedicSave,
   applySaboteurTransfer: roles.applySaboteurTransfer,
   applySniperRedirect: roles.applySniperRedirect,
+
+  // ─── Pre-game selection & role reveal (#116) ─────────────
+  generateSelectionPool: pregame.generateSelectionPool,
+  beginPreGame: pregame.beginPreGame,
+  startPreGameSelection: pregame.startPreGameSelection,
+  applyPreGameSelection: pregame.applyPreGameSelection,
+  finalizePreGame: pregame.finalizePreGame,
 
   // ─── Spin + Bounty + Survival hand reset ─────────────────
   spinGun: spin.spinGun,

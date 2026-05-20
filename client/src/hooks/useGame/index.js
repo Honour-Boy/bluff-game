@@ -9,7 +9,7 @@ import { getSocket } from '../../lib/socket';
 import { useGameBrowserEffects, useSocketAuthenticationEffect } from './browserEffects';
 import { useGameActions } from './gameActions';
 import { useGroupActions } from './groupActions';
-import { usePromptEvents } from './promptEffects';
+import { usePromptEvents, usePreGameEvents } from './promptEffects';
 import { useGameSocketEvents } from './socketEvents';
 
 export function useGame(getAccessToken, getGuestAuth, authIdentityKey = null) {
@@ -31,6 +31,7 @@ export function useGame(getAccessToken, getGuestAuth, authIdentityKey = null) {
   const [powerEventQueue, setPowerEventQueue] = useState([]);
   const [medicPrompt, setMedicPrompt] = useState(null);
   const [sniperPrompt, setSniperPrompt] = useState(null);
+  const [pregame, setPregame] = useState(null);
 
   const chatOpenRef = useRef(false);
   useEffect(() => {
@@ -188,6 +189,12 @@ export function useGame(getAccessToken, getGuestAuth, authIdentityKey = null) {
     setMedicPrompt,
     setSniperPrompt,
   });
+  usePreGameEvents({
+    socket,
+    roomPhase: roomState?.phase,
+    serializedPregame: roomState?.pregame,
+    setPregame,
+  });
 
   const groupActions = useGroupActions({
     socket,
@@ -238,6 +245,7 @@ export function useGame(getAccessToken, getGuestAuth, authIdentityKey = null) {
     ...gameActions,
     medicPrompt,
     sniperPrompt,
+    pregame,
     powerEventQueue,
     consumePowerEvent,
     setError,

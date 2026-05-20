@@ -7,6 +7,7 @@
 // + ghosted prompt target hint.
 
 const { MODES } = require('./constants');
+const { isBarehandVisible } = require('./roles');
 
 function serializeRoom(room, requestingPlayerId = null, opts = {}) {
   const isOnline = room.mode === MODES.ONLINE;
@@ -158,6 +159,30 @@ function serializeRoom(room, requestingPlayerId = null, opts = {}) {
         : undefined,
     suddenDeathCounter: isOnline ? (room.suddenDeathCounter || 0) : undefined,
     mirrorMatchActive: isOnline ? !!room.mirrorMatchActive : undefined,
+    // Pre-game selection & role reveal (#116). Authoritative view for
+    // the requesting player — reconnect-safe. Only the caller's own
+    // pool/selection is exposed; other players' picks stay private,
+    // and the ready Set is reduced to live counts (Sets don't survive
+    // JSON over the wire).
+    pregame: isOnline && room.phase === 'pre_game'
+      ? {
+          selectionOpen: !!room.pregameSelectionOpen,
+          deadline: room.pregameSelectionDeadline || null,
+          totalCount: room.players.filter(p => p.status === 'alive').length,
+          pendingCount: Math.max(
+            0,
+            room.players.filter(p => p.status === 'alive').length
+              - (room.pregameSelectionsReady ? room.pregameSelectionsReady.size : 0),
+          ),
+          barehandVisible: isBarehandVisible(
+            room.players.filter(p => p.status === 'alive').length,
+          ),
+          myPool: requestingPlayerId ? (room.pregamePools?.[requestingPlayerId] || null) : null,
+          mySelectionId: requestingPlayerId
+            ? (room.pregameSelections?.[requestingPlayerId]?.id || null)
+            : null,
+        }
+      : null,
   };
 }
 

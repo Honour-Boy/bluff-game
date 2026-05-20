@@ -6,11 +6,76 @@
 // spin_acknowledged. Phase-F system events live in handlers/systems.js.
 
 const engine = require('../gameEngine');
-const { getRoom, saveRoom } = require('../lib/state');
+const {
+  getRoom,
+  saveRoom,
+  pregameTimers,
+  _clearPreGameTimer,
+} = require('../lib/state');
 const { broadcastRoomState } = require('../lib/broadcast');
 const { socketRateLimit } = require('../lib/rateLimiter');
 const { maybeRecordGroupWinner } = require('../lib/roomBuilders');
 const { runMirrorMatchSpin } = require('../lib/orchestration');
+
+// ─── Pre-game selection orchestration (#116) ─────────────────
+// Pure phase/state logic lives in engine/pregame.js; these helpers
+// own the socket I/O + the two chained server timers (role-reveal
+// display → 15s selection auto-resolve). One timer per room at a time,
+// registered in lib/state's `pregameTimers`. Mirrors the betting /
+// ghost-vote timer pattern in lib/orchestration.js.
+
+async function emitRoleReveals(io, room) {
+  const aliveCount = room.players.filter(p => p.status === 'alive').length;
+  const barehandVisible = engine.isBarehandVisible(aliveCount);
+  const sockets = await io.in(room.code).fetchSockets();
+  for (const s of sockets) {
+    const player = room.players.find(p => p.socketId === s.id);
+    if (!player) continue;
+    s.emit('role_reveal', { role: player.role || 'barehand', barehandVisible });
+  }
+}
+
+async function finalizePreGameAndBroadcast(io, code) {
+  const room = await getRoom(code);
+  if (!room || room.phase !== 'pre_game') return;
+  const result = engine.finalizePreGame(room);
+  if (!result.ok) return;
+  await saveRoom(room);
+  io.to(code).emit('pre_game_complete');
+  await broadcastRoomState(io, code);
+}
+
+function schedulePreGameFinalize(io, code) {
+  _clearPreGameTimer(code);
+  const handle = setTimeout(async () => {
+    pregameTimers.delete(code);
+    await finalizePreGameAndBroadcast(io, code);
+  }, engine.PRE_GAME_SELECTION_TIMEOUT_MS);
+  pregameTimers.set(code, handle);
+}
+
+function schedulePreGameSelectionOpen(io, code) {
+  _clearPreGameTimer(code);
+  const handle = setTimeout(async () => {
+    pregameTimers.delete(code);
+    const room = await getRoom(code);
+    if (!room || room.phase !== 'pre_game') return;
+    engine.startPreGameSelection(room);
+    await saveRoom(room);
+    const sockets = await io.in(code).fetchSockets();
+    for (const s of sockets) {
+      const player = room.players.find(p => p.socketId === s.id);
+      if (!player) continue;
+      s.emit('pre_game_selection_start', {
+        pool: room.pregamePools?.[player.id] || [],
+        deadline: room.pregameSelectionDeadline,
+      });
+    }
+    await broadcastRoomState(io, code);
+    schedulePreGameFinalize(io, code);
+  }, engine.ROLE_REVEAL_DISPLAY_MS);
+  pregameTimers.set(code, handle);
+}
 
 function register(io, socket, deps) {
   const { groupSettingsRepo, leaderboardRepo } = deps;
@@ -38,6 +103,14 @@ function register(io, socket, deps) {
 
       delete room.groupLeaderboardWinnerRecorded;
       engine.startGame(room);
+
+      // #116 — online games run a pre_game phase (private role reveal
+      // then per-player bonus-card selection) before play. startGame
+      // has already dealt + assigned roles; beginPreGame just flips the
+      // phase to 'pre_game' and builds the selection pools. Physical
+      // mode keeps the direct lobby → playing transition.
+      const runsPreGame = room.mode === engine.MODES.ONLINE;
+      if (runsPreGame) engine.beginPreGame(room);
 
       if (room.groupId) {
         try {
@@ -81,8 +154,45 @@ function register(io, socket, deps) {
           subtitle: 'requires an even player count',
         });
       }
+
+      // Kick off the pre_game sequence: private role reveals now, then
+      // open selection once the reveal display window elapses.
+      if (runsPreGame) {
+        await emitRoleReveals(io, room);
+        schedulePreGameSelectionOpen(io, roomCode);
+      }
     } catch (err) {
       callback({ success: false, error: err.message });
+    }
+  });
+
+  // ─── PLAYER: Confirm pre-game card selection (#116) ──────
+  socket.on('pre_game_select', async ({ roomCode, optionId } = {}, callback) => {
+    try {
+      if (!socket.userId) return callback?.({ success: false, error: 'Not authenticated' });
+      const code = roomCode?.toUpperCase();
+      const room = await getRoom(code);
+      if (!room) return callback?.({ success: false, error: 'Room not found' });
+
+      const result = engine.applyPreGameSelection(room, socket.userId, optionId);
+      if (!result.ok) return callback?.({ success: false, error: result.error });
+
+      await saveRoom(room);
+      io.to(code).emit('pre_game_waiting', {
+        pendingCount: result.pendingCount,
+        totalCount: result.totalCount,
+      });
+      await broadcastRoomState(io, code);
+      callback?.({ success: true, pendingCount: result.pendingCount });
+
+      // Last player in → resolve immediately and cancel the timer so
+      // there's no race between the final pick and the 15s auto-resolve.
+      if (result.allReady) {
+        _clearPreGameTimer(code);
+        await finalizePreGameAndBroadcast(io, code);
+      }
+    } catch (err) {
+      callback?.({ success: false, error: err.message });
     }
   });
 

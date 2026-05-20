@@ -55,6 +55,18 @@ function getRole(room, playerId) {
   return p?.role || ROLES.BAREHAND;
 }
 
+/**
+ * Pre-game role reveal visibility (#116). Special roles are only
+ * assigned when alive count >= ROLES_AT_MIN_ALIVE, but the reveal
+ * overlay must additionally hide the *Barehand* label below the
+ * threshold — small tables show a neutral "Standard" indicator
+ * instead so the reveal doesn't telegraph that no roles are in play.
+ * Assignment vs. visibility are deliberately decoupled.
+ */
+function isBarehandVisible(playerCount) {
+  return playerCount > ROLES_AT_MIN_ALIVE;
+}
+
 // ─── Role helpers ────────────────────────────────────────────
 
 /**
@@ -202,6 +214,7 @@ module.exports = {
   _shuffle,
   assignRoles,
   getRole,
+  isBarehandVisible,
   findAvailableMedic,
   findAvailableSniper,
   applyMedicSave,
