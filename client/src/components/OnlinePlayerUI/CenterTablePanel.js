@@ -1,5 +1,5 @@
-import { CardShape } from '../CardShape';
-import { ShapeIcon } from '../ShapeIcon';
+import { CardShape } from '../shared/CardShape';
+import { ShapeIcon } from '../shared/ShapeIcon';
 import { ActionLog } from '../ActionLog';
 import { WaitingForPlayerBanner } from '../TurnActionModal';
 import { LeaderboardPanel } from '../LeaderboardPanel';

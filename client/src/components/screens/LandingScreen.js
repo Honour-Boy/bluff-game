@@ -6,7 +6,7 @@ const HowToPlayModal = lazy(() =>
   import('./HowToPlayModal').then((m) => ({ default: m.HowToPlayModal })),
 );
 import { UserProfile } from './UserProfile';
-import { ShapeIcon } from '../ShapeIcon';
+import { ShapeIcon } from '../shared/ShapeIcon';
 
 export function LandingScreen({
   username,

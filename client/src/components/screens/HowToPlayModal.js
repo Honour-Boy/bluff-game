@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { PowerCard, POWER_META } from "../PowerCard";
+import { PowerCard, POWER_META } from "../shared/PowerCard";
 import { ROLE_META } from "../RoleRevealOverlay";
 
 // ─── HowToPlayModal ───────────────────────────────────────────

@@ -1,5 +1,5 @@
 import { ActionLog } from '../ActionLog';
-import { CardShape } from '../CardShape';
+import { CardShape } from '../shared/CardShape';
 
 export function RequiredCardPanel({ show, currentCardType }) {
   if (!show || !currentCardType) return null;

@@ -13,7 +13,7 @@ import { GroupDetailScreen } from '../components/screens/GroupDetailScreen';
 import { HostUI } from '../components/HostUI';
 import { PlayerUI } from '../components/PlayerUI';
 import { OnlinePlayerUI } from '../components/OnlinePlayerUI';
-import { Notification } from '../components/Notification';
+import { Notification } from '../components/shared/Notification';
 import { ChatPanel } from '../components/ChatPanel';
 import { useIsMobile } from '../hooks/useIsMobile';
 

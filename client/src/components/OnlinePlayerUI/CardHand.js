@@ -1,5 +1,5 @@
-import { ShapeIcon } from '../ShapeIcon';
-import { POWER_META, POWER_ICONS } from '../PowerCard';
+import { ShapeIcon } from '../shared/ShapeIcon';
+import { POWER_META, POWER_ICONS } from '../shared/PowerCard';
 
 export function CardHand({ hand, selectedCardId, onCardClick, interactive = true }) {
   if (hand.length === 0) {
