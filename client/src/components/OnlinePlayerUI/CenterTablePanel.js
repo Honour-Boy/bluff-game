@@ -3,7 +3,7 @@ import { ShapeIcon } from '../ShapeIcon';
 import { ActionLog } from '../ActionLog';
 import { WaitingForPlayerBanner } from '../TurnActionModal';
 import { LeaderboardPanel } from '../LeaderboardPanel';
-import { PreGameSettingsPanel } from '../PreGameSettingsPanel';
+import { PreGameSettingsPanel } from '../screens/PreGameSettingsPanel';
 import { LobbyConfigSummary } from '../LobbyConfigSummary';
 
 function FaceDownStack({ count, label, warning = false }) {

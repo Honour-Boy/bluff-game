@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState, lazy } from 'react';
 const HowToPlayModal = lazy(() =>
-  import('../HowToPlayModal').then((module) => ({ default: module.HowToPlayModal })),
+  import('../screens/HowToPlayModal').then((module) => ({ default: module.HowToPlayModal })),
 );
 import { PlayerHeader } from './PlayerHeader';
 import { PlayerStatusCard } from './PlayerStatusCard';
