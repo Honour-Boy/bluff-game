@@ -14,7 +14,7 @@ import {
   GAME_UI_STYLE,
   orderClockwiseFromLocal,
 } from './helpers';
-import { useOnlinePlayerUiController } from './useOnlinePlayerUiController';
+import { useOnlinePlayerUiController } from '../../hooks/useOnlinePlayerUiController';
 
 export { CardHand, distributePlayers, orderClockwiseFromLocal };
 
