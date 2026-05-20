@@ -76,11 +76,11 @@ function _consumeArmedCard(room, player) {
   if (!player) return null;
   const armed = player.armedPowerCard;
   if (!armed) return null;
-  const hand = room.hands?.get(player.id);
-  if (hand) {
-    const idx = hand.findIndex(c => c?.id === armed.cardId);
+  const slot = room.powerCardSlot?.[player.id];
+  if (Array.isArray(slot)) {
+    const idx = slot.findIndex(c => c?.id === armed.cardId);
     if (idx !== -1) {
-      const [card] = hand.splice(idx, 1);
+      const [card] = slot.splice(idx, 1);
       if (!room.discardPile) room.discardPile = [];
       room.discardPile.push(card);
     }
@@ -326,9 +326,9 @@ function _stageSwap(room, state) {
   const { accused } = state;
   if (!accused?.armedPowerCard || accused.armedPowerCard.power !== 'swap') return;
 
-  // Find the swap card in the hand to verify activatability.
-  const hand = room.hands?.get(accused.id) || [];
-  const swapCard = hand.find(c => c?.id === accused.armedPowerCard.cardId);
+  // Find the swap card in the slot to verify activatability.
+  const slot = room.powerCardSlot?.[accused.id] || [];
+  const swapCard = slot.find(c => c?.id === accused.armedPowerCard.cardId);
   // Phase B's isSwapActivatable considers an unset pendingPlayerIds
   // as "no gate, activatable". By Phase C we only ever arm a Swap
   // through activatePowerCard which itself enforces the gate, so by

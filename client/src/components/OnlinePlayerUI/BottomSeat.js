@@ -22,6 +22,7 @@ export function BottomSeat({
   spectatedHand,
   handleSpectatePlayer,
   myHand,
+  myPowerCardSlot = [],
   selectedCardId,
   handleCardClick,
   phase,
@@ -202,6 +203,7 @@ export function BottomSeat({
             </div>
             <CardHand
               hand={myHand}
+              powerCardSlot={myPowerCardSlot}
               selectedCardId={isMyTurn && isPlaying && !cardPlayedThisTurn ? selectedCardId : null}
               onCardClick={handleCardClick}
               interactive={isMyTurn && isPlaying && !cardPlayedThisTurn}

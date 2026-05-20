@@ -61,6 +61,7 @@ function buildBluffScenario({
   room.cardPlayedThisTurn = false;
   room.discardPile = [];
   room.hands = new Map();
+  room.powerCardSlot = {};
 
   // Cards played this round live in playedPile; lastPlayedCard is
   // the top of the pile (= accused's most recent card).
@@ -74,10 +75,12 @@ function buildBluffScenario({
   room.lastPlayedCard = playedCard;
   room.currentCardType = currentCardType;
 
-  // Wire armed cards into the holder's hand + armedPowerCard.
+  // Wire armed cards into the holder's slot + armedPowerCard.
+  // Post-#117: power cards live in room.powerCardSlot, not room.hands.
   function armPlayer(player, armed) {
+    room.hands.set(player.id, []);
     if (!armed) {
-      room.hands.set(player.id, []);
+      room.powerCardSlot[player.id] = [];
       return;
     }
     const card = {
@@ -87,7 +90,7 @@ function buildBluffScenario({
       armed: true,
       ...(armed.power === 'swap' ? { swapPendingPlayerIds: [] } : {}),
     };
-    room.hands.set(player.id, [card]);
+    room.powerCardSlot[player.id] = [card];
     player.armedPowerCard = {
       power: armed.power,
       cardId: card.id,
@@ -321,7 +324,7 @@ describe('pipeline / Swap', () => {
     // activatable. The pipeline should fall through to default.
     const { room } = buildSwapScenario();
     const accused = room.players.find(p => p.id === 'p0');
-    const swapCard = room.hands.get('p0').find(c => c.power === 'swap');
+    const swapCard = room.powerCardSlot['p0']?.find(c => c.power === 'swap');
     swapCard.swapPendingPlayerIds = ['p1']; // gate not satisfied
     const { outcome } = resolveBluff(room, 'p1');
     // Stage 5 (Swap) saw the gate, did not pause. Falls through to

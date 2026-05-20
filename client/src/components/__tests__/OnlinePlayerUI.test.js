@@ -167,7 +167,7 @@ describe('CardHand — armed power-card visual state (issue #64)', () => {
 
   it('shows the lock badge for an armed card', () => {
     render(
-      <CardHand hand={[card('p1', { type: 'power', power: 'assassin', armed: true })]} />,
+      <CardHand hand={[]} powerCardSlot={[card('p1', { type: 'power', power: 'assassin', armed: true })]} />,
     );
     expect(screen.getByLabelText(/Activated — awaiting trigger/i)).toBeInTheDocument();
   });
@@ -175,10 +175,8 @@ describe('CardHand — armed power-card visual state (issue #64)', () => {
   it('halves the inner-card opacity when armed', () => {
     render(
       <CardHand
-        hand={[
-          card('plain'),
-          card('armed-card', { type: 'power', power: 'shield', armed: true }),
-        ]}
+        hand={[card('plain')]}
+        powerCardSlot={[card('armed-card', { type: 'power', power: 'shield', armed: true })]}
       />,
     );
     const lock = screen.getByLabelText(/Activated — awaiting trigger/i);
@@ -193,7 +191,8 @@ describe('CardHand — armed power-card visual state (issue #64)', () => {
     const onCardClick = vi.fn();
     render(
       <CardHand
-        hand={[card('p1', { type: 'power', power: 'assassin', armed: true })]}
+        hand={[]}
+        powerCardSlot={[card('p1', { type: 'power', power: 'assassin', armed: true })]}
         onCardClick={onCardClick}
         interactive
       />,
@@ -210,7 +209,7 @@ describe('CardHand — armed power-card visual state (issue #64)', () => {
 
   it('exposes a hover tooltip via the title attribute on the armed card', () => {
     render(
-      <CardHand hand={[card('p1', { type: 'power', power: 'shield', armed: true })]} />,
+      <CardHand hand={[]} powerCardSlot={[card('p1', { type: 'power', power: 'shield', armed: true })]} />,
     );
     const lock = screen.getByLabelText(/Activated — awaiting trigger/i);
     const outer = lock.parentElement;
@@ -221,10 +220,8 @@ describe('CardHand — armed power-card visual state (issue #64)', () => {
     const onCardClick = vi.fn();
     render(
       <CardHand
-        hand={[
-          card('normal', { shape: 'square', number: 7 }),
-          card('armed-card', { type: 'power', power: 'assassin', armed: true }),
-        ]}
+        hand={[card('normal', { shape: 'square', number: 7 })]}
+        powerCardSlot={[card('armed-card', { type: 'power', power: 'assassin', armed: true })]}
         onCardClick={onCardClick}
         interactive
       />,
