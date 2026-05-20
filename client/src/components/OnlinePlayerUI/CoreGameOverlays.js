@@ -1,6 +1,6 @@
 import { lazy, Suspense } from 'react';
-import { CardShape } from '../CardShape';
-import { ShapeIcon } from '../ShapeIcon';
+import { CardShape } from '../shared/CardShape';
+import { ShapeIcon } from '../shared/ShapeIcon';
 import { TurnActionModal } from '../TurnActionModal';
 import { SpinOverlay } from './SpinOverlay';
 

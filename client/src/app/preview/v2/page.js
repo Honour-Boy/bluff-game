@@ -6,10 +6,10 @@
 // ──────────────────────────────────────────────────────────────
 
 import { useState } from "react";
-import { PowerCard, POWER_TYPES, POWER_META } from "../../../components/PowerCard";
-import { PowerCardBack } from "../../../components/PowerCardBack";
-import { AnnouncementBanner } from "../../../components/AnnouncementBanner";
-import { CardShape } from "../../../components/CardShape";
+import { PowerCard, POWER_TYPES, POWER_META } from "../../../components/shared/PowerCard";
+import { PowerCardBack } from "../../../components/shared/PowerCardBack";
+import { AnnouncementBanner } from "../../../components/shared/AnnouncementBanner";
+import { CardShape } from "../../../components/shared/CardShape";
 
 const BANNER_KINDS = [
   { kind: "bluff_blocked", label: "Bluff Blocked", subtitle: "Shield activated" },

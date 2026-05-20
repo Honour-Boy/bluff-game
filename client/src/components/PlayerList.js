@@ -1,6 +1,6 @@
 'use client';
 
-import { RiskMeter } from './RiskMeter';
+import { RiskMeter } from './shared/RiskMeter';
 import { VoiceIndicator } from './VoicePanel';
 
 export function PlayerList({ players, turnOrder, currentPlayerId, isHost, phase, speakingIds, voiceConnected }) {

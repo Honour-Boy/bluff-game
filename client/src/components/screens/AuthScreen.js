@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { ShapeIcon } from '../ShapeIcon';
+import { ShapeIcon } from '../shared/ShapeIcon';
 
 // ─── Shared input style helper ────────────────────────────────
 const INPUT_STYLE = {

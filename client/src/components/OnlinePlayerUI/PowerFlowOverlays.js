@@ -1,6 +1,6 @@
-import { PowerCard, POWER_META } from '../PowerCard';
-import { ShapeIcon } from '../ShapeIcon';
-import { AnnouncementBanner } from '../AnnouncementBanner';
+import { PowerCard, POWER_META } from '../shared/PowerCard';
+import { ShapeIcon } from '../shared/ShapeIcon';
+import { AnnouncementBanner } from '../shared/AnnouncementBanner';
 import { buildAnnouncementBannerProps } from './helpers';
 
 export function PowerFlowOverlays({
