@@ -1,5 +1,5 @@
 # Bluff Game — Current State
-> Last updated: 2026-05-20
+> Last updated: 2026-05-20 (post #130)
 
 ---
 
@@ -13,6 +13,7 @@
 
 | PR | Issue | What |
 |----|-------|------|
+| #130 | #125 | Refactor: tests → `__tests__/` dirs; `test-utils/` barrel; `gameActions` unit tests |
 | #128 | #123 | Refactor: primitive UI atoms → `components/shared/` |
 | #127 | #122 | Refactor: screen-level components → `components/screens/` |
 | #126 | #124 | Refactor: drop stub shims + relocate `useOnlinePlayerUiController` → `hooks/` |
@@ -38,7 +39,6 @@
 | **#119** | Architecture: Unified Event Resolution Engine | feature, refactor | Not started — **implement before #120** |
 | **#120** | Feature: Card Behaviors & Medic Role Integration | feature, enhancement, bug | Depends on #119 |
 | **#121** | Bug: Public Announcement & Event Sync Accuracy | bug | Depends on #119 |
-| **#125** | Refactor: Establish consistent test file organisation | refactor | Not started |
 
 ---
 
@@ -58,6 +58,7 @@ client/src/
     useGame/     — Game socket hook (split into sub-modules)
     useAuth.js, useVoice.js, useIsMobile.js
     useOnlinePlayerUiController.js  ← moved here from OnlinePlayerUI/
+  test-utils/            — shared test helpers (makeMockSocket); import from here
   lib/           — socket.js, supabase.js
 ```
 
