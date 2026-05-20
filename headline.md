@@ -1,5 +1,5 @@
 # Bluff Game — Current State
-> Last updated: 2026-05-20 (post #130)
+> Last updated: 2026-05-20 (post #132)
 
 ---
 
@@ -13,6 +13,7 @@
 
 | PR | Issue | What |
 |----|-------|------|
+| #132 | #117 | Feature: power cards moved to `room.powerCardSlot`; hand UI splits shape cards from a dedicated POWER side-column |
 | #130 | #125 | Refactor: tests → `__tests__/` dirs; `test-utils/` barrel; `gameActions` unit tests |
 | #128 | #123 | Refactor: primitive UI atoms → `components/shared/` |
 | #127 | #122 | Refactor: screen-level components → `components/screens/` |
@@ -34,7 +35,6 @@
 | # | Title | Labels | Status |
 |---|-------|--------|--------|
 | **#116** | Feature: Pre-Game Selection & Role Reveal Flow | feature, enhancement | Not started |
-| **#117** | Feature: Hand UI & Playable Card Limit Rework | feature, enhancement, ui | Not started |
 | **#118** | Feature: Pre-Emptive Manual Activation & Upkeep Phase | feature, enhancement | Not started |
 | **#119** | Architecture: Unified Event Resolution Engine | feature, refactor | Not started — **implement before #120** |
 | **#120** | Feature: Card Behaviors & Medic Role Integration | feature, enhancement, bug | Depends on #119 |
