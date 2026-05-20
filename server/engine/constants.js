@@ -37,6 +37,49 @@ const CARD_TYPES_DISCRIMINATOR = {
 };
 const POWER_TYPES = ['shield', 'mirror', 'swap', 'peek', 'freeze', 'assassin'];
 
+// ─── v2 #119 — Unified Event Resolution Engine ───────────────
+//
+// `bluffPipeline.js` resolves every bluff by pushing a single typed
+// `GameEvent` through an ordered `ResolutionQueue`. The queue has
+// exactly six priority tiers; no tier runs until the previous one has
+// fully resolved. Priority is declarative (the tier number) rather
+// than implicit in array position — there are no pairwise card-vs-card
+// overrides. Clashes that used to be encoded by stage ordering (e.g.
+// "Assassin > Mirror") are now expressed through event flags: a
+// non-`redirectable` event is one that Tier-4 redirectors (Mirror,
+// Sniper) must leave untouched.
+const RESOLUTION_TIERS = {
+  PREVENTION: 1,      // Shield, Freeze — cancel the bluff outright
+  MODIFICATION: 2,    // Swap, Peek — mutate the played card / pause
+  BLUFF_VALIDATION: 3,// Determine truth of the played card + type the consequence
+  REDIRECTION: 4,     // Mirror, Sniper — retarget a redirectable consequence
+  CONSEQUENCE: 5,     // Spin, Assassin (FORCED_ELIMINATION) — materialise it
+  POST_RESOLUTION: 6, // Medic, Bounty, Role effects, Announcements
+};
+
+// Typed `GameEvent.type` values. Each tier handler receives a
+// `GameEvent` and returns the same event (pass-through), a mutated /
+// re-typed event, or `null` (event cancelled / consumed).
+const GAME_EVENT_TYPES = {
+  BLUFF_CALLED: 'BLUFF_CALLED',           // initial, not-yet-typed event
+  SPIN_CONSEQUENCE: 'SPIN_CONSEQUENCE',   // someone spins the chamber
+  FORCED_ELIMINATION: 'FORCED_ELIMINATION', // Assassin strike — non-redirectable
+  ASSASSIN_BACKFIRE: 'ASSASSIN_BACKFIRE', // correct call vs Assassin → +N penalty
+  BLUFF_BLOCKED: 'BLUFF_BLOCKED',         // Shield — bluff never registers
+  SWAP_PENDING: 'SWAP_PENDING',           // Swap — pause for the holder's pick
+  BLUFF_ERROR: 'BLUFF_ERROR',             // resume-time invariant violation
+};
+
+/**
+ * @typedef {Object} GameEvent
+ * @property {string}  type         One of GAME_EVENT_TYPES.
+ * @property {boolean} redirectable false ⇒ Mirror / Sniper cannot retarget it.
+ * @property {boolean} preventable  false ⇒ Shield / Freeze cannot cancel it.
+ * @property {string|null} source   playerId who triggered the effect.
+ * @property {string|null} target   playerId the effect lands on.
+ * @property {Object}  payload      effect-specific data carried to the caller.
+ */
+
 const MODES = {
   PHYSICAL: 'physical',
   ONLINE: 'online',
@@ -136,6 +179,8 @@ module.exports = {
   PRE_GAME_SELECTION_TIMEOUT_MS,
   CARD_TYPES_DISCRIMINATOR,
   POWER_TYPES,
+  RESOLUTION_TIERS,
+  GAME_EVENT_TYPES,
   MODES,
   CHAT_LOG_MAX,
   CHAT_TEXT_MAX,

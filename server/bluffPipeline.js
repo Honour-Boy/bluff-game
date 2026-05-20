@@ -1,70 +1,61 @@
 // ============================================================
-// BLUFF PIPELINE — Phase C
+// BLUFF PIPELINE — Unified Event Resolution Engine (#119)
 // ============================================================
 //
-// `call_bluff` used to live as a procedural blob inside the socket
-// handler. With v2's bluff-time power cards (Shield / Mirror / Swap /
-// Assassin) and the upcoming Phase D roles (Sheriff exempts the
-// caller from Assassin) it has to grow several conditional branches
-// AND several short-circuits — exactly the shape that gets messy
-// fast in inline code.
+// `call_bluff` resolution used to be a procedural blob, then a fixed
+// array of stage functions whose priority was *implicit in array
+// position*. #119 replaces that with a declarative, typed engine:
 //
-// This module hosts a single entry point — `resolveBluff(room, accuserId)`
-// — that runs the resolution as a series of small, named stages. Each
-// stage is a pure-ish function: it can read the room, append events,
-// mutate `state` (the per-pipeline scratch), and either return to
-// continue OR set `state.shortCircuit = true` to stop the run.
+//   • Every effect is represented as a typed `GameEvent`
+//     (see constants.js `GAME_EVENT_TYPES` + the `GameEvent` typedef).
+//   • A single `GameEvent` is pushed through a `ResolutionQueue` of
+//     exactly six ordered priority tiers (constants.js
+//     `RESOLUTION_TIERS`). No tier runs until the previous one has
+//     fully resolved.
+//   • Each tier handler receives the event and returns the same event
+//     (pass-through), a mutated / re-typed event, or `null` (cancelled).
+//   • Clash priorities are NO LONGER encoded by ordering. They fall out
+//     of the event flags: a non-`redirectable` event is one Tier-4
+//     redirectors (Mirror / Sniper) must leave untouched — that is how
+//     "Assassin > Mirror" is honoured without an `if assassin && mirror`
+//     pairwise override.
+//
+//   Tier 1 Prevention      → Shield (Freeze has no bluff-time effect)
+//   Tier 2 Modification     → Swap   (Peek has no bluff-time effect)
+//   Tier 3 Bluff Validation → truth of the played card + consequence typing
+//   Tier 4 Redirection      → Mirror (Sniper handled by the orchestrator)
+//   Tier 5 Consequence      → spin target / Assassin FORCED_ELIMINATION
+//   Tier 6 Post-Resolution   → Gambler, Sheriff relief, Bounty
+//
+// NOTE on Assassin placement: the Assassin's consequence is *typed*
+// during Tier 3, because its branch is a function of bluff correctness
+// AND because Tier-4 Mirror must be able to see a non-`redirectable`
+// FORCED_ELIMINATION in order to refuse it. Tier 5 then *materialises*
+// that consequence (consume the card, emit the strike). This keeps the
+// "Assassin > Mirror" clash purely flag-driven.
 //
 // Side effects (announce-banner socket emits, room phase mutation,
-// chamber spinning, hand reset) are performed by the *caller* —
-// `socketHandlers.js`. The pipeline is pure logic + a list of
-// `events` for the caller to broadcast.
+// chamber spinning, hand reset, Sniper/Medic pauses) are still
+// performed by the *callers* — `handlers/bluff.js` + `lib/orchestration.js`.
+// The pipeline is pure logic + a list of `events` for the caller to
+// broadcast.
 //
-// Public surface:
+// Public surface (UNCHANGED — callers + tests rely on `outcome.kind`):
 //
-//   resolveBluff(room, accuserId)
-//     → {
-//         events:  PowerCardEvent[],   // announce-banner payloads
-//         outcome: {
-//           kind: 'spin' | 'blocked' | 'eliminated' | 'assassin_backfire' | 'swap_pending',
-//           // for 'spin':
-//           spinTargetId?: string,
-//           bluffIsCorrect?: boolean,
-//           accuserId?: string,
-//           accusedId?: string,
-//           revealedCard?: Card | null,
-//           // for 'blocked':
-//           // (no extras — caller advances turn normally)
-//           // for 'eliminated' (Assassin path, wrong bluff):
-//           eliminatedPlayerId?: string,
-//           eliminatedReason?: 'assassin',
-//           // for 'assassin_backfire' (Assassin path, correct bluff):
-//           cardsToDrawForAccused?: number,
-//           // for 'swap_pending':
-//           swapHolderId?: string,
-//         },
-//       }
+//   resolveBluff(room, accuserId)     → { events, outcome }
+//   resumeAfterSwap(room, accuserId, pickedCardId) → { events, outcome }
 //
-// Pipeline stages, in order:
-//   1. Shield check on accused → blocked (consume Shield)
-//   2. Determine bluff correctness
-//   3. Assassin check on accused → branch on correctness (consume Assassin)
-//      • Wrong bluff (accused told truth) → eliminate accuser
-//      • Correct bluff (accused was bluffing) → backfire: accused draws +3
-//      • Sheriff role exemption hook (Phase D) bypasses both branches
-//   4. Mirror check on accused → redirect spin to accuser (consume Mirror)
-//   5. Swap check on accused → return swap_pending (caller pauses for pick)
-//   6. Default: spin target = correct caller or wrong caller per existing rules
-//
-// Phase D entry points:
-//   • Sheriff (player.role === 'sheriff') is checked in the Assassin
-//     stage — see `_isSheriff(...)`. Today returns false; Phase D
-//     flips the body on once roles ship.
-//   • Bounty / role-driven mods bolt on as new stages between (3) and
-//     (6) without touching existing ones.
+//   outcome.kind ∈ 'spin' | 'blocked' | 'eliminated' | 'assassin_backfire'
+//                | 'swap_pending' | 'error'
+//   outcome.event is the terminal typed GameEvent (for consumers that
+//   prefer the typed surface; `outcome.kind` maps 1:1 to event.type).
 // ============================================================
 
-const SHAPES = ['circle', 'triangle', 'cross', 'square', 'star'];
+const {
+  RESOLUTION_TIERS,
+  GAME_EVENT_TYPES,
+} = require('./engine/constants');
+const { isBluffCorrect, buildBluffValidationEvent } = require('./engine/bluff');
 
 // ─── Tiny helpers ─────────────────────────────────────────────
 
@@ -96,18 +87,12 @@ function _accusedPrev(room) {
   return _findPlayer(room, room.turnOrder[prevIdx]);
 }
 
-function _isBluffCorrect(room) {
-  const revealed = room.lastPlayedCard;
-  if (!revealed) return true; // No card played → "the previous player can't have told the truth"
-  if (revealed.shape === 'whot') return false;
-  return revealed.shape !== room.currentCardType;
-}
+// Thin alias kept for the `_internal` test surface — the rule itself
+// lives in engine/bluff.js so there is exactly one implementation.
+const _isBluffCorrect = isBluffCorrect;
 
 // Phase D hook — Sheriff role exempts the accuser from Assassin's
-// strike. Now LIVE: reads `player.role === 'sheriff'` (set at
-// startGame by engine.assignRoles when alive count >= 9). The
-// Sheriff also gains a passive risk-drop on correct bluff calls
-// — that lives in stage 6 below.
+// strike (also gains a passive risk-drop on correct calls — Tier 6).
 function _isSheriff(room, playerId) {
   return _findPlayer(room, playerId)?.role === 'sheriff';
 }
@@ -116,18 +101,13 @@ function _isGambler(room, playerId) {
   return _findPlayer(room, playerId)?.role === 'gambler';
 }
 
-// v2 Phase D — Gambler: when a bluff is correctly called on the
-// Gambler, their risk level jumps to 4 BEFORE the spin happens.
-// This is implemented by re-shaping their chamber array to hold
-// exactly 4 bullets at random positions (preserving the spec's
-// "risk level = bullet count" invariant). External modifiers
-// (Sudden Death, etc.) still affect Gambler's risk normally because
-// they read `player.chamber`/`player.riskLevel` like everyone else.
+// v2 Phase D — Gambler: a correctly-called bluff jumps their risk to 4
+// BEFORE the spin by rewriting the chamber to hold exactly 4 bullets at
+// random positions (preserving "risk level = bullet count").
 function _bumpGamblerRiskToFour(player) {
   const TARGET = 4;
   const SIZE = player.chamber.length;
   const filled = new Array(SIZE).fill(null);
-  // Random-distinct slot sampling.
   const indices = [];
   while (indices.length < TARGET) {
     const idx = Math.floor(Math.random() * SIZE);
@@ -138,419 +118,453 @@ function _bumpGamblerRiskToFour(player) {
   player.riskLevel = TARGET;
 }
 
-// ─── Stage 1: Shield ──────────────────────────────────────────
-//
-// Shield blocks the bluff outright. Per spec, the bluff "never
-// officially registers" — so subsequent stages, including Assassin,
-// don't fire. Accuser loses their bluff-call opportunity and must
-// just play a card and end turn normally (the caller flips
-// `bluffUsedThisTurn` so the game gates reflect this).
-function _stageShield(room, state) {
-  const { accused } = state;
-  if (!accused?.armedPowerCard || accused.armedPowerCard.power !== 'shield') return;
-
-  _consumeArmedCard(room, accused);
-  state.events.push({
-    kind: 'shield_blocked',
-    holderId: accused.id,
-    holderName: accused.username,
-  });
-  state.outcome = {
-    kind: 'blocked',
-    accuserId: state.accuser?.id || null,
-    accusedId: accused.id,
-  };
-  state.shortCircuit = true;
-}
-
-// ─── Stage 2: Determine bluff correctness ────────────────────
-//
-// Cached on state so the Assassin stage (which branches on it) and
-// stages 4 + 6 can read it without recomputing.
-function _stageBluffCorrectness(room, state) {
-  state.bluffIsCorrect = _isBluffCorrect(room);
-  state.revealedCard = room.lastPlayedCard || null;
-}
-
-// ─── Stage 3: Assassin ────────────────────────────────────────
-//
-// Per #63, Assassin no longer fires unconditionally. The branch depends
-// on whether the bluff call was correct:
-//   • Wrong bluff (accused told truth) → caller is eliminated.
-//   • Correct bluff (accused was bluffing) → caller does NOT spin and
-//     accused does NOT spin; instead the Assassin backfires and the
-//     holder draws +3 cards. Card is consumed either way.
-//
-// Spec notes: Shield > Assassin (stage 1 short-circuits us). Sheriff
-// > Assassin is a Phase D hook — when the accuser is the Sheriff, the
-// Assassin doesn't fire at all (no strike, no backfire); the bluff
-// falls through to normal resolution so a correct Sheriff call still
-// spins the accused and earns its risk-drop.
-function _stageAssassin(room, state) {
-  const { accuser, accused } = state;
-  if (!accused?.armedPowerCard || accused.armedPowerCard.power !== 'assassin') return;
-
-  // Phase D Sheriff exemption — Sheriff cannot be killed by Assassin.
-  // The Assassin stays armed (consumption is gated on a successful
-  // strike, not a fired-and-fizzled trigger). The bluff proceeds to
-  // the normal stages so a correct call still spins the accused, and
-  // a Sheriff calling correctly still gets the role's risk-drop. We
-  // emit a public `sheriff_protected` banner so the table sees the
-  // immunity fire.
-  if (_isSheriff(room, accuser?.id)) {
-    state.events.push({
-      kind: 'sheriff_protected',
-      // holderId/holderName key the banner on the Sheriff (the
-      // protected role) — same convention as other role banners.
-      holderId: accuser.id,
-      holderName: accuser.username,
-      assassinHolderId: accused.id,
-      assassinHolderName: accused.username,
-    });
-    return;
+// APNAP tie-breaker — Active Player → Non-Active Player. When two or
+// more handlers in the SAME tier want to fire simultaneously, resolve
+// them in clockwise turn order starting from the active player
+// (`currentTurnIndex`). Returns the candidate ids re-ordered to match.
+function _apnapOrder(room, candidateIds) {
+  const order = room.turnOrder || [];
+  const start = room.currentTurnIndex || 0;
+  const len = order.length;
+  const rank = new Map();
+  for (let step = 0; step < len; step++) {
+    rank.set(order[(start + step) % len], step);
   }
+  // Unknown ids (not in turnOrder) sort last, stable among themselves.
+  return [...candidateIds].sort((a, b) => {
+    const ra = rank.has(a) ? rank.get(a) : len + candidateIds.indexOf(a);
+    const rb = rank.has(b) ? rank.get(b) : len + candidateIds.indexOf(b);
+    return ra - rb;
+  });
+}
 
-  // Wrong bluff → caller dies.
-  if (state.bluffIsCorrect === false) {
+// ─── Typed GameEvent constructor ──────────────────────────────
+
+function _event(type, { source = null, target = null, redirectable = false, preventable = false, payload = {} } = {}) {
+  return { type, source, target, redirectable, preventable, payload };
+}
+
+// ─── Tier 1 — Prevention (Shield, Freeze) ─────────────────────
+//
+// Shield blocks the bluff outright — per spec it "never officially
+// registers", so no later tier fires. Freeze is a turn-skip mechanic
+// with no bluff-resolution effect, so it is a no-op here.
+function _tierPrevention(room, event, ctx) {
+  const { accused } = ctx;
+  if (accused?.armedPowerCard?.power === 'shield') {
     _consumeArmedCard(room, accused);
-    state.events.push({
-      kind: 'assassin_strike',
+    ctx.events.push({
+      kind: 'shield_blocked',
       holderId: accused.id,
       holderName: accused.username,
-      eliminatedId: accuser?.id || null,
-      eliminatedName: accuser?.username || null,
     });
-    state.outcome = {
-      kind: 'eliminated',
-      eliminatedPlayerId: accuser?.id || null,
-      eliminatedReason: 'assassin',
-      accuserId: accuser?.id || null,
-      accusedId: accused.id,
-    };
-    state.shortCircuit = true;
-    return;
+    ctx.halt = true;
+    return _event(GAME_EVENT_TYPES.BLUFF_BLOCKED, {
+      source: ctx.accuser?.id || null,
+      target: accused.id,
+      payload: { accuserId: ctx.accuser?.id || null, accusedId: accused.id },
+    });
   }
-
-  // Correct bluff → backfire: holder takes +3 penalty cards, no spin,
-  // no elimination. Card consumed. Caller goes to a normal post-bluff
-  // turn advance (handled by the socket layer's `assassin_backfire`
-  // branch).
-  _consumeArmedCard(room, accused);
-  state.events.push({
-    kind: 'assassin_backfire',
-    holderId: accused.id,
-    holderName: accused.username,
-    accuserId: accuser?.id || null,
-    accuserName: accuser?.username || null,
-    cardsDrawn: 3,
-  });
-  state.outcome = {
-    kind: 'assassin_backfire',
-    accuserId: accuser?.id || null,
-    accusedId: accused.id,
-    cardsToDrawForAccused: 3,
-  };
-  state.shortCircuit = true;
+  return event;
 }
 
-// ─── Stage 4: Mirror ─────────────────────────────────────────
+// ─── Tier 2 — Modification (Swap, Peek) ───────────────────────
 //
-// Two scenarios, but both happen at this stage of the *incoming*
-// bluff resolution (the one we're processing here). The "outgoing"
-// scenario — Mirror holder calling a wrong bluff on someone else —
-// is also routed through this same code path: the accuser/accused
-// flip is a function of who holds Mirror, NOT a separate pipeline.
-//
-// Concretely:
-//   • Scenario 1 (incoming): accused holds Mirror → spin redirected
-//     to accuser regardless of correctness. Accused's turn ends.
-//   • Scenario 2 (outgoing): accuser holds Mirror AND bluff is wrong
-//     (accuser would normally spin) → spin redirected to accused.
-//     Accuser's turn does NOT end.
-//
-// Stage 1 (Shield) and stage 2 (Assassin) already short-circuited.
-// Stage 5 (Swap) runs AFTER us — see clash priority "Swap > Mirror"
-// in the spec — but Swap re-runs bluff correctness AND re-runs the
-// pipeline against the swapped card, so Mirror still gets a chance
-// to fire on the post-swap world.
-function _stageMirror(room, state) {
-  const { accuser, accused } = state;
+// An activatable armed Swap pauses the queue and asks the holder to
+// pick a card from the played pile; the caller resumes via
+// `resumeAfterSwap`, which re-enters the queue at Tier 3. Peek has no
+// bluff-resolution effect.
+function _tierModification(room, event, ctx) {
+  const { accused } = ctx;
+  if (accused?.armedPowerCard?.power !== 'swap') return event;
 
-  // Scenario 1: accused holds Mirror — incoming reflection.
-  if (accused?.armedPowerCard?.power === 'mirror') {
-    _consumeArmedCard(room, accused);
-    state.events.push({
-      kind: 'mirror_reflected',
-      holderId: accused.id,
-      holderName: accused.username,
-      redirectedToId: accuser?.id || null,
-      redirectedToName: accuser?.username || null,
-      scenario: 'incoming',
-    });
-    state.spinTargetId = accuser?.id || null;
-    state.mirrorEndsAccusedTurn = true; // caller advances turn after spin
-    return;
-  }
-
-  // Scenario 2: accuser holds Mirror AND bluff would normally spin
-  // them (i.e. the bluff was wrong).
-  if (accuser?.armedPowerCard?.power === 'mirror' && state.bluffIsCorrect === false) {
-    _consumeArmedCard(room, accuser);
-    state.events.push({
-      kind: 'mirror_reflected',
-      holderId: accuser.id,
-      holderName: accuser.username,
-      redirectedToId: accused?.id || null,
-      redirectedToName: accused?.username || null,
-      scenario: 'outgoing',
-    });
-    state.spinTargetId = accused?.id || null;
-    state.mirrorEndsAccuserTurn = false; // caller does NOT advance turn
-    return;
-  }
-}
-
-// ─── Stage 5: Swap ───────────────────────────────────────────
-//
-// If the accused holds an *activatable* armed Swap, we pause the
-// pipeline and ask the holder to pick a card from the played pile.
-// Caller resumes the pipeline via `resumeAfterSwap(room, accuserId,
-// pickedCardId)`.
-//
-// Clash priority: Swap > Mirror. So even if Mirror just set a
-// redirect, Swap takes precedence and forces a re-run of the bluff
-// resolution with the swapped card. We achieve that by short-
-// circuiting here, then re-entering via `resumeAfterSwap`, which
-// re-runs stages 3 + 4 + 6.
-function _stageSwap(room, state) {
-  const { accused } = state;
-  if (!accused?.armedPowerCard || accused.armedPowerCard.power !== 'swap') return;
-
-  // Find the swap card in the slot to verify activatability.
   const slot = room.powerCardSlot?.[accused.id] || [];
   const swapCard = slot.find(c => c?.id === accused.armedPowerCard.cardId);
-  // Phase B's isSwapActivatable considers an unset pendingPlayerIds
-  // as "no gate, activatable". By Phase C we only ever arm a Swap
-  // through activatePowerCard which itself enforces the gate, so by
-  // the time we get here the gate is satisfied. Nonetheless we
-  // double-check here for defensive correctness — if somehow the gate
-  // isn't met, we don't pause the pipeline (Mirror/default proceed).
+  // If the activation gate is still pending we do NOT pause — fall
+  // through so Tier 3+ resolve the bluff normally.
   const stillGated = swapCard
     && Array.isArray(swapCard.swapPendingPlayerIds)
     && swapCard.swapPendingPlayerIds.length > 0;
-  if (stillGated) return;
+  if (stillGated) return event;
 
-  state.outcome = {
-    kind: 'swap_pending',
-    swapHolderId: accused.id,
-    accuserId: state.accuser?.id || null,
-    accusedId: accused.id,
-  };
-  state.shortCircuit = true;
-}
-
-// ─── Stage 6: Default spin target ────────────────────────────
-//
-// If no earlier stage decided the spin target, fall back to the
-// existing behaviour: bluff correct → accused spins; bluff wrong →
-// accuser spins.
-function _stageDefaultSpin(room, state) {
-  if (state.spinTargetId !== undefined && state.spinTargetId !== null) return;
-  state.spinTargetId = state.bluffIsCorrect
-    ? state.accused?.id || null
-    : state.accuser?.id || null;
-}
-
-// ─── Stage 7.5 (Phase F): Bounty collection ─────────────────
-//
-// If a successful bluff was called against a player carrying a
-// bounty, the accuser collects it: their risk level drops by 1 and
-// the bounty clears. Counter resets on the bounty holder.
-function _stageBountyCollection(room, state) {
-  if (state.bluffIsCorrect !== true) return;
-  if (!state.accused?.hasBounty) return;
-  if (!room.config?.systems?.bounty) return;
-
-  const accused = state.accused;
-  const accuser = state.accuser;
-  accused.hasBounty = false;
-  accused.consecutiveSurvivedSpins = 0;
-  if (accuser) {
-    const bullets = accuser.chamber
-      .map((s, i) => (s === 'bullet' ? i : -1))
-      .filter(i => i !== -1);
-    if (bullets.length > 0) {
-      const removeIdx = bullets[Math.floor(Math.random() * bullets.length)];
-      const next = [...accuser.chamber];
-      next[removeIdx] = null;
-      accuser.chamber = next;
-      accuser.riskLevel = next.filter(s => s === 'bullet').length;
-    }
-  }
-  state.events.push({
-    kind: 'bounty_collected',
-    holderId: accused.id,
-    holderName: accused.username || null,
-    accuserId: accuser?.id || null,
-    accuserName: accuser?.username || null,
-    accuserRiskAfter: accuser?.riskLevel ?? null,
+  ctx.halt = true;
+  return _event(GAME_EVENT_TYPES.SWAP_PENDING, {
+    source: ctx.accuser?.id || null,
+    target: accused.id,
+    payload: {
+      swapHolderId: accused.id,
+      accuserId: ctx.accuser?.id || null,
+      accusedId: accused.id,
+    },
   });
 }
 
-// ─── Stage 7 (Phase D): Role-driven post-bluff effects ───────
+// ─── Tier 3 — Bluff Validation (+ consequence typing) ─────────
 //
-// Two role-passives that fire AFTER bluff correctness + spin target
-// have been determined:
-//
-//   • Gambler — if a bluff is CORRECTLY called against them, their
-//     risk level jumps immediately to 4 (chamber rewritten to hold
-//     4 bullets) BEFORE the spin. Both Mirror-redirected and direct
-//     spin-on-Gambler paths trigger this when the accused = Gambler
-//     and bluff was correct.
-//
-//   • Sheriff — every correct bluff call BY the Sheriff drops their
-//     risk level by 1 (one bullet removed from chamber). Permanent
-//     passive — fires every time, not once per game. Fires regardless
-//     of spin outcome (the elimination of the accused doesn't matter
-//     for the Sheriff's chamber).
-function _stageRoleEffects(room, state) {
-  if (state.bluffIsCorrect !== true) return;
+// Determines truth of the played card (delegated to engine/bluff.js so
+// the rule lives in one place) and types the consequence event:
+//   • Assassin on the accused → a non-redirectable FORCED_ELIMINATION
+//     (wrong call) or a terminal ASSASSIN_BACKFIRE (correct call),
+//     unless the accuser is the immune Sheriff.
+//   • otherwise → the redirectable SPIN_CONSEQUENCE from engine/bluff.js.
+function _tierBluffValidation(room, event, ctx) {
+  const { accuser, accused } = ctx;
+  const { bluffIsCorrect, revealedCard, event: spinEvent } =
+    buildBluffValidationEvent(room, accuser, accused);
+  ctx.bluffIsCorrect = bluffIsCorrect;
+  ctx.revealedCard = revealedCard;
 
-  // Gambler — accused was the bluffer and got caught. Spin happens
-  // AFTER this stage (caller's player_spin handler), so by bumping
-  // chamber here the spin will land in a 4-bullet chamber.
-  if (state.accused && _isGambler(room, state.accused.id)) {
-    _bumpGamblerRiskToFour(state.accused);
-    state.events.push({
-      kind: 'gambler_caught',
-      holderId: state.accused.id,
-      holderName: state.accused.username,
+  if (accused?.armedPowerCard?.power === 'assassin') {
+    // Sheriff is immune — Assassin stays armed, bluff falls through to
+    // the normal spin consequence (a correct Sheriff call still spins
+    // the accused and earns its Tier-6 risk-drop).
+    if (_isSheriff(room, accuser?.id)) {
+      ctx.events.push({
+        kind: 'sheriff_protected',
+        holderId: accuser.id,
+        holderName: accuser.username,
+        assassinHolderId: accused.id,
+        assassinHolderName: accused.username,
+      });
+      return spinEvent;
+    }
+
+    // Wrong bluff (accused told the truth) → forced elimination of the
+    // accuser. Non-redirectable + non-preventable so Mirror (Tier 4)
+    // refuses it; the strike is materialised at Tier 5.
+    if (bluffIsCorrect === false) {
+      return _event(GAME_EVENT_TYPES.FORCED_ELIMINATION, {
+        source: accused.id,
+        target: accuser?.id || null,
+        payload: {
+          eliminatedReason: 'assassin',
+          accuserId: accuser?.id || null,
+          accusedId: accused.id,
+        },
+      });
+    }
+
+    // Correct bluff → backfire. Terminal: card consumed, holder draws
+    // +3, no spin, no elimination.
+    _consumeArmedCard(room, accused);
+    ctx.events.push({
+      kind: 'assassin_backfire',
+      holderId: accused.id,
+      holderName: accused.username,
+      accuserId: accuser?.id || null,
+      accuserName: accuser?.username || null,
+      cardsDrawn: 3,
+    });
+    ctx.halt = true;
+    return _event(GAME_EVENT_TYPES.ASSASSIN_BACKFIRE, {
+      source: accused.id,
+      target: accused.id,
+      payload: {
+        accuserId: accuser?.id || null,
+        accusedId: accused.id,
+        cardsToDrawForAccused: 3,
+      },
     });
   }
 
-  // Sheriff — accuser made a correct call. Drop a bullet.
-  if (state.accuser && _isSheriff(room, state.accuser.id)) {
-    const chamber = state.accuser.chamber;
-    const bulletIndices = chamber
-      .map((s, i) => (s === 'bullet' ? i : -1))
-      .filter(i => i !== -1);
-    if (bulletIndices.length > 0) {
-      const removeIdx = bulletIndices[Math.floor(Math.random() * bulletIndices.length)];
-      const next = [...chamber];
-      next[removeIdx] = null;
-      state.accuser.chamber = next;
-      state.accuser.riskLevel = next.filter(s => s === 'bullet').length;
-      state.events.push({
+  return spinEvent;
+}
+
+// ─── Tier 4 — Redirection (Mirror, Sniper) ────────────────────
+//
+// Only `redirectable` events can be retargeted. Mirror has two
+// scenarios; when more than one holder could fire, candidates are
+// resolved in APNAP order and the first applicable one wins (a spin is
+// redirected at most once). Sniper redirection is a player-driven pause
+// handled downstream by the orchestrator, not inside the queue.
+function _tierRedirection(room, event, ctx) {
+  if (!event.redirectable) return event;
+  const { accuser, accused } = ctx;
+
+  // Collect the Mirror holders whose scenario applies to this event.
+  const candidates = [];
+  if (accused?.armedPowerCard?.power === 'mirror') {
+    // Scenario 1 (incoming): accused reflects the spin to the accuser,
+    // regardless of correctness. Accused's turn ends after the spin.
+    candidates.push({
+      holderId: accused.id,
+      holder: accused,
+      scenario: 'incoming',
+      newTarget: accuser?.id || null,
+      redirectedTo: accuser,
+      apply: () => { ctx.mirrorEndsAccusedTurn = true; },
+    });
+  }
+  if (accuser?.armedPowerCard?.power === 'mirror' && ctx.bluffIsCorrect === false) {
+    // Scenario 2 (outgoing): accuser would normally spin (wrong bluff)
+    // → their Mirror redirects to the accused. Accuser's turn does NOT
+    // end.
+    candidates.push({
+      holderId: accuser.id,
+      holder: accuser,
+      scenario: 'outgoing',
+      newTarget: accused?.id || null,
+      redirectedTo: accused,
+      apply: () => { ctx.mirrorEndsAccuserTurn = false; },
+    });
+  }
+  if (candidates.length === 0) return event;
+
+  const [first] = _apnapOrder(room, candidates.map(c => c.holderId))
+    .map(id => candidates.find(c => c.holderId === id));
+
+  _consumeArmedCard(room, first.holder);
+  ctx.events.push({
+    kind: 'mirror_reflected',
+    holderId: first.holder.id,
+    holderName: first.holder.username,
+    redirectedToId: first.redirectedTo?.id || null,
+    redirectedToName: first.redirectedTo?.username || null,
+    scenario: first.scenario,
+  });
+  first.apply();
+  event.target = first.newTarget;
+  return event;
+}
+
+// ─── Tier 5 — Consequence (Spin, Assassin elimination) ────────
+//
+// Materialises the typed consequence. A FORCED_ELIMINATION consumes the
+// Assassin, emits the strike banner, and halts the queue (no
+// post-resolution effects follow an Assassin kill). A SPIN_CONSEQUENCE
+// simply carries its already-resolved target forward to Tier 6.
+function _tierConsequence(room, event, ctx) {
+  if (event.type === GAME_EVENT_TYPES.FORCED_ELIMINATION) {
+    const { accused } = ctx;
+    _consumeArmedCard(room, accused);
+    ctx.events.push({
+      kind: 'assassin_strike',
+      holderId: accused.id,
+      holderName: accused.username,
+      eliminatedId: event.target,
+      eliminatedName: _findPlayer(room, event.target)?.username || null,
+    });
+    ctx.halt = true;
+  }
+  return event;
+}
+
+// ─── Tier 6 — Post-Resolution (Roles, Bounty) ─────────────────
+//
+// Role passives and bounty collection that fire AFTER the spin target
+// is locked. Order: Gambler → Sheriff → Bounty (announcement order is
+// asserted by clashResolution.test.js).
+function _tierPostResolution(room, event, ctx) {
+  if (event.type !== GAME_EVENT_TYPES.SPIN_CONSEQUENCE) return event;
+  if (ctx.bluffIsCorrect !== true) return event;
+  const { accuser, accused } = ctx;
+
+  // Gambler — accused was caught bluffing. Chamber bumped to 4 BEFORE
+  // the (caller-run) spin.
+  if (accused && _isGambler(room, accused.id)) {
+    _bumpGamblerRiskToFour(accused);
+    ctx.events.push({
+      kind: 'gambler_caught',
+      holderId: accused.id,
+      holderName: accused.username,
+    });
+  }
+
+  // Sheriff — every correct call BY the Sheriff drops their risk by 1.
+  if (accuser && _isSheriff(room, accuser.id)) {
+    const dropped = _removeRandomBullet(accuser);
+    if (dropped) {
+      ctx.events.push({
         kind: 'sheriff_relief',
-        holderId: state.accuser.id,
-        holderName: state.accuser.username,
-        riskLevel: state.accuser.riskLevel,
+        holderId: accuser.id,
+        holderName: accuser.username,
+        riskLevel: accuser.riskLevel,
       });
     }
   }
+
+  // Bounty — a correct call against a bounty carrier lets the accuser
+  // collect: one bullet removed, bounty cleared, streak reset.
+  if (accused?.hasBounty && room.config?.systems?.bounty) {
+    accused.hasBounty = false;
+    accused.consecutiveSurvivedSpins = 0;
+    if (accuser) _removeRandomBullet(accuser);
+    ctx.events.push({
+      kind: 'bounty_collected',
+      holderId: accused.id,
+      holderName: accused.username || null,
+      accuserId: accuser?.id || null,
+      accuserName: accuser?.username || null,
+      accuserRiskAfter: accuser?.riskLevel ?? null,
+    });
+  }
+
+  return event;
 }
 
-// ─── Pipeline driver ─────────────────────────────────────────
+// Remove one random bullet from a player's chamber (keeps riskLevel in
+// sync with bullet count). Returns true if a bullet was removed.
+function _removeRandomBullet(player) {
+  const bulletIndices = player.chamber
+    .map((s, i) => (s === 'bullet' ? i : -1))
+    .filter(i => i !== -1);
+  if (bulletIndices.length === 0) return false;
+  const removeIdx = bulletIndices[Math.floor(Math.random() * bulletIndices.length)];
+  const next = [...player.chamber];
+  next[removeIdx] = null;
+  player.chamber = next;
+  player.riskLevel = next.filter(s => s === 'bullet').length;
+  return true;
+}
 
-function _runStages(room, state, stages) {
-  for (const stage of stages) {
-    if (state.shortCircuit) break;
-    stage(room, state);
+// ─── ResolutionQueue driver ───────────────────────────────────
+
+const TIER_HANDLERS = [
+  { tier: RESOLUTION_TIERS.PREVENTION, fn: _tierPrevention },
+  { tier: RESOLUTION_TIERS.MODIFICATION, fn: _tierModification },
+  { tier: RESOLUTION_TIERS.BLUFF_VALIDATION, fn: _tierBluffValidation },
+  { tier: RESOLUTION_TIERS.REDIRECTION, fn: _tierRedirection },
+  { tier: RESOLUTION_TIERS.CONSEQUENCE, fn: _tierConsequence },
+  { tier: RESOLUTION_TIERS.POST_RESOLUTION, fn: _tierPostResolution },
+];
+
+// Run the queue from `fromTier` (inclusive). A handler returning `null`
+// cancels the event and stops the queue. `ctx.halt` lets a handler stop
+// the queue while keeping the event it produced.
+function _runQueue(room, ctx, fromTier = RESOLUTION_TIERS.PREVENTION) {
+  let event = ctx.event;
+  for (const { tier, fn } of TIER_HANDLERS) {
+    if (tier < fromTier) continue;
+    if (ctx.halt) break;
+    const next = fn(room, event, ctx);
+    if (next === null) { ctx.halt = true; break; }
+    event = next;
+    ctx.event = event;
+  }
+  return event;
+}
+
+function _newCtx(accuser, accused) {
+  return {
+    accuser,
+    accused,
+    events: [],
+    bluffIsCorrect: undefined,
+    revealedCard: null,
+    halt: false,
+    mirrorEndsAccusedTurn: false,
+    mirrorEndsAccuserTurn: false,
+    event: _event(GAME_EVENT_TYPES.BLUFF_CALLED, {
+      source: accuser?.id || null,
+      preventable: true,
+    }),
+  };
+}
+
+// ─── Terminal event → legacy outcome mapping ──────────────────
+//
+// `outcome.kind` is the discriminator every caller + test relies on; it
+// maps 1:1 to the terminal `event.type`. `outcome.event` exposes the
+// typed event for consumers that prefer it.
+function _toOutcome(event, ctx) {
+  const base = { event, type: event.type };
+  switch (event.type) {
+    case GAME_EVENT_TYPES.BLUFF_BLOCKED:
+      return {
+        ...base,
+        kind: 'blocked',
+        accuserId: event.payload.accuserId,
+        accusedId: event.payload.accusedId,
+      };
+    case GAME_EVENT_TYPES.SWAP_PENDING:
+      return {
+        ...base,
+        kind: 'swap_pending',
+        swapHolderId: event.payload.swapHolderId,
+        accuserId: event.payload.accuserId,
+        accusedId: event.payload.accusedId,
+      };
+    case GAME_EVENT_TYPES.ASSASSIN_BACKFIRE:
+      return {
+        ...base,
+        kind: 'assassin_backfire',
+        accuserId: event.payload.accuserId,
+        accusedId: event.payload.accusedId,
+        cardsToDrawForAccused: event.payload.cardsToDrawForAccused,
+      };
+    case GAME_EVENT_TYPES.FORCED_ELIMINATION:
+      return {
+        ...base,
+        kind: 'eliminated',
+        eliminatedPlayerId: event.target,
+        eliminatedReason: event.payload.eliminatedReason,
+        accuserId: event.payload.accuserId,
+        accusedId: event.payload.accusedId,
+      };
+    case GAME_EVENT_TYPES.SPIN_CONSEQUENCE:
+    default:
+      return {
+        ...base,
+        kind: 'spin',
+        spinTargetId: event.target,
+        bluffIsCorrect: ctx.bluffIsCorrect,
+        accuserId: ctx.accuser?.id || null,
+        accusedId: ctx.accused?.id || null,
+        revealedCard: ctx.revealedCard,
+        mirrorEndsAccusedTurn: ctx.mirrorEndsAccusedTurn,
+        mirrorEndsAccuserTurn: ctx.mirrorEndsAccuserTurn,
+      };
   }
 }
 
 /**
- * Resolve a bluff call. See module-level docs for full contract.
+ * Resolve a bluff call. See module-level docs for the full contract.
  *
- * The room is mutated in-place for power-card consumption (cards
- * leave the hand and land in `room.discardPile`, `armedPowerCard`
- * is cleared). The CALLER (socketHandlers.js) is still responsible
- * for spinning the chamber, eliminating losers, broadcasting state,
- * and emitting `power_card_triggered` events from the returned list.
+ * The room is mutated in-place for power-card consumption (cards leave
+ * the slot and land in `room.discardPile`, `armedPowerCard` cleared).
+ * The CALLER (handlers/bluff.js) is still responsible for spinning the
+ * chamber, eliminating losers, broadcasting state, and emitting the
+ * returned banner events.
  */
 function resolveBluff(room, accuserId) {
   const accuser = _findPlayer(room, accuserId);
   const accused = _accusedPrev(room);
 
-  const state = {
-    events: [],
-    accuser,
-    accused,
-    spinTargetId: undefined,
-    bluffIsCorrect: undefined,
-    revealedCard: null,
-    outcome: null,
-    shortCircuit: false,
-    // Mirror-specific flags — caller reads these to decide turn flow.
-    mirrorEndsAccusedTurn: false,
-    mirrorEndsAccuserTurn: false,
-  };
+  const ctx = _newCtx(accuser, accused);
+  const event = _runQueue(room, ctx);
 
-  _runStages(room, state, [
-    _stageShield,
-    _stageBluffCorrectness,
-    _stageAssassin,
-    _stageMirror,
-    _stageSwap,
-    _stageDefaultSpin,
-    _stageRoleEffects,
-    _stageBountyCollection,
-  ]);
-
-  if (!state.outcome) {
-    state.outcome = {
-      kind: 'spin',
-      spinTargetId: state.spinTargetId,
-      bluffIsCorrect: state.bluffIsCorrect,
-      accuserId: accuser?.id || null,
-      accusedId: accused?.id || null,
-      revealedCard: state.revealedCard,
-      // Surface the Mirror flag so the caller knows whether to end
-      // the accused's turn after the spin.
-      mirrorEndsAccusedTurn: state.mirrorEndsAccusedTurn,
-      mirrorEndsAccuserTurn: state.mirrorEndsAccuserTurn,
-    };
-  }
-
-  return { events: state.events, outcome: state.outcome };
+  return { events: ctx.events, outcome: _toOutcome(event, ctx) };
 }
 
 /**
  * Resume a bluff after a Swap pick.
  *
  * Swap mechanics (locked, per spec):
- *   1. The accused (Swap holder) plays a card face-down. Bluff is
- *      called on them. We paused the pipeline and asked them to
- *      pick one of the cards in `room.playedPile` — anonymously,
- *      no labels — to swap with their just-played card.
- *   2. The accused's played card (currently the top of `playedPile`,
- *      i.e. `room.lastPlayedCard`) is removed from the played pile
- *      and placed in the hand of whoever held the *picked* card
- *      originally — except played-pile cards have no owner, so we
- *      simply put the original played card back into the played pile
- *      at the picked card's slot.
- *   3. The picked card replaces `lastPlayedCard` (top of pile).
- *      Bluff correctness is re-evaluated against the swapped card.
- *      Mirror gets a fresh chance on the post-swap world.
- *   4. Both cards are revealed face-up to everyone (caller emits
- *      `swap_resolved` event; revealing UI lives client-side).
+ *   1. The accused (Swap holder) played a card face-down; a bluff was
+ *      called. We paused and asked them to pick one of the cards in
+ *      `room.playedPile` to swap with their just-played card.
+ *   2. The accused's played card (top of `playedPile`) trades places
+ *      with the picked card; the picked card becomes the new
+ *      `lastPlayedCard`.
+ *   3. Bluff correctness is re-evaluated against the swapped-in card,
+ *      and Mirror gets a fresh chance on the post-swap world.
+ *   4. Both cards are revealed (caller emits the reveal UI).
  *
- * Returns the same shape as `resolveBluff` so the caller's flow
- * stays uniform.
+ * Per #119 this re-enters the ResolutionQueue at **Tier 3** — Shield
+ * (Tier 1) and Swap (Tier 2) do NOT re-run; they were already evaluated
+ * against the original accused state and the Swap card is consumed here.
+ * Returns the same `{ events, outcome }` shape as `resolveBluff`.
  */
 function resumeAfterSwap(room, accuserId, pickedCardId) {
   const accuser = _findPlayer(room, accuserId);
   const accused = _accusedPrev(room);
   if (!accused) {
-    return { events: [], outcome: { kind: 'spin', spinTargetId: accuserId, bluffIsCorrect: false } };
+    return {
+      events: [],
+      outcome: { kind: 'spin', type: GAME_EVENT_TYPES.SPIN_CONSEQUENCE, spinTargetId: accuserId, bluffIsCorrect: false },
+    };
   }
 
-  // The accused's played card sits at the top of room.playedPile
-  // (placed there by validateAndPlayCard during play_card_online).
-  // The picked card sits somewhere earlier in the pile. We swap
-  // their positions in the pile so the picked card becomes the new
-  // top (and therefore the new lastPlayedCard) and the accused's
-  // original card lands in the picked card's old slot.
   const playedPile = room.playedPile || [];
   const originalIdx = playedPile.length - 1;
   const originalCard = playedPile[originalIdx] || null;
@@ -559,19 +573,18 @@ function resumeAfterSwap(room, accuserId, pickedCardId) {
   if (pickedIdx === -1) {
     return {
       events: [],
-      outcome: { kind: 'error', error: 'Picked card not in played pile' },
+      outcome: { kind: 'error', type: GAME_EVENT_TYPES.BLUFF_ERROR, error: 'Picked card not in played pile' },
     };
   }
   if (!originalCard) {
     return {
       events: [],
-      outcome: { kind: 'error', error: 'No played card to swap' },
+      outcome: { kind: 'error', type: GAME_EVENT_TYPES.BLUFF_ERROR, error: 'No played card to swap' },
     };
   }
   if (pickedIdx === originalIdx) {
-    // Picked their own just-played card → no-op swap. Treat as a
-    // wasted Swap (still consume it, fall through to normal bluff).
-    // Continue to consume + reuse re-resolution logic.
+    // Picked their own just-played card → no-op swap. Still consume the
+    // Swap and fall through to a normal (post-swap == pre-swap) bluff.
   } else {
     const pickedCard = playedPile[pickedIdx];
     playedPile[pickedIdx] = originalCard;
@@ -582,57 +595,20 @@ function resumeAfterSwap(room, accuserId, pickedCardId) {
   // Consume the Swap card itself.
   _consumeArmedCard(room, accused);
 
-  // After mutation, the new lastPlayedCard is the swapped-in card.
-  const swapEvent = {
+  const ctx = _newCtx(accuser, accused);
+  // The swap reveal banner is the first event the caller broadcasts.
+  ctx.events.push({
     kind: 'swap_resolved',
     holderId: accused.id,
     holderName: accused.username,
     originalCard,
     swappedCard: room.lastPlayedCard,
-  };
+  });
 
-  // Re-run BluffCorrectness + Mirror + default spin on the post-swap
-  // world. Shield and Assassin do NOT re-run — they were already
-  // evaluated against the original accused state. Their armed cards
-  // have either been consumed or were never present, so re-running
-  // would be a no-op anyway, but we still skip them deliberately to
-  // keep the spec-implied sequencing: "Swap resolves first, then
-  // bluff check, then Mirror".
-  const state = {
-    events: [swapEvent],
-    accuser,
-    accused,
-    spinTargetId: undefined,
-    bluffIsCorrect: undefined,
-    revealedCard: null,
-    outcome: null,
-    shortCircuit: false,
-    mirrorEndsAccusedTurn: false,
-    mirrorEndsAccuserTurn: false,
-  };
+  // Re-enter at Tier 3 (Bluff Validation) — Tiers 1 + 2 are skipped.
+  const event = _runQueue(room, ctx, RESOLUTION_TIERS.BLUFF_VALIDATION);
 
-  _runStages(room, state, [
-    _stageBluffCorrectness,
-    _stageMirror,
-    _stageDefaultSpin,
-    _stageRoleEffects,
-    _stageBountyCollection,
-  ]);
-
-  if (!state.outcome) {
-    state.outcome = {
-      kind: 'spin',
-      spinTargetId: state.spinTargetId,
-      bluffIsCorrect: state.bluffIsCorrect,
-      accuserId: accuser?.id || null,
-      accusedId: accused?.id || null,
-      revealedCard: state.revealedCard,
-      mirrorEndsAccusedTurn: state.mirrorEndsAccusedTurn,
-      mirrorEndsAccuserTurn: state.mirrorEndsAccuserTurn,
-    };
-  }
-
-  return { events: state.events, outcome: state.outcome };
+  return { events: ctx.events, outcome: _toOutcome(event, ctx) };
 }
 
 module.exports = {
@@ -643,5 +619,9 @@ module.exports = {
     _isBluffCorrect,
     _consumeArmedCard,
     _accusedPrev,
+    _apnapOrder,
+    _event,
+    _runQueue,
+    _toOutcome,
   },
 };

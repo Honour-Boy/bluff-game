@@ -6,7 +6,7 @@
 // checks the actual played card). Round reset rebuilds the deck +
 // hands for the next round, preserving cross-round chamber state.
 
-const { MODES } = require('./constants');
+const { MODES, GAME_EVENT_TYPES } = require('./constants');
 const { buildDeck, dealCards } = require('./deck');
 const { spinGun } = require('./spin');
 const { eliminateFromTurnOrder } = require('./players');
@@ -16,6 +16,44 @@ const {
   _snapshotSwapHolders,
 } = require('./powerCards');
 
+// ─── Bluff correctness — the single source of truth ──────────
+//
+// A bluff call is "correct" when the previously played card did NOT
+// satisfy the required shape: a Whot (wild) never counts as truthful,
+// and a missing card means the previous player can't have told the
+// truth. `bluffPipeline.js`'s Tier-3 (#119) consumes this so the
+// correctness rule lives in exactly one place.
+function isBluffCorrect(room) {
+  const revealed = room.lastPlayedCard;
+  if (!revealed) return true;
+  if (revealed.shape === 'whot') return false;
+  return revealed.shape !== room.currentCardType;
+}
+
+// Tier-3 (Bluff Validation) of the ResolutionQueue. Returns the
+// computed correctness, the revealed card, and the typed base
+// `GameEvent` (#119) — a `SPIN_CONSEQUENCE` that targets the accused
+// on a correct call or the accuser on a wrong one. It is `redirectable`
+// so Tier-4 Mirror/Sniper may retarget it; power-card branches in the
+// pipeline re-type it into a non-redirectable event when needed.
+function buildBluffValidationEvent(room, accuser, accused) {
+  const bluffIsCorrect = isBluffCorrect(room);
+  const revealedCard = room.lastPlayedCard || null;
+  const target = bluffIsCorrect ? (accused?.id || null) : (accuser?.id || null);
+  return {
+    bluffIsCorrect,
+    revealedCard,
+    event: {
+      type: GAME_EVENT_TYPES.SPIN_CONSEQUENCE,
+      redirectable: true,
+      preventable: false,
+      source: accuser?.id || null,
+      target,
+      payload: { bluffIsCorrect },
+    },
+  };
+}
+
 function resolveBluffOnline(room) {
   const accuserId = room.turnOrder[room.currentTurnIndex];
   const accuser = room.players.find(p => p.id === accuserId);
@@ -24,17 +62,7 @@ function resolveBluffOnline(room) {
   const accusedId = room.turnOrder[prevIdx];
   const accused = room.players.find(p => p.id === accusedId);
 
-  const revealedCard = room.lastPlayedCard;
-
-  let bluffIsCorrect;
-  if (!revealedCard) {
-    bluffIsCorrect = true;
-  } else {
-    const isWhot = revealedCard.shape === 'whot';
-    const matchesRequired = revealedCard.shape === room.currentCardType;
-    bluffIsCorrect = !isWhot && !matchesRequired;
-  }
-
+  const { bluffIsCorrect, revealedCard } = buildBluffValidationEvent(room, accuser, accused);
   const spinTarget = bluffIsCorrect ? accused : accuser;
   return { bluffIsCorrect, spinTarget, revealedCard, accuser, accused };
 }
@@ -117,4 +145,6 @@ module.exports = {
   resolveBluffOnline,
   resolveBluff,
   resetRoundOnline,
+  isBluffCorrect,
+  buildBluffValidationEvent,
 };

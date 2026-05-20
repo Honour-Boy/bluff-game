@@ -33,7 +33,9 @@ function _sniperEligibleTargets(room, sniperId) {
 }
 
 function maybeStartSniperPause(io, room, outcome) {
-  if (!outcome || outcome.kind !== 'spin') return false;
+  // Only a redirectable spin consequence can be sniped — eliminations,
+  // blocks, backfires and swap-pauses are off-limits.
+  if (!outcome || outcome.type !== engine.GAME_EVENT_TYPES.SPIN_CONSEQUENCE) return false;
   const sniper = engine.findAvailableSniper(room);
   if (!sniper) return false;
 
@@ -211,8 +213,13 @@ function _enterLastStand(io, room) {
  */
 function applyBluffOutcome(room, outcome) {
   if (!outcome) return null;
+  const E = engine.GAME_EVENT_TYPES;
+  // Consume the typed GameEvent. `outcome.type` mirrors the terminal
+  // event the ResolutionQueue produced; the default (no match) is a
+  // normal spin consequence.
+  const eventType = outcome.type;
 
-  if (outcome.kind === 'blocked') {
+  if (eventType === E.BLUFF_BLOCKED) {
     room.phase = 'playing';
     room.spinTargetId = null;
     room.lastAction = {
@@ -223,12 +230,12 @@ function applyBluffOutcome(room, outcome) {
     return outcome;
   }
 
-  if (outcome.kind === 'eliminated') {
+  if (eventType === E.FORCED_ELIMINATION) {
     finaliseAssassinElimination(room, outcome);
     return outcome;
   }
 
-  if (outcome.kind === 'assassin_backfire') {
+  if (eventType === E.ASSASSIN_BACKFIRE) {
     room.phase = 'playing';
     room.spinTargetId = null;
     room.cardPlayedThisTurn = false;
@@ -243,7 +250,7 @@ function applyBluffOutcome(room, outcome) {
     return outcome;
   }
 
-  if (outcome.kind === 'swap_pending') {
+  if (eventType === E.SWAP_PENDING) {
     room.phase = 'swap_pending';
     room.swapHolderId = outcome.swapHolderId;
     room.lastAction = {
@@ -399,7 +406,7 @@ function resolveLeaverPendingPauses(io, code, room, playerId) {
       const { events: swapEvents, outcome: swapOutcome } =
         bluffPipeline.resumeAfterSwap(room, accuserId, top.id);
       room.swapHolderId = null;
-      if (swapOutcome && swapOutcome.kind !== 'error') {
+      if (swapOutcome && swapOutcome.type !== engine.GAME_EVENT_TYPES.BLUFF_ERROR) {
         applyBluffOutcome(room, swapOutcome);
       }
       emitPowerCardEvents(io, code, swapEvents);

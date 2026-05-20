@@ -198,9 +198,10 @@ function register(io, socket, deps) {
 
       if (room.mode === engine.MODES.ONLINE) {
         const { events, outcome } = bluffPipeline.resolveBluff(room, playerId);
+        const E = engine.GAME_EVENT_TYPES;
 
-        // v2 Phase D — Sniper interception.
-        if (outcome.kind === 'spin' && maybeStartSniperPause(io, room, outcome)) {
+        // v2 Phase D — Sniper interception (only a spin can be sniped).
+        if (outcome.type === E.SPIN_CONSEQUENCE && maybeStartSniperPause(io, room, outcome)) {
           await saveRoom(room);
           emitPowerCardEvents(io, code, events);
           await broadcastRoomState(io, code);
@@ -209,7 +210,7 @@ function register(io, socket, deps) {
 
         // v2 Phase D — Medic interception (Assassin path).
         if (
-          outcome.kind === 'eliminated'
+          outcome.type === E.FORCED_ELIMINATION
           && maybeStartMedicPause(io, room, outcome.eliminatedPlayerId, 'assassin', () => {
             finaliseAssassinElimination(room, outcome);
             applyPostElimSystemHooks(io, room);
@@ -222,7 +223,7 @@ function register(io, socket, deps) {
         }
 
         // #63 — Assassin backfire penalty before applyBluffOutcome.
-        if (outcome.kind === 'assassin_backfire' && outcome.accusedId) {
+        if (outcome.type === E.ASSASSIN_BACKFIRE && outcome.accusedId) {
           engine.applyAssassinBackfirePenalty(
             room,
             outcome.accusedId,
@@ -232,7 +233,7 @@ function register(io, socket, deps) {
 
         applyBluffOutcome(room, outcome);
 
-        if (outcome.kind === 'eliminated') {
+        if (outcome.type === E.FORCED_ELIMINATION) {
           if (outcome.eliminatedPlayerId) {
             _bountyOnElimination(room, outcome.eliminatedPlayerId);
           }
@@ -240,7 +241,7 @@ function register(io, socket, deps) {
           await maybeRecordGroupWinner(io, room, leaderboardRepo);
         }
 
-        if (outcome.kind === 'assassin_backfire') {
+        if (outcome.type === E.ASSASSIN_BACKFIRE) {
           engine.advanceTurn(room);
         }
 
@@ -287,20 +288,21 @@ function register(io, socket, deps) {
       if (!accuserId) return callback?.({ success: false, error: 'Lost bluff context' });
 
       const { events, outcome } = bluffPipeline.resumeAfterSwap(room, accuserId, cardId);
-      if (outcome?.kind === 'error') {
+      const E = engine.GAME_EVENT_TYPES;
+      if (outcome?.type === E.BLUFF_ERROR) {
         return callback?.({ success: false, error: outcome.error });
       }
 
       room.swapHolderId = null;
 
-      if (outcome.kind === 'spin' && maybeStartSniperPause(io, room, outcome)) {
+      if (outcome.type === E.SPIN_CONSEQUENCE && maybeStartSniperPause(io, room, outcome)) {
         await saveRoom(room);
         emitPowerCardEvents(io, code, events);
         await broadcastRoomState(io, code);
         return callback?.({ success: true });
       }
       if (
-        outcome.kind === 'eliminated'
+        outcome.type === E.FORCED_ELIMINATION
         && maybeStartMedicPause(io, room, outcome.eliminatedPlayerId, 'assassin', () => {
           finaliseAssassinElimination(room, outcome);
           applyPostElimSystemHooks(io, room);
@@ -314,7 +316,7 @@ function register(io, socket, deps) {
 
       applyBluffOutcome(room, outcome);
 
-      if (outcome.kind === 'eliminated') {
+      if (outcome.type === E.FORCED_ELIMINATION) {
         if (outcome.eliminatedPlayerId) {
           _bountyOnElimination(room, outcome.eliminatedPlayerId);
         }
