@@ -1,8 +1,8 @@
 "use client";
 
 import { useState } from "react";
-import { PowerCard, POWER_META } from "./PowerCard";
-import { ROLE_META } from "./RoleRevealOverlay";
+import { PowerCard, POWER_META } from "../PowerCard";
+import { ROLE_META } from "../RoleRevealOverlay";
 
 // ─── HowToPlayModal ───────────────────────────────────────────
 // Reference for the full v2 ruleset. Collapsible accordion so the

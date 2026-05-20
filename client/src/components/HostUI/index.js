@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef, lazy } from 'react';
 const HowToPlayModal = lazy(() =>
-  import('../HowToPlayModal').then((module) => ({ default: module.HowToPlayModal })),
+  import('../screens/HowToPlayModal').then((module) => ({ default: module.HowToPlayModal })),
 );
 import { HostHeader } from './HostHeader';
 import { HostPhaseBanner, HostGameSummary } from './HostStatusPanels';

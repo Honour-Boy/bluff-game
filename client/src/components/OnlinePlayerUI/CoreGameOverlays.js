@@ -5,7 +5,7 @@ import { TurnActionModal } from '../TurnActionModal';
 import { SpinOverlay } from './SpinOverlay';
 
 const HowToPlayModal = lazy(() =>
-  import('../HowToPlayModal').then((module) => ({ default: module.HowToPlayModal })),
+  import('../screens/HowToPlayModal').then((module) => ({ default: module.HowToPlayModal })),
 );
 
 export function CoreGameOverlays({
