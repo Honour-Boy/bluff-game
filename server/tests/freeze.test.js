@@ -50,14 +50,15 @@ function makeFrozenRoom() {
   room.currentTurnIndex = 0;
   room.phase = 'playing';
 
-  // Hand contents: shape filler so the hand-cap rule isn't tripped,
-  // plus the freeze card itself in p0's hand.
+  // Hands contain shape cards only (post-#117). Freeze card lives in
+  // room.powerCardSlot, where consumeFreezeOnTurnEnd now reads it.
   const freezeCard = { id: 'freeze-1', type: 'power', power: 'freeze', armed: true };
   room.hands = new Map([
-    ['p0', [freezeCard, { id: 'circle-1-x', type: 'shape', shape: 'circle', number: 1 }]],
+    ['p0', [{ id: 'circle-1-x', type: 'shape', shape: 'circle', number: 1 }]],
     ['p1', [{ id: 'square-2-x', type: 'shape', shape: 'square', number: 2 }]],
     ['p2', [{ id: 'star-3-x', type: 'shape', shape: 'star', number: 3 }]],
   ]);
+  room.powerCardSlot = { p0: [freezeCard], p1: [], p2: [] };
   room.deck = [];
   room.playedPile = [];
   room.discardPile = [];
@@ -182,15 +183,14 @@ describe("Freeze: the skipped player's hand and state are untouched", () => {
 
 // ─── Freeze card consumed ────────────────────────────────────
 
-describe('Freeze: card removed from hand to discardPile, armed cleared', () => {
-  it('moves the freeze card from holder hand to room.discardPile', () => {
+describe('Freeze: card removed from slot to discardPile, armed cleared', () => {
+  it('moves the freeze card from holder slot to room.discardPile', () => {
     const { room, freezeCard } = makeFrozenRoom();
-    const handBefore = room.hands.get('p0');
-    expect(handBefore).toContain(freezeCard);
+    expect(room.powerCardSlot['p0']).toContain(freezeCard);
 
     consumeFreezeOnTurnEnd(room, 'p0');
 
-    expect(room.hands.get('p0')).not.toContain(freezeCard);
+    expect(room.powerCardSlot['p0']).not.toContain(freezeCard);
     expect(room.discardPile).toContain(freezeCard);
   });
 
@@ -202,16 +202,16 @@ describe('Freeze: card removed from hand to discardPile, armed cleared', () => {
     expect(p0.armedPowerCard).toBeNull();
   });
 
-  it('falls back to power-slug match if cardId drifted from the actual card in hand', () => {
+  it('falls back to power-slug match if cardId drifted from the actual card in slot', () => {
     // Defensive path: armedPowerCard.cardId points at an id no longer
-    // in the hand (e.g. state corruption). The helper still finds and
+    // in the slot (e.g. state corruption). The helper still finds and
     // consumes the freeze card by power slug.
     const { room } = makeFrozenRoom();
     const p0 = room.players[0];
     p0.armedPowerCard = { power: 'freeze', cardId: 'wrong-id', activatedAtTurn: 0 };
     consumeFreezeOnTurnEnd(room, 'p0');
     // Freeze card was removed via the slug-match fallback.
-    expect(room.hands.get('p0').some(c => c?.power === 'freeze')).toBe(false);
+    expect(room.powerCardSlot['p0'].some(c => c?.power === 'freeze')).toBe(false);
     expect(room.discardPile.some(c => c?.power === 'freeze')).toBe(true);
   });
 });

@@ -61,6 +61,7 @@ function buildBluffScenario({
   room.cardPlayedThisTurn = false;
   room.discardPile = [];
   room.hands = new Map();
+  room.powerCardSlot = {};
 
   // Cards played this round live in playedPile; lastPlayedCard is
   // the top of the pile (= accused's most recent card).
@@ -74,10 +75,12 @@ function buildBluffScenario({
   room.lastPlayedCard = playedCard;
   room.currentCardType = currentCardType;
 
-  // Wire armed cards into the holder's hand + armedPowerCard.
+  // Wire armed cards into the holder's slot + armedPowerCard.
+  // Post-#117: power cards live in room.powerCardSlot, not room.hands.
   function armPlayer(player, armed) {
+    room.hands.set(player.id, []);
     if (!armed) {
-      room.hands.set(player.id, []);
+      room.powerCardSlot[player.id] = [];
       return;
     }
     const card = {
@@ -87,7 +90,7 @@ function buildBluffScenario({
       armed: true,
       ...(armed.power === 'swap' ? { swapPendingPlayerIds: [] } : {}),
     };
-    room.hands.set(player.id, [card]);
+    room.powerCardSlot[player.id] = [card];
     player.armedPowerCard = {
       power: armed.power,
       cardId: card.id,
