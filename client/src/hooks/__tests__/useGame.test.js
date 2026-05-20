@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { renderHook, act, waitFor } from '@testing-library/react';
-import { makeMockSocket } from '../test/helpers/mockSocket';
+import { makeMockSocket } from '../../test-utils';
 
 // ─── Mock the socket singleton ─────────────────────────────────
 // useGame imports getSocket() from lib/socket. We swap that out for
@@ -9,12 +9,12 @@ import { makeMockSocket } from '../test/helpers/mockSocket';
 
 const socketHolder = vi.hoisted(() => ({ socket: null }));
 
-vi.mock('../lib/socket', () => ({
+vi.mock('../../lib/socket', () => ({
   getSocket: () => socketHolder.socket,
   SERVER_URL: 'http://localhost:3001',
 }));
 
-import { useGame } from './useGame';
+import { useGame } from '../useGame';
 
 beforeEach(() => {
   socketHolder.socket = makeMockSocket({ connected: false });

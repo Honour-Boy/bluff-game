@@ -125,6 +125,10 @@ export function useGameActions({
     return emitPromiseAction(socket, 'swap_pick', { roomCode, cardId }, failError);
   }, [failError, roomCode, socket]);
 
+  const preGameSelect = useCallback((optionId) => {
+    return emitPromiseAction(socket, 'pre_game_select', { roomCode, optionId }, failError);
+  }, [failError, roomCode, socket]);
+
   const updateRoomConfig = useCallback((nextConfig) => {
     return emitPromiseAction(socket, 'update_room_config', { roomCode, config: nextConfig }, failError);
   }, [failError, roomCode, socket]);
@@ -200,6 +204,7 @@ export function useGameActions({
     spectatePlayer,
     activatePowerCard,
     swapPick,
+    preGameSelect,
     updateRoomConfig,
     medicDecide,
     saboteurTransfer,

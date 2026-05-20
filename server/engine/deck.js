@@ -67,12 +67,33 @@ function buildDeck(playerCount, config = null) {
   return shuffleDeck([...full, ...powers]);
 }
 
-function dealCards(deck, orderedPlayerIds, cardsPerPlayer = 6) {
+// ─── Bonus-card mechanism (#116 pre-game selection) ───────────
+// Append per-player extra cards onto an existing hands Map. Shared
+// so both the deal and the pre-game finaliser route bonus cards
+// through one code path. `extraCards` may be a Map or a plain object
+// keyed by playerId → Card[]. Players absent from the map are left
+// untouched. Returns the same `hands` Map for chaining.
+function _appendExtraCards(hands, extraCards) {
+  if (!hands || !extraCards) return hands;
+  const lookup = extraCards instanceof Map
+    ? (pid) => extraCards.get(pid)
+    : (pid) => extraCards[pid];
+  for (const pid of hands.keys()) {
+    const extra = lookup(pid);
+    if (Array.isArray(extra) && extra.length) {
+      hands.get(pid).push(...extra);
+    }
+  }
+  return hands;
+}
+
+function dealCards(deck, orderedPlayerIds, cardsPerPlayer = 6, extraCards = null) {
   const hands = new Map();
   let remaining = [...deck];
   for (const pid of orderedPlayerIds) {
     hands.set(pid, remaining.splice(0, cardsPerPlayer));
   }
+  _appendExtraCards(hands, extraCards);
   return { hands, remainingDeck: remaining };
 }
 
@@ -82,4 +103,5 @@ module.exports = {
   buildPowerCards,
   buildDeck,
   dealCards,
+  _appendExtraCards,
 };

@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { renderHook, act, waitFor } from '@testing-library/react';
-import { makeMockSocket } from '../test/helpers/mockSocket';
+import { makeMockSocket } from '../../test-utils';
 
 // ─── Stub the env var so connect() doesn't bail with "not configured"
 // useVoice reads process.env.NEXT_PUBLIC_LIVEKIT_URL at module-import
@@ -13,7 +13,7 @@ vi.hoisted(() => {
 
 // ─── Mock the socket singleton ─────────────────────────────────
 const socketHolder = vi.hoisted(() => ({ socket: null }));
-vi.mock('../lib/socket', () => ({
+vi.mock('../../lib/socket', () => ({
   getSocket: () => socketHolder.socket,
   SERVER_URL: 'http://localhost:3001',
 }));
@@ -82,7 +82,7 @@ vi.mock('livekit-client', () => ({
   Track: livekitMock.Track,
 }));
 
-import { useVoice } from './useVoice';
+import { useVoice } from '../useVoice';
 
 beforeEach(() => {
   socketHolder.socket = makeMockSocket({ connected: true });

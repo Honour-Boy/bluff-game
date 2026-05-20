@@ -9,6 +9,7 @@ const {
   playerDisconnectTimers,
   _clearBettingTimer,
   _clearGhostVoteTimer,
+  _clearPreGameTimer,
   saveRoom,
 } = require('./state');
 const { broadcastRoomState } = require('./broadcast');
@@ -34,6 +35,7 @@ function startInactivitySweep(io) {
       });
       _clearBettingTimer(code);
       _clearGhostVoteTimer(code);
+      _clearPreGameTimer(code);
       const hostTimer = hostDisconnectTimers.get(code);
       if (hostTimer) {
         clearTimeout(hostTimer);
@@ -204,6 +206,7 @@ async function dismissIdleLobby(io, code, reason) {
   io.to(code).emit('game_ended', { reason });
   _clearBettingTimer(code);
   _clearGhostVoteTimer(code);
+  _clearPreGameTimer(code);
   const hostTimer = hostDisconnectTimers.get(code);
   if (hostTimer) {
     clearTimeout(hostTimer);

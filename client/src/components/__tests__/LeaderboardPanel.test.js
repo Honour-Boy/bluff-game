@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import { render, screen, waitFor } from '@testing-library/react';
-import { LeaderboardPanel } from './LeaderboardPanel';
+import { LeaderboardPanel } from '../LeaderboardPanel';
 
 describe('LeaderboardPanel', () => {
   it('renders the empty state for a fresh group', async () => {

@@ -11,6 +11,7 @@ const {
   dcKey,
   _clearBettingTimer,
   _clearGhostVoteTimer,
+  _clearPreGameTimer,
   saveRoom,
 } = require('../lib/state');
 const { broadcastRoomState, emitPowerCardEvents } = require('../lib/broadcast');
@@ -32,6 +33,7 @@ function register(io, socket, deps) {
           io.to(code).emit('game_ended', { reason: 'The host left the game.' });
           _clearBettingTimer(code);
           _clearGhostVoteTimer(code);
+          _clearPreGameTimer(code);
           discardLobbyIdleState(code);
           rooms.delete(code);
           hostDisconnectTimers.delete(code);

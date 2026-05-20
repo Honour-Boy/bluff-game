@@ -1,6 +1,6 @@
 import { describe, it, expect, vi } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
-import { VoicePanel, VoiceIndicator } from './VoicePanel';
+import { VoicePanel, VoiceIndicator } from '../VoicePanel';
 
 describe('VoicePanel', () => {
   it('renders the join button in idle state', () => {

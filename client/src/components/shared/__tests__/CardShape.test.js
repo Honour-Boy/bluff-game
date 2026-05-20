@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { render, screen } from '@testing-library/react';
-import { CardShape, SHAPES } from './CardShape';
+import { CardShape, SHAPES } from '../CardShape';
 
 describe('CardShape', () => {
   it.each(SHAPES)('renders the %s shape with its label', (shape) => {

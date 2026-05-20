@@ -1,6 +1,6 @@
 import { describe, it, expect, vi } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
-import { PreGameSettingsPanel, DEFAULT_V2_CONFIG } from './PreGameSettingsPanel';
+import { PreGameSettingsPanel, DEFAULT_V2_CONFIG } from '../PreGameSettingsPanel';
 
 function renderPanel({ initialConfig = DEFAULT_V2_CONFIG } = {}) {
   const onChange = vi.fn();

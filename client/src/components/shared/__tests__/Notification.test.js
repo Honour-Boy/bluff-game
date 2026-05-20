@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { render, screen } from '@testing-library/react';
-import { Notification } from './Notification';
+import { Notification } from '../Notification';
 
 describe('Notification', () => {
   it('renders nothing when notification is null', () => {

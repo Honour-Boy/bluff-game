@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { render, screen } from '@testing-library/react';
-import { RiskMeter } from './RiskMeter';
+import { RiskMeter } from '../RiskMeter';
 
 describe('RiskMeter', () => {
   it('renders six chamber slots regardless of risk level', () => {

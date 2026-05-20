@@ -13,6 +13,11 @@ const rooms = new Map();
 const bettingTimers = new Map();    // roomCode → setTimeout handle
 const ghostVoteTimers = new Map();  // roomCode → setTimeout handle
 
+// v2 Phase G — pre-game selection (#116). One handle per room covers
+// the role-reveal delay then the 15s selection auto-resolve (only one
+// is ever pending at a time). Cleared early when all players confirm.
+const pregameTimers = new Map();    // roomCode → setTimeout handle
+
 // Host / player disconnect grace timers.
 const hostDisconnectTimers = new Map();
 // Player disconnect timers must be visible across socket connections —
@@ -28,6 +33,10 @@ function _clearBettingTimer(code) {
 function _clearGhostVoteTimer(code) {
   const t = ghostVoteTimers.get(code);
   if (t) { clearTimeout(t); ghostVoteTimers.delete(code); }
+}
+function _clearPreGameTimer(code) {
+  const t = pregameTimers.get(code);
+  if (t) { clearTimeout(t); pregameTimers.delete(code); }
 }
 
 async function getRoom(code) {
@@ -45,11 +54,13 @@ module.exports = {
   rooms,
   bettingTimers,
   ghostVoteTimers,
+  pregameTimers,
   hostDisconnectTimers,
   playerDisconnectTimers,
   dcKey,
   _clearBettingTimer,
   _clearGhostVoteTimer,
+  _clearPreGameTimer,
   getRoom,
   saveRoom,
 };

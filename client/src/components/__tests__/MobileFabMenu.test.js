@@ -1,6 +1,6 @@
 import { describe, it, expect, vi } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
-import { MobileFabMenu } from './MobileFabMenu';
+import { MobileFabMenu } from '../MobileFabMenu';
 
 const baseVoice = {
   status: 'idle',

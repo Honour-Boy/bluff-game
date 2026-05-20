@@ -60,12 +60,14 @@ function HomeContent() {
     leaveGame, restartRoom, setError,
     activatePowerCard,
     swapPick,
+    preGameSelect,
     updateRoomConfig,
     medicDecide,
     saboteurTransfer,
     sniperRedirect,
     medicPrompt,
     sniperPrompt,
+    pregame,
     powerEventQueue,
     consumePowerEvent,
     leaderboardUpdateNonce,
@@ -426,6 +428,7 @@ function HomeContent() {
           spinDismissed={spinDismissed}
           activatePowerCard={activatePowerCard}
           swapPick={swapPick}
+          preGameSelect={preGameSelect}
           updateRoomConfig={updateRoomConfig}
           getGroupLeaderboard={getGroupLeaderboard}
           leaderboardUpdateNonce={leaderboardUpdateNonce}
@@ -434,6 +437,7 @@ function HomeContent() {
           sniperRedirect={sniperRedirect}
           medicPrompt={medicPrompt}
           sniperPrompt={sniperPrompt}
+          pregame={pregame}
           powerEventQueue={powerEventQueue}
           consumePowerEvent={consumePowerEvent}
           placeBet={placeBet}
@@ -483,6 +487,7 @@ function HomeContent() {
           spinDismissed={spinDismissed}
           activatePowerCard={activatePowerCard}
           swapPick={swapPick}
+          preGameSelect={preGameSelect}
           updateRoomConfig={updateRoomConfig}
           getGroupLeaderboard={getGroupLeaderboard}
           leaderboardUpdateNonce={leaderboardUpdateNonce}
@@ -491,6 +496,7 @@ function HomeContent() {
           sniperRedirect={sniperRedirect}
           medicPrompt={medicPrompt}
           sniperPrompt={sniperPrompt}
+          pregame={pregame}
           powerEventQueue={powerEventQueue}
           consumePowerEvent={consumePowerEvent}
           placeBet={placeBet}

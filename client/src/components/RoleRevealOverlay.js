@@ -29,6 +29,14 @@ export const ROLE_META = {
     color: "#8a8f99", // neutral steel grey
     flavor: "No special abilities. Read the room and trust your instincts — the basics are all you need to win.",
   },
+  // Shown to Barehand players on small tables (#116) — the literal
+  // "Barehand" label is hidden below the role threshold so the reveal
+  // doesn't telegraph that no special roles are in play this game.
+  standard: {
+    label: "Standard",
+    color: "#8a8f99", // same neutral steel grey
+    flavor: "No special role this game. Play the odds, read your opponents, and survive the chamber.",
+  },
   gambler: {
     label: "The Gambler",
     color: "#e5a23c", // amber
@@ -123,9 +131,13 @@ const ROLE_ICONS = {
   ),
 };
 
-export function RoleRevealOverlay({ role, onComplete, durationMs = 7500 }) {
-  const meta = ROLE_META[role] || ROLE_META.barehand;
-  const draw = ROLE_ICONS[role] || ROLE_ICONS.barehand;
+export function RoleRevealOverlay({ role, onComplete, durationMs = 7500, barehandVisible = true }) {
+  // Barehand players below the role threshold see the neutral
+  // "Standard" card instead of "Barehand" (#116). Special roles are
+  // always shown as themselves; only the Barehand label is masked.
+  const effectiveRole = role === "barehand" && !barehandVisible ? "standard" : role;
+  const meta = ROLE_META[effectiveRole] || ROLE_META.barehand;
+  const draw = ROLE_ICONS[effectiveRole] || ROLE_ICONS.barehand;
 
   const [phase, setPhase] = useState("enter"); // 'enter' | 'hold' | 'exit'
 

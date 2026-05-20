@@ -24,6 +24,13 @@ const ROLE_TYPES = Object.values(ROLES);
 const ROLES_AT_MIN_ALIVE = 9;
 const COLLECTOR_POWER_CARD_CAP = 3;
 
+// ─── v2 Phase G — Pre-game selection & role reveal (#116) ────
+// How long the private role-reveal card lingers before the server
+// opens the selection window. Selection then auto-resolves after
+// PRE_GAME_SELECTION_TIMEOUT_MS for any player who hasn't picked.
+const ROLE_REVEAL_DISPLAY_MS = 2000;
+const PRE_GAME_SELECTION_TIMEOUT_MS = 15000;
+
 const CARD_TYPES_DISCRIMINATOR = {
   SHAPE: 'shape',
   POWER: 'power',
@@ -125,6 +132,8 @@ module.exports = {
   ROLE_TYPES,
   ROLES_AT_MIN_ALIVE,
   COLLECTOR_POWER_CARD_CAP,
+  ROLE_REVEAL_DISPLAY_MS,
+  PRE_GAME_SELECTION_TIMEOUT_MS,
   CARD_TYPES_DISCRIMINATOR,
   POWER_TYPES,
   MODES,
