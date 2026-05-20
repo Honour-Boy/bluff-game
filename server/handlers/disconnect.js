@@ -94,7 +94,7 @@ function register(io, socket, deps) {
                 const { events: swapEvents, outcome: swapOutcome } =
                   bluffPipeline.resumeAfterSwap(room, accuserId, top.id);
                 room.swapHolderId = null;
-                if (swapOutcome && swapOutcome.kind !== 'error') {
+                if (swapOutcome && swapOutcome.type !== engine.GAME_EVENT_TYPES.BLUFF_ERROR) {
                   applyBluffOutcome(room, swapOutcome);
                 }
                 emitPowerCardEvents(io, code, swapEvents);
