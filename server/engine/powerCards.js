@@ -286,9 +286,10 @@ function consumeFreezeOnTurnEnd(room, holderId) {
   if (!room.discardPile) room.discardPile = [];
   const slot = room.powerCardSlot?.[holderId];
   if (Array.isArray(slot)) {
-    const cardIdx = armed.cardId
+    let cardIdx = armed.cardId
       ? slot.findIndex(c => c?.id === armed.cardId)
-      : slot.findIndex(c => c?.power === 'freeze');
+      : -1;
+    if (cardIdx === -1) cardIdx = slot.findIndex(c => c?.power === 'freeze');
     if (cardIdx !== -1) {
       const [card] = slot.splice(cardIdx, 1);
       room.discardPile.push(card);

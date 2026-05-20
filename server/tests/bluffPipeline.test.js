@@ -324,7 +324,7 @@ describe('pipeline / Swap', () => {
     // activatable. The pipeline should fall through to default.
     const { room } = buildSwapScenario();
     const accused = room.players.find(p => p.id === 'p0');
-    const swapCard = room.hands.get('p0').find(c => c.power === 'swap');
+    const swapCard = room.powerCardSlot['p0']?.find(c => c.power === 'swap');
     swapCard.swapPendingPlayerIds = ['p1']; // gate not satisfied
     const { outcome } = resolveBluff(room, 'p1');
     // Stage 5 (Swap) saw the gate, did not pause. Falls through to
