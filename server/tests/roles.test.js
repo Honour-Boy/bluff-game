@@ -34,6 +34,7 @@ import {
   ROLE_TYPES,
   ROLES_AT_MIN_ALIVE,
   COLLECTOR_POWER_CARD_CAP,
+  MEDIC_MAX_SAVES,
   MODES,
 } from '../gameEngine.js';
 import { resolveBluff } from '../bluffPipeline.js';
@@ -407,7 +408,8 @@ describe('Medic — save flow', () => {
     expect(p1.status).toBe('alive');
     expect(p1.isSpectator).toBe(false);
     expect(room.hands.get('p0').length).toBe(handBefore + 2);
-    expect(p0.medicAbilityAvailable).toBe(false);
+    // #120 — one save spent (counter, not a one-shot boolean).
+    expect(p0.medicSavesUsed).toBe(1);
   });
 
   it('save bumps chamber by 1 on spin source', () => {
@@ -435,15 +437,41 @@ describe('Medic — save flow', () => {
     expect(findAvailableMedic(room)).toBeNull();
   });
 
-  it('rejects after ability consumed', () => {
+  it('allows up to MEDIC_MAX_SAVES, then rejects the next with a save-limit error (#120)', () => {
     const { room, p0, p1 } = setupMedicRoom();
-    p1.status = 'eliminated';
-    applyMedicSave(room, 'p1', 'spin');
-    // Re-eliminate and try again.
+    // Keep the Medic's hand small between saves so the 6-card hand cap
+    // never masks the save-count cap this test is exercising.
+    for (let i = 0; i < MEDIC_MAX_SAVES; i++) {
+      room.hands.set('p0', []); // as if the Medic played their cards
+      p1.status = 'eliminated';
+      p1.isSpectator = true;
+      const res = applyMedicSave(room, 'p1', 'spin');
+      expect(res.ok).toBe(true);
+      expect(res.savesRemaining).toBe(MEDIC_MAX_SAVES - (i + 1));
+    }
+    expect(p0.medicSavesUsed).toBe(MEDIC_MAX_SAVES);
+
+    // Budget spent — no longer available, and a further attempt is
+    // rejected with the specific error.
+    room.hands.set('p0', []);
     p1.status = 'eliminated';
     expect(findAvailableMedic(room)).toBeNull();
-    const second = applyMedicSave(room, 'p1', 'spin');
-    expect(second.ok).toBe(false);
+    const overCap = applyMedicSave(room, 'p1', 'spin');
+    expect(overCap.ok).toBe(false);
+    expect(overCap.error).toBe('Save limit reached');
+  });
+
+  it('medicSavesUsed persists across separate eliminations', () => {
+    const { room, p0, p1 } = setupMedicRoom();
+    room.hands.set('p0', []);
+    p1.status = 'eliminated';
+    applyMedicSave(room, 'p1', 'spin');
+    expect(p0.medicSavesUsed).toBe(1);
+
+    room.hands.set('p0', []);
+    p1.status = 'eliminated';
+    applyMedicSave(room, 'p1', 'spin');
+    expect(p0.medicSavesUsed).toBe(2);
   });
 
   it('rejects when no Medic in the room', () => {

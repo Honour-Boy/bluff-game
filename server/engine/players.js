@@ -24,7 +24,9 @@ function createPlayer(id, username, socketId) {
     armedPowerCard: null,
     // v2 Phase D — Secret roles.
     role: ROLES.BAREHAND,
-    medicAbilityAvailable: true,
+    // v2 #120 — Medic revives are capped per game (MEDIC_MAX_SAVES).
+    // Track a running count instead of a one-shot boolean.
+    medicSavesUsed: 0,
     saboteurAbilityAvailable: true,
     sniperAbilityAvailable: true,
     // v2 Phase F — Bounty system.

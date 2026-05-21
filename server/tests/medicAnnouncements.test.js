@@ -9,7 +9,7 @@
 // ============================================================
 
 import { describe, it, expect } from 'vitest';
-import { createRoom, createPlayer, defaultRoomConfig, MODES, ROLES } from '../gameEngine.js';
+import { createRoom, createPlayer, defaultRoomConfig, MODES, ROLES, MEDIC_MAX_SAVES } from '../gameEngine.js';
 import { maybeStartMedicPause } from '../lib/orchestration.js';
 
 // Minimal io double that records every emit with its target so we can
@@ -63,7 +63,7 @@ describe('#121 — Medic pause broadcast', () => {
 
   it('does not pause or announce when no Medic is available', () => {
     const { room, medic } = setupMedicRoom();
-    medic.medicAbilityAvailable = false;
+    medic.medicSavesUsed = MEDIC_MAX_SAVES; // budget spent → unavailable
     const io = makeIo();
 
     const started = maybeStartMedicPause(io, room, 'p1', 'spin', () => {});
