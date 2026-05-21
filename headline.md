@@ -1,11 +1,12 @@
 # Bluff Game — Current State
+
 > Last updated: 2026-05-20 (post #133)
 
 ---
 
 ## Maintenance rules
 
-- **`headline.md` is updated locally only — never raise a PR for it.** After every completed task, fetch the current state of the repo (`git fetch`, `gh pr list`, `gh issue list`) and refresh this file in-place. Commit it straight to whatever branch is checked out (typically `staging`). It is a project journal, not an audit artefact — the PR-roundtrip ceremony that #131 and #134 used is retired.
+- **`headline.md` is updated locally only — never raise a PR for it.** After every completed task, fetch the current state of the repo (`git fetch`, `gh pr list`, `gh issue list`) and refresh this file in-place. do not Commit it either. It is a project journal, not an audit artefact — the PR-roundtrip ceremony that #131 and #134 used is retired.
 
 ---
 
@@ -17,34 +18,34 @@
 
 ## Recently shipped (merged to staging)
 
-| PR | Issue | What |
-|----|-------|------|
-| #133 | #116 | Feature: pre-game role reveal + bonus-card selection phase (lobby → `pre_game` → `playing`) |
-| #132 | #117 | Feature: power cards moved to `room.powerCardSlot`; hand UI splits shape cards from a dedicated POWER side-column |
-| #130 | #125 | Refactor: tests → `__tests__/` dirs; `test-utils/` barrel; `gameActions` unit tests |
-| #128 | #123 | Refactor: primitive UI atoms → `components/shared/` |
-| #127 | #122 | Refactor: screen-level components → `components/screens/` |
-| #126 | #124 | Refactor: drop stub shims + relocate `useOnlinePlayerUiController` → `hooks/` |
-| #115 | #107 | Security: session expiry, rate limiting, Supabase RLS hardening |
-| #113 | #105 (PR D) | Refactor: `HostUI`, `PlayerUI`, `useGame` splits |
-| #112 | #105 (PR C) | Refactor: `OnlinePlayerUI` split into modules |
-| #111 | #105 (PR B) | Refactor: `socketHandlers.js` split into `handlers/*` + `lib/*` |
-| #110 | #105 (PR A) | Refactor: `gameEngine.js` split into `server/engine/*` modules |
-| #109 | #106 | Performance: client-side caching (groups, profile, leaderboard, HowToPlay lazy-load) |
-| #108 | #104 | Mobile: Group screens responsive below 640px |
-| #103 | #102 | Mobile: FAB menu + VoicePanel layout fix |
-| #98–101 | FR1 epic | Persistent groups — P1 (schema + join), P2 (settings), P3 (leaderboard) |
+| PR      | Issue       | What                                                                                                              |
+| ------- | ----------- | ----------------------------------------------------------------------------------------------------------------- |
+| #133    | #116        | Feature: pre-game role reveal + bonus-card selection phase (lobby → `pre_game` → `playing`)                       |
+| #132    | #117        | Feature: power cards moved to `room.powerCardSlot`; hand UI splits shape cards from a dedicated POWER side-column |
+| #130    | #125        | Refactor: tests → `__tests__/` dirs; `test-utils/` barrel; `gameActions` unit tests                               |
+| #128    | #123        | Refactor: primitive UI atoms → `components/shared/`                                                               |
+| #127    | #122        | Refactor: screen-level components → `components/screens/`                                                         |
+| #126    | #124        | Refactor: drop stub shims + relocate `useOnlinePlayerUiController` → `hooks/`                                     |
+| #115    | #107        | Security: session expiry, rate limiting, Supabase RLS hardening                                                   |
+| #113    | #105 (PR D) | Refactor: `HostUI`, `PlayerUI`, `useGame` splits                                                                  |
+| #112    | #105 (PR C) | Refactor: `OnlinePlayerUI` split into modules                                                                     |
+| #111    | #105 (PR B) | Refactor: `socketHandlers.js` split into `handlers/*` + `lib/*`                                                   |
+| #110    | #105 (PR A) | Refactor: `gameEngine.js` split into `server/engine/*` modules                                                    |
+| #109    | #106        | Performance: client-side caching (groups, profile, leaderboard, HowToPlay lazy-load)                              |
+| #108    | #104        | Mobile: Group screens responsive below 640px                                                                      |
+| #103    | #102        | Mobile: FAB menu + VoicePanel layout fix                                                                          |
+| #98–101 | FR1 epic    | Persistent groups — P1 (schema + join), P2 (settings), P3 (leaderboard)                                           |
 
 ---
 
 ## Open issues
 
-| # | Title | Labels | Status |
-|---|-------|--------|--------|
-| **#118** | Feature: Pre-Emptive Manual Activation & Upkeep Phase | feature, enhancement | Not started |
-| **#119** | Architecture: Unified Event Resolution Engine | feature, refactor | Not started — **implement before #120** |
-| **#120** | Feature: Card Behaviors & Medic Role Integration | feature, enhancement, bug | Depends on #119 |
-| **#121** | Bug: Public Announcement & Event Sync Accuracy | bug | Depends on #119 |
+| #        | Title                                                 | Labels                    | Status                                  |
+| -------- | ----------------------------------------------------- | ------------------------- | --------------------------------------- |
+| **#118** | Feature: Pre-Emptive Manual Activation & Upkeep Phase | feature, enhancement      | Not started                             |
+| **#119** | Architecture: Unified Event Resolution Engine         | feature, refactor         | Not started — **implement before #120** |
+| **#120** | Feature: Card Behaviors & Medic Role Integration      | feature, enhancement, bug | Depends on #119                         |
+| **#121** | Bug: Public Announcement & Event Sync Accuracy        | bug                       | Depends on #119                         |
 
 ---
 
@@ -79,6 +80,7 @@ Phases A–H defined in `tasks/v2-roadmap.md`. Phase A (test framework + setting
 ## Foundation fixes — not yet started
 
 Seven bugs in `tasks/todo.md` Phase 1. Key P0s:
+
 - `host_reconnect` has no auth check — anyone with a room code can hijack host
 - `disconnectTimers` declared inside handler scope — reconnect timer can never be cleared
 - Auth race on reconnect in `useGame.js`

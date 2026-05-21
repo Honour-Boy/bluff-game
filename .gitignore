@@ -4,6 +4,7 @@ server/node_modules/
 .next/
 .env
 .env.local
+headline.md
 
 # Supabase local dev artifacts (migrations are committed; local state isn't)
 supabase/.branches/
