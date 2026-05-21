@@ -103,6 +103,78 @@ const PRESETS = {
     bg: "linear-gradient(90deg, #050506 0%, #0a0204 50%, #050506 100%)",
     glyph: "duel",
   },
+
+  // ─── #121: distinct presets per resolved outcome ──────────────
+  // Before #121 the kind→banner map squashed several distinct
+  // outcomes onto bluff_blocked / assassin / sudden_death, so a swap,
+  // a freeze, a medic save, etc. all rendered the WRONG banner. Each
+  // outcome now owns an accurately-worded, visually-distinct preset.
+  swap_resolved: {
+    title: "SWAP RESOLVED",
+    accent: "#7cd5ff", // ice blue
+    bg: "linear-gradient(90deg, rgba(4,8,12,0.96) 0%, rgba(6,20,30,0.96) 50%, rgba(4,8,12,0.96) 100%)",
+    glyph: "mirror",
+  },
+  freeze_applied: {
+    title: "FROZEN",
+    accent: "#7cd5ff", // ice blue
+    bg: "linear-gradient(90deg, rgba(4,8,12,0.96) 0%, rgba(8,22,34,0.96) 50%, rgba(4,8,12,0.96) 100%)",
+    glyph: "snow",
+  },
+  medic_deciding: {
+    title: "MEDIC DECIDING",
+    accent: "#5fd0a8", // teal-green
+    bg: "linear-gradient(90deg, rgba(4,12,10,0.96) 0%, rgba(6,28,22,0.96) 50%, rgba(4,12,10,0.96) 100%)",
+    glyph: "cross",
+  },
+  medic_saved: {
+    title: "MEDIC SAVE",
+    accent: "var(--alive)",
+    bg: "linear-gradient(90deg, rgba(4,12,10,0.96) 0%, rgba(6,30,20,0.96) 50%, rgba(4,12,10,0.96) 100%)",
+    glyph: "cross",
+  },
+  medic_skipped: {
+    title: "NO SAVE",
+    accent: "var(--eliminated)",
+    bg: "linear-gradient(90deg, rgba(8,4,6,0.97) 0%, rgba(40,8,16,0.96) 50%, rgba(8,4,6,0.97) 100%)",
+    glyph: "skull",
+  },
+  assassin_backfire: {
+    title: "ASSASSIN BACKFIRES",
+    accent: "#e0863a", // amber
+    bg: "linear-gradient(90deg, rgba(12,6,4,0.97) 0%, rgba(36,16,4,0.96) 50%, rgba(12,6,4,0.97) 100%)",
+    glyph: "skull",
+  },
+  gambler_caught: {
+    title: "GAMBLER CAUGHT",
+    accent: "#b8143a", // deep crimson
+    bg: "linear-gradient(90deg, rgba(10,4,6,0.97) 0%, rgba(40,4,12,0.96) 50%, rgba(10,4,6,0.97) 100%)",
+    glyph: "coin",
+  },
+  sheriff_relief: {
+    title: "SHERIFF RELIEVED",
+    accent: "var(--accent)", // lime
+    bg: "linear-gradient(90deg, rgba(10,10,11,0.96) 0%, rgba(20,28,8,0.96) 50%, rgba(10,10,11,0.96) 100%)",
+    glyph: "shield",
+  },
+  sheriff_protected: {
+    title: "SHERIFF PROTECTED",
+    accent: "var(--accent)", // lime
+    bg: "linear-gradient(90deg, rgba(10,10,11,0.96) 0%, rgba(20,28,8,0.96) 50%, rgba(10,10,11,0.96) 100%)",
+    glyph: "shield",
+  },
+  sniper_redirect: {
+    title: "SNIPER REDIRECT",
+    accent: "#b8143a", // deep crimson
+    bg: "linear-gradient(90deg, rgba(10,4,6,0.97) 0%, rgba(30,6,10,0.96) 50%, rgba(10,4,6,0.97) 100%)",
+    glyph: "duel",
+  },
+  system_notice: {
+    title: "NOTICE",
+    accent: "var(--text-dim, #9aa3ad)",
+    bg: "linear-gradient(90deg, rgba(10,10,11,0.96) 0%, rgba(16,16,20,0.96) 50%, rgba(10,10,11,0.96) 100%)",
+    glyph: "shield",
+  },
 };
 
 // Inline glyph SVGs — same approach as ShapeIcon / PowerCard
@@ -149,6 +221,11 @@ const GLYPHS = {
       <path d="M50 14 L50 30" />
     </g>
   ),
+  cross: (c) => (
+    <g fill="none" stroke={c} strokeWidth="7" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M50 18 L50 82 M18 50 L82 50" />
+    </g>
+  ),
 };
 
 export function AnnouncementBanner({
@@ -160,11 +237,8 @@ export function AnnouncementBanner({
   onComplete,
   durationMs = 3500,
 }) {
-  const preset = PRESETS[kind] || PRESETS.bluff_blocked;
-  const accent = accentColor || preset.accent;
-  const headline = title || preset.title;
-  const draw = GLYPHS[preset.glyph] || GLYPHS.shield;
-
+  // Hooks run unconditionally and FIRST so the unknown-kind early
+  // return below never trips the Rules of Hooks.
   const [phase, setPhase] = useState("enter"); // 'enter' | 'hold' | 'exit'
 
   useEffect(() => {
@@ -177,6 +251,22 @@ export function AnnouncementBanner({
       clearTimeout(t3);
     };
   }, [durationMs, onComplete]);
+
+  // #121: no generic fallback. An unknown `kind` must render NOTHING
+  // rather than silently impersonating "BLUFF BLOCKED" (which actively
+  // contradicts the real game state). The kind→preset mapping upstream
+  // (buildAnnouncementBannerProps) is the first guard; this is the
+  // belt-and-braces second one.
+  const preset = PRESETS[kind];
+  if (!preset) {
+    if (typeof console !== "undefined") {
+      console.warn("[AnnouncementBanner] unknown kind:", kind);
+    }
+    return null;
+  }
+  const accent = accentColor || preset.accent;
+  const headline = title || preset.title;
+  const draw = GLYPHS[preset.glyph] || GLYPHS.shield;
 
   // Translate based on phase
   const translate =

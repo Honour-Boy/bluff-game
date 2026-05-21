@@ -25,83 +25,64 @@ export const GAME_UI_STYLE = `
   }
 `;
 
+// ─── #121: Announcement accuracy ──────────────────────────────
+// Single source of truth mapping a server `power_card_triggered`
+// event `kind` to the banner it should render: which PRESETS entry
+// to use (visual identity), the headline, and a subtitle builder.
+//
+// EVERY kind the server can emit as `power_card_triggered` MUST be
+// listed here. A kind that is NOT listed is treated as unknown:
+// `buildAnnouncementBannerProps` returns null and warns, so the
+// banner renders nothing instead of silently impersonating another
+// outcome (pre-#121 every unmapped kind fell through to
+// "BLUFF BLOCKED").
+//
+// NOTE on Peek: `peek_used` is intentionally absent — Peek is private
+// to its holder and is delivered via the activate_power_card callback,
+// never broadcast as `power_card_triggered`, so it never reaches here.
+const ANNOUNCEMENT_MAP = {
+  // Bluff-pipeline outcomes
+  shield_blocked: { preset: 'bluff_blocked', title: 'BLUFF BLOCKED', subtitle: (e) => (e.holderName ? `${e.holderName}'s Shield` : 'Shield held') },
+  sheriff_protected: { preset: 'sheriff_protected', title: 'SHERIFF PROTECTED', subtitle: () => 'assassin held back' },
+  assassin_backfire: { preset: 'assassin_backfire', title: 'ASSASSIN BACKFIRES', subtitle: (e) => `${e.holderName || 'Holder'} draws +${e.cardsDrawn || 3}` },
+  mirror_reflected: { preset: 'bluff_reflected', title: 'BLUFF REFLECTED', subtitle: (e) => (e.redirectedToName ? `back to ${e.redirectedToName}` : 'reflected') },
+  assassin_strike: { preset: 'assassin', title: 'ASSASSIN STRIKE', subtitle: (e) => (e.eliminatedName ? `${e.eliminatedName} eliminated` : '') },
+  gambler_caught: { preset: 'gambler_caught', title: 'GAMBLER CAUGHT', subtitle: () => 'risk jumps to 4' },
+  sheriff_relief: { preset: 'sheriff_relief', title: 'SHERIFF RELIEVED', subtitle: () => 'one bullet removed' },
+  swap_resolved: { preset: 'swap_resolved', title: 'SWAP RESOLVED', subtitle: () => 'card swapped' },
+  // Role abilities + role pauses
+  medic_deciding: { preset: 'medic_deciding', title: 'MEDIC DECIDING', subtitle: (e) => (e.eliminatedPlayerName ? `${e.eliminatedPlayerName} on the line` : 'a save is pending') },
+  medic_saved: { preset: 'medic_saved', title: 'MEDIC SAVE', subtitle: (e) => (e.revivedPlayerName ? `${e.revivedPlayerName} revived` : 'player revived') },
+  medic_skipped: { preset: 'medic_skipped', title: 'NO SAVE', subtitle: (e) => (e.eliminatedPlayerName ? `${e.eliminatedPlayerName} eliminated` : 'elimination stands') },
+  sniper_redirect: { preset: 'sniper_redirect', title: 'SNIPER REDIRECT', subtitle: (e) => (e.toName ? `to ${e.toName}` : 'spin redirected') },
+  // Systems
+  freeze_skip: { preset: 'freeze_applied', title: 'FROZEN', subtitle: (e) => (e.skippedName ? `${e.skippedName} is skipped` : 'turn skipped') },
+  bounty_placed: { preset: 'bounty', title: 'BOUNTY PLACED', subtitle: (e) => (e.holderName ? `on ${e.holderName}` : '') },
+  bounty_collected: { preset: 'bounty_collected', title: 'BOUNTY COLLECTED', subtitle: (e) => { const who = e.accuserName || e.collectorName; return who ? `${who} reduces risk` : ''; } },
+  betting_open: { preset: 'betting_open', title: 'PLACE YOUR BETS', subtitle: () => '' },
+  betting_streak_reward: { preset: 'betting_streak_reward', title: 'BETTING STREAK!', subtitle: (e) => (e.playerName ? `${e.playerName} predicts well` : '') },
+  sudden_death: { preset: 'sudden_death', title: 'SUDDEN DEATH', subtitle: () => 'everyone gains a bullet' },
+  ghost_vote_started: { preset: 'ghost_vote_started', title: 'GHOST COUNCIL CONVENES', subtitle: () => 'the dead are voting' },
+  ghost_vote_result: { preset: 'ghost_vote_result', title: 'GHOST COUNCIL DECIDES', subtitle: (e) => e.result || e.winningOption || '' },
+  last_stand_entered: { preset: 'last_stand_entered', title: 'LAST STAND', subtitle: () => 'two finalists remain' },
+  system_notice: { preset: 'system_notice', title: 'NOTICE', subtitle: (e) => e.message || '' },
+};
+
 export function buildAnnouncementBannerProps(evt) {
-  if (!evt) return null;
+  if (!evt || !evt.kind) return null;
 
-  const kind = (() => {
-    switch (evt.kind) {
-      case 'shield_blocked':
-        return 'bluff_blocked';
-      case 'mirror_reflected':
-        return 'bluff_reflected';
-      case 'assassin_strike':
-        return 'assassin';
-      case 'assassin_backfire':
-        return 'bluff_blocked';
-      case 'swap_resolved':
-        return 'bluff_blocked';
-      case 'freeze_skip':
-        return 'sudden_death';
-      case 'gambler_caught':
-        return 'assassin';
-      case 'sheriff_relief':
-        return 'bluff_blocked';
-      case 'sheriff_protected':
-        return 'bluff_blocked';
-      case 'medic_save':
-        return 'sudden_death';
-      case 'sniper_redirect':
-        return 'assassin';
-      default:
-        return 'bluff_blocked';
+  const entry = ANNOUNCEMENT_MAP[evt.kind];
+  if (!entry) {
+    if (typeof console !== 'undefined') {
+      console.warn('[buildAnnouncementBannerProps] unknown event kind:', evt.kind);
     }
-  })();
-
-  const titleByKind = {
-    shield_blocked: 'BLUFF BLOCKED',
-    mirror_reflected: 'BLUFF REFLECTED',
-    assassin_strike: 'ASSASSIN STRIKE',
-    assassin_backfire: 'ASSASSIN BACKFIRES',
-    swap_resolved: 'SWAP RESOLVED',
-    freeze_skip: 'FREEZE',
-    gambler_caught: 'GAMBLER CAUGHT',
-    sheriff_relief: 'SHERIFF RELIEVED',
-    sheriff_protected: 'SHERIFF PROTECTED',
-    medic_save: 'MEDIC SAVE',
-    sniper_redirect: 'SNIPER REDIRECT',
-  };
-
-  const subtitle = (() => {
-    if (evt.kind === 'mirror_reflected') {
-      return evt.redirectedToName ? `â†’ ${evt.redirectedToName}` : '';
-    }
-    if (evt.kind === 'assassin_strike') {
-      return evt.eliminatedName ? `${evt.eliminatedName} eliminated` : '';
-    }
-    if (evt.kind === 'assassin_backfire') {
-      const drawn = evt.cardsDrawn || 3;
-      return `${evt.holderName || 'Holder'} draws +${drawn}`;
-    }
-    if (evt.kind === 'swap_resolved') return 'card swapped';
-    if (evt.kind === 'freeze_skip') {
-      return evt.skippedName ? `${evt.skippedName} is skipped` : 'turn skipped';
-    }
-    if (evt.kind === 'gambler_caught') return 'risk jumps to 4';
-    if (evt.kind === 'sheriff_relief') return 'one bullet removed';
-    if (evt.kind === 'sheriff_protected') return 'assassin held back';
-    if (evt.kind === 'medic_save') {
-      return evt.revivedPlayerName ? `${evt.revivedPlayerName} revived` : 'player revived';
-    }
-    if (evt.kind === 'sniper_redirect') {
-      return evt.toName ? `â†’ ${evt.toName}` : 'spin redirected';
-    }
-    return '';
-  })();
+    return null;
+  }
 
   return {
-    kind,
-    title: titleByKind[evt.kind],
-    subtitle,
+    kind: entry.preset,
+    title: entry.title,
+    subtitle: typeof entry.subtitle === 'function' ? entry.subtitle(evt) : (entry.subtitle || ''),
     playerName: evt.holderName,
   };
 }
