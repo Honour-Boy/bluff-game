@@ -30,6 +30,25 @@ function register(io, socket, deps) {
       if (!pending) return callback?.({ success: false, error: 'Lost Medic context' });
       if (pending.medicId !== socket.userId) return callback?.({ success: false, error: 'Not the Medic' });
 
+      // #121 — once the elimination is final (Medic declines or the save
+      // fails), release the death announcement that was suppressed while
+      // the room was paused. The Assassin path defers a specific
+      // assassin_strike banner; every other path gets the generic
+      // medic_skipped notice.
+      const releaseDeath = () => {
+        const deferred = Array.isArray(pending.deferredBanners) ? pending.deferredBanners : [];
+        if (deferred.length > 0) {
+          for (const b of deferred) io.to(code).emit('power_card_triggered', b);
+        } else {
+          io.to(code).emit('power_card_triggered', {
+            kind: 'medic_skipped',
+            medicId: pending.medicId,
+            eliminatedPlayerId: pending.eliminatedPlayerId,
+            eliminatedPlayerName: pending.eliminatedPlayerName,
+          });
+        }
+      };
+
       if (save) {
         const res = engine.applyMedicSave(room, pending.eliminatedPlayerId, pending.source);
         if (!res.ok) {
@@ -40,12 +59,13 @@ function register(io, socket, deps) {
           await maybeRecordGroupWinner(io, room, leaderboardRepo);
           await saveRoom(room);
           await broadcastRoomState(io, code);
+          releaseDeath();
           return callback?.({ success: false, error: res.error });
         }
 
         // Medic save banner — public.
         io.to(code).emit('power_card_triggered', {
-          kind: 'medic_save',
+          kind: 'medic_saved',
           holderId: res.medicId,
           revivedPlayerId: res.revivedPlayerId,
           revivedPlayerName: pending.eliminatedPlayerName,
@@ -70,6 +90,7 @@ function register(io, socket, deps) {
       await maybeRecordGroupWinner(io, room, leaderboardRepo);
       await saveRoom(room);
       await broadcastRoomState(io, code);
+      releaseDeath();
       callback?.({ success: true, saved: false });
     } catch (err) {
       console.error('[medic_decide]', err);

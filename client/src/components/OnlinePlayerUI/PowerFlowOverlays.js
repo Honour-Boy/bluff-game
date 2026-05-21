@@ -1,3 +1,4 @@
+import { useEffect } from 'react';
 import { PowerCard, POWER_META } from '../shared/PowerCard';
 import { ShapeIcon } from '../shared/ShapeIcon';
 import { AnnouncementBanner } from '../shared/AnnouncementBanner';
@@ -22,6 +23,16 @@ export function PowerFlowOverlays({
 }) {
   const event = Array.isArray(powerEventQueue) && powerEventQueue.length > 0 ? powerEventQueue[0] : null;
   const bannerModel = buildAnnouncementBannerProps(event);
+
+  // #121: an event at the head that maps to no banner (unknown kind)
+  // renders nothing by design — but it must still be consumed or it
+  // would stall every banner queued behind it. Drop it so the queue
+  // keeps moving. `consumePowerEvent` is a stable useCallback.
+  const headId = event?.id || null;
+  const renderable = !!bannerModel;
+  useEffect(() => {
+    if (headId && !renderable) consumePowerEvent?.();
+  }, [headId, renderable, consumePowerEvent]);
 
   return (
     <>

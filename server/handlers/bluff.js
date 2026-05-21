@@ -209,17 +209,23 @@ function register(io, socket, deps) {
         }
 
         // v2 Phase D — Medic interception (Assassin path).
-        if (
-          outcome.type === E.FORCED_ELIMINATION
-          && maybeStartMedicPause(io, room, outcome.eliminatedPlayerId, 'assassin', () => {
+        if (outcome.type === E.FORCED_ELIMINATION) {
+          const medicStarted = maybeStartMedicPause(io, room, outcome.eliminatedPlayerId, 'assassin', () => {
             finaliseAssassinElimination(room, outcome);
             applyPostElimSystemHooks(io, room);
-          })
-        ) {
-          await saveRoom(room);
-          emitPowerCardEvents(io, code, events);
-          await broadcastRoomState(io, code);
-          return callback({ success: true });
+          });
+          if (medicStarted) {
+            // #121 — hold the death announcement until the Medic resolves.
+            // The assassin_strike banner is deferred onto the pending-save
+            // state; medic_decide releases it on decline, drops it on save.
+            const deferred = events.filter(e => e?.kind === 'assassin_strike');
+            const immediate = events.filter(e => e?.kind !== 'assassin_strike');
+            if (room.pendingMedicSave) room.pendingMedicSave.deferredBanners = deferred;
+            await saveRoom(room);
+            emitPowerCardEvents(io, code, immediate);
+            await broadcastRoomState(io, code);
+            return callback({ success: true });
+          }
         }
 
         // #63 — Assassin backfire penalty before applyBluffOutcome.
@@ -301,17 +307,22 @@ function register(io, socket, deps) {
         await broadcastRoomState(io, code);
         return callback?.({ success: true });
       }
-      if (
-        outcome.type === E.FORCED_ELIMINATION
-        && maybeStartMedicPause(io, room, outcome.eliminatedPlayerId, 'assassin', () => {
+      if (outcome.type === E.FORCED_ELIMINATION) {
+        const medicStarted = maybeStartMedicPause(io, room, outcome.eliminatedPlayerId, 'assassin', () => {
           finaliseAssassinElimination(room, outcome);
           applyPostElimSystemHooks(io, room);
-        })
-      ) {
-        await saveRoom(room);
-        emitPowerCardEvents(io, code, events);
-        await broadcastRoomState(io, code);
-        return callback?.({ success: true });
+        });
+        if (medicStarted) {
+          // #121 — hold the death announcement until the Medic resolves
+          // (released on decline / dropped on save by medic_decide).
+          const deferred = events.filter(e => e?.kind === 'assassin_strike');
+          const immediate = events.filter(e => e?.kind !== 'assassin_strike');
+          if (room.pendingMedicSave) room.pendingMedicSave.deferredBanners = deferred;
+          await saveRoom(room);
+          emitPowerCardEvents(io, code, immediate);
+          await broadcastRoomState(io, code);
+          return callback?.({ success: true });
+        }
       }
 
       applyBluffOutcome(room, outcome);

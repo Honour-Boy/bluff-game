@@ -56,8 +56,12 @@ function buildPhrase(evt) {
       return 'Sheriff caught the bluff — risk reduced';
     case 'gambler_caught':
       return 'Gambler caught — risk jumps to four';
-    case 'medic_save':
+    case 'medic_deciding':
+      return `Medic is deciding the fate of ${evt.eliminatedPlayerName || 'a player'}`;
+    case 'medic_saved':
       return `Medic intervenes — ${evt.savedName || evt.revivedPlayerName || 'a player'} survives`;
+    case 'medic_skipped':
+      return `No save — ${evt.eliminatedPlayerName || 'a player'} is eliminated`;
     case 'sniper_redirect':
       return `Sniper redirects — ${evt.newTargetName || evt.toName || 'a new target'} is the new target`;
     case 'saboteur_planted':

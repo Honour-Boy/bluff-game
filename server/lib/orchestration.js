@@ -82,6 +82,18 @@ function maybeStartMedicPause(io, room, eliminatedPlayerId, source, finaliseFn) 
     finaliseFn,
   };
 
+  // #121 — the whole room must know the game is paused awaiting a Medic
+  // decision, not just the Medic. Broadcast a public `medic_deciding`
+  // announcement to every client; the Medic additionally gets the
+  // private save prompt below.
+  io.to(room.code).emit('power_card_triggered', {
+    kind: 'medic_deciding',
+    medicId: medic.id,
+    eliminatedPlayerId,
+    eliminatedPlayerName: eliminated?.username || null,
+    source,
+  });
+
   if (medic.socketId) {
     io.to(medic.socketId).emit('medic_save_pending', {
       eliminatedPlayerId,
@@ -392,6 +404,19 @@ function resolveLeaverPendingPauses(io, code, room, playerId) {
     if (typeof pending.finaliseFn === 'function') pending.finaliseFn();
     room.pendingMedicSave = null;
     if (room.phase === 'medic_pending') room.phase = 'playing';
+    // #121 — the Medic vanished, so the suppressed death is now final.
+    // Release the deferred announcement (or the generic skip notice).
+    const deferred = Array.isArray(pending.deferredBanners) ? pending.deferredBanners : [];
+    if (deferred.length > 0) {
+      for (const b of deferred) io.to(code).emit('power_card_triggered', b);
+    } else {
+      io.to(code).emit('power_card_triggered', {
+        kind: 'medic_skipped',
+        medicId: pending.medicId,
+        eliminatedPlayerId: pending.eliminatedPlayerId,
+        eliminatedPlayerName: pending.eliminatedPlayerName,
+      });
+    }
   }
   if (room.phase === 'sniper_pending' && room.pendingSniperRedirect?.sniperId === playerId) {
     const pending = room.pendingSniperRedirect;
