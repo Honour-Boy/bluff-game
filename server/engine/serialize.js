@@ -6,7 +6,7 @@
 // (eliminated players who picked a target) get the spectated hand
 // + ghosted prompt target hint.
 
-const { MODES } = require('./constants');
+const { MODES, MEDIC_MAX_SAVES } = require('./constants');
 const { isBarehandVisible } = require('./roles');
 
 function serializeRoom(room, requestingPlayerId = null, opts = {}) {
@@ -65,7 +65,12 @@ function serializeRoom(room, requestingPlayerId = null, opts = {}) {
         p.id === requestingPlayerId
           ? (p.role || 'barehand')
           : (room.phase === 'game_over' ? (p.role || 'barehand') : null),
-      medicAbilityAvailable: p.id === requestingPlayerId ? !!p.medicAbilityAvailable : undefined,
+      // #120 — Medic save budget. Only exposed to its owner. Keep the
+      // derived `medicAbilityAvailable` boolean so existing consumers
+      // keep working; add the raw count + remaining for UI ("2 saves left").
+      medicSavesUsed: p.id === requestingPlayerId ? (p.medicSavesUsed || 0) : undefined,
+      medicSavesRemaining: p.id === requestingPlayerId ? Math.max(0, MEDIC_MAX_SAVES - (p.medicSavesUsed || 0)) : undefined,
+      medicAbilityAvailable: p.id === requestingPlayerId ? (p.medicSavesUsed || 0) < MEDIC_MAX_SAVES : undefined,
       saboteurAbilityAvailable: p.id === requestingPlayerId ? !!p.saboteurAbilityAvailable : undefined,
       sniperAbilityAvailable: p.id === requestingPlayerId ? !!p.sniperAbilityAvailable : undefined,
       hasBounty: !!p.hasBounty,

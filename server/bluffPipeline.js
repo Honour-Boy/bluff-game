@@ -230,12 +230,21 @@ function _tierBluffValidation(room, event, ctx) {
     }
 
     // Wrong bluff (accused told the truth) → forced elimination of the
-    // accuser. Non-redirectable + non-preventable so Mirror (Tier 4)
-    // refuses it; the strike is materialised at Tier 5.
+    // accuser. Per #120 the typed event is the source of truth for the
+    // clash rules:
+    //   redirectable: false → Mirror (Tier 4) MUST refuse it (Assassin > Mirror).
+    //   preventable: true   → Shield CAN cancel it (Shield > Assassin).
+    // The `preventable` flag is declarative here: a player holds at most
+    // one armed power card, and an armed Shield is already consumed at
+    // Tier 1 (Prevention) before this consequence is ever typed — so the
+    // clash is honoured by ordering. The flag keeps the GameEvent
+    // self-describing for any future tier that reads it.
     if (bluffIsCorrect === false) {
       return _event(GAME_EVENT_TYPES.FORCED_ELIMINATION, {
         source: accused.id,
         target: accuser?.id || null,
+        redirectable: false,
+        preventable: true,
         payload: {
           eliminatedReason: 'assassin',
           accuserId: accuser?.id || null,

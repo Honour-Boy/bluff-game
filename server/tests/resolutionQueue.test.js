@@ -107,7 +107,7 @@ describe('#119 / typed GameEvent', () => {
     expect(outcome.event.type).toBe(GAME_EVENT_TYPES.BLUFF_BLOCKED);
   });
 
-  it('a wrong bluff vs Assassin yields a non-redirectable FORCED_ELIMINATION', () => {
+  it('a wrong bluff vs Assassin yields a non-redirectable, preventable FORCED_ELIMINATION', () => {
     const { room } = buildScenario({
       accusedArmed: { power: 'assassin', cardId: 'k-A' },
       lastPlayedShape: 'circle',
@@ -116,8 +116,9 @@ describe('#119 / typed GameEvent', () => {
     const { outcome } = resolveBluff(room, 'p1');
     expect(outcome.kind).toBe('eliminated');
     expect(outcome.event.type).toBe(GAME_EVENT_TYPES.FORCED_ELIMINATION);
+    // #120 clash contract: Mirror MUST refuse it; Shield MAY cancel it.
     expect(outcome.event.redirectable).toBe(false);
-    expect(outcome.event.preventable).toBe(false);
+    expect(outcome.event.preventable).toBe(true);
     expect(outcome.event.target).toBe('p1');
   });
 });

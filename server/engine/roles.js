@@ -5,7 +5,7 @@
 // role appears at most once per game; Gambler may appear 1-2 times.
 // Remaining players are Barehand.
 
-const { ROLES, ROLES_AT_MIN_ALIVE, MODES } = require('./constants');
+const { ROLES, ROLES_AT_MIN_ALIVE, MODES, MEDIC_MAX_SAVES } = require('./constants');
 const { addBulletToChamber } = require('./chamber');
 const { drawCardForPlayer } = require('./cards');
 const { _countPowerCardsInHand, _powerCardCapForPlayer } = require('./handHelpers');
@@ -71,13 +71,14 @@ function isBarehandVisible(playerCount) {
 
 /**
  * Return the alive Medic player who can still use their save ability
- * AND has hand-room (< 6 cards), or null.
+ * AND has hand-room (< 6 cards), or null. The Medic may revive up to
+ * MEDIC_MAX_SAVES times per game (#120).
  */
 function findAvailableMedic(room) {
   const medic = room.players.find(p =>
     p.role === ROLES.MEDIC
     && p.status === 'alive'
-    && p.medicAbilityAvailable
+    && (p.medicSavesUsed || 0) < MEDIC_MAX_SAVES
   );
   if (!medic) return null;
   if (room.mode === MODES.ONLINE) {
@@ -109,7 +110,17 @@ function findAvailableSniper(room) {
 function applyMedicSave(room, eliminatedPlayerId, source = 'spin') {
   if (room.mode !== MODES.ONLINE) return { ok: false, error: 'Online mode only' };
   const medic = findAvailableMedic(room);
-  if (!medic) return { ok: false, error: 'No Medic available' };
+  if (!medic) {
+    // findAvailableMedic also rejects a Medic who has spent all their
+    // saves — surface that as a distinct error so the caller (and the
+    // 4th-attempt acceptance test) can tell it apart from "no Medic".
+    const capped = room.players.find(p =>
+      p.role === ROLES.MEDIC
+      && p.status === 'alive'
+      && (p.medicSavesUsed || 0) >= MEDIC_MAX_SAVES
+    );
+    return { ok: false, error: capped ? 'Save limit reached' : 'No Medic available' };
+  }
   const target = room.players.find(p => p.id === eliminatedPlayerId);
   if (!target) return { ok: false, error: 'Target not found' };
   if (target.status !== 'eliminated') {
@@ -133,9 +144,16 @@ function applyMedicSave(room, eliminatedPlayerId, source = 'spin') {
     if (card) dealt.push(card);
     else break;
   }
-  medic.medicAbilityAvailable = false;
+  medic.medicSavesUsed = (medic.medicSavesUsed || 0) + 1;
 
-  return { ok: true, dealt, revivedPlayerId: target.id, medicId: medic.id };
+  return {
+    ok: true,
+    dealt,
+    revivedPlayerId: target.id,
+    medicId: medic.id,
+    savesUsed: medic.medicSavesUsed,
+    savesRemaining: MEDIC_MAX_SAVES - medic.medicSavesUsed,
+  };
 }
 
 /**

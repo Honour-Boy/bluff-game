@@ -23,6 +23,10 @@ const ROLES = {
 const ROLE_TYPES = Object.values(ROLES);
 const ROLES_AT_MIN_ALIVE = 9;
 const COLLECTOR_POWER_CARD_CAP = 3;
+// v2 #120 — Medic may revive at most this many eliminations per game
+// (tracked per-player as `medicSavesUsed`, enforced in roles.js +
+// handlers/roles.js). A 4th attempt is rejected server-side.
+const MEDIC_MAX_SAVES = 3;
 
 // ─── v2 Phase G — Pre-game selection & role reveal (#116) ────
 // How long the private role-reveal card lingers before the server
@@ -175,6 +179,7 @@ module.exports = {
   ROLE_TYPES,
   ROLES_AT_MIN_ALIVE,
   COLLECTOR_POWER_CARD_CAP,
+  MEDIC_MAX_SAVES,
   ROLE_REVEAL_DISPLAY_MS,
   PRE_GAME_SELECTION_TIMEOUT_MS,
   CARD_TYPES_DISCRIMINATOR,
