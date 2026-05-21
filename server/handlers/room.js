@@ -10,7 +10,6 @@ const {
   playerDisconnectTimers,
   dcKey,
 } = require('../lib/state');
-const { socketRateLimit } = require('../lib/rateLimiter');
 const { broadcastRoomState } = require('../lib/broadcast');
 const {
   buildAdHocRoom,
@@ -25,9 +24,6 @@ function register(io, socket, deps) {
   // ─── HOST: Create a new room ─────────────────────────────
   socket.on('create_room', async ({ mode, config } = {}, callback) => {
     if (!socket.userId) return callback({ success: false, error: 'Not authenticated' });
-    if (!socketRateLimit(socket, 'create_room', 5, 60_000).allowed) {
-      return callback({ success: false, error: 'Rate limit exceeded' });
-    }
 
     try {
       const roomMode = mode === engine.MODES.ONLINE ? engine.MODES.ONLINE : engine.MODES.PHYSICAL;
@@ -58,9 +54,6 @@ function register(io, socket, deps) {
   // ─── PLAYER: Join an existing room ──────────────────────
   socket.on('join_room', async ({ roomCode } = {}, callback) => {
     if (!socket.userId) return callback({ success: false, error: 'Not authenticated' });
-    if (!socketRateLimit(socket, 'join_room', 10, 60_000).allowed) {
-      return callback({ success: false, error: 'Rate limit exceeded' });
-    }
 
     try {
       const code = roomCode?.toUpperCase();

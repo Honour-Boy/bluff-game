@@ -31,12 +31,6 @@ const GUEST_USERNAME_KEY = 'bluff_guest_username';
 const GUEST_USERNAME_MIN = 4;
 const GUEST_USERNAME_MAX = 20;
 
-// Absolute session lifetime enforced client-side. Supabase's refresh
-// token rotates silently forever by default; this cap ensures a stolen
-// or shared device can't hold a valid session indefinitely.
-const AUTH_LOGIN_AT_KEY = 'bluff_auth_login_at';
-const MAX_SESSION_MS    = 30 * 24 * 60 * 60 * 1000; // 30 days
-
 // Mirrors the server-side regex (server is the authority — this is
 // only a UX hint so we surface validation before round-tripping).
 function isValidGuestUsername(raw) {
@@ -84,25 +78,6 @@ function clearGuestFromStorage() {
     sessionStorage.removeItem(GUEST_ID_KEY);
     sessionStorage.removeItem(GUEST_USERNAME_KEY);
   } catch (_) { /* ignore */ }
-}
-
-function writeLoginAt() {
-  if (typeof window === 'undefined') return;
-  try { localStorage.setItem(AUTH_LOGIN_AT_KEY, String(Date.now())); } catch (_) {}
-}
-
-function clearLoginAt() {
-  if (typeof window === 'undefined') return;
-  try { localStorage.removeItem(AUTH_LOGIN_AT_KEY); } catch (_) {}
-}
-
-function isSessionExpired() {
-  if (typeof window === 'undefined') return false;
-  try {
-    const loginAt = Number(localStorage.getItem(AUTH_LOGIN_AT_KEY));
-    if (!loginAt) return false;
-    return Date.now() - loginAt > MAX_SESSION_MS;
-  } catch (_) { return false; }
 }
 
 export function useAuth() {
@@ -158,16 +133,6 @@ export function useAuth() {
     supabase.auth.getSession().then(({ data: { session } }) => {
       if (!mounted) return;
       const u = session?.user ?? null;
-
-      // Enforce absolute 30-day session cap. If the stored login
-      // timestamp is absent (first-ever load) we treat the session as
-      // unexpired — writeLoginAt fires on the next SIGNED_IN event.
-      if (u && isSessionExpired()) {
-        clearLoginAt();
-        supabase.auth.signOut().finally(() => { if (mounted) setLoading(false); });
-        return;
-      }
-
       setUser(u);
       if (u) {
         // A real Supabase session shadows any stale guest entry —
@@ -183,10 +148,6 @@ export function useAuth() {
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
       if (!mounted) return;
-      // Stamp the wall-clock login time on every fresh sign-in so the
-      // 30-day cap is measured from the most recent authentication, not
-      // the first one ever (handles sign-out → sign-in resets).
-      if (_event === 'SIGNED_IN') writeLoginAt();
       const u = session?.user ?? null;
       setUser(u);
       if (u) {
@@ -252,7 +213,6 @@ export function useAuth() {
   // network round-trip).
   const signOut = useCallback(async () => {
     await supabase.auth.signOut();
-    clearLoginAt();
     setUser(null);
     setProfile(null);
     profileLoadedForRef.current = null;

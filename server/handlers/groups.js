@@ -5,7 +5,6 @@
 const { rooms, saveRoom } = require('../lib/state');
 const { broadcastRoomState } = require('../lib/broadcast');
 const { getGroupAuthError } = require('../lib/roomBuilders');
-const { socketRateLimit } = require('../lib/rateLimiter');
 
 function register(io, socket, deps) {
   const { groupsRepo, leaderboardRepo } = deps;
@@ -25,9 +24,6 @@ function register(io, socket, deps) {
   });
 
   socket.on('list_my_groups', async (_payload = {}, callback) => {
-    if (!socketRateLimit(socket, 'list_my_groups', 10, 30_000).allowed) {
-      return callback?.({ success: false, error: 'Rate limit exceeded' });
-    }
     try {
       const authError = getGroupAuthError(socket);
       if (authError) return callback?.({ success: false, error: authError });
@@ -39,9 +35,6 @@ function register(io, socket, deps) {
   });
 
   socket.on('get_group', async ({ groupId } = {}, callback) => {
-    if (!socketRateLimit(socket, 'get_group', 20, 30_000).allowed) {
-      return callback?.({ success: false, error: 'Rate limit exceeded' });
-    }
     try {
       const authError = getGroupAuthError(socket);
       if (authError) return callback?.({ success: false, error: authError });
@@ -118,9 +111,6 @@ function register(io, socket, deps) {
   });
 
   socket.on('invite_to_group', async ({ groupId, identifier } = {}, callback) => {
-    if (!socketRateLimit(socket, 'invite_to_group', 5, 60_000).allowed) {
-      return callback?.({ success: false, error: 'Rate limit exceeded' });
-    }
     try {
       const authError = getGroupAuthError(socket);
       if (authError) return callback?.({ success: false, error: authError });
@@ -147,9 +137,6 @@ function register(io, socket, deps) {
   });
 
   socket.on('respond_to_invite', async ({ inviteId, accept } = {}, callback) => {
-    if (!socketRateLimit(socket, 'respond_to_invite', 10, 60_000).allowed) {
-      return callback?.({ success: false, error: 'Rate limit exceeded' });
-    }
     try {
       const authError = getGroupAuthError(socket);
       if (authError) return callback?.({ success: false, error: authError });
