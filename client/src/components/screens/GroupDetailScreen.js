@@ -28,6 +28,8 @@ export function GroupDetailScreen({
   onEnterRoom,
   onInvite,
   onTransferHost,
+  onReclaimHost,
+  onHandBackHost,
   onRemoveMember,
   onDeleteGroup,
   onLeaveGroup,
@@ -38,6 +40,14 @@ export function GroupDetailScreen({
   const [copied, setCopied] = useState(false);
 
   const isHost = group?.role === 'host';
+  // #145 — the permanent owner is tracked separately from the current acting
+  // host. "Make Host" appoints a temporary stand-in; the owner can reclaim and
+  // the stand-in can hand back.
+  const ownerUserId = group?.ownerUserId || null;
+  const actingHostId = group?.hostUserId || null;
+  const isOwner = !!ownerUserId && currentUserId === ownerUserId;
+  const isActingHost = !!actingHostId && currentUserId === actingHostId;
+  const standInActive = !!ownerUserId && !!actingHostId && ownerUserId !== actingHostId;
 
   if (!group) {
     return (
@@ -71,6 +81,18 @@ export function GroupDetailScreen({
   const handleTransferHost = async (userId) => {
     setBusyAction(`transfer:${userId}`);
     await onTransferHost(userId);
+    setBusyAction(null);
+  };
+
+  const handleReclaimHost = async () => {
+    setBusyAction('reclaim');
+    await onReclaimHost?.();
+    setBusyAction(null);
+  };
+
+  const handleHandBackHost = async () => {
+    setBusyAction('handback');
+    await onHandBackHost?.();
     setBusyAction(null);
   };
 
@@ -164,6 +186,41 @@ export function GroupDetailScreen({
         </div>
       )}
 
+      {standInActive && (
+        <div
+          style={{
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'center',
+            gap: 12,
+            flexWrap: 'wrap',
+            padding: '12px 14px',
+            borderRadius: 'var(--radius)',
+            border: '1px solid var(--accent)',
+            background: 'rgba(124, 92, 255, 0.08)',
+            fontSize: 12,
+            color: 'var(--text)',
+          }}
+        >
+          <span>
+            {(group.members || []).find((m) => m.userId === actingHostId)?.username || 'A stand-in'}
+            {' '}is acting host (temporary).{' '}
+            {(group.members || []).find((m) => m.userId === ownerUserId)?.username || 'The owner'}
+            {' '}remains the group owner.
+          </span>
+          {isOwner && (
+            <button type="button" className="primary" onClick={handleReclaimHost} disabled={busyAction === 'reclaim'}>
+              {busyAction === 'reclaim' ? 'Reclaiming...' : 'Reclaim Host'}
+            </button>
+          )}
+          {isActingHost && !isOwner && (
+            <button type="button" onClick={handleHandBackHost} disabled={busyAction === 'handback'}>
+              {busyAction === 'handback' ? 'Handing back...' : 'Hand Back Host'}
+            </button>
+          )}
+        </div>
+      )}
+
       <div
         className="group-detail__grid"
         style={{
@@ -186,7 +243,15 @@ export function GroupDetailScreen({
           <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
             {(group.members || []).map((member) => {
               const isMe = member.userId === currentUserId;
-              const isMemberHost = member.role === 'host';
+              const isMemberOwner = !!ownerUserId && member.userId === ownerUserId;
+              const isMemberActingHost = !!actingHostId && member.userId === actingHostId;
+              // eslint-disable-next-line no-nested-ternary
+              const roleLabel = isMemberActingHost
+                ? (isMemberOwner ? 'HOST' : 'STAND-IN HOST')
+                : (isMemberOwner ? 'OWNER' : 'MEMBER');
+              // Host-management actions don't apply to the acting host or the
+              // permanent owner.
+              const canManageMember = !isMemberActingHost && !isMemberOwner;
               return (
                 <div
                   key={member.userId}
@@ -214,33 +279,30 @@ export function GroupDetailScreen({
                         {isMe ? ' (you)' : ''}
                       </div>
                       <div style={{ marginTop: 6, fontSize: 11, color: 'var(--text-dim)', letterSpacing: '0.12em' }}>
-                        {isMemberHost ? 'HOST' : 'MEMBER'} . {formatJoinedDate(member.joinedAt)}
+                        {roleLabel} . {formatJoinedDate(member.joinedAt)}
                       </div>
                     </div>
 
-                    {isHost && !isMe && (
+                    {isHost && !isMe && canManageMember && (
                       <div
                         className="group-detail__member-actions"
                         style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}
                       >
-                        {!isMemberHost && (
-                          <button
-                            type="button"
-                            onClick={() => handleTransferHost(member.userId)}
-                            disabled={busyAction === `transfer:${member.userId}` || busyAction === `remove:${member.userId}`}
-                          >
-                            {busyAction === `transfer:${member.userId}` ? 'Transferring...' : 'Make Host'}
-                          </button>
-                        )}
-                        {!isMemberHost && (
-                          <button
-                            type="button"
-                            onClick={() => handleRemoveMember(member.userId)}
-                            disabled={busyAction === `transfer:${member.userId}` || busyAction === `remove:${member.userId}`}
-                          >
-                            {busyAction === `remove:${member.userId}` ? 'Removing...' : 'Remove'}
-                          </button>
-                        )}
+                        <button
+                          type="button"
+                          title="Hand host to this member as a temporary stand-in. You can reclaim it at any time."
+                          onClick={() => handleTransferHost(member.userId)}
+                          disabled={busyAction === `transfer:${member.userId}` || busyAction === `remove:${member.userId}`}
+                        >
+                          {busyAction === `transfer:${member.userId}` ? 'Handing over...' : 'Make Stand-in Host'}
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => handleRemoveMember(member.userId)}
+                          disabled={busyAction === `transfer:${member.userId}` || busyAction === `remove:${member.userId}`}
+                        >
+                          {busyAction === `remove:${member.userId}` ? 'Removing...' : 'Remove'}
+                        </button>
                       </div>
                     )}
                   </div>

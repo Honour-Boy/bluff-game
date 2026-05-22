@@ -92,25 +92,55 @@ function register(io, socket, deps) {
     }
   });
 
+  // Point any live rooms for this group at the new acting host so in-game
+  // host controls follow the stand-in / reclaim / hand-back. #145
+  async function syncLiveRoomHosts(groupId, newHostUserId) {
+    for (const room of rooms.values()) {
+      if (room.groupId !== groupId) continue;
+      room.hostUserId = newHostUserId;
+      const nextHostPlayer = room.players.find((player) => player.id === newHostUserId);
+      room.hostSocketId = nextHostPlayer?.socketId || null;
+      await saveRoom(room);
+      await broadcastRoomState(io, room.code);
+    }
+  }
+
   socket.on('transfer_host', async ({ groupId, newHostUserId } = {}, callback) => {
     try {
       const authError = getGroupAuthError(socket);
       if (authError) return callback?.({ success: false, error: authError });
-      await groupsRepo.transferHost({
+      const result = await groupsRepo.transferHost({
         groupId,
         hostUserId: socket.userId,
         newHostUserId,
       });
+      await syncLiveRoomHosts(groupId, result.hostUserId);
+      callback?.({ success: true });
+    } catch (err) {
+      callback?.({ success: false, error: err.message });
+    }
+  });
 
-      for (const room of rooms.values()) {
-        if (room.groupId !== groupId) continue;
-        room.hostUserId = newHostUserId;
-        const nextHostPlayer = room.players.find((player) => player.id === newHostUserId);
-        room.hostSocketId = nextHostPlayer?.socketId || null;
-        await saveRoom(room);
-        await broadcastRoomState(io, room.code);
-      }
+  // #145 — original owner reclaims acting host from a stand-in.
+  socket.on('reclaim_host', async ({ groupId } = {}, callback) => {
+    try {
+      const authError = getGroupAuthError(socket);
+      if (authError) return callback?.({ success: false, error: authError });
+      const result = await groupsRepo.reclaimHost({ groupId, userId: socket.userId });
+      await syncLiveRoomHosts(groupId, result.hostUserId);
+      callback?.({ success: true });
+    } catch (err) {
+      callback?.({ success: false, error: err.message });
+    }
+  });
 
+  // #145 — acting stand-in hands host back to the owner.
+  socket.on('hand_back_host', async ({ groupId } = {}, callback) => {
+    try {
+      const authError = getGroupAuthError(socket);
+      if (authError) return callback?.({ success: false, error: authError });
+      const result = await groupsRepo.handBackHost({ groupId, userId: socket.userId });
+      await syncLiveRoomHosts(groupId, result.hostUserId);
       callback?.({ success: true });
     } catch (err) {
       callback?.({ success: false, error: err.message });

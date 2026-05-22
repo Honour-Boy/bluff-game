@@ -83,7 +83,7 @@ function createGroupsRepo(supabase) {
   async function getActiveGroupByCode(code) {
     const result = await supabase
       .from('groups')
-      .select('id, code, name, host_user_id, created_at, deleted_at')
+      .select('id, code, name, host_user_id, owner_user_id, created_at, deleted_at')
       .eq('code', code)
       .is('deleted_at', null)
       .limit(1);
@@ -93,7 +93,7 @@ function createGroupsRepo(supabase) {
   async function getActiveGroupById(groupId) {
     const result = await supabase
       .from('groups')
-      .select('id, code, name, host_user_id, created_at, deleted_at')
+      .select('id, code, name, host_user_id, owner_user_id, created_at, deleted_at')
       .eq('id', groupId)
       .is('deleted_at', null)
       .limit(1);
@@ -256,8 +256,9 @@ function createGroupsRepo(supabase) {
         code,
         name: normalizedName,
         host_user_id: hostUserId,
+        owner_user_id: hostUserId,
       })
-      .select('id, code, name, host_user_id')
+      .select('id, code, name, host_user_id, owner_user_id')
       .single();
     const group = requireData(insertGroupResult);
 
@@ -290,7 +291,7 @@ function createGroupsRepo(supabase) {
     const groupIds = memberships.map((membership) => membership.group_id);
     const groupsResult = await supabase
       .from('groups')
-      .select('id, code, name, host_user_id, created_at, deleted_at')
+      .select('id, code, name, host_user_id, owner_user_id, created_at, deleted_at')
       .in('id', groupIds)
       .is('deleted_at', null);
     const groups = requireData(groupsResult) || [];
@@ -331,6 +332,7 @@ function createGroupsRepo(supabase) {
       name: group.name,
       role: membership.role,
       hostUserId: group.host_user_id,
+      ownerUserId: group.owner_user_id,
       members,
       pendingInvites,
     };
@@ -347,18 +349,16 @@ function createGroupsRepo(supabase) {
     return { success: true };
   }
 
-  async function transferHost({ groupId, hostUserId, newHostUserId }) {
-    if (hostUserId === newHostUserId) return { success: true };
-    await assertActiveHost(groupId, hostUserId);
-
+  // Set the CURRENT acting host to newHostUserId: point groups.host_user_id at
+  // them and sync the member roles so exactly one member carries role 'host'.
+  // owner_user_id is never touched here, so the permanent owner is preserved.
+  async function applyActingHost(groupId, newHostUserId) {
     const membersResult = await supabase
       .from('group_members')
       .select('group_id, user_id, role')
       .eq('group_id', groupId);
     const members = requireData(membersResult) || [];
     const nextMembers = applyHostTransferRoles(members, newHostUserId);
-    const previousHost = nextMembers.find((member) => member.user_id === hostUserId);
-    const newHost = nextMembers.find((member) => member.user_id === newHostUserId);
 
     const updateGroupResult = await supabase
       .from('groups')
@@ -367,21 +367,45 @@ function createGroupsRepo(supabase) {
       .is('deleted_at', null);
     requireData(updateGroupResult);
 
-    const updateOldResult = await supabase
-      .from('group_members')
-      .update({ role: previousHost.role })
-      .eq('group_id', groupId)
-      .eq('user_id', hostUserId);
-    requireData(updateOldResult);
+    for (const member of nextMembers) {
+      const before = members.find((m) => m.user_id === member.user_id);
+      if (before && before.role === member.role) continue;
+      const updateResult = await supabase
+        .from('group_members')
+        .update({ role: member.role })
+        .eq('group_id', groupId)
+        .eq('user_id', member.user_id);
+      requireData(updateResult);
+    }
+  }
 
-    const updateNewResult = await supabase
-      .from('group_members')
-      .update({ role: newHost.role })
-      .eq('group_id', groupId)
-      .eq('user_id', newHostUserId);
-    requireData(updateNewResult);
+  // "Make Host" — appoint a TEMPORARY stand-in. The permanent owner
+  // (owner_user_id) is unchanged, so host can later revert to them. #145
+  async function transferHost({ groupId, hostUserId, newHostUserId }) {
+    if (hostUserId === newHostUserId) return { success: true, hostUserId };
+    await assertActiveHost(groupId, hostUserId);
+    await applyActingHost(groupId, newHostUserId);
+    return { success: true, hostUserId: newHostUserId };
+  }
 
-    return { success: true };
+  // The original owner deliberately takes acting-host back at any time. #145
+  async function reclaimHost({ groupId, userId }) {
+    const group = await getActiveGroupById(groupId);
+    if (!group) throw new Error('Group not found');
+    if (group.owner_user_id !== userId) throw new Error('Only the group owner can reclaim host');
+    if (group.host_user_id === userId) return { success: true, hostUserId: userId };
+    await applyActingHost(groupId, userId);
+    return { success: true, hostUserId: userId };
+  }
+
+  // The acting stand-in voluntarily hands host back to the owner. #145
+  async function handBackHost({ groupId, userId }) {
+    const group = await getActiveGroupById(groupId);
+    if (!group) throw new Error('Group not found');
+    if (group.host_user_id !== userId) throw new Error('Only the acting host can hand back');
+    if (group.owner_user_id === userId) return { success: true, hostUserId: userId };
+    await applyActingHost(groupId, group.owner_user_id);
+    return { success: true, hostUserId: group.owner_user_id };
   }
 
   async function inviteToGroup({ groupId, hostUserId, identifier }) {
@@ -565,8 +589,10 @@ function createGroupsRepo(supabase) {
   }
 
   async function removeMember({ groupId, hostUserId, userId }) {
-    await assertActiveHost(groupId, hostUserId);
+    const group = await assertActiveHost(groupId, hostUserId);
     if (hostUserId === userId) throw new Error('Host cannot remove themselves');
+    // A stand-in must not be able to evict the permanent owner. #145
+    if (group.owner_user_id === userId) throw new Error('Cannot remove the group owner');
 
     const membership = await getMembership(groupId, userId);
     if (!membership) throw new Error('Member not found');
@@ -585,9 +611,29 @@ function createGroupsRepo(supabase) {
   async function leaveGroup({ groupId, userId }) {
     const { group, membership } = await assertActiveMembership(groupId, userId);
     const memberCount = await countMembers(groupId);
+    const otherMemberCount = Math.max(0, memberCount - 1);
+    const isOwner = group.owner_user_id === userId;
+    const isActingHost = group.host_user_id === userId;
+
+    // A temporary stand-in (acting host but not the owner) can always leave.
+    // Host first reverts to the owner so the group keeps a valid host. #145
+    if (isActingHost && !isOwner) {
+      if (otherMemberCount > 0) {
+        await applyActingHost(groupId, group.owner_user_id);
+      }
+      const deleteResult = await supabase
+        .from('group_members')
+        .delete()
+        .eq('group_id', groupId)
+        .eq('user_id', userId);
+      requireData(deleteResult);
+      await clearInviteHistory(groupId, userId);
+      return { success: true };
+    }
+
     const decision = evaluateLeaveGroup({
-      isHost: membership.role === 'host' || group.host_user_id === userId,
-      otherMemberCount: Math.max(0, memberCount - 1),
+      isHost: isOwner || membership.role === 'host',
+      otherMemberCount,
     });
     if (!decision.ok) throw new Error(decision.error);
 
@@ -620,6 +666,8 @@ function createGroupsRepo(supabase) {
     getGroup,
     deleteGroup,
     transferHost,
+    reclaimHost,
+    handBackHost,
     inviteToGroup,
     listMyInvites,
     respondToInvite,
