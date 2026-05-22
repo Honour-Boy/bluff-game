@@ -104,6 +104,9 @@ export function MobileFabMenu({
   onToggleSpeech,
   onOpenChat,
   chatUnread = 0,
+  // On desktop the standalone VoicePanel still lives in the header, so the
+  // menu omits its own voice section to avoid duplicate controls. #146
+  showVoice = true,
 }) {
   const [open, setOpen] = useState(false);
 
@@ -287,7 +290,7 @@ export function MobileFabMenu({
           {/* Voice — rendered inline. Joining/leaving is fully self-
               contained inside the slot so it cannot reflow anything
               behind the sheet (issue #102 invariant). */}
-          {voice && (
+          {voice && showVoice && (
             <div style={{ marginTop: 16 }}>
               <div style={{
                 fontSize: 10, color: 'var(--text-dim)',
