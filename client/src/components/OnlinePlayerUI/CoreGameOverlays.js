@@ -104,7 +104,7 @@ export function CoreGameOverlays({
                   setPendingCard(null);
                 }}
               >
-                â–¶ Play
+                ▶ Play
               </button>
               <button
                 style={{
@@ -145,7 +145,7 @@ export function CoreGameOverlays({
         >
           <div className="card" style={{ maxWidth: 340, width: '100%', textAlign: 'center' }}>
             <div style={{ fontFamily: "'Bebas Neue', sans-serif", fontSize: 22, letterSpacing: '0.12em', color: 'var(--accent)', marginBottom: 6 }}>
-              ðŸƒ WHOT CARD
+              🃏 WHOT CARD
             </div>
             <div style={{ fontSize: 12, color: 'var(--text-dim)', marginBottom: 18 }}>
               Choose the next required shape:
@@ -209,7 +209,7 @@ export function CoreGameOverlays({
         >
           <div className="card fade-in" style={{ maxWidth: 360, width: '100%', textAlign: 'center', border: '1px solid var(--accent2)' }}>
             <div style={{ fontFamily: "'Bebas Neue', sans-serif", fontSize: 56, color: 'var(--accent2)', marginBottom: 12 }}>
-              ðŸ’€ ELIMINATED
+              💀 ELIMINATED
             </div>
             <div style={{ fontSize: 14, color: 'var(--text)', marginBottom: 8 }}>
               You&apos;ve been eliminated from this round.

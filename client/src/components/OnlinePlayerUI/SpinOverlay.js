@@ -133,10 +133,10 @@ export function SpinOverlay({
               marginBottom: 14,
             }}
           >
-            {spinData.eliminated ? 'ðŸ’€ ELIMINATED' : 'ðŸ˜®â€ðŸ’¨ SURVIVED'}
+            {spinData.eliminated ? '💀 ELIMINATED' : '😮‍💨 SURVIVED'}
           </div>
           <div style={{ fontSize: 12, color: 'var(--text-dim)', marginBottom: 28 }}>
-            Chamber {spinData.landingChamberIndex + 1} Â· {spinData.eliminated ? 'bullet found' : 'empty'}
+            Chamber {spinData.landingChamberIndex + 1} · {spinData.eliminated ? 'bullet found' : 'empty'}
           </div>
           {isSpinTarget ? (
             <button className="primary" onClick={acknowledgeSpinResult} style={{ padding: '10px 32px', fontSize: 14 }}>

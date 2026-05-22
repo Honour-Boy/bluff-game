@@ -49,7 +49,7 @@ export function TableScene({
           distributed.top.map(renderChip)
         ) : (
           <div style={{ fontSize: 10, color: 'var(--text-dim)', letterSpacing: '0.12em' }}>
-            {otherPlayers.length === 0 ? '(waiting for playersâ€¦)' : ''}
+            {otherPlayers.length === 0 ? '(waiting for players…)' : ''}
           </div>
         )}
       </div>

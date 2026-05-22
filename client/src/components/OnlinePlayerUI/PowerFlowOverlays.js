@@ -81,7 +81,7 @@ export function PowerFlowOverlays({
             </div>
             <div style={{ display: 'flex', gap: 10 }}>
               <button className="primary" onClick={handleActivatePower} disabled={activating} style={{ flex: 1, padding: '12px' }}>
-                {activating ? 'â€¦' : 'âš¡ Activate'}
+                {activating ? '…' : '⚡ Activate'}
               </button>
               <button
                 onClick={handleSkipPower}
@@ -127,7 +127,7 @@ export function PowerFlowOverlays({
             }}
           >
             <div style={{ fontSize: 10, color: POWER_META.peek.color, letterSpacing: '0.15em', marginBottom: 14 }}>
-              PEEK Â· LAST PLAYED
+              PEEK · LAST PLAYED
             </div>
             {peekedCard?._empty || !peekedCard?.shape ? (
               <div style={{ fontSize: 14, color: 'var(--text-dim)', padding: '20px 0' }}>
@@ -204,10 +204,10 @@ export function PowerFlowOverlays({
             }}
           >
             <div style={{ fontFamily: "'Bebas Neue', sans-serif", fontSize: 22, letterSpacing: '0.12em', color: POWER_META.swap.color, marginBottom: 6 }}>
-              SWAP â€” PICK A CARD
+              SWAP — PICK A CARD
             </div>
             <div style={{ fontSize: 12, color: 'var(--text-dim)', marginBottom: 18, lineHeight: 1.5 }}>
-              Choose blindly. The cards below are ALL face-down â€” no shapes, no names. Your played card will be swapped with the one you pick, then both reveal face-up.
+              Choose blindly. The cards below are ALL face-down — no shapes, no names. Your played card will be swapped with the one you pick, then both reveal face-up.
             </div>
             <div
               style={{
@@ -262,7 +262,7 @@ export function PowerFlowOverlays({
               ))}
             </div>
             <div style={{ fontSize: 10, color: 'var(--text-dim)', fontStyle: 'italic' }}>
-              {swapping ? 'Swappingâ€¦' : 'Tap any card to swap.'}
+              {swapping ? 'Swapping…' : 'Tap any card to swap.'}
             </div>
           </div>
         </div>
@@ -287,7 +287,7 @@ export function PowerFlowOverlays({
               SWAP IN PROGRESS
             </div>
             <div style={{ fontSize: 12, color: 'var(--text-dim)' }}>
-              {players?.find((player) => player.id === swapHolderId)?.username || 'Player'} is choosing a cardâ€¦
+              {players?.find((player) => player.id === swapHolderId)?.username || 'Player'} is choosing a card…
             </div>
           </div>
         </div>
