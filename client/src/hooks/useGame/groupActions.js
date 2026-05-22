@@ -53,6 +53,14 @@ export function useGroupActions({
     return emitPromiseAction(socket, 'transfer_host', { groupId, newHostUserId }, () => setError(null), failError);
   }, [failError, setError, socket]);
 
+  const reclaimHost = useCallback((groupId) => {
+    return emitPromiseAction(socket, 'reclaim_host', { groupId }, () => setError(null), failError);
+  }, [failError, setError, socket]);
+
+  const handBackHost = useCallback((groupId) => {
+    return emitPromiseAction(socket, 'hand_back_host', { groupId }, () => setError(null), failError);
+  }, [failError, setError, socket]);
+
   const deleteGroup = useCallback((groupId) => {
     return emitPromiseAction(socket, 'delete_group', { groupId }, () => setError(null), failError);
   }, [failError, setError, socket]);
@@ -95,6 +103,8 @@ export function useGroupActions({
     revokeInvite,
     removeMember,
     transferHost,
+    reclaimHost,
+    handBackHost,
     deleteGroup,
     leaveGroup,
     getGroupLeaderboard,
