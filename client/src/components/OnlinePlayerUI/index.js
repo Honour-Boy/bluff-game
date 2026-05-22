@@ -132,7 +132,7 @@ export function OnlinePlayerUI({
   if (isMyTurn && isPlaying) {
     if (!bluffUsedThisTurn && !cardPlayedThisTurn) {
       if (bluffBlockedThisTurn) {
-        actionHint = 'Last turn was frozen â€” no card to challenge. Play a card from your hand.';
+        actionHint = 'Last turn was frozen — no card to challenge. Play a card from your hand.';
       } else {
         actionHint = isFirstTurn
           ? 'Play a card from your hand. (No bluff on the first turn.)'
