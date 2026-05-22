@@ -337,7 +337,10 @@ function HomeContent() {
           onClose={closeChat}
           onSend={sendChatMessage}
           myUserId={user?.id}
-          hideTrigger={isMobile}
+          // #146 — the consolidated in-game menu (online mode, any screen size)
+          // owns the chat entry point, so suppress ChatPanel's own trigger
+          // there. Physical-mode desktop still uses the standalone trigger.
+          hideTrigger={isMobile || gameMode === 'online'}
         />
       )}
     </div>
