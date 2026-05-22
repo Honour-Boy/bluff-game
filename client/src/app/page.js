@@ -49,6 +49,7 @@ function HomeContent() {
     createGroup, listMyGroups, getGroup,
     inviteToGroup, listMyInvites, respondToInvite,
     revokeInvite, removeMember, transferHost,
+    reclaimHost, handBackHost,
     deleteGroup, leaveGroup, getGroupLeaderboard,
     nextTurn, resolveBluff,
     playCard, endTurn, playerSpin,
@@ -230,6 +231,32 @@ function HomeContent() {
     return res;
   }, [fetchGroupDetail, invalidateGroupsCache, refreshGroupsHome, selectedGroup?.id, transferHost]);
 
+  const handleReclaimHost = useCallback(async () => {
+    if (!selectedGroup?.id) return { success: false, error: 'Group not found' };
+    const res = await reclaimHost(selectedGroup.id);
+    if (res?.success) {
+      invalidateGroupsCache('all', selectedGroup.id);
+      await Promise.all([
+        refreshGroupsHome(),
+        fetchGroupDetail(selectedGroup.id),
+      ]);
+    }
+    return res;
+  }, [fetchGroupDetail, invalidateGroupsCache, refreshGroupsHome, selectedGroup?.id, reclaimHost]);
+
+  const handleHandBackHost = useCallback(async () => {
+    if (!selectedGroup?.id) return { success: false, error: 'Group not found' };
+    const res = await handBackHost(selectedGroup.id);
+    if (res?.success) {
+      invalidateGroupsCache('all', selectedGroup.id);
+      await Promise.all([
+        refreshGroupsHome(),
+        fetchGroupDetail(selectedGroup.id),
+      ]);
+    }
+    return res;
+  }, [fetchGroupDetail, invalidateGroupsCache, refreshGroupsHome, selectedGroup?.id, handBackHost]);
+
   const handleRemoveMember = useCallback(async (userId) => {
     if (!selectedGroup?.id) return { success: false, error: 'Group not found' };
     const res = await removeMember(selectedGroup.id, userId);
@@ -383,6 +410,8 @@ function HomeContent() {
           onEnterRoom={() => joinRoom(selectedGroup.code)}
           onInvite={handleInviteToGroup}
           onTransferHost={handleTransferHost}
+          onReclaimHost={handleReclaimHost}
+          onHandBackHost={handleHandBackHost}
           onRemoveMember={handleRemoveMember}
           onDeleteGroup={handleDeleteGroup}
           onLeaveGroup={handleLeaveGroup}
