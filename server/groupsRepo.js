@@ -550,6 +550,20 @@ function createGroupsRepo(supabase) {
     return { success: true };
   }
 
+  // When a membership ends (removed or voluntarily left) we also clear
+  // that user's invite rows for the group. Otherwise the previously
+  // 'accepted' invite lingers and a future re-invite + accept collides
+  // with the (group_id, invitee_user_id, status) unique constraint,
+  // surfacing as a "duplicate" error on rejoin. Issue #144.
+  async function clearInviteHistory(groupId, userId) {
+    const result = await supabase
+      .from('group_invites')
+      .delete()
+      .eq('group_id', groupId)
+      .eq('invitee_user_id', userId);
+    requireData(result);
+  }
+
   async function removeMember({ groupId, hostUserId, userId }) {
     await assertActiveHost(groupId, hostUserId);
     if (hostUserId === userId) throw new Error('Host cannot remove themselves');
@@ -563,6 +577,8 @@ function createGroupsRepo(supabase) {
       .eq('group_id', groupId)
       .eq('user_id', userId);
     requireData(deleteResult);
+
+    await clearInviteHistory(groupId, userId);
     return { success: true };
   }
 
@@ -586,6 +602,8 @@ function createGroupsRepo(supabase) {
       .eq('group_id', groupId)
       .eq('user_id', userId);
     requireData(deleteResult);
+
+    await clearInviteHistory(groupId, userId);
     return { success: true };
   }
 
