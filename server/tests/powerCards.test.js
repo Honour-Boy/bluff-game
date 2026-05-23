@@ -536,13 +536,19 @@ describe('activatePowerCard', () => {
     expect(player.armedPowerCard).toEqual(expect.objectContaining({ power: 'shield', cardId: 'a' }));
   });
 
-  it('rejects when bluff already called this turn', () => {
+  // Turn actions are order-independent: activating a power card after calling a
+  // bluff in the same turn is now allowed. Mid-resolution is excluded by the
+  // phase guard (room stays 'playing' only when the bluff/spin has settled back
+  // on this turn), not by a bluffUsedThisTurn block.
+  it('allows activation after a bluff was already called this turn (any order)', () => {
     const card = { id: 'a', type: 'power', power: 'shield' };
     const room = setupActiveRoom({ holding: card });
     room.bluffUsedThisTurn = true;
     const result = activatePowerCard(room, 'p0');
-    expect(result.ok).toBe(false);
-    expect(result.error).toMatch(/bluff already called/i);
+    expect(result.ok).toBe(true);
+    expect(result.power).toBe('shield');
+    const player = room.players.find(p => p.id === 'p0');
+    expect(player.armedPowerCard).toEqual(expect.objectContaining({ power: 'shield', cardId: 'a' }));
   });
 
   it('rejects swap activation while pendingPlayerIds is non-empty', () => {
