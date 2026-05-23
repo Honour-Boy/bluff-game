@@ -184,6 +184,20 @@ function HomeContent() {
     }
   }, [fetchGroupDetail, setError]);
 
+  // #160 — manual in-place reload of the open group detail (members +
+  // pending invites). Forces past the cache so the user sees changes other
+  // members made without leaving the view.
+  const refreshGroupDetail = useCallback(async () => {
+    if (!selectedGroup?.id) return { success: false, error: 'Group not found' };
+    setGroupsLoading(true);
+    try {
+      invalidateGroupsCache('detail', selectedGroup.id);
+      return await fetchGroupDetail(selectedGroup.id);
+    } finally {
+      setGroupsLoading(false);
+    }
+  }, [fetchGroupDetail, invalidateGroupsCache, selectedGroup?.id]);
+
   // ─── Mutations: each one invalidates the slices it touches and
   // re-fetches blockingly (the UI already shows a busy state during
   // these). The cache exists to skip *spontaneous* fetches, not
@@ -391,6 +405,7 @@ function HomeContent() {
           onCreateGroup={handleCreateGroup}
           onOpenGroup={openGroupDetail}
           onRespondToInvite={handleRespondToInvite}
+          onRefresh={() => refreshGroupsHome({ force: true })}
         />
       );
     }
@@ -416,6 +431,7 @@ function HomeContent() {
           onDeleteGroup={handleDeleteGroup}
           onLeaveGroup={handleLeaveGroup}
           onRevokeInvite={handleRevokeInvite}
+          onRefresh={refreshGroupDetail}
         />
       );
     }

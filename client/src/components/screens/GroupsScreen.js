@@ -19,6 +19,44 @@ const panelStyle = {
   boxShadow: '0 18px 48px rgba(0, 0, 0, 0.28)',
 };
 
+// #160 — per-section manual reload control. `loading` reflects the parent's
+// in-flight fetch so the spinner stays in sync even when another section
+// triggered the same combined refresh.
+function RefreshButton({ onRefresh, loading, label = 'Refresh' }) {
+  const [busy, setBusy] = useState(false);
+  const active = busy || loading;
+  const handleClick = async () => {
+    if (active || !onRefresh) return;
+    setBusy(true);
+    try {
+      await onRefresh();
+    } finally {
+      setBusy(false);
+    }
+  };
+  return (
+    <button
+      type="button"
+      onClick={handleClick}
+      disabled={active}
+      title="Reload this section"
+      style={{
+        display: 'inline-flex',
+        alignItems: 'center',
+        gap: 6,
+        fontSize: 11,
+        letterSpacing: '0.08em',
+        padding: '6px 11px',
+      }}
+    >
+      <span className={active ? 'groups-refresh-icon groups-refresh-icon--spin' : 'groups-refresh-icon'} aria-hidden>
+        &#x21bb;
+      </span>
+      {active ? 'Refreshing...' : label}
+    </button>
+  );
+}
+
 export function GroupsScreen({
   username,
   groups,
@@ -29,6 +67,7 @@ export function GroupsScreen({
   onCreateGroup,
   onOpenGroup,
   onRespondToInvite,
+  onRefresh,
 }) {
   const [groupName, setGroupName] = useState('');
   const [busyAction, setBusyAction] = useState(null);
@@ -140,7 +179,7 @@ export function GroupsScreen({
                 {sortedGroups.length} saved {sortedGroups.length === 1 ? 'group' : 'groups'}
               </div>
             </div>
-            {loading && <div style={{ fontSize: 11, color: 'var(--text-dim)' }}>Refreshing...</div>}
+            <RefreshButton onRefresh={onRefresh} loading={loading} />
           </div>
 
           <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
@@ -235,8 +274,11 @@ export function GroupsScreen({
 
           <section className="groups-screen__panel" style={panelStyle}>
             <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, alignItems: 'center', marginBottom: 12 }}>
-              <div style={{ fontSize: 11, color: 'var(--text-dim)', letterSpacing: '0.14em' }}>PENDING INVITES</div>
-              <div style={{ fontSize: 11, color: 'var(--text-dim)' }}>{invites?.length || 0}</div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                <div style={{ fontSize: 11, color: 'var(--text-dim)', letterSpacing: '0.14em' }}>PENDING INVITES</div>
+                <div style={{ fontSize: 11, color: 'var(--text-dim)' }}>{invites?.length || 0}</div>
+              </div>
+              <RefreshButton onRefresh={onRefresh} loading={loading} />
             </div>
 
             {(!invites || invites.length === 0) && (
@@ -305,6 +347,17 @@ export function GroupsScreen({
       </div>
 
       <style>{`
+        .groups-refresh-icon {
+          display: inline-block;
+          font-size: 13px;
+          line-height: 1;
+        }
+        .groups-refresh-icon--spin {
+          animation: groups-refresh-spin 0.8s linear infinite;
+        }
+        @keyframes groups-refresh-spin {
+          to { transform: rotate(360deg); }
+        }
         @media (max-width: 640px) {
           .groups-screen__header {
             flex-direction: column !important;
