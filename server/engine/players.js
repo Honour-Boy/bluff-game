@@ -3,7 +3,7 @@
 // ============================================================
 // createPlayer, turn-order helpers, elimination + reconnect bookkeeping.
 
-const { ROLES } = require('./constants');
+const { ROLES, MODES } = require('./constants');
 const { initChamber } = require('./chamber');
 const { _creditSwapTurnFor, _removePlayerFromSwapSnapshots } = require('./powerCards');
 
@@ -51,6 +51,48 @@ function getCurrentPlayer(room) {
 // player in turn order is fully skipped. The player AFTER the
 // skipped one inherits room.bluffBlockedThisTurn = true.
 
+// ─── Roulette Rotation — spontaneous turn order (online) ───────
+//
+// Each "cycle" is a fresh random permutation of the alive players: everyone
+// takes exactly one turn before anyone repeats, and the first player of a new
+// cycle differs from the last player of the finished one so nobody plays twice
+// back-to-back across the boundary. With exactly two alive players this forces
+// strict alternation (the only repeat-free order possible) — intended.
+function _buildRouletteCycle(room, avoidFirstId) {
+  const ids = room.players.filter(p => p.status === 'alive').map(p => p.id);
+  // Fisher-Yates.
+  for (let i = ids.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [ids[i], ids[j]] = [ids[j], ids[i]];
+  }
+  if (ids.length >= 2 && ids[0] === avoidFirstId) {
+    // avoidFirstId occurs exactly once, so swapping slot 0 with any later slot
+    // is guaranteed to seat a different player first.
+    const swapWith = 1 + Math.floor(Math.random() * (ids.length - 1));
+    [ids[0], ids[swapWith]] = [ids[swapWith], ids[0]];
+  }
+  return ids;
+}
+
+// Advance the turn pointer one step. Normal mode walks the fixed order with a
+// wrap. Roulette Rotation (online) regenerates a brand-new random cycle the
+// instant the current one is exhausted, so the order is re-rolled every cycle.
+function _advanceTurnIndex(room) {
+  const len = room.turnOrder.length;
+  if (len === 0) return;
+
+  const rouletteOn =
+    room.mode === MODES.ONLINE && !!room.config?.roomModifiers?.rouletteRotation;
+
+  if (rouletteOn && room.currentTurnIndex >= len - 1) {
+    const lastId = room.turnOrder[room.currentTurnIndex] || null;
+    room.turnOrder = _buildRouletteCycle(room, lastId);
+    room.currentTurnIndex = 0;
+    return;
+  }
+  room.currentTurnIndex = (room.currentTurnIndex + 1) % len;
+}
+
 function advanceTurn(room) {
   if (!room.turnOrder.length) return room;
 
@@ -67,7 +109,13 @@ function advanceTurn(room) {
   room.challengeableCard = room.lastPlayedCard || null;
   room.challengeableCardType = room.currentCardType ?? null;
 
-  room.currentTurnIndex = (room.currentTurnIndex + 1) % room.turnOrder.length;
+  // The bluff accuses whoever took the immediately-previous turn. Stamp it
+  // explicitly: under Roulette Rotation the order reshuffles at the cycle
+  // boundary, so `turnOrder[currentTurnIndex - 1]` would name the wrong player
+  // on the first turn of a new cycle. See getPreviousTurnPlayerId.
+  room.prevTurnPlayerId = finishingPlayerId;
+
+  _advanceTurnIndex(room);
   room.lastAction = null;
   room.phase = 'playing';
   room.bluffUsedThisTurn = false;
@@ -78,7 +126,9 @@ function advanceTurn(room) {
   if (room.skipNextPlayer) {
     const skippedPlayerId = room.turnOrder[room.currentTurnIndex] || null;
     if (skippedPlayerId) _creditSwapTurnFor(room, skippedPlayerId);
-    room.currentTurnIndex = (room.currentTurnIndex + 1) % room.turnOrder.length;
+    // The skipped (frozen) player is now the immediate predecessor.
+    room.prevTurnPlayerId = skippedPlayerId;
+    _advanceTurnIndex(room);
     room.skipNextPlayer = false;
     room.bluffBlockedThisTurn = true;
     // The skipped (frozen) player played nothing — nothing to challenge or peek.
@@ -88,6 +138,18 @@ function advanceTurn(room) {
 
   _sweepStaleArmedPowerCards(room);
   return room;
+}
+
+// The player who took the immediately-previous turn — i.e. the player a bluff
+// call accuses / Peek reveals. Prefers the explicit `prevTurnPlayerId` stamped
+// by advanceTurn (correct across Roulette Rotation cycle boundaries) and falls
+// back to fixed turn-order arithmetic for callers/tests that build a room
+// without ever advancing.
+function getPreviousTurnPlayerId(room) {
+  if (room?.prevTurnPlayerId != null) return room.prevTurnPlayerId;
+  const len = room?.turnOrder?.length || 0;
+  if (!len) return null;
+  return room.turnOrder[(room.currentTurnIndex - 1 + len) % len] || null;
 }
 
 // #163 + playtest §1.4 — sweep stale armed power cards on every turn advance.
@@ -114,8 +176,9 @@ function advanceTurn(room) {
 //              cycle (swapPendingPlayerIds), so it MUST persist across turns.
 function _sweepStaleArmedPowerCards(room) {
   if (!Array.isArray(room.turnOrder) || room.turnOrder.length === 0) return;
-  const len = room.turnOrder.length;
-  const prevId = room.turnOrder[(room.currentTurnIndex - 1 + len) % len] || null;
+  // Use the explicitly-tracked previous turn-taker so Roulette Rotation's
+  // reshuffled boundary keeps the right player's bluff window live.
+  const prevId = getPreviousTurnPlayerId(room);
 
   for (const player of room.players) {
     const armed = player?.armedPowerCard;
@@ -208,6 +271,7 @@ module.exports = {
   createPlayer,
   getCurrentPlayer,
   advanceTurn,
+  getPreviousTurnPlayerId,
   eliminateFromTurnOrder,
   eliminatePlayer,
   handleDisconnect,

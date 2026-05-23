@@ -124,8 +124,7 @@ function register(io, socket, deps) {
       const currentPlayerId = room.turnOrder[room.currentTurnIndex];
       const currentPlayer = room.players.find(p => p.id === currentPlayerId);
 
-      const prevIdx = (room.currentTurnIndex - 1 + room.turnOrder.length) % room.turnOrder.length;
-      const prevPlayer = room.players.find(p => p.id === room.turnOrder[prevIdx]);
+      const prevPlayer = room.players.find(p => p.id === engine.getPreviousTurnPlayerId(room));
 
       const spinTarget = bluffIsCorrect ? prevPlayer : currentPlayer;
 
@@ -290,10 +289,7 @@ function register(io, socket, deps) {
         // let them arm it in response BEFORE the bluff resolves. The resolution
         // queue reads the freshly-armed card when we resume — no pipeline
         // change is needed. On arm/pass/timeout we run `_resolveOnlineBluff`.
-        const len = room.turnOrder.length;
-        const accusedId = len
-          ? room.turnOrder[(room.currentTurnIndex - 1 + len) % len]
-          : null;
+        const accusedId = engine.getPreviousTurnPlayerId(room);
 
         if (accusedId && accusedId !== playerId && engine.canInterceptBluff(room, accusedId)) {
           const accusedPlayer = room.players.find(p => p.id === accusedId);

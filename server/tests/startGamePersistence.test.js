@@ -90,6 +90,7 @@ describe('start_game group settings persistence', () => {
     expect(cb).toHaveBeenCalledWith({
       success: true,
       mirrorMatchAutoDisabled: false,
+      rouletteRotationAutoDisabled: false,
     });
     expect(groupSettingsRepo.upsertGroupSettings).toHaveBeenCalledWith(
       'group-75',
@@ -136,6 +137,7 @@ describe('start_game group settings persistence', () => {
     expect(cb).toHaveBeenCalledWith({
       success: true,
       mirrorMatchAutoDisabled: false,
+      rouletteRotationAutoDisabled: false,
     });
     expect(groupSettingsRepo.upsertGroupSettings).not.toHaveBeenCalled();
   });
@@ -168,6 +170,7 @@ describe('start_game group settings persistence', () => {
     expect(cb).toHaveBeenCalledWith({
       success: true,
       mirrorMatchAutoDisabled: false,
+      rouletteRotationAutoDisabled: false,
     });
     expect(errorSpy).toHaveBeenCalled();
     errorSpy.mockRestore();

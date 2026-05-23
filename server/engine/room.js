@@ -59,6 +59,10 @@ function createRoom(hostSocketId, mode = MODES.PHYSICAL, config = null) {
     // advanceTurn) — the card a bluff / Peek resolves against. See engine/bluff.js.
     challengeableCard: null,
     challengeableCardType: null,
+    // Id of the player who took the immediately-previous turn (the bluff target).
+    // Stamped by advanceTurn so Roulette Rotation's reshuffled cycles resolve
+    // the accused correctly. See engine/players.js getPreviousTurnPlayerId.
+    prevTurnPlayerId: null,
     chatLog: [],
     config: normalizeRoomConfig(config),
     discardPile: [],
@@ -102,6 +106,7 @@ function startGame(room) {
   room.lastPlayedCard = null;
   room.challengeableCard = null;
   room.challengeableCardType = null;
+  room.prevTurnPlayerId = null;
   room.discardPile = room.discardPile || [];
 
   // v2 Phase E1 — Russian Roulette: re-init chambers with 2 bullets.

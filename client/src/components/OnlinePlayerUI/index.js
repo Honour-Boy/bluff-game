@@ -115,6 +115,7 @@ export function OnlinePlayerUI({
     players,
     turnOrder,
     currentPlayerId,
+    nextPlayerId = null,
     currentCardType,
     phase,
     roundNumber,
@@ -143,10 +144,15 @@ export function OnlinePlayerUI({
   const isSpinTarget = ui.spinData?.spinTargetId === myPlayer.id;
   const currentPlayer = players?.find((player) => player.id === currentPlayerId);
   const alivePlayers = players?.filter((player) => player.status === 'alive') || [];
+  // Roulette Rotation conceals the upcoming order: only the current + next
+  // player are revealed. Seat by a STABLE order (join order) instead of the
+  // live, reshuffled turnOrder so the table doesn't telegraph the cycle.
+  const rouletteActive = !!roomState?.config?.roomModifiers?.rouletteRotation;
   const otherPlayers = useMemo(() => {
     const others = players?.filter((player) => player.id !== myPlayer.id) || [];
-    return orderClockwiseFromLocal(others, turnOrder, myPlayer.id);
-  }, [myPlayer.id, players, turnOrder]);
+    const seatOrder = rouletteActive ? (players?.map((p) => p.id) || []) : turnOrder;
+    return orderClockwiseFromLocal(others, seatOrder, myPlayer.id);
+  }, [myPlayer.id, players, turnOrder, rouletteActive]);
   const distributed = useMemo(() => distributePlayers(otherPlayers), [otherPlayers]);
 
   let actionHint = '';
@@ -216,6 +222,7 @@ export function OnlinePlayerUI({
       key={player.id}
       player={player}
       isCurrentTurn={player.id === currentPlayerId}
+      isNextTurn={rouletteActive && isPlaying && player.id === nextPlayerId}
       isSpinTarget={isSpinPending && player.id === spinTargetId}
       voice={voice}
       onClick={showSpectatorView ? () => ui.handleSpectatePlayer(player.id) : undefined}
@@ -224,6 +231,9 @@ export function OnlinePlayerUI({
   ), [
     bettingEnabled,
     currentPlayerId,
+    rouletteActive,
+    isPlaying,
+    nextPlayerId,
     isSpinPending,
     spinTargetId,
     showSpectatorView,
@@ -294,6 +304,7 @@ export function OnlinePlayerUI({
         myPlayer={myPlayer}
         isEliminated={isEliminated}
         isMyTurn={isMyTurn}
+        isMyNextTurn={rouletteActive && isPlaying && nextPlayerId === myPlayer.id}
         isPlaying={isPlaying}
         isLobby={isLobby}
         isGameOver={isGameOver}

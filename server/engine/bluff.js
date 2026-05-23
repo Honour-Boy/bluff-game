@@ -9,7 +9,7 @@
 const { MODES, GAME_EVENT_TYPES } = require('./constants');
 const { buildDeck, dealCards } = require('./deck');
 const { spinGun } = require('./spin');
-const { eliminateFromTurnOrder } = require('./players');
+const { eliminateFromTurnOrder, getPreviousTurnPlayerId } = require('./players');
 const {
   _normalisePowerCardHandCap,
   _guaranteeMinPowerCardPerPlayer,
@@ -66,8 +66,7 @@ function resolveBluffOnline(room) {
   const accuserId = room.turnOrder[room.currentTurnIndex];
   const accuser = room.players.find(p => p.id === accuserId);
 
-  const prevIdx = (room.currentTurnIndex - 1 + room.turnOrder.length) % room.turnOrder.length;
-  const accusedId = room.turnOrder[prevIdx];
+  const accusedId = getPreviousTurnPlayerId(room);
   const accused = room.players.find(p => p.id === accusedId);
 
   const { bluffIsCorrect, revealedCard } = buildBluffValidationEvent(room, accuser, accused);
@@ -79,8 +78,7 @@ function resolveBluff(room, bluffIsCorrect) {
   const currentPlayerId = room.turnOrder[room.currentTurnIndex];
   const currentPlayer = room.players.find(p => p.id === currentPlayerId);
 
-  const prevIdx = (room.currentTurnIndex - 1 + room.turnOrder.length) % room.turnOrder.length;
-  const prevPlayer = room.players.find(p => p.id === room.turnOrder[prevIdx]);
+  const prevPlayer = room.players.find(p => p.id === getPreviousTurnPlayerId(room));
 
   const spinTarget = bluffIsCorrect ? prevPlayer : currentPlayer;
   const spinResult = spinGun(spinTarget);
@@ -140,6 +138,7 @@ function resetRoundOnline(room) {
   room.lastPlayedCard = null;
   room.challengeableCard = null;
   room.challengeableCardType = null;
+  room.prevTurnPlayerId = null;
   room.bluffUsedThisTurn = false;
   room.cardPlayedThisTurn = false;
   room.isFirstTurn = true;

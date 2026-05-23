@@ -147,6 +147,8 @@ function defaultRoomConfig() {
       speedMode: false,
       suddenDeath: false,
       mirrorMatch: false,
+      // Roulette Rotation — each cycle is a fresh random turn order (online).
+      rouletteRotation: false,
     },
     systems: {
       bounty: false,

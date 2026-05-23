@@ -95,6 +95,7 @@ module.exports = {
   createPlayer: players.createPlayer,
   getCurrentPlayer: players.getCurrentPlayer,
   advanceTurn: players.advanceTurn,
+  getPreviousTurnPlayerId: players.getPreviousTurnPlayerId,
   eliminateFromTurnOrder: players.eliminateFromTurnOrder,
   eliminatePlayer: players.eliminatePlayer,
   handleDisconnect: players.handleDisconnect,

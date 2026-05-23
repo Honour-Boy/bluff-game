@@ -56,6 +56,7 @@ const {
   GAME_EVENT_TYPES,
 } = require('./engine/constants');
 const { isBluffCorrect, buildBluffValidationEvent } = require('./engine/bluff');
+const { getPreviousTurnPlayerId } = require('./engine/players');
 
 // ─── Tiny helpers ─────────────────────────────────────────────
 
@@ -81,10 +82,10 @@ function _consumeArmedCard(room, player) {
 }
 
 function _accusedPrev(room) {
-  const len = room.turnOrder.length;
-  if (!len) return null;
-  const prevIdx = (room.currentTurnIndex - 1 + len) % len;
-  return _findPlayer(room, room.turnOrder[prevIdx]);
+  // The accused is whoever took the immediately-previous turn. Routed through
+  // the engine helper so Roulette Rotation's reshuffled cycle boundary resolves
+  // to the correct player rather than naive turn-order arithmetic.
+  return _findPlayer(room, getPreviousTurnPlayerId(room));
 }
 
 // Thin alias kept for the `_internal` test surface — the rule itself

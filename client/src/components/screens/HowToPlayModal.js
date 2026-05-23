@@ -70,6 +70,10 @@ const ROOM_MODS = [
     label: "Mirror Match",
     desc: "When one player spins, the player opposite them at the table spins too. Requires an even player count at start.",
   },
+  {
+    label: "Roulette Rotation",
+    desc: "Turn order is reshuffled every cycle instead of a fixed loop. Everyone still takes exactly one turn per cycle and nobody plays twice in a row. Only the next player is revealed. Requires 3+ players.",
+  },
 ];
 
 const SYSTEMS = [
