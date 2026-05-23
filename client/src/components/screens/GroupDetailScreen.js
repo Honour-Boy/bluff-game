@@ -424,7 +424,8 @@ export function GroupDetailScreen({
             <div style={{ fontSize: 11, color: 'var(--text-dim)', letterSpacing: '0.14em', marginBottom: 12 }}>
               DANGER ZONE
             </div>
-            {isHost ? (
+            {/* #159 — only the permanent owner may delete; a stand-in host must not. */}
+            {isOwner ? (
               <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
                 <div style={{ fontSize: 12, color: 'var(--text-dim)', lineHeight: 1.6 }}>
                   Deleting the group removes access to this permanent room code for everyone. The code becomes reusable after deletion.
@@ -440,6 +441,11 @@ export function GroupDetailScreen({
               </div>
             ) : (
               <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+                {isActingHost && (
+                  <div style={{ fontSize: 12, color: 'var(--text-dim)', lineHeight: 1.6 }}>
+                    You are a temporary stand-in host. Only the group owner can delete this group.
+                  </div>
+                )}
                 <div style={{ fontSize: 12, color: 'var(--text-dim)', lineHeight: 1.6 }}>
                   Leaving removes your membership. You can be invited back later if needed.
                 </div>

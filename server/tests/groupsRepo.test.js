@@ -4,6 +4,7 @@ import {
   pickUniqueGroupCode,
   applyHostTransferRoles,
   evaluateLeaveGroup,
+  evaluateDeleteGroup,
   GROUP_CODE_LENGTH,
   GROUP_MEMBER_LIMIT,
 } from '../groupsRepo.js';
@@ -87,6 +88,30 @@ describe('evaluateLeaveGroup', () => {
       ok: true,
       action: 'delete_group',
     });
+  });
+});
+
+describe('evaluateDeleteGroup (#159)', () => {
+  const owner = 'owner-1';
+
+  it('allows the permanent owner to delete', () => {
+    expect(evaluateDeleteGroup({ ownerUserId: owner, requesterUserId: owner }))
+      .toEqual({ ok: true });
+  });
+
+  it('refuses a temporary stand-in host (acting host but not owner)', () => {
+    const result = evaluateDeleteGroup({ ownerUserId: owner, requesterUserId: 'standin-2' });
+    expect(result.ok).toBe(false);
+    expect(result.error).toMatch(/only the group owner/i);
+  });
+
+  it('refuses a plain member', () => {
+    expect(evaluateDeleteGroup({ ownerUserId: owner, requesterUserId: 'member-3' }).ok).toBe(false);
+  });
+
+  it('refuses when ownership is unknown', () => {
+    expect(evaluateDeleteGroup({ ownerUserId: null, requesterUserId: 'anyone' }).ok).toBe(false);
+    expect(evaluateDeleteGroup({ ownerUserId: undefined, requesterUserId: undefined }).ok).toBe(false);
   });
 });
 

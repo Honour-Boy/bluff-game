@@ -58,6 +58,17 @@ function evaluateLeaveGroup({ isHost, otherMemberCount }) {
   return { ok: true, action: 'delete_group' };
 }
 
+// #159 — only the PERMANENT owner (owner_user_id) may delete a group. A
+// temporary stand-in host (the current acting host_user_id, appointed via
+// "Make Host" in #145) must be refused, otherwise a stand-in could destroy a
+// group they do not own. Acting-host status is deliberately NOT sufficient.
+function evaluateDeleteGroup({ ownerUserId, requesterUserId }) {
+  if (!ownerUserId || ownerUserId !== requesterUserId) {
+    return { ok: false, error: 'Only the group owner can delete this group' };
+  }
+  return { ok: true };
+}
+
 function normalizeIdentifier(raw) {
   return String(raw || '').trim();
 }
@@ -339,7 +350,15 @@ function createGroupsRepo(supabase) {
   }
 
   async function deleteGroup({ groupId, hostUserId }) {
-    await assertActiveHost(groupId, hostUserId);
+    // #159 — gate on ownership, not acting-host. A stand-in host passes
+    // assertActiveHost (host_user_id) but must NOT be able to delete the group.
+    const group = await getActiveGroupById(groupId);
+    if (!group) throw new Error('Group not found');
+    const decision = evaluateDeleteGroup({
+      ownerUserId: group.owner_user_id,
+      requesterUserId: hostUserId,
+    });
+    if (!decision.ok) throw new Error(decision.error);
     const updateResult = await supabase
       .from('groups')
       .update({ deleted_at: new Date().toISOString() })
@@ -691,5 +710,6 @@ module.exports = {
   pickUniqueGroupCode,
   applyHostTransferRoles,
   evaluateLeaveGroup,
+  evaluateDeleteGroup,
   createGroupsRepo,
 };

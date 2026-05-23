@@ -98,9 +98,16 @@ function register(io, socket, deps) {
   async function syncLiveRoomHosts(groupId, newHostUserId) {
     for (const room of rooms.values()) {
       if (room.groupId !== groupId) continue;
-      room.hostUserId = newHostUserId;
       const nextHostPlayer = room.players.find((player) => player.id === newHostUserId);
-      room.hostSocketId = nextHostPlayer?.socketId || null;
+      // #159 — a group-level stand-in who is NOT seated in this room must not
+      // be forced in as its host. Doing so nulls hostSocketId and leaves a
+      // hostless, locked room: players outside hit "Game already started" and
+      // neither they nor the absent host can enter. Leave the room on its
+      // existing host until the new acting host actually joins (join_room then
+      // claims the host socket from group.host_user_id).
+      if (!nextHostPlayer) continue;
+      room.hostUserId = newHostUserId;
+      room.hostSocketId = nextHostPlayer.socketId || null;
       await saveRoom(room);
       await broadcastRoomState(io, room.code);
     }
