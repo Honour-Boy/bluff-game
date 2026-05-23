@@ -50,6 +50,14 @@ function serializeRoom(room, requestingPlayerId = null, opts = {}) {
     code: room.code,
     groupId: room.groupId || null,
     mode: room.mode,
+    // Host identity. Exposed so clients can RE-DERIVE isHost on every state
+    // push — host can change live (stand-in reclaim / hand-back / migration)
+    // and that only arrives via room_state. `hostUserId` is the host's Supabase
+    // id (same value the server compares in join_room); `amHost` is the
+    // per-recipient convenience flag (only meaningful when a requestingPlayerId
+    // was supplied, i.e. the per-socket online broadcast).
+    hostUserId: room.hostUserId || null,
+    amHost: requestingPlayerId != null ? (requestingPlayerId === room.hostUserId) : undefined,
     players: room.players.map(p => ({
       id: p.id,
       username: p.username,

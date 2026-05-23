@@ -64,6 +64,19 @@ export function useGameSocketEvents({
 
     const onRoomState = (state) => {
       setRoomState(state);
+      // Live host changes (stand-in reclaim / hand-back / migration) reach us
+      // ONLY through room_state, so re-derive isHost on every push. Prefer the
+      // per-recipient amHost flag (per-socket online broadcast); else compare
+      // the room host id to our own id; if neither is determinable, leave
+      // isHost untouched so an ad-hoc host (whose playerId we may not hold) is
+      // never wrongly demoted.
+      if (state) {
+        if (typeof state.amHost === 'boolean') {
+          setIsHost(state.amHost);
+        } else if (state.hostUserId != null && myUserIdRef.current != null) {
+          setIsHost(state.hostUserId === myUserIdRef.current);
+        }
+      }
       if (state?.lastAction?.type === 'spin_result') setSpinDismissed(false);
       if (Array.isArray(state?.chatLog)) {
         setChatMessages((prev) => {
