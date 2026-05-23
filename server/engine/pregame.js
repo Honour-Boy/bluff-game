@@ -17,7 +17,7 @@ const {
   POWER_TYPES,
   PRE_GAME_SELECTION_TIMEOUT_MS,
 } = require('./constants');
-const { shuffleDeck, _appendExtraCards } = require('./deck');
+const { shuffleDeck } = require('./deck');
 
 let _poolIdCounter = 0;
 function _nextPoolId(playerId, tag) {
@@ -138,8 +138,9 @@ function applyPreGameSelection(room, playerId, optionId) {
 function finalizePreGame(room) {
   if (room.phase !== 'pre_game') return { ok: false, error: 'Not in pre-game phase' };
 
+  const alive = _alivePlayers(room);
   const autoAssigned = [];
-  for (const p of _alivePlayers(room)) {
+  for (const p of alive) {
     if (room.pregameSelectionsReady?.has(p.id)) continue;
     const pool = room.pregamePools?.[p.id] || [];
     if (pool.length === 0) continue;
@@ -149,13 +150,38 @@ function finalizePreGame(room) {
     autoAssigned.push(p.id);
   }
 
-  // Append each chosen bonus card to its owner's hand.
-  if (room.hands) {
-    const extraCards = {};
-    for (const [pid, card] of Object.entries(room.pregameSelections)) {
-      extraCards[pid] = [card];
+  // #140 — the pre-game pick decides the power slot: a player gets EITHER a
+  // power card OR an extra ("Additional") shape card, never both. This
+  // REPLACES the deal-time power grant (room.startGame guarantees one) so no
+  // player starts with two power cards. A fresh power card is only obtainable
+  // later by surviving a trigger round.
+  if (!room.powerCardSlot) room.powerCardSlot = {};
+  const aliveIds = alive.map(p => p.id);
+  for (const [pid, card] of Object.entries(room.pregameSelections)) {
+    if (card.type === 'power') {
+      // The selection IS the player's start-of-game power card.
+      const slotCard = { ...card, armed: false };
+      if (slotCard.power === 'swap') {
+        slotCard.swapPendingPlayerIds = aliveIds.filter(id => id !== pid);
+      }
+      room.powerCardSlot[pid] = [slotCard];
+    } else {
+      // "Additional Card" — the replacement penalty for forgoing a power
+      // card: one extra shape card in hand and an EMPTY power slot.
+      if (room.hands?.has?.(pid)) room.hands.get(pid).push(card);
+      room.powerCardSlot[pid] = [];
     }
-    _appendExtraCards(room.hands, extraCards);
+  }
+
+  // #140 — deprioritise non-responders from the first active turn so a player
+  // who never picked (auto-assigned) doesn't open the game and stall it. Seed
+  // the turn to the first player in order who selected on their own; if every
+  // alive player was auto-assigned, fall back to the existing start index.
+  if (Array.isArray(room.turnOrder) && room.turnOrder.length > 0) {
+    const onTimeIdx = room.turnOrder.findIndex(
+      id => id && !autoAssigned.includes(id) && aliveIds.includes(id),
+    );
+    room.currentTurnIndex = onTimeIdx === -1 ? 0 : onTimeIdx;
   }
 
   const assignments = { ...room.pregameSelections };
