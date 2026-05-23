@@ -39,12 +39,10 @@ export function useOnlinePlayerUiController({
   const prevStatusRef = useRef(null);
   const pendingEliminatedRef = useRef(false);
   const [justEliminated, setJustEliminated] = useState(false);
-  const [powerPromptTurnKey, setPowerPromptTurnKey] = useState(null);
-  const [powerPromptDismissedFor, setPowerPromptDismissedFor] = useState(null);
   const [peekedCard, setPeekedCard] = useState(null);
-  // #139 — manual (click-to-open) power-card activation confirmation. The
-  // turn-start auto-prompt still fires; this lets the player re-open the same
-  // styled modal by tapping their held power card after dismissing it.
+  // #139 — manual (click-to-open) power-card activation confirmation. There is
+  // NO turn-start auto-prompt: the Activate/Skip modal opens only when the
+  // player taps their held power card (this flag), and closes on activate/skip.
   const [powerConfirmOpen, setPowerConfirmOpen] = useState(false);
   const [activating, setActivating] = useState(false);
   const [swapping, setSwapping] = useState(false);
@@ -58,7 +56,6 @@ export function useOnlinePlayerUiController({
   const [lastStandSpinBusy, setLastStandSpinBusy] = useState(false);
   const [speechEnabled, setSpeechEnabled] = useState(true);
 
-  const myTurnKey = `${roomState?.currentPlayerId || ''}:${roomState?.currentTurnIndex || 0}:${roomState?.roundNumber || 0}`;
   const announcementHead = Array.isArray(powerEventQueue) && powerEventQueue.length > 0
     ? powerEventQueue[0]
     : null;
@@ -162,11 +159,6 @@ export function useOnlinePlayerUiController({
   }, [peekedCard]);
 
   useEffect(() => {
-    if (!isMyTurn) return;
-    setPowerPromptTurnKey(myTurnKey);
-  }, [myTurnKey, isMyTurn]);
-
-  useEffect(() => {
     if (roomState?.phase === 'lobby') setRoleRevealSeen(false);
   }, [roomState?.phase]);
 
@@ -214,7 +206,6 @@ export function useOnlinePlayerUiController({
     setActivating(true);
     try {
       const response = await activatePowerCard();
-      setPowerPromptDismissedFor(powerPromptTurnKey);
       setPowerConfirmOpen(false);
       if (response?.success && response?.power === 'peek') {
         setPeekedCard(response.peekedCard || { _empty: true });
@@ -222,12 +213,11 @@ export function useOnlinePlayerUiController({
     } finally {
       setActivating(false);
     }
-  }, [activatePowerCard, activating, powerPromptTurnKey]);
+  }, [activatePowerCard, activating]);
 
   const handleSkipPower = useCallback(() => {
-    setPowerPromptDismissedFor(powerPromptTurnKey);
     setPowerConfirmOpen(false);
-  }, [powerPromptTurnKey]);
+  }, []);
 
   const handleSwapPick = useCallback(async (cardId) => {
     if (!swapPick || swapping || !cardId) return;
@@ -294,8 +284,6 @@ export function useOnlinePlayerUiController({
     cylinderAnimating,
     justEliminated,
     setJustEliminated,
-    powerPromptTurnKey,
-    powerPromptDismissedFor,
     peekedCard,
     powerConfirmOpen,
     activating,

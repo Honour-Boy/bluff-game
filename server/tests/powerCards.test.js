@@ -262,8 +262,25 @@ describe('startGame initial-deal hand cap', () => {
       expect(hand.filter(c => c.type === 'power')).toHaveLength(0);
       const slot = room.powerCardSlot?.[pid] || [];
       expect(slot.length).toBeLessThanOrEqual(1);
-      // Total cards across hand (shapes) + slot (powers) = 6.
-      expect(hand.length + slot.length).toBe(6);
+    }
+  });
+
+  // #139 — the power card lives in its own slot and must not decrement the
+  // playable hand. After the deal every player holds a full 6 shape cards
+  // PLUS their separate power slot (7 cards at round start), not 5 + 1.
+  it('deals 6 shape cards plus a separate power slot (#139)', () => {
+    const cfg = configWith({ shield: true, mirror: true, swap: true, peek: true, freeze: true, assassin: true }, 2);
+    const room = makeOnlineRoomWithPlayers(3, cfg);
+    startGame(room);
+
+    for (const [pid, hand] of room.hands.entries()) {
+      // The playable hand is always 6 shape cards — power cards never count.
+      expect(hand.filter(c => c.type === 'shape')).toHaveLength(6);
+      expect(hand).toHaveLength(6);
+      // Power card is held separately (guaranteed one, capped at one here).
+      const slot = room.powerCardSlot?.[pid] || [];
+      expect(slot).toHaveLength(1);
+      expect(slot[0].type).toBe('power');
     }
   });
 
@@ -341,8 +358,9 @@ describe('startGame guarantees ≥1 power card per player (#77)', () => {
           barehandTotal++;
           if (powerCount >= 1) barehandWithPower++;
         }
-        // Total cards = hand (shapes) + slot (powers) = 6.
-        expect(hand.length + slot.length).toBe(6);
+        // #139 — the playable hand is always a full 6 shape cards; the
+        // power card sits in its own slot and never decrements it.
+        expect(hand.length).toBe(6);
         const cap = p.role === 'collector' ? 3 : 1;
         expect(powerCount).toBeLessThanOrEqual(cap);
       }
@@ -411,11 +429,11 @@ describe('startGame guarantees ≥1 power card per player (#77)', () => {
       return slot.some(c => c?.type === 'power');
     });
     expect(covered.length).toBeGreaterThanOrEqual(1);
-    // Hand + slot size invariant holds even when guarantee can't reach all.
+    // #139 — every hand tops up to a full 6 shape cards regardless of
+    // whether the power-card guarantee could reach that player.
     for (const p of room.players) {
       const hand = room.hands.get(p.id) || [];
-      const slot = room.powerCardSlot?.[p.id] || [];
-      expect(hand.length + slot.length).toBe(6);
+      expect(hand.length).toBe(6);
     }
   });
 });

@@ -22,6 +22,7 @@ const {
   _guaranteeMinPowerCardPerPlayer,
   _snapshotSwapHolders,
   _extractPowerCardsToSlot,
+  _topUpShapeHandsTo,
 } = require('./powerCards');
 
 function generateRoomCode() {
@@ -123,6 +124,10 @@ function startGame(room) {
     _guaranteeMinPowerCardPerPlayer(room);
     _snapshotSwapHolders(room);
     _extractPowerCardsToSlot(room);
+    // #139 — the power card lives in its own slot and must NOT eat into the
+    // playable hand. Refill each hand to a full 6 shape cards after the
+    // power card has been pulled out.
+    _topUpShapeHandsTo(room, 6);
 
     let startIdx = room.deck.findIndex(c => c.type === 'shape' && c.shape !== 'whot');
     if (startIdx === -1) startIdx = room.deck.findIndex(c => c.type === 'shape');
