@@ -612,6 +612,47 @@ describe('swap pending-set credit on advanceTurn', () => {
   });
 });
 
+// ─── #163 — stale armed power card reset on turn cycle ───────
+
+describe('stale armed power card resets at the holder next turn (#163)', () => {
+  function armedRoom(power) {
+    const room = makeOnlineRoomWithPlayers(2);
+    room.phase = 'playing';
+    room.turnOrder = ['p0', 'p1'];
+    room.currentTurnIndex = 0;
+    const card = { id: `c-${power}`, type: 'power', power, armed: true };
+    if (power === 'swap') card.swapPendingPlayerIds = ['p1'];
+    room.hands = new Map([['p0', []], ['p1', []]]);
+    room.powerCardSlot = { p0: [card], p1: [] };
+    room.players.find(p => p.id === 'p0').armedPowerCard = {
+      power, cardId: card.id, activatedAtTurn: 0, activatedAtRound: 1,
+    };
+    return room;
+  }
+
+  it('keeps a Shield armed while the next player can still bluff the holder', () => {
+    const room = armedRoom('shield');
+    advanceTurn(room); // → p1's turn; p1 can still call bluff on p0
+    expect(room.players.find(p => p.id === 'p0').armedPowerCard).not.toBeNull();
+  });
+
+  it('clears an unconsumed armed Shield once the turn returns to the holder', () => {
+    const room = armedRoom('shield');
+    advanceTurn(room); // → p1
+    advanceTurn(room); // → back to p0; the bluff window closed unused
+    const p0 = room.players.find(p => p.id === 'p0');
+    expect(p0.armedPowerCard).toBeNull();
+    expect(room.powerCardSlot.p0[0].armed).toBe(false); // card stays, re-armable
+  });
+
+  it('does NOT reset an armed Swap (its activation spans turns)', () => {
+    const room = armedRoom('swap');
+    advanceTurn(room);
+    advanceTurn(room);
+    expect(room.players.find(p => p.id === 'p0').armedPowerCard).not.toBeNull();
+  });
+});
+
 // ─── Survive-and-reset hand ──────────────────────────────────
 
 describe('resetHandOnSurvival (Section 7)', () => {
