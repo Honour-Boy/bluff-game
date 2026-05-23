@@ -57,6 +57,16 @@ function advanceTurn(room) {
   const finishingPlayerId = room.turnOrder[room.currentTurnIndex] || null;
   if (finishingPlayerId) _creditSwapTurnFor(room, finishingPlayerId);
 
+  // Snapshot the card the finishing player played as the "card under
+  // accusation" for the incoming player. Frozen at this turn boundary so the
+  // incoming player's OWN same-turn play (turn actions are order-free) can no
+  // longer overwrite what a call_bluff / Peek resolves against — the bug where
+  // playing first made the bluff judge your own card instead of the previous
+  // player's. `lastPlayedCard` keeps tracking the live most-recent play so the
+  // next boundary captures this player's card in turn.
+  room.challengeableCard = room.lastPlayedCard || null;
+  room.challengeableCardType = room.currentCardType ?? null;
+
   room.currentTurnIndex = (room.currentTurnIndex + 1) % room.turnOrder.length;
   room.lastAction = null;
   room.phase = 'playing';
@@ -71,6 +81,9 @@ function advanceTurn(room) {
     room.currentTurnIndex = (room.currentTurnIndex + 1) % room.turnOrder.length;
     room.skipNextPlayer = false;
     room.bluffBlockedThisTurn = true;
+    // The skipped (frozen) player played nothing — nothing to challenge or peek.
+    room.challengeableCard = null;
+    room.challengeableCardType = null;
   }
 
   _sweepStaleArmedPowerCards(room);

@@ -23,11 +23,19 @@ const {
 // and a missing card means the previous player can't have told the
 // truth. `bluffPipeline.js`'s Tier-3 (#119) consumes this so the
 // correctness rule lives in exactly one place.
+//
+// The card under accusation is `room.challengeableCard` — the previous
+// player's play, snapshotted at the turn boundary (`advanceTurn`) and
+// validated against `room.challengeableCardType` (the required shape in
+// effect when they played). We deliberately do NOT read the live
+// `lastPlayedCard`/`currentCardType`: turn actions are order-free, so the
+// accuser may have already played their own card this turn, which would
+// otherwise make the bluff judge their card instead of the accused's.
 function isBluffCorrect(room) {
-  const revealed = room.lastPlayedCard;
+  const revealed = room.challengeableCard;
   if (!revealed) return true;
   if (revealed.shape === 'whot') return false;
-  return revealed.shape !== room.currentCardType;
+  return revealed.shape !== room.challengeableCardType;
 }
 
 // Tier-3 (Bluff Validation) of the ResolutionQueue. Returns the
@@ -38,7 +46,7 @@ function isBluffCorrect(room) {
 // pipeline re-type it into a non-redirectable event when needed.
 function buildBluffValidationEvent(room, accuser, accused) {
   const bluffIsCorrect = isBluffCorrect(room);
-  const revealedCard = room.lastPlayedCard || null;
+  const revealedCard = room.challengeableCard || null;
   const target = bluffIsCorrect ? (accused?.id || null) : (accuser?.id || null);
   return {
     bluffIsCorrect,
@@ -130,6 +138,8 @@ function resetRoundOnline(room) {
   room.phase = 'playing';
   room.lastAction = null;
   room.lastPlayedCard = null;
+  room.challengeableCard = null;
+  room.challengeableCardType = null;
   room.bluffUsedThisTurn = false;
   room.cardPlayedThisTurn = false;
   room.isFirstTurn = true;

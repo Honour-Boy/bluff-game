@@ -46,6 +46,7 @@ function makeRoom(p0Slot = []) {
   room.playedPile = [];
   room.discardPile = [];
   room.lastPlayedCard = { id: 'sq-3', type: 'shape', shape: 'square', number: 3 };
+  room.challengeableCard = room.lastPlayedCard;
   return room;
 }
 

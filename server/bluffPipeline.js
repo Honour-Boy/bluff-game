@@ -611,8 +611,12 @@ function resumeAfterSwap(room, accuserId, pickedCardId) {
   }
 
   const playedPile = room.playedPile || [];
-  const originalIdx = playedPile.length - 1;
-  const originalCard = playedPile[originalIdx] || null;
+  // The accused's just-played card is the one under accusation — i.e. the
+  // turn-boundary snapshot, NOT blindly the top of the pile. With order-free
+  // actions the accuser may have played their own card after the accused, so
+  // the accused's card is no longer guaranteed to be on top.
+  const originalCard = room.challengeableCard || playedPile[playedPile.length - 1] || null;
+  const originalIdx = originalCard ? playedPile.findIndex(c => c?.id === originalCard.id) : -1;
   const pickedIdx = playedPile.findIndex(c => c?.id === pickedCardId);
 
   if (pickedIdx === -1) {
@@ -633,7 +637,10 @@ function resumeAfterSwap(room, accuserId, pickedCardId) {
   } else {
     const pickedCard = playedPile[pickedIdx];
     playedPile[pickedIdx] = originalCard;
-    playedPile[originalIdx] = pickedCard;
+    if (originalIdx !== -1) playedPile[originalIdx] = pickedCard;
+    // The swapped-in card is now the card under accusation; re-validation
+    // (Tier 3, below) reads challengeableCard. Keep lastPlayedCard aligned.
+    room.challengeableCard = pickedCard;
     room.lastPlayedCard = pickedCard;
   }
 

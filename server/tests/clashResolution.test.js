@@ -111,6 +111,8 @@ function buildRoom({
   room.playedPile = [playedCard];
   room.lastPlayedCard = playedCard;
   room.currentCardType = currentCardType;
+  room.challengeableCard = playedCard;
+  room.challengeableCardType = currentCardType;
 
   function arm(player, armed) {
     if (!armed) return;

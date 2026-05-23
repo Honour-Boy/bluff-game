@@ -74,6 +74,10 @@ function buildBluffScenario({
   room.playedPile = [playedCard];
   room.lastPlayedCard = playedCard;
   room.currentCardType = currentCardType;
+  // The accused's card is what a bluff resolves against — set the turn-boundary
+  // snapshot directly since these scenarios bypass advanceTurn.
+  room.challengeableCard = playedCard;
+  room.challengeableCardType = currentCardType;
 
   // Wire armed cards into the holder's slot + armedPowerCard.
   // Post-#117: power cards live in room.powerCardSlot, not room.hands.
@@ -477,6 +481,7 @@ describe('pipeline / default behaviour', () => {
   it('no card played → bluff is correct (the previous player must have lied)', () => {
     const { room } = buildBluffScenario({});
     room.lastPlayedCard = null;
+    room.challengeableCard = null;
     room.playedPile = [];
     const { outcome } = resolveBluff(room, 'p1');
     expect(outcome.bluffIsCorrect).toBe(true);

@@ -170,6 +170,8 @@ describe('Bounty — collection drops accuser risk by 1', () => {
     room.lastPlayedCard = { id: 'c1', type: 'shape', shape: 'square', number: 7 };
     room.playedPile = [room.lastPlayedCard];
     room.currentCardType = 'circle'; // mismatch → bluff is correct
+    room.challengeableCard = room.lastPlayedCard;
+    room.challengeableCardType = 'circle';
 
     const { events, outcome } = resolveBluff(room, 'p1');
     expect(outcome.kind).toBe('spin');
@@ -195,6 +197,8 @@ describe('Bounty — collection drops accuser risk by 1', () => {
     room.lastPlayedCard = { id: 'c1', type: 'shape', shape: 'circle', number: 7 };
     room.playedPile = [room.lastPlayedCard];
     room.currentCardType = 'circle'; // match → bluff wrong
+    room.challengeableCard = room.lastPlayedCard;
+    room.challengeableCardType = 'circle';
 
     const { events } = resolveBluff(room, 'p1');
     expect(events.find(e => e.kind === 'bounty_collected')).toBeFalsy();

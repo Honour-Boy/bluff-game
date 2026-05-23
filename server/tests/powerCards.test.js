@@ -461,6 +461,8 @@ describe('activatePowerCard', () => {
     room.playedPile = [];
     room.discardPile = [];
     room.lastPlayedCard = lastPlayedCard;
+    // Peek reveals the previous player's play — the turn-boundary snapshot.
+    room.challengeableCard = lastPlayedCard;
     return room;
   }
 

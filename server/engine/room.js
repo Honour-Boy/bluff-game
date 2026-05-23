@@ -55,6 +55,10 @@ function createRoom(hostSocketId, mode = MODES.PHYSICAL, config = null) {
     powerCardSlot: null,
     currentCard: null,
     lastPlayedCard: null,
+    // Snapshot of the previous player's play (taken at each turn boundary in
+    // advanceTurn) — the card a bluff / Peek resolves against. See engine/bluff.js.
+    challengeableCard: null,
+    challengeableCardType: null,
     chatLog: [],
     config: normalizeRoomConfig(config),
     discardPile: [],
@@ -96,6 +100,8 @@ function startGame(room) {
   room.lastAction = null;
   room.isFirstTurn = true;
   room.lastPlayedCard = null;
+  room.challengeableCard = null;
+  room.challengeableCardType = null;
   room.discardPile = room.discardPile || [];
 
   // v2 Phase E1 — Russian Roulette: re-init chambers with 2 bullets.

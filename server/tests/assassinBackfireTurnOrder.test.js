@@ -63,6 +63,8 @@ function buildRoom({ lastPlayedShape }) {
   room.playedPile = [playedCard];
   room.lastPlayedCard = playedCard;
   room.currentCardType = 'circle';
+  room.challengeableCard = playedCard;
+  room.challengeableCardType = 'circle';
 
   return { room, p0, p1, p2 };
 }

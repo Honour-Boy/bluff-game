@@ -271,7 +271,10 @@ function activatePowerCard(room, playerId) {
   if (powerCard.power === 'peek') {
     room.powerCardSlot[playerId] = slot.filter(c => c.id !== powerCard.id);
     room.discardPile.push(powerCard);
-    const peekedCard = room.lastPlayedCard || null;
+    // Peek reveals the previous player's play — the same snapshotted card a
+    // bluff targets — NOT the live lastPlayedCard, which would be this player's
+    // own card if they already played this turn (order-free actions).
+    const peekedCard = room.challengeableCard || null;
     return {
       ok: true,
       power: 'peek',
