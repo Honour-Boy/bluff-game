@@ -63,7 +63,7 @@ function register(io, socket, deps) {
         continue;
       }
 
-      if (['playing', 'bluff_resolution', 'spin_pending', 'swap_pending', 'medic_pending', 'sniper_pending', 'ghost_vote_pending', 'last_stand'].includes(room.phase)) {
+      if (['playing', 'bluff_resolution', 'spin_pending', 'swap_pending', 'medic_pending', 'sniper_pending', 'bluff_intercept_pending', 'ghost_vote_pending', 'last_stand'].includes(room.phase)) {
         io.to(code).emit('player_disconnecting', { playerId: player.id, playerName: player.username });
 
         const key = dcKey(code, player.id);

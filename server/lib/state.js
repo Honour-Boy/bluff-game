@@ -18,6 +18,11 @@ const ghostVoteTimers = new Map();  // roomCode → setTimeout handle
 // is ever pending at a time). Cleared early when all players confirm.
 const pregameTimers = new Map();    // roomCode → setTimeout handle
 
+// §1.1 — bluff interception window. One 8s handle per room while an accused
+// decides whether to arm a defensive card in response to a bluff; on expiry
+// the bluff resolves with no interception. Cleared early on arm/pass/leave.
+const bluffInterceptTimers = new Map();  // roomCode → setTimeout handle
+
 // Host / player disconnect grace timers.
 const hostDisconnectTimers = new Map();
 // Player disconnect timers must be visible across socket connections —
@@ -38,6 +43,10 @@ function _clearPreGameTimer(code) {
   const t = pregameTimers.get(code);
   if (t) { clearTimeout(t); pregameTimers.delete(code); }
 }
+function _clearBluffInterceptTimer(code) {
+  const t = bluffInterceptTimers.get(code);
+  if (t) { clearTimeout(t); bluffInterceptTimers.delete(code); }
+}
 
 async function getRoom(code) {
   return rooms.get(code) || null;
@@ -55,12 +64,14 @@ module.exports = {
   bettingTimers,
   ghostVoteTimers,
   pregameTimers,
+  bluffInterceptTimers,
   hostDisconnectTimers,
   playerDisconnectTimers,
   dcKey,
   _clearBettingTimer,
   _clearGhostVoteTimer,
   _clearPreGameTimer,
+  _clearBluffInterceptTimer,
   getRoom,
   saveRoom,
 };

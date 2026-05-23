@@ -9,6 +9,7 @@ import { CoreGameOverlays } from './CoreGameOverlays';
 import { PowerFlowOverlays } from './PowerFlowOverlays';
 import { RolePromptOverlays } from './RolePromptOverlays';
 import { SystemsLayer } from './SystemsLayer';
+import { BluffInterceptOverlay } from './BluffInterceptOverlay';
 import { PreGameSelectionModal } from '../PreGameSelectionModal';
 import {
   distributePlayers,
@@ -45,6 +46,7 @@ export function OnlinePlayerUI({
   medicDecide,
   saboteurTransfer,
   sniperRedirect,
+  bluffIntercept,
   medicPrompt,
   sniperPrompt,
   powerEventQueue,
@@ -423,6 +425,14 @@ export function OnlinePlayerUI({
         players={players}
         spectatedHand={ui.spectatedHand}
       />
+
+      {/* §1.1 — bluff interception window (accused arms a defence in response). */}
+      {phase === 'bluff_intercept_pending' && roomState?.pendingBluffIntercept && (
+        <BluffInterceptOverlay
+          pending={roomState.pendingBluffIntercept}
+          bluffIntercept={bluffIntercept}
+        />
+      )}
 
       <SystemsLayer
         roomState={roomState}

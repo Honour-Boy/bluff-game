@@ -66,6 +66,7 @@ function HomeContent() {
     medicDecide,
     saboteurTransfer,
     sniperRedirect,
+    bluffIntercept,
     medicPrompt,
     sniperPrompt,
     pregame,
@@ -483,6 +484,7 @@ function HomeContent() {
           medicDecide={medicDecide}
           saboteurTransfer={saboteurTransfer}
           sniperRedirect={sniperRedirect}
+          bluffIntercept={bluffIntercept}
           medicPrompt={medicPrompt}
           sniperPrompt={sniperPrompt}
           pregame={pregame}
@@ -542,6 +544,7 @@ function HomeContent() {
           medicDecide={medicDecide}
           saboteurTransfer={saboteurTransfer}
           sniperRedirect={sniperRedirect}
+          bluffIntercept={bluffIntercept}
           medicPrompt={medicPrompt}
           sniperPrompt={sniperPrompt}
           pregame={pregame}

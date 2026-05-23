@@ -5,7 +5,7 @@
 // engine/deck.js; this module handles cards once they're in hands
 // and the activate/consume lifecycle.
 
-const { MODES, ROLES } = require('./constants');
+const { MODES, ROLES, INTERCEPTABLE_POWERS } = require('./constants');
 const {
   _findPowerCardInHand,
   _countPowerCardsInHand,
@@ -299,6 +299,74 @@ function activatePowerCard(room, playerId) {
   };
 }
 
+// ─── Bluff interception (§1.1) ─────────────────────────────────
+// When a bluff is called, the accused (the previous player — NOT on turn)
+// gets a window to arm a DEFENSIVE power card in response, before the bluff
+// resolves. The resolution pipeline already reads `accused.armedPowerCard` at
+// every tier (Shield→Tier1, Swap→Tier2, Mirror→Tier4), so arming here is all
+// that's needed — the existing queue does the rest.
+
+/**
+ * The defensive power cards `playerId` could arm right now in response to a
+ * bluff: interceptable powers they hold, with Swap's "everyone took a turn"
+ * gate honoured. Returns the matching slot cards (possibly empty).
+ */
+function listInterceptCards(room, playerId) {
+  const slot = room.powerCardSlot?.[playerId] || [];
+  return slot.filter(
+    c => c
+      && INTERCEPTABLE_POWERS.includes(c.power)
+      && (c.power !== 'swap' || isSwapActivatable(c)),
+  );
+}
+
+/**
+ * Can `playerId` open an interception window at all? True only if they hold an
+ * interceptable card AND aren't already armed (an already-armed card is handled
+ * by the pipeline directly — no window needed).
+ */
+function canInterceptBluff(room, playerId) {
+  const player = room.players.find(p => p.id === playerId);
+  if (!player || player.status !== 'alive') return false;
+  if (player.armedPowerCard) return false;
+  return listInterceptCards(room, playerId).length > 0;
+}
+
+/**
+ * Arm a defensive power card for the accused during an interception window.
+ * Unlike `activatePowerCard` this does NOT require the holder to be the active
+ * player (the accused is off-turn by definition). `cardId` selects which held
+ * card to arm; omitted → the first eligible one.
+ */
+function armInterceptCard(room, playerId, cardId = null) {
+  if (room.mode !== MODES.ONLINE) return { ok: false, error: 'Online mode only' };
+  const player = room.players.find(p => p.id === playerId);
+  if (!player) return { ok: false, error: 'Player not found' };
+  if (player.status !== 'alive') return { ok: false, error: 'Player not alive' };
+  if (player.armedPowerCard) return { ok: false, error: 'Already armed' };
+
+  const slot = room.powerCardSlot?.[playerId] || [];
+  const card = cardId ? slot.find(c => c?.id === cardId) : listInterceptCards(room, playerId)[0];
+  if (!card) return { ok: false, error: 'No defensive card to arm' };
+  if (!INTERCEPTABLE_POWERS.includes(card.power)) {
+    return { ok: false, error: 'Not a defensive card' };
+  }
+  if (card.power === 'swap' && !isSwapActivatable(card)) {
+    return { ok: false, error: 'Swap not yet activatable — every alive player must take a turn first' };
+  }
+
+  card.armed = true;
+  player.armedPowerCard = {
+    power: card.power,
+    cardId: card.id,
+    activatedAtTurn: room.currentTurnIndex,
+    activatedAtRound: room.roundNumber,
+    viaIntercept: true,
+  };
+
+  return { ok: true, power: card.power, cardId: card.id };
+}
+
 // ─── Freeze trigger (Phase C) ──────────────────────────────────
 // "Activated at turn start" (Phase B arms it) and "consumed on turn
 // end". When the holder calls end_turn, we look for an armed freeze
@@ -357,5 +425,8 @@ module.exports = {
   applyAssassinBackfirePenalty,
   isSwapActivatable,
   activatePowerCard,
+  listInterceptCards,
+  canInterceptBluff,
+  armInterceptCard,
   consumeFreezeOnTurnEnd,
 };

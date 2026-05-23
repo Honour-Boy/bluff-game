@@ -133,6 +133,22 @@ function serializeRoom(room, requestingPlayerId = null, opts = {}) {
               : undefined,
         }
       : null,
+    // §1.1 — bluff interception window. Everyone sees who's deciding; only the
+    // accused gets the list of cards they may arm.
+    pendingBluffIntercept: isOnline && room.pendingBluffIntercept
+      ? {
+          accuserId: room.pendingBluffIntercept.accuserId,
+          accuserName: room.pendingBluffIntercept.accuserName,
+          accusedId: room.pendingBluffIntercept.accusedId,
+          accusedName: room.pendingBluffIntercept.accusedName,
+          deadline: room.pendingBluffIntercept.deadline,
+          amAccused: requestingPlayerId === room.pendingBluffIntercept.accusedId,
+          options:
+            requestingPlayerId === room.pendingBluffIntercept.accusedId
+              ? room.pendingBluffIntercept.options
+              : undefined,
+        }
+      : null,
     betting: isOnline && room.betting && !room.betting.closed
       ? {
           spinTargetId: room.betting.spinTargetId,
