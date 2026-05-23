@@ -345,6 +345,39 @@ function _tierRedirection(room, event, ctx) {
 function _tierConsequence(room, event, ctx) {
   if (event.type === GAME_EVENT_TYPES.FORCED_ELIMINATION) {
     const { accused } = ctx;
+
+    // Playtest §1.3 — Shield > Assassin, applied UNIVERSALLY to whoever the
+    // strike lands on. A wrong call backfires onto the ACCUSER, who may have
+    // armed a Shield in their own defence. Tier 1 (Prevention) only ever sees
+    // the *accused's* Shield, so it cannot catch this case; without the check
+    // here the Assassin would kill a shielded accuser, the Shield would stay
+    // armed-but-useless, and the death banner would clash with the expected
+    // block (the reported "engine lockup"). When the elimination target holds
+    // an armed Shield we consume BOTH cards, emit the block banner, and resolve
+    // the bluff cleanly as BLUFF_BLOCKED — nobody dies, no later tier runs.
+    const target = _findPlayer(room, event.target);
+    if (event.preventable && target?.armedPowerCard?.power === 'shield') {
+      _consumeArmedCard(room, target);   // the Shield (intercepts)
+      _consumeArmedCard(room, accused);  // the Assassin (fired, but blocked)
+      ctx.events.push({
+        kind: 'shield_blocked',
+        holderId: target.id,
+        holderName: target.username,
+        blockedPower: 'assassin',
+        assassinHolderId: accused?.id || null,
+        assassinHolderName: accused?.username || null,
+      });
+      ctx.halt = true;
+      return _event(GAME_EVENT_TYPES.BLUFF_BLOCKED, {
+        source: accused?.id || null,
+        target: target.id,
+        payload: {
+          accuserId: ctx.accuser?.id || null,
+          accusedId: accused?.id || null,
+        },
+      });
+    }
+
     _consumeArmedCard(room, accused);
     ctx.events.push({
       kind: 'assassin_strike',
@@ -482,6 +515,9 @@ function _toOutcome(event, ctx) {
       return {
         ...base,
         kind: 'blocked',
+        // The Shield holder is always the event target — the accused for a
+        // Tier-1 block, the strike target (accuser) for a §1.3 Assassin block.
+        shieldHolderId: event.target,
         accuserId: event.payload.accuserId,
         accusedId: event.payload.accusedId,
       };

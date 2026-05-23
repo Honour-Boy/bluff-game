@@ -236,7 +236,9 @@ function applyBluffOutcome(room, outcome) {
     room.spinTargetId = null;
     room.lastAction = {
       type: 'bluff_blocked',
-      shieldHolderId: outcome.accusedId,
+      // §1.3 — the Shield holder is the event target (the accused for a
+      // Tier-1 block, the accuser for an Assassin-strike block).
+      shieldHolderId: outcome.shieldHolderId ?? outcome.accusedId,
       accuserId: outcome.accuserId,
     };
     return outcome;

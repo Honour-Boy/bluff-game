@@ -192,14 +192,16 @@ export function useOnlinePlayerUiController({
   }, [spectatePlayer]);
 
   // #139 — open the activation confirmation modal by tapping the held power
-  // card. Gated so a power card can never be activated off-turn or after a
-  // card/bluff has been committed this turn.
+  // card. Playtest §1.1 — a power card may be armed at any point in the
+  // holder's own turn, INCLUDING after a normal card has been played (arming a
+  // defensive Shield/Mirror post-play is the intended set-up). We still block
+  // once a bluff has been called this turn or once the player is armed.
   const handlePowerCardClick = useCallback(() => {
     if (!isMyTurn || !isPlaying) return;
-    if (roomState?.cardPlayedThisTurn || roomState?.bluffUsedThisTurn) return;
+    if (roomState?.bluffUsedThisTurn) return;
     if (myPlayer?.armedPowerCard) return;
     setPowerConfirmOpen(true);
-  }, [isMyTurn, isPlaying, roomState?.cardPlayedThisTurn, roomState?.bluffUsedThisTurn, myPlayer?.armedPowerCard]);
+  }, [isMyTurn, isPlaying, roomState?.bluffUsedThisTurn, myPlayer?.armedPowerCard]);
 
   const handleActivatePower = useCallback(async () => {
     if (!activatePowerCard || activating) return;

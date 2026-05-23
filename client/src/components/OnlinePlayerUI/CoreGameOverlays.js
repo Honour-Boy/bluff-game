@@ -33,6 +33,7 @@ export function CoreGameOverlays({
   isFirstTurn,
   bluffUsedThisTurn,
   cardPlayedThisTurn,
+  bluffBlockedThisTurn,
   prevPlayerName,
   callBluff,
   setShowTurnModal,
@@ -235,6 +236,7 @@ export function CoreGameOverlays({
         isFirstTurn={isFirstTurn}
         bluffUsed={bluffUsedThisTurn}
         cardPlayed={cardPlayedThisTurn}
+        bluffBlocked={bluffBlockedThisTurn}
         prevPlayerName={prevPlayerName}
         onCallBluff={() => {
           callBluff();

@@ -8,6 +8,9 @@
  *   isFirstTurn     — disables Call Bluff on the very first turn
  *   bluffUsed       — true once bluff has been called this turn
  *   cardPlayed      — true once a card has been played this turn
+ *   bluffBlocked    — true when the previous turn was a frozen skip (§1.2): the
+ *                     skipped player never played a card, so there is nothing to
+ *                     challenge — Call Bluff must be disabled for everyone.
  *   prevPlayerName  — name of the previous player (shown in "Call [X] bluff" label)
  *   onCallBluff     — called when player taps "Call Bluff"
  *   onClose         — dismiss modal (player wants to pick a card manually from hand)
@@ -17,6 +20,7 @@ export function TurnActionModal({
   isFirstTurn,
   bluffUsed,
   cardPlayed,
+  bluffBlocked,
   prevPlayerName,
   onCallBluff,
   onClose,
@@ -26,7 +30,7 @@ export function TurnActionModal({
   // If card already played, just show "End Turn" reminder and close handle
   if (cardPlayed) return null; // action panel handles End Turn inline
 
-  const canBluff = !isFirstTurn && !bluffUsed && !cardPlayed;
+  const canBluff = !isFirstTurn && !bluffUsed && !cardPlayed && !bluffBlocked;
 
   return (
     <div
@@ -113,9 +117,11 @@ export function TurnActionModal({
         >
           {canBluff
             ? "Call bluff if you think the previous player lied about their card, or pick a card from your hand to play."
-            : bluffUsed
-              ? "Bluff called. Now play a card from your hand."
-              : "Play a card from your hand."}
+            : bluffBlocked
+              ? "The previous turn was frozen — that player never laid a card, so there's nothing to challenge. Play a card from your hand."
+              : bluffUsed
+                ? "Bluff called. Now play a card from your hand."
+                : "Play a card from your hand."}
         </div>
       </div>
     </div>

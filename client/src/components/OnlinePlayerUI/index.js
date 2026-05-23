@@ -146,12 +146,13 @@ export function OnlinePlayerUI({
   }
 
   // #139 — eligibility to show the activation modal at all (turn/state gating).
+  // Playtest §1.1 — `cardPlayedThisTurn` is intentionally NOT a gate here:
+  // arming a power card after a normal card has been played is allowed.
   const powerModalEligible = (
     isMyTurn
     && !isEliminated
     && !showSpectatorView
     && isPlaying
-    && !cardPlayedThisTurn
     && !bluffUsedThisTurn
     && !!heldPowerCard
     && !armedPowerCard
@@ -328,6 +329,7 @@ export function OnlinePlayerUI({
         isFirstTurn={isFirstTurn}
         bluffUsedThisTurn={bluffUsedThisTurn}
         cardPlayedThisTurn={cardPlayedThisTurn}
+        bluffBlockedThisTurn={bluffBlockedThisTurn}
         prevPlayerName={prevPlayer?.username || null}
         callBluff={callBluff}
         setShowTurnModal={ui.setShowTurnModal}

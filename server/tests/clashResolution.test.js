@@ -215,6 +215,32 @@ describe('clash 2 — Shield > Assassin', () => {
     expect(outcome1.events[0].kind).toBe('shield_blocked');
     expect(p0.armedPowerCard).toBeNull();
   });
+
+  // Playtest §1.3 — the bug case: the ACCUSER (not the accused) holds the
+  // Shield, and a wrong call backfires the Assassin onto them. Tier 1 only
+  // sees the accused's Shield, so this exercises the Tier-5 universal block.
+  it('Shield on the ACCUSER blocks an Assassin strike that backfires onto them', () => {
+    const { room, p0, p1 } = buildRoom({
+      accusedArmed: { power: 'assassin', cardId: 'kill-A' },
+      accuserArmed: { power: 'shield',   cardId: 'shi-B' },
+      lastPlayedShape: 'circle', // bluff is WRONG → strike targets the accuser
+      currentCardType: 'circle',
+    });
+    const { outcome, events } = resolveBluff(room, 'p1');
+
+    // Nobody is eliminated — the bluff resolves as a clean block.
+    expect(outcome.kind).toBe('blocked');
+    expect(outcome.shieldHolderId).toBe('p1');
+    // Both cards are consumed.
+    expect(p1.armedPowerCard).toBeNull(); // Shield
+    expect(p0.armedPowerCard).toBeNull(); // Assassin
+    // A shield_blocked banner fires naming the Assassin holder; NO strike.
+    const block = events.find(e => e.kind === 'shield_blocked');
+    expect(block).toBeTruthy();
+    expect(block.blockedPower).toBe('assassin');
+    expect(block.assassinHolderId).toBe('p0');
+    expect(events.find(e => e.kind === 'assassin_strike')).toBeFalsy();
+  });
 });
 
 // ─── Priority 3: Mirror > Sniper Role ────────────────────────

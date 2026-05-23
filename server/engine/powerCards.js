@@ -244,7 +244,13 @@ function activatePowerCard(room, playerId) {
   const currentPlayerId = room.turnOrder[room.currentTurnIndex];
   if (currentPlayerId !== playerId) return { ok: false, error: 'Not your turn' };
 
-  if (room.cardPlayedThisTurn) return { ok: false, error: 'Card already played this turn' };
+  // Playtest §1.1 — turn-flow flexibility. A power card may be armed at ANY
+  // point during the holder's own active turn window, INCLUDING after they
+  // have already placed a normal card down (the old `cardPlayedThisTurn`
+  // block locked the UI to nothing but "End Turn"). Arming after a play is
+  // exactly how a player sets up a defensive Shield / Mirror against the next
+  // player's bluff. We still block once a bluff has been called this turn
+  // (the resolution is already in flight) and once the player is armed.
   if (room.bluffUsedThisTurn)  return { ok: false, error: 'Bluff already called this turn' };
 
   const player = room.players.find(p => p.id === playerId);
