@@ -119,6 +119,38 @@ function _snapshotSwapHolders(room) {
 }
 
 /**
+ * #139 — restore the playable hand to a full `size` shape cards.
+ *
+ * The initial deal sizes each hand at 6 cards INCLUDING any power card,
+ * and `_guaranteeMinPowerCardPerPlayer` ensures everyone holds one. Once
+ * `_extractPowerCardsToSlot` pulls that power card into its own slot the
+ * playable hand is left one short (5 shape cards). The power/bonus slot is
+ * a SEPARATE slot — it must never decrement the 6-card shape hand — so we
+ * top each hand back up to `size` shape cards from the remaining deck.
+ *
+ * Run AFTER extraction. Pure draw from room.deck (no played-pile reshuffle
+ * needed at deal time — a fresh deck always has ample shape cards: 71 per
+ * single deck, doubled past 10 players).
+ */
+function _topUpShapeHandsTo(room, size) {
+  if (!room.hands || !Array.isArray(room.deck)) return;
+  for (const hand of room.hands.values()) {
+    if (!Array.isArray(hand)) continue;
+    let shapeCount = hand.reduce((n, c) => (c?.type === 'shape' ? n + 1 : n), 0);
+    while (shapeCount < size) {
+      const shapeIdx = room.deck.findIndex(c => c?.type === 'shape');
+      if (shapeIdx === -1) {
+        console.warn('[engine] _topUpShapeHandsTo: deck exhausted of shape cards');
+        break;
+      }
+      const [shape] = room.deck.splice(shapeIdx, 1);
+      hand.push(shape);
+      shapeCount++;
+    }
+  }
+}
+
+/**
  * After the initial deal and cap normalisation, move every power card
  * out of room.hands into room.powerCardSlot[playerId] (an array).
  * From this point on, room.hands contains shape cards only.
@@ -313,6 +345,7 @@ module.exports = {
   _guaranteeMinPowerCardPerPlayer,
   _snapshotSwapHolders,
   _extractPowerCardsToSlot,
+  _topUpShapeHandsTo,
   _creditSwapTurnFor,
   _removePlayerFromSwapSnapshots,
   applyAssassinBackfirePenalty,

@@ -29,6 +29,13 @@ export function BottomSeat({
   phase,
   leaveGame,
 }) {
+  // #139 — the power card lives in its own slot and must never change the
+  // playable-card count. Count shape cards for the headline number and show
+  // any held power card separately.
+  const shapeCardCount = myHand.filter((card) => card?.type !== 'power').length;
+  const powerCardCount = (myPowerCardSlot?.length || 0)
+    + myHand.filter((card) => card?.type === 'power').length;
+
   return (
     <div
       className="topdown-bottom"
@@ -200,7 +207,12 @@ export function BottomSeat({
               }}
             >
               <span>YOUR HAND</span>
-              <span>{myHand.length} card{myHand.length !== 1 ? 's' : ''}</span>
+              <span>
+                {shapeCardCount} card{shapeCardCount !== 1 ? 's' : ''}
+                {powerCardCount > 0 && (
+                  <span style={{ color: 'var(--accent)' }}> + {powerCardCount} power</span>
+                )}
+              </span>
             </div>
             <CardHand
               hand={myHand}

@@ -158,10 +158,10 @@ export function OnlinePlayerUI({
     && !ui.spinData
     && !ui.justEliminated
   );
-  // Auto turn-start prompt (suppressed once dismissed for this turn).
-  const showPowerPrompt = powerModalEligible && ui.powerPromptDismissedFor !== ui.powerPromptTurnKey;
-  // The modal also opens on demand when the player taps their power card.
-  const showPowerModal = powerModalEligible && (showPowerPrompt || ui.powerConfirmOpen);
+  // #139 — NO turn-start auto-prompt. The Activate/Skip modal opens ONLY
+  // when the player explicitly taps their power-card slot (which flips
+  // ui.powerConfirmOpen). Eligibility still gates whether that tap is honoured.
+  const showPowerModal = powerModalEligible && ui.powerConfirmOpen;
 
   const isSwapPending = roomState?.phase === 'swap_pending';
   const amSwapHolder = isSwapPending && roomState?.swapHolderId === myPlayer?.id;
