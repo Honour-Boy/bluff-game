@@ -73,36 +73,50 @@ function advanceTurn(room) {
     room.bluffBlockedThisTurn = true;
   }
 
-  _resetStaleArmedPowerCard(room);
+  _sweepStaleArmedPowerCards(room);
   return room;
 }
 
-// #163 — reset a stale armed power card at the START of the holder's turn.
-// A holder can only be bluffed by the player immediately after them
+// #163 + playtest §1.4 — sweep stale armed power cards on every turn advance.
+//
+// A holder can only ever be bluffed by the player immediately AFTER them
 // (`call_bluff` always targets the previous player), so an armed Shield /
-// Mirror / Assassin that survived unconsumed all the way back to the holder's
-// next turn can no longer fire for the play it was armed for. Clearing the
-// armed flag here means a stale card never fires on an unintended later play,
-// and the holder must explicitly re-confirm (re-arm) for their new turn. The
-// card itself stays in the slot, ready to re-arm.
+// Mirror / Assassin is "live" ONLY while its holder is the immediately-
+// previous player to the current turn. The instant the turn rotates past
+// that one-step window the armed flag is dead weight: it can no longer fire
+// for the play it was armed for, yet it would otherwise linger and auto-fire
+// on an unintended later play (the reported bug) and keep the client lock
+// badge stuck on.
+//
+// We therefore sweep EVERY player each advance and un-arm anyone who is no
+// longer the immediately-previous player. This is stricter (and more robust
+// against eliminations / freeze-skips shuffling the order) than only checking
+// the incoming player: a card armed by p0 is cleared the moment the turn moves
+// from p1 to p2, not a full rotation later. The card itself stays in the slot,
+// ready to be re-armed on the holder's next turn.
 //
 // Excluded:
 //   • Freeze — consumed at end_turn via consumeFreezeOnTurnEnd, never survives.
 //   • Swap   — armed early but only becomes activatable after a full turn
 //              cycle (swapPendingPlayerIds), so it MUST persist across turns.
-function _resetStaleArmedPowerCard(room) {
-  const playerId = room.turnOrder[room.currentTurnIndex] || null;
-  if (!playerId) return;
-  const player = room.players.find(p => p.id === playerId);
-  const armed = player?.armedPowerCard;
-  if (!armed || armed.power === 'freeze' || armed.power === 'swap') return;
+function _sweepStaleArmedPowerCards(room) {
+  if (!Array.isArray(room.turnOrder) || room.turnOrder.length === 0) return;
+  const len = room.turnOrder.length;
+  const prevId = room.turnOrder[(room.currentTurnIndex - 1 + len) % len] || null;
 
-  const slot = room.powerCardSlot?.[playerId];
-  if (Array.isArray(slot)) {
-    const card = slot.find(c => c?.id === armed.cardId);
-    if (card) card.armed = false;
+  for (const player of room.players) {
+    const armed = player?.armedPowerCard;
+    if (!armed || armed.power === 'freeze' || armed.power === 'swap') continue;
+    // The immediately-previous player is still inside their live bluff window.
+    if (player.id === prevId) continue;
+
+    const slot = room.powerCardSlot?.[player.id];
+    if (Array.isArray(slot)) {
+      const card = slot.find(c => c?.id === armed.cardId);
+      if (card) card.armed = false;
+    }
+    player.armedPowerCard = null;
   }
-  player.armedPowerCard = null;
 }
 
 function eliminateFromTurnOrder(room, playerId) {

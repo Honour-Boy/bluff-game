@@ -126,15 +126,18 @@ export function BottomSeat({
         <div style={{ marginBottom: 10 }}>
           <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
             {!isFirstTurn && (
+              // Playtest §1.1 — Call Bluff stays available for the whole active
+              // turn window, even after a normal card has been played; only a
+              // bluff already used or a frozen-skip turn (§1.2) disables it.
               <button
                 className="danger"
                 onClick={callBluff}
-                disabled={bluffUsedThisTurn || cardPlayedThisTurn || bluffBlockedThisTurn}
+                disabled={bluffUsedThisTurn || bluffBlockedThisTurn}
                 title={bluffBlockedThisTurn ? 'No card to challenge — last turn was frozen' : undefined}
                 style={{
                   flex: 1,
-                  opacity: bluffUsedThisTurn || cardPlayedThisTurn || bluffBlockedThisTurn ? 0.4 : 1,
-                  cursor: bluffUsedThisTurn || cardPlayedThisTurn || bluffBlockedThisTurn ? 'not-allowed' : 'pointer',
+                  opacity: bluffUsedThisTurn || bluffBlockedThisTurn ? 0.4 : 1,
+                  cursor: bluffUsedThisTurn || bluffBlockedThisTurn ? 'not-allowed' : 'pointer',
                 }}
               >
                 Call Bluff
@@ -221,6 +224,10 @@ export function BottomSeat({
               onCardClick={handleCardClick}
               onPowerCardClick={handlePowerCardClick}
               interactive={isMyTurn && isPlaying && !cardPlayedThisTurn}
+              // Playtest §1.1 — power cards remain tappable for the whole active
+              // turn (even after a shape card was played), while shape cards
+              // lock once the single play is spent.
+              powerInteractive={isMyTurn && isPlaying}
             />
           </div>
         )

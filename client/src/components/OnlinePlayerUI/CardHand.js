@@ -1,14 +1,20 @@
 import { ShapeIcon } from '../shared/ShapeIcon';
 import { POWER_META, POWER_ICONS } from '../shared/PowerCard';
 
-function renderOneCard({ card, index, isSelected, interactive, onCardClick, onPowerCardClick }) {
+function renderOneCard({ card, index, isSelected, interactive, powerInteractive, onCardClick, onPowerCardClick }) {
   const isPower = card.type === 'power';
   const isWhot = !isPower && card.shape === 'whot';
   const powerMeta = isPower ? POWER_META[card.power] : null;
   const powerColor = powerMeta?.color || 'var(--accent)';
   const drawPowerIcon = isPower ? (POWER_ICONS[card.power] || POWER_ICONS.shield) : null;
   const isArmed = card.armed === true;
-  const cardInteractive = interactive && !isArmed;
+  // Playtest §1.1 — power cards can carry their own interactivity flag so they
+  // stay tappable after a shape card has been played this turn. Falls back to
+  // `interactive` when not supplied (every existing caller keeps prior behaviour).
+  const effectiveInteractive = isPower
+    ? (powerInteractive === undefined ? interactive : powerInteractive)
+    : interactive;
+  const cardInteractive = effectiveInteractive && !isArmed;
   const armedLabel = 'Activated — awaiting trigger';
 
   // #139 — power cards are activated through their own confirmation flow and
@@ -162,7 +168,7 @@ function renderOneCard({ card, index, isSelected, interactive, onCardClick, onPo
   );
 }
 
-export function CardHand({ hand, powerCardSlot = [], selectedCardId, onCardClick, onPowerCardClick, interactive = true }) {
+export function CardHand({ hand, powerCardSlot = [], selectedCardId, onCardClick, onPowerCardClick, interactive = true, powerInteractive = undefined }) {
   const shapeCards = hand.filter(c => c?.type !== 'power');
 
   if (shapeCards.length === 0 && powerCardSlot.length === 0) {
@@ -190,7 +196,7 @@ export function CardHand({ hand, powerCardSlot = [], selectedCardId, onCardClick
             }}
           >
             {shapeCards.map((card, index) =>
-              renderOneCard({ card, index, isSelected: selectedCardId === card.id, interactive, onCardClick, onPowerCardClick })
+              renderOneCard({ card, index, isSelected: selectedCardId === card.id, interactive, powerInteractive, onCardClick, onPowerCardClick })
             )}
           </div>
         </div>
@@ -200,7 +206,7 @@ export function CardHand({ hand, powerCardSlot = [], selectedCardId, onCardClick
         <div style={{ flexShrink: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4, paddingBottom: 4 }}>
           <div style={{ fontSize: 9, color: 'var(--text-dim)', letterSpacing: '0.12em' }}>POWER</div>
           {powerCardSlot.map((card, index) =>
-            renderOneCard({ card, index, isSelected: selectedCardId === card.id, interactive, onCardClick, onPowerCardClick })
+            renderOneCard({ card, index, isSelected: selectedCardId === card.id, interactive, powerInteractive, onCardClick, onPowerCardClick })
           )}
         </div>
       )}

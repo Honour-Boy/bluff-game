@@ -521,13 +521,19 @@ describe('activatePowerCard', () => {
     expect(second.error).toMatch(/already armed/i);
   });
 
-  it('rejects when card already played this turn', () => {
+  // Playtest §1.1 — turn-flow flexibility. Arming a power card AFTER a normal
+  // card has been played in the same turn is now allowed (previously the UI
+  // locked to nothing but "End Turn"). Arming a defensive Shield/Mirror after
+  // your play is the intended set-up against the next player's bluff.
+  it('allows activation after a card was already played this turn (§1.1)', () => {
     const card = { id: 'a', type: 'power', power: 'shield' };
     const room = setupActiveRoom({ holding: card });
     room.cardPlayedThisTurn = true;
     const result = activatePowerCard(room, 'p0');
-    expect(result.ok).toBe(false);
-    expect(result.error).toMatch(/card already played/i);
+    expect(result.ok).toBe(true);
+    expect(result.power).toBe('shield');
+    const player = room.players.find(p => p.id === 'p0');
+    expect(player.armedPowerCard).toEqual(expect.objectContaining({ power: 'shield', cardId: 'a' }));
   });
 
   it('rejects when bluff already called this turn', () => {
@@ -650,6 +656,52 @@ describe('stale armed power card resets at the holder next turn (#163)', () => {
     advanceTurn(room);
     advanceTurn(room);
     expect(room.players.find(p => p.id === 'p0').armedPowerCard).not.toBeNull();
+  });
+});
+
+// ─── §1.4 — armed cards cleared the moment their bluff window closes ──
+// Stricter than the original full-cycle reset: a card armed by p0 is live
+// only while p0 is the immediately-previous player. Once the turn moves
+// past p0+1 the armed flag must be swept, in games of any size, so it can
+// never auto-fire on a later play.
+
+describe('stale armed power cards swept once past the bluff window (§1.4)', () => {
+  function armedRoomN(n, power, holderIdx = 0) {
+    const room = makeOnlineRoomWithPlayers(n);
+    room.phase = 'playing';
+    room.turnOrder = Array.from({ length: n }, (_, i) => `p${i}`);
+    room.currentTurnIndex = holderIdx;
+    const card = { id: `c-${power}`, type: 'power', power, armed: true };
+    room.hands = new Map(room.turnOrder.map(id => [id, []]));
+    room.powerCardSlot = Object.fromEntries(room.turnOrder.map(id => [id, []]));
+    room.powerCardSlot[`p${holderIdx}`] = [card];
+    room.players.find(p => p.id === `p${holderIdx}`).armedPowerCard = {
+      power, cardId: card.id, activatedAtTurn: holderIdx, activatedAtRound: 1,
+    };
+    return room;
+  }
+
+  it('keeps a Shield armed while the holder is still the previous player (3-player)', () => {
+    const room = armedRoomN(3, 'shield', 0);
+    advanceTurn(room); // p0 → p1; p1 (the next player) can still bluff p0
+    expect(room.players.find(p => p.id === 'p0').armedPowerCard).not.toBeNull();
+  });
+
+  it('clears the Shield the moment the turn moves past the next player (3-player)', () => {
+    const room = armedRoomN(3, 'shield', 0);
+    advanceTurn(room); // p0 → p1 (live window)
+    advanceTurn(room); // p1 → p2; p0 can no longer be bluffed → swept
+    const p0 = room.players.find(p => p.id === 'p0');
+    expect(p0.armedPowerCard).toBeNull();
+    expect(room.powerCardSlot.p0[0].armed).toBe(false);
+  });
+
+  it('does not strand an armed Mirror when the holder is mid-order (4-player)', () => {
+    const room = armedRoomN(4, 'mirror', 1); // p1 holds, currentTurnIndex = 1
+    advanceTurn(room); // p1 → p2 (p1 is prev — kept)
+    expect(room.players.find(p => p.id === 'p1').armedPowerCard).not.toBeNull();
+    advanceTurn(room); // p2 → p3 (p1 no longer prev — swept)
+    expect(room.players.find(p => p.id === 'p1').armedPowerCard).toBeNull();
   });
 });
 
