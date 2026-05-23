@@ -40,6 +40,13 @@ const MEDIC_SAVE_HAND_CAP = 8;
 // PRE_GAME_SELECTION_TIMEOUT_MS for any player who hasn't picked.
 const ROLE_REVEAL_DISPLAY_MS = 2000;
 const PRE_GAME_SELECTION_TIMEOUT_MS = 15000;
+// Playtest §2.1 — the 15s window always runs to completion (no quick-skip when
+// the last player confirms). A pick made at/after the 12s mark is "late": the
+// picker earns a private 5s review buffer to look at what they drew, and is
+// deprioritised off the very first active turn so they aren't on the clock
+// while reviewing.
+const PRE_GAME_LATE_THRESHOLD_MS = 12000;
+const PRE_GAME_LATE_REVIEW_MS = 5000;
 
 const CARD_TYPES_DISCRIMINATOR = {
   SHAPE: 'shape',
@@ -189,6 +196,8 @@ module.exports = {
   MEDIC_SAVE_HAND_CAP,
   ROLE_REVEAL_DISPLAY_MS,
   PRE_GAME_SELECTION_TIMEOUT_MS,
+  PRE_GAME_LATE_THRESHOLD_MS,
+  PRE_GAME_LATE_REVIEW_MS,
   CARD_TYPES_DISCRIMINATOR,
   POWER_TYPES,
   RESOLUTION_TIERS,

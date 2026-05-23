@@ -1,4 +1,4 @@
-import { useCallback, useMemo } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { CardHand } from './CardHand';
 import { PlayerChip } from './PlayerChip';
 import { RoomHeader } from './RoomHeader';
@@ -75,6 +75,31 @@ export function OnlinePlayerUI({
     spinDismissed,
     powerEventQueue,
   });
+
+  // §2.1 — private late-pick review buffer. When the server flags a pick as
+  // late (≥12s into the 15s window) it returns a reviewMs grace period. We
+  // snapshot this player's pool + chosen id so their reveal can stay mounted
+  // past the shared finalize, giving them a guaranteed private look before the
+  // table appears. (They're already deprioritised off the opening turn server-
+  // side.) Only the late picker ever sees this hold.
+  const [reviewSnapshot, setReviewSnapshot] = useState(null);
+  const handleLatePick = useCallback((reviewMs, optionId) => {
+    setReviewSnapshot({
+      pool: pregame?.myPool || [],
+      selectedId: pregame?.mySelectionId || optionId || null,
+      until: Date.now() + (reviewMs || 0),
+    });
+  }, [pregame]);
+  useEffect(() => {
+    if (!reviewSnapshot) return undefined;
+    const remaining = reviewSnapshot.until - Date.now();
+    if (remaining <= 0) {
+      setReviewSnapshot(null);
+      return undefined;
+    }
+    const id = setTimeout(() => setReviewSnapshot(null), remaining);
+    return () => clearTimeout(id);
+  }, [reviewSnapshot]);
 
   if (!roomState || !myPlayer) {
     return (
@@ -173,7 +198,10 @@ export function OnlinePlayerUI({
   // (pregame.selectionOpen) the reveal gives way to the picker.
   const inPreGame = phase === 'pre_game';
   const showRoleReveal = inPreGame && !pregame?.selectionOpen && !!myPlayer?.role;
-  const showPreGameSelection = inPreGame && !!pregame?.selectionOpen;
+  // §2.1 — keep the modal alive through the private review buffer even after
+  // pre_game has finalised for the table at large.
+  const reviewActive = !!reviewSnapshot && reviewSnapshot.until > Date.now();
+  const showPreGameSelection = (inPreGame && !!pregame?.selectionOpen) || reviewActive;
   const isSaboteur = myRole === 'saboteur';
   const medicPending = roomState?.pendingMedicSave || null;
   const sniperPending = roomState?.pendingSniperRedirect || null;
@@ -355,12 +383,14 @@ export function OnlinePlayerUI({
 
       {showPreGameSelection && (
         <PreGameSelectionModal
-          pool={pregame?.myPool || []}
-          deadline={pregame?.deadline || null}
-          pendingCount={pregame?.pendingCount || 0}
-          totalCount={pregame?.totalCount || 0}
-          selectedId={pregame?.mySelectionId || null}
+          pool={reviewActive ? reviewSnapshot.pool : (pregame?.myPool || [])}
+          deadline={reviewActive ? null : (pregame?.deadline || null)}
+          pendingCount={reviewActive ? 0 : (pregame?.pendingCount || 0)}
+          totalCount={reviewActive ? 0 : (pregame?.totalCount || 0)}
+          selectedId={reviewActive ? reviewSnapshot.selectedId : (pregame?.mySelectionId || null)}
+          reviewUntil={reviewActive ? reviewSnapshot.until : null}
           onSelect={preGameSelect}
+          onLatePick={handleLatePick}
         />
       )}
 

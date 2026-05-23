@@ -335,6 +335,54 @@ describe('finalizePreGame', () => {
   });
 });
 
+// ─── §2.1 — late-pick threshold + first-turn deprioritisation ─
+
+describe('§2.1 late pickers (12s threshold)', () => {
+  it('flags an early confirmation as not late and records nobody', () => {
+    const room = makeRoomInPreGameSelection(2);
+    room.pregameSelectionDeadline = Date.now() + 15000; // full window left
+    const res = applyPreGameSelection(room, 'p0', room.pregamePools.p0[0].id);
+    expect(res.late).toBe(false);
+    expect(room.pregameLateSelectors).toEqual([]);
+  });
+
+  it('flags a confirmation at/after the 12s mark as late and records the id', () => {
+    const room = makeRoomInPreGameSelection(2);
+    room.pregameSelectionDeadline = Date.now() + 1500; // <= 3s left → late
+    const res = applyPreGameSelection(room, 'p0', room.pregamePools.p0[0].id);
+    expect(res.late).toBe(true);
+    expect(room.pregameLateSelectors).toContain('p0');
+  });
+
+  it('keeps a late picker off the opening turn even when first in order (Rule 3)', () => {
+    const room = makeRoomInPreGameSelection(3);
+    const firstId = room.turnOrder[0];
+    const secondId = room.turnOrder[1];
+    const thirdId = room.turnOrder[2];
+
+    // The first player in order confirms LATE...
+    room.pregameSelectionDeadline = Date.now() + 1000;
+    applyPreGameSelection(room, firstId, room.pregamePools[firstId][0].id);
+    // ...the rest confirm on time.
+    room.pregameSelectionDeadline = Date.now() + 15000;
+    applyPreGameSelection(room, secondId, room.pregamePools[secondId][0].id);
+    applyPreGameSelection(room, thirdId, room.pregamePools[thirdId][0].id);
+
+    finalizePreGame(room);
+    const opener = room.turnOrder[room.currentTurnIndex];
+    expect(opener).not.toBe(firstId);
+    expect(opener).toBe(secondId);
+  });
+
+  it('clears the late-selector bookkeeping on finalize', () => {
+    const room = makeRoomInPreGameSelection(2);
+    room.pregameSelectionDeadline = Date.now() + 1000;
+    applyPreGameSelection(room, 'p0', room.pregamePools.p0[0].id);
+    finalizePreGame(room);
+    expect(room.pregameLateSelectors).toBeUndefined();
+  });
+});
+
 // ─── serializeRoom pregame block ─────────────────────────────
 
 describe('serializeRoom — pregame block', () => {
