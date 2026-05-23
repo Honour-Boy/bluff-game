@@ -239,7 +239,11 @@ describe('applyPreGameSelection', () => {
 // ─── finalizePreGame ─────────────────────────────────────────
 
 describe('finalizePreGame', () => {
-  it('auto-assigns non-responders, appends bonus cards, and starts play', () => {
+  // Convenience: find a power option and the single shape option in a pool.
+  const powerOpt = (pool) => pool.find(c => c.type === 'power');
+  const shapeOpt = (pool) => pool.find(c => c.type === 'shape');
+
+  it('auto-assigns non-responders, transitions to playing, and clears bookkeeping', () => {
     const room = makeRoomInPreGameSelection(3);
     // Only p0 picks; p1 and p2 will be auto-assigned.
     applyPreGameSelection(room, 'p0', room.pregamePools.p0[0].id);
@@ -247,12 +251,7 @@ describe('finalizePreGame', () => {
     const result = finalizePreGame(room);
     expect(result.ok).toBe(true);
     expect(result.autoAssigned.sort()).toEqual(['p1', 'p2']);
-
     expect(room.phase).toBe('playing');
-    // Each alive player's hand grew from the dealt 6 to 6 + 1 bonus.
-    for (const p of room.players) {
-      expect(room.hands.get(p.id)).toHaveLength(7);
-    }
 
     // Pre-game bookkeeping cleared.
     expect(room.pregamePools).toBeUndefined();
@@ -262,13 +261,70 @@ describe('finalizePreGame', () => {
     expect(room.pregameSelectionDeadline).toBeUndefined();
   });
 
-  it('adds exactly the chosen bonus card to the hand', () => {
+  // #140 — a power pick becomes the player's power slot card (the deal-time
+  // grant is replaced) and is NOT also appended to the playable hand.
+  it('routes a power pick into the power slot, not the hand', () => {
     const room = makeRoomInPreGameSelection(2);
-    const chosen = room.pregamePools.p0[1];
+    const chosen = powerOpt(room.pregamePools.p0);
     applyPreGameSelection(room, 'p0', chosen.id);
-    applyPreGameSelection(room, 'p1', room.pregamePools.p1[0].id);
+    applyPreGameSelection(room, 'p1', powerOpt(room.pregamePools.p1).id);
     finalizePreGame(room);
+
+    const slot = room.powerCardSlot.p0;
+    expect(slot).toHaveLength(1);
+    expect(slot[0].power).toBe(chosen.power);
+    // No power card leaked into the shape-only hand, and no extra card.
+    expect(room.hands.get('p0').some(c => c.type === 'power')).toBe(false);
+    expect(room.hands.get('p0')).toHaveLength(6);
+  });
+
+  // #140 — the "Additional Card" (shape) pick is the replacement penalty for
+  // forgoing a power card: +1 shape in hand and an EMPTY power slot.
+  it('routes an Additional (shape) pick into the hand with no power card', () => {
+    const room = makeRoomInPreGameSelection(2);
+    const chosen = shapeOpt(room.pregamePools.p0);
+    applyPreGameSelection(room, 'p0', chosen.id);
+    applyPreGameSelection(room, 'p1', shapeOpt(room.pregamePools.p1).id);
+    finalizePreGame(room);
+
+    expect(room.powerCardSlot.p0).toHaveLength(0);
+    expect(room.hands.get('p0')).toHaveLength(7);
     expect(room.hands.get('p0').some(c => c.id === chosen.id)).toBe(true);
+  });
+
+  // #140 — no player ever ends pre-game holding two power cards (a power pick
+  // OR an additional card, never both), including auto-assigned non-responders.
+  it('never grants both a power card and an additional card (double-reward fix)', () => {
+    const room = makeRoomInPreGameSelection(4);
+    applyPreGameSelection(room, 'p0', powerOpt(room.pregamePools.p0).id);
+    applyPreGameSelection(room, 'p1', shapeOpt(room.pregamePools.p1).id);
+    // p2 and p3 auto-assigned.
+    finalizePreGame(room);
+
+    for (const p of room.players) {
+      const slot = room.powerCardSlot[p.id] || [];
+      const hand = room.hands.get(p.id);
+      expect(slot.length).toBeLessThanOrEqual(1);
+      if (slot.length === 1) {
+        expect(slot[0].type).toBe('power');
+        expect(hand).toHaveLength(6); // no extra shape card
+      } else {
+        expect(hand).toHaveLength(7); // got the additional card instead
+      }
+    }
+  });
+
+  // #140 — a player who never picked (auto-assigned) must not open the game.
+  it('seeds the first active turn to a player who selected on time', () => {
+    const room = makeRoomInPreGameSelection(3);
+    // Only the LAST player in turn order picks; the first two are auto-assigned.
+    const lastId = room.turnOrder[room.turnOrder.length - 1];
+    applyPreGameSelection(room, lastId, room.pregamePools[lastId][0].id);
+
+    const result = finalizePreGame(room);
+    expect(result.autoAssigned).not.toContain(lastId);
+    const opener = room.turnOrder[room.currentTurnIndex];
+    expect(opener).toBe(lastId);
   });
 
   it('is idempotent — a second finalise after playing is a no-op', () => {
