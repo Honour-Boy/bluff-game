@@ -247,9 +247,13 @@ function register(io, socket, deps) {
           await maybeRecordGroupWinner(io, room, leaderboardRepo);
         }
 
-        if (outcome.type === E.ASSASSIN_BACKFIRE) {
-          engine.advanceTurn(room);
-        }
+        // #141 — On an Assassin BACKFIRE (the accuser called CORRECTLY), turn
+        // priority STAYS with the caller so they can still play a card or
+        // activate a power card this turn. applyBluffOutcome already set
+        // phase='playing' + cardPlayedThisTurn=false; the old advanceTurn here
+        // wrongly auto-ended the correct caller's turn. The WRONG-call path
+        // (FORCED_ELIMINATION) passes the turn to the next clockwise player via
+        // eliminateFromTurnOrder inside finaliseAssassinElimination.
 
         if (room.phase === 'spin_pending') {
           _maybeOpenBetting(io, room);
