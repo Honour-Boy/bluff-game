@@ -101,6 +101,18 @@ function register(io, socket, deps) {
         mirrorMatchAutoDisabled = true;
       }
 
+      // Roulette Rotation needs 3+ players — with 2 the only repeat-free order
+      // is plain alternation, so the modifier would be a no-op. Auto-disable it.
+      let rouletteRotationAutoDisabled = false;
+      if (
+        room.mode === engine.MODES.ONLINE
+        && room.config?.roomModifiers?.rouletteRotation
+        && room.players.filter(p => p.status === 'alive').length < 3
+      ) {
+        room.config.roomModifiers.rouletteRotation = false;
+        rouletteRotationAutoDisabled = true;
+      }
+
       delete room.groupLeaderboardWinnerRecorded;
       engine.startGame(room);
 
@@ -145,13 +157,21 @@ function register(io, socket, deps) {
 
       await saveRoom(room);
       await broadcastRoomState(io, roomCode);
-      callback({ success: true, mirrorMatchAutoDisabled });
+      callback({ success: true, mirrorMatchAutoDisabled, rouletteRotationAutoDisabled });
 
       if (mirrorMatchAutoDisabled) {
         io.to(roomCode).emit('power_card_triggered', {
           kind: 'system_notice',
           title: 'Mirror Match disabled',
           subtitle: 'requires an even player count',
+        });
+      }
+
+      if (rouletteRotationAutoDisabled) {
+        io.to(roomCode).emit('power_card_triggered', {
+          kind: 'system_notice',
+          title: 'Roulette Rotation disabled',
+          subtitle: 'requires at least 3 players',
         });
       }
 

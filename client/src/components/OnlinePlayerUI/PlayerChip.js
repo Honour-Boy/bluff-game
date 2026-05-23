@@ -28,6 +28,7 @@ function MiniRiskDots({ riskLevel = 1 }) {
 export function PlayerChip({
   player,
   isCurrentTurn,
+  isNextTurn = false,
   isSpinTarget,
   voice,
   onClick,
@@ -163,10 +164,16 @@ export function PlayerChip({
             ? 'var(--warning)'
             : isSpinTarget
               ? 'var(--accent2)'
-              : 'transparent',
+              : isNextTurn && alive
+                ? 'var(--accent)'
+                : 'transparent',
         }}
       >
-        {isCurrentTurn && alive ? 'TURN' : isSpinTarget ? 'SPIN' : '.'}
+        {isCurrentTurn && alive
+          ? 'TURN'
+          : isSpinTarget
+            ? 'SPIN'
+            : (isNextTurn && alive ? 'NEXT' : '.')}
       </div>
     </button>
   );

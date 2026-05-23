@@ -6,6 +6,7 @@ export function BottomSeat({
   myPlayer,
   isEliminated,
   isMyTurn,
+  isMyNextTurn = false,
   isPlaying,
   isLobby,
   isGameOver,
@@ -80,6 +81,11 @@ export function BottomSeat({
           {isMyTurn && isPlaying && !isEliminated && (
             <span style={{ fontSize: 10, color: 'var(--warning)', border: '1px solid var(--warning)', padding: '1px 5px', borderRadius: 2 }}>
               YOUR TURN
+            </span>
+          )}
+          {!isMyTurn && isMyNextTurn && isPlaying && !isEliminated && (
+            <span style={{ fontSize: 10, color: 'var(--accent)', border: '1px solid var(--accent)', padding: '1px 5px', borderRadius: 2 }}>
+              UP NEXT
             </span>
           )}
         </div>

@@ -33,9 +33,10 @@ const RISK_MODS = [
   { key: 'redemptionSpin',  label: 'Redemption Spin' },
 ];
 const ROOM_MODS = [
-  { key: 'speedMode',   label: 'Speed Mode' },
-  { key: 'suddenDeath', label: 'Sudden Death' },
-  { key: 'mirrorMatch', label: 'Mirror Match' },
+  { key: 'speedMode',        label: 'Speed Mode' },
+  { key: 'suddenDeath',      label: 'Sudden Death' },
+  { key: 'mirrorMatch',      label: 'Mirror Match' },
+  { key: 'rouletteRotation', label: 'Roulette Rotation' },
 ];
 const SYSTEMS = [
   { key: 'bounty',       label: 'Bounty' },

@@ -88,6 +88,13 @@ function serializeRoom(room, requestingPlayerId = null, opts = {}) {
     turnOrder: room.turnOrder,
     currentTurnIndex: room.currentTurnIndex,
     currentPlayerId: room.turnOrder[room.currentTurnIndex] || null,
+    // The immediately-next player within the current cycle. Under Roulette
+    // Rotation the rest of the cycle stays concealed (the next cycle isn't
+    // generated yet), so this is null on the final turn of a cycle — the next
+    // player is a genuine surprise. The client reveals only this much.
+    nextPlayerId: Array.isArray(room.turnOrder)
+      ? (room.turnOrder[room.currentTurnIndex + 1] || null)
+      : null,
     currentCardType: room.currentCardType,
     currentCard: room.currentCard || null,
     phase: room.phase,
