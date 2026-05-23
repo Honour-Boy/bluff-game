@@ -88,6 +88,7 @@ module.exports = {
   getCurrentPlayer: players.getCurrentPlayer,
   advanceTurn: players.advanceTurn,
   eliminateFromTurnOrder: players.eliminateFromTurnOrder,
+  eliminatePlayer: players.eliminatePlayer,
   handleDisconnect: players.handleDisconnect,
   checkGameOver: players.checkGameOver,
   declareRoundWinner: players.declareRoundWinner,
