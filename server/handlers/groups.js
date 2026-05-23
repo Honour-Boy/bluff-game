@@ -2,9 +2,10 @@
 // HANDLERS — Persistent groups (FR1-P1)
 // ============================================================
 
+const engine = require('../gameEngine');
 const { rooms, saveRoom } = require('../lib/state');
 const { broadcastRoomState } = require('../lib/broadcast');
-const { getGroupAuthError } = require('../lib/roomBuilders');
+const { getGroupAuthError, maybeRecordGroupWinner } = require('../lib/roomBuilders');
 const { socketRateLimit } = require('../lib/rateLimiter');
 
 function register(io, socket, deps) {
@@ -100,6 +101,60 @@ function register(io, socket, deps) {
       room.hostUserId = newHostUserId;
       const nextHostPlayer = room.players.find((player) => player.id === newHostUserId);
       room.hostSocketId = nextHostPlayer?.socketId || null;
+      await saveRoom(room);
+      await broadcastRoomState(io, room.code);
+    }
+  }
+
+  // #156 — When a member is removed from a group, evict them from any live
+  // room for that group immediately rather than leaving them seated until a
+  // manual refresh. Mirrors syncLiveRoomHosts (iterate rooms by groupId,
+  // mutate, saveRoom + broadcastRoomState) and the 30s disconnect
+  // auto-eliminate behaviour: lobby → free the seat; mid-game → eliminate +
+  // resolve any game-over the empty seat triggers. The removed player is
+  // socket-pushed `removed_from_group` so their client toasts and exits to
+  // the landing screen.
+  async function bootRemovedMemberFromRooms(groupId, userId) {
+    for (const room of rooms.values()) {
+      if (room.groupId !== groupId) continue;
+      const player = room.players.find((p) => p.id === userId);
+      if (!player) continue;
+
+      // Push the removed player's own client out of the room.
+      if (player.socketId) {
+        io.to(player.socketId).emit('removed_from_group', {
+          groupId,
+          reason: 'You were removed from the group.',
+        });
+      }
+
+      // Defensive: removeMember already blocks evicting the acting host, but
+      // if the removed player is somehow this room's host there's no valid
+      // host left to run it — end the room for everyone.
+      if (room.hostUserId === userId) {
+        io.to(room.code).emit('game_ended', { reason: 'The host left the game.' });
+        rooms.delete(room.code);
+        continue;
+      }
+
+      if (room.phase === 'lobby') {
+        const idx = room.players.findIndex((p) => p.id === userId);
+        if (idx !== -1) room.players.splice(idx, 1);
+      } else if (player.status === 'alive') {
+        engine.eliminatePlayer(room, userId);
+        room.lastAction = {
+          type: 'removed_from_group',
+          playerId: userId,
+          playerName: player.username,
+        };
+        const winner = engine.checkGameOver(room);
+        if (winner) {
+          room.phase = 'game_over';
+          room.lastAction = { type: 'game_over', winnerId: winner.id, winnerName: winner.username };
+          await maybeRecordGroupWinner(io, room, leaderboardRepo);
+        }
+      }
+
       await saveRoom(room);
       await broadcastRoomState(io, room.code);
     }
@@ -217,6 +272,7 @@ function register(io, socket, deps) {
         hostUserId: socket.userId,
         userId,
       });
+      await bootRemovedMemberFromRooms(groupId, userId);
       callback?.({ success: true });
     } catch (err) {
       callback?.({ success: false, error: err.message });

@@ -94,13 +94,22 @@ function eliminateFromTurnOrder(room, playerId) {
   if (room) room.suddenDeathCounter = 0;
 }
 
-function handleDisconnect(room, socketId) {
-  const player = room.players.find(p => p.socketId === socketId);
+// Eliminate a player by id (set status, drop them into spectator, and pull
+// them out of the turn order). Shared by the disconnect timeout and the
+// group-removal eviction (#156) so both paths behave identically.
+function eliminatePlayer(room, playerId) {
+  const player = room.players.find(p => p.id === playerId);
   if (!player || player.status === 'eliminated') return null;
   player.status = 'eliminated';
   player.isSpectator = true;
   eliminateFromTurnOrder(room, player.id);
   return player;
+}
+
+function handleDisconnect(room, socketId) {
+  const player = room.players.find(p => p.socketId === socketId);
+  if (!player) return null;
+  return eliminatePlayer(room, player.id);
 }
 
 function checkGameOver(room) {
@@ -129,6 +138,7 @@ module.exports = {
   getCurrentPlayer,
   advanceTurn,
   eliminateFromTurnOrder,
+  eliminatePlayer,
   handleDisconnect,
   checkGameOver,
   declareRoundWinner,

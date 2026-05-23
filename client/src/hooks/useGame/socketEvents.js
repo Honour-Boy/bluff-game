@@ -107,6 +107,13 @@ export function useGameSocketEvents({
       clearSession();
       notify(reason || 'The game has ended.', 'error');
     };
+    // #156 — host removed us from the group; drop out of any live room and
+    // return to the landing screen, mirroring how game_ended is handled.
+    const onRemovedFromGroup = ({ reason } = {}) => {
+      sessionStorage.removeItem('bluff_session');
+      clearSession();
+      notify(reason || 'You were removed from the group.', 'error');
+    };
     const onLobbyIdleWarning = ({ secondsUntilAction, willAutoStart } = {}) => {
       const secs = secondsUntilAction ?? 60;
       notify(
@@ -131,6 +138,7 @@ export function useGameSocketEvents({
     socket.on('spin_acknowledged', onSpinAcknowledged);
     socket.on('host_disconnecting', onHostDisconnecting);
     socket.on('game_ended', onGameEnded);
+    socket.on('removed_from_group', onRemovedFromGroup);
     socket.on('power_card_triggered', onPowerCardTriggered);
     socket.on('group_leaderboard_updated', onGroupLeaderboardUpdated);
     socket.on('lobby_idle_warning', onLobbyIdleWarning);
@@ -146,6 +154,7 @@ export function useGameSocketEvents({
       socket.off('spin_acknowledged', onSpinAcknowledged);
       socket.off('host_disconnecting', onHostDisconnecting);
       socket.off('game_ended', onGameEnded);
+      socket.off('removed_from_group', onRemovedFromGroup);
       socket.off('power_card_triggered', onPowerCardTriggered);
       socket.off('group_leaderboard_updated', onGroupLeaderboardUpdated);
       socket.off('lobby_idle_warning', onLobbyIdleWarning);
