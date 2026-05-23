@@ -35,6 +35,7 @@ import {
   ROLES_AT_MIN_ALIVE,
   COLLECTOR_POWER_CARD_CAP,
   MEDIC_MAX_SAVES,
+  MEDIC_SAVE_HAND_CAP,
   MODES,
 } from '../gameEngine.js';
 import { resolveBluff } from '../bluffPipeline.js';
@@ -429,12 +430,27 @@ describe('Medic — save flow', () => {
     expect(p1.chamber.filter(s => s === 'bullet').length).toBe(before);
   });
 
-  it('blocked at 6+ card hand — findAvailableMedic returns null', () => {
-    const { room, p0 } = setupMedicRoom();
-    // Pad Medic to 6 cards.
+  it('blocked at the save-hand cap — findAvailableMedic returns null', () => {
+    const { room } = setupMedicRoom();
+    // Pad Medic up to the cap.
     const hand = room.hands.get('p0');
-    while (hand.length < 6) hand.push({ id: `pad-${hand.length}`, type: 'shape', shape: 'circle', number: 1 });
+    while (hand.length < MEDIC_SAVE_HAND_CAP) {
+      hand.push({ id: `pad-${hand.length}`, type: 'shape', shape: 'circle', number: 1 });
+    }
     expect(findAvailableMedic(room)).toBeNull();
+  });
+
+  // #142 — regression guard: post-#139 every starting hand is 6 shape cards.
+  // The save-hand cap must leave room for a save from that fresh hand, or the
+  // Medic could never trigger a save at game start.
+  it('can save from a fresh 6-card starting hand (#142 / #139 interaction)', () => {
+    const { room } = setupMedicRoom();
+    const hand = room.hands.get('p0');
+    while (hand.length < 6) {
+      hand.push({ id: `pad-${hand.length}`, type: 'shape', shape: 'circle', number: 1 });
+    }
+    expect(hand.length).toBe(6);
+    expect(findAvailableMedic(room)).not.toBeNull();
   });
 
   it('allows up to MEDIC_MAX_SAVES, then rejects the next with a save-limit error (#120)', () => {

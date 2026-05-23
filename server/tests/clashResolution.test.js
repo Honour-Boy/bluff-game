@@ -33,6 +33,7 @@ import {
   // role helpers
   applySniperRedirect,
   applyMedicSave,
+  MEDIC_SAVE_HAND_CAP,
   // modifier helpers
   tickSuddenDeath,
   SUDDEN_DEATH_THRESHOLD,
@@ -300,16 +301,16 @@ describe('clash 4 — Medic > Assassin', () => {
     expect(p1.chamber.filter(s => s === 'bullet').length).toBeLessThanOrEqual(1);
   });
 
-  it('Medic blocked at 6+ cards → no save available', () => {
+  it('Medic blocked at the save-hand cap → no save available', () => {
     const { room, p1 } = buildRoom({
       accusedArmed: { power: 'assassin', cardId: 'k-A' },
       lastPlayedShape: 'circle',
       currentCardType: 'circle',
       extraPlayers: [{ id: 'medic', name: 'Doc', role: ROLES.MEDIC }],
     });
-    // Medic at 6 cards — at the cap.
-    room.hands.set('medic', Array.from({ length: 6 }).map((_, i) => ({
-      id: `mh-${i}`, type: 'shape', shape: 'circle', number: i + 1,
+    // Medic at the save-hand cap (#142) — too full to take the +2 save cost.
+    room.hands.set('medic', Array.from({ length: MEDIC_SAVE_HAND_CAP }).map((_, i) => ({
+      id: `mh-${i}`, type: 'shape', shape: 'circle', number: (i % 14) + 1,
     })));
 
     p1.status = 'eliminated';

@@ -51,8 +51,9 @@ function register(io, socket, deps) {
 
       if (save) {
         // applyMedicSave enforces the rules a save can fail on — hand at
-        // the 6-card cap, or the Medic's MEDIC_MAX_SAVES budget spent
-        // (#120, error 'Save limit reached'). On any failure we finalise
+        // the save-hand cap (MEDIC_SAVE_HAND_CAP), or the Medic's
+        // MEDIC_MAX_SAVES budget spent (#120, error 'Save limit reached').
+        // On any failure we finalise
         // the elimination instead and surface the error to the caller.
         const res = engine.applyMedicSave(room, pending.eliminatedPlayerId, pending.source);
         if (!res.ok) {
