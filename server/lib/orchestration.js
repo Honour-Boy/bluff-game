@@ -14,6 +14,7 @@ const {
   saveRoom,
   _clearBettingTimer,
   _clearGhostVoteTimer,
+  _clearBluffInterceptTimer,
 } = require('./state');
 const { broadcastRoomState, emitPowerCardEvents } = require('./broadcast');
 
@@ -441,6 +442,21 @@ function resolveLeaverPendingPauses(io, code, room, playerId) {
       room.swapHolderId = null;
       room.phase = 'playing';
     }
+  }
+  // §1.1 — a leaver in an open interception window. If the accused OR the
+  // accuser is the one leaving, the pending bluff is moot: cancel the window
+  // cleanly so the (immediate) leave-elimination + turn advance proceed, and
+  // the 8s timer can't later resolve against a changed turn order. A third
+  // party leaving leaves the window untouched.
+  if (
+    room.phase === 'bluff_intercept_pending'
+    && room.pendingBluffIntercept
+    && (room.pendingBluffIntercept.accusedId === playerId
+      || room.pendingBluffIntercept.accuserId === playerId)
+  ) {
+    _clearBluffInterceptTimer(code);
+    room.pendingBluffIntercept = null;
+    room.phase = 'playing';
   }
 }
 

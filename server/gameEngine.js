@@ -33,6 +33,8 @@ module.exports = {
   CARD_TYPES: constants.CARD_TYPES,
   SHAPES: constants.SHAPES,
   POWER_TYPES: constants.POWER_TYPES,
+  INTERCEPTABLE_POWERS: constants.INTERCEPTABLE_POWERS,
+  BLUFF_INTERCEPT_WINDOW_MS: constants.BLUFF_INTERCEPT_WINDOW_MS,
   ROLES: constants.ROLES,
   ROLE_TYPES: constants.ROLE_TYPES,
   ROLES_AT_MIN_ALIVE: constants.ROLES_AT_MIN_ALIVE,
@@ -85,6 +87,9 @@ module.exports = {
   applyAssassinBackfirePenalty: powerCards.applyAssassinBackfirePenalty,
   consumeFreezeOnTurnEnd: powerCards.consumeFreezeOnTurnEnd,
   isSwapActivatable: powerCards.isSwapActivatable,
+  listInterceptCards: powerCards.listInterceptCards,
+  canInterceptBluff: powerCards.canInterceptBluff,
+  armInterceptCard: powerCards.armInterceptCard,
 
   // ─── Players / turn lifecycle ────────────────────────────
   createPlayer: players.createPlayer,

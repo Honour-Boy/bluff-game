@@ -54,6 +54,14 @@ const CARD_TYPES_DISCRIMINATOR = {
 };
 const POWER_TYPES = ['shield', 'mirror', 'swap', 'peek', 'freeze', 'assassin'];
 
+// §1.1 — Bluff interception window. When a bluff is called, an accused who
+// still holds an un-armed DEFENSIVE power card gets a short window to arm it in
+// response, BEFORE resolution runs. Only reactive/defensive powers qualify:
+// shield (blocks), mirror (reflects), swap (re-faces the played card). Assassin
+// is offensive and freeze/peek have no bluff-time effect, so they're excluded.
+const INTERCEPTABLE_POWERS = ['shield', 'mirror', 'swap'];
+const BLUFF_INTERCEPT_WINDOW_MS = 8000;
+
 // ─── v2 #119 — Unified Event Resolution Engine ───────────────
 //
 // `bluffPipeline.js` resolves every bluff by pushing a single typed
@@ -200,6 +208,8 @@ module.exports = {
   PRE_GAME_LATE_REVIEW_MS,
   CARD_TYPES_DISCRIMINATOR,
   POWER_TYPES,
+  INTERCEPTABLE_POWERS,
+  BLUFF_INTERCEPT_WINDOW_MS,
   RESOLUTION_TIERS,
   GAME_EVENT_TYPES,
   MODES,

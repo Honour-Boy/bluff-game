@@ -145,6 +145,12 @@ export function useGameActions({
     return emitPromiseAction(socket, 'sniper_redirect', { roomCode, newTargetId: newTargetId || null }, failError);
   }, [failError, roomCode, socket]);
 
+  // §1.1 — accused responds to a bluff during the interception window: arm a
+  // defensive card (cardId set) or pass (cardId null). Either closes the window.
+  const bluffIntercept = useCallback((cardId = null) => {
+    return emitPromiseAction(socket, 'bluff_intercept', { roomCode, cardId: cardId || null }, failError);
+  }, [failError, roomCode, socket]);
+
   const placeBet = useCallback((prediction) => {
     return emitPromiseAction(socket, 'place_bet', { roomCode, prediction }, failError);
   }, [failError, roomCode, socket]);
@@ -209,6 +215,7 @@ export function useGameActions({
     medicDecide,
     saboteurTransfer,
     sniperRedirect,
+    bluffIntercept,
     placeBet,
     ghostVote,
     lastStandSpin,

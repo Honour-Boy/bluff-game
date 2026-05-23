@@ -7,7 +7,13 @@
 
 const engine = require('../gameEngine');
 const bluffPipeline = require('../bluffPipeline');
-const { getRoom, saveRoom, _clearBettingTimer } = require('../lib/state');
+const {
+  getRoom,
+  saveRoom,
+  _clearBettingTimer,
+  bluffInterceptTimers,
+  _clearBluffInterceptTimer,
+} = require('../lib/state');
 const { broadcastRoomState, emitPowerCardEvents } = require('../lib/broadcast');
 const { maybeRecordGroupWinner } = require('../lib/roomBuilders');
 const {
@@ -22,6 +28,88 @@ const {
   _enterLastStand,
   _openGhostVote,
 } = require('../lib/orchestration');
+
+// ─── Shared online bluff resolution ──────────────────────────
+// The full post-`resolveBluff` flow (Sniper/Medic pauses, Assassin backfire,
+// outcome application, post-elim hooks, betting, broadcast). Shared by the
+// immediate `call_bluff` path and the §1.1 interception resume so both behave
+// identically. Performs its own save + emit + broadcast; the caller only acks.
+async function _resolveOnlineBluff(io, code, room, accuserId, leaderboardRepo) {
+  const { events, outcome } = bluffPipeline.resolveBluff(room, accuserId);
+  const E = engine.GAME_EVENT_TYPES;
+
+  // v2 Phase D — Sniper interception (only a spin can be sniped).
+  if (outcome.type === E.SPIN_CONSEQUENCE && maybeStartSniperPause(io, room, outcome)) {
+    await saveRoom(room);
+    emitPowerCardEvents(io, code, events);
+    await broadcastRoomState(io, code);
+    return;
+  }
+
+  // v2 Phase D — Medic interception (Assassin path).
+  if (outcome.type === E.FORCED_ELIMINATION) {
+    const medicStarted = maybeStartMedicPause(io, room, outcome.eliminatedPlayerId, 'assassin', () => {
+      finaliseAssassinElimination(room, outcome);
+      applyPostElimSystemHooks(io, room);
+    });
+    if (medicStarted) {
+      // #121 — hold the death announcement until the Medic resolves.
+      const deferred = events.filter(e => e?.kind === 'assassin_strike');
+      const immediate = events.filter(e => e?.kind !== 'assassin_strike');
+      if (room.pendingMedicSave) room.pendingMedicSave.deferredBanners = deferred;
+      await saveRoom(room);
+      emitPowerCardEvents(io, code, immediate);
+      await broadcastRoomState(io, code);
+      return;
+    }
+  }
+
+  // #63 — Assassin backfire penalty before applyBluffOutcome.
+  if (outcome.type === E.ASSASSIN_BACKFIRE && outcome.accusedId) {
+    engine.applyAssassinBackfirePenalty(room, outcome.accusedId, outcome.cardsToDrawForAccused || 3);
+  }
+
+  applyBluffOutcome(room, outcome);
+
+  if (outcome.type === E.FORCED_ELIMINATION) {
+    if (outcome.eliminatedPlayerId) _bountyOnElimination(room, outcome.eliminatedPlayerId);
+    applyPostElimSystemHooks(io, room);
+    await maybeRecordGroupWinner(io, room, leaderboardRepo);
+  }
+
+  if (room.phase === 'spin_pending') _maybeOpenBetting(io, room);
+
+  await saveRoom(room);
+  emitPowerCardEvents(io, code, events);
+  await broadcastRoomState(io, code);
+}
+
+// §1.1 — schedule the interception window's auto-resume. On expiry (no
+// interception arrived) the bluff resolves with whatever the accused had
+// armed beforehand (usually nothing). `ms` lets a rejected arm reschedule for
+// the time remaining instead of a fresh full window.
+function _scheduleBluffInterceptTimeout(io, code, leaderboardRepo, ms = engine.BLUFF_INTERCEPT_WINDOW_MS) {
+  _clearBluffInterceptTimer(code);
+  const handle = setTimeout(async () => {
+    bluffInterceptTimers.delete(code);
+    try {
+      const room = await getRoom(code);
+      if (!room || room.phase !== 'bluff_intercept_pending') return;
+      const accuserId = room.pendingBluffIntercept?.accuserId || null;
+      room.pendingBluffIntercept = null;
+      room.phase = 'playing';
+      if (!accuserId) {
+        await saveRoom(room);
+        await broadcastRoomState(io, code);
+        return;
+      }
+      await _resolveOnlineBluff(io, code, room, accuserId, leaderboardRepo);
+    } catch (err) {
+      console.error('[bluff_intercept timeout]', err);
+    }
+  }, ms);
+  bluffInterceptTimers.set(code, handle);
+}
 
 function register(io, socket, deps) {
   const { leaderboardRepo } = deps;
@@ -197,71 +285,49 @@ function register(io, socket, deps) {
       const callerPlayer = room.players.find(p => p.id === playerId);
 
       if (room.mode === engine.MODES.ONLINE) {
-        const { events, outcome } = bluffPipeline.resolveBluff(room, playerId);
-        const E = engine.GAME_EVENT_TYPES;
+        // §1.1 — interception window. If the accused (the previous player, who
+        // is OFF-turn) still holds an un-armed defensive power card, pause and
+        // let them arm it in response BEFORE the bluff resolves. The resolution
+        // queue reads the freshly-armed card when we resume — no pipeline
+        // change is needed. On arm/pass/timeout we run `_resolveOnlineBluff`.
+        const len = room.turnOrder.length;
+        const accusedId = len
+          ? room.turnOrder[(room.currentTurnIndex - 1 + len) % len]
+          : null;
 
-        // v2 Phase D — Sniper interception (only a spin can be sniped).
-        if (outcome.type === E.SPIN_CONSEQUENCE && maybeStartSniperPause(io, room, outcome)) {
+        if (accusedId && accusedId !== playerId && engine.canInterceptBluff(room, accusedId)) {
+          const accusedPlayer = room.players.find(p => p.id === accusedId);
+          room.phase = 'bluff_intercept_pending';
+          room.pendingBluffIntercept = {
+            accuserId: playerId,
+            accuserName: callerPlayer?.username || null,
+            accusedId,
+            accusedName: accusedPlayer?.username || null,
+            deadline: Date.now() + engine.BLUFF_INTERCEPT_WINDOW_MS,
+            options: engine.listInterceptCards(room, accusedId).map(c => ({ cardId: c.id, power: c.power })),
+          };
+          room.lastAction = {
+            type: 'bluff_intercept_window',
+            accuserId: playerId,
+            accuserName: callerPlayer?.username || null,
+            accusedId,
+            accusedName: accusedPlayer?.username || null,
+          };
+          _scheduleBluffInterceptTimeout(io, code, leaderboardRepo);
+
           await saveRoom(room);
-          emitPowerCardEvents(io, code, events);
-          await broadcastRoomState(io, code);
-          return callback({ success: true });
-        }
-
-        // v2 Phase D — Medic interception (Assassin path).
-        if (outcome.type === E.FORCED_ELIMINATION) {
-          const medicStarted = maybeStartMedicPause(io, room, outcome.eliminatedPlayerId, 'assassin', () => {
-            finaliseAssassinElimination(room, outcome);
-            applyPostElimSystemHooks(io, room);
+          io.to(code).emit('power_card_triggered', {
+            kind: 'bluff_intercept_window',
+            accuserId: playerId,
+            accuserName: callerPlayer?.username || null,
+            accusedId,
+            accusedName: accusedPlayer?.username || null,
           });
-          if (medicStarted) {
-            // #121 — hold the death announcement until the Medic resolves.
-            // The assassin_strike banner is deferred onto the pending-save
-            // state; medic_decide releases it on decline, drops it on save.
-            const deferred = events.filter(e => e?.kind === 'assassin_strike');
-            const immediate = events.filter(e => e?.kind !== 'assassin_strike');
-            if (room.pendingMedicSave) room.pendingMedicSave.deferredBanners = deferred;
-            await saveRoom(room);
-            emitPowerCardEvents(io, code, immediate);
-            await broadcastRoomState(io, code);
-            return callback({ success: true });
-          }
+          await broadcastRoomState(io, code);
+          return callback({ success: true, intercept: true });
         }
 
-        // #63 — Assassin backfire penalty before applyBluffOutcome.
-        if (outcome.type === E.ASSASSIN_BACKFIRE && outcome.accusedId) {
-          engine.applyAssassinBackfirePenalty(
-            room,
-            outcome.accusedId,
-            outcome.cardsToDrawForAccused || 3,
-          );
-        }
-
-        applyBluffOutcome(room, outcome);
-
-        if (outcome.type === E.FORCED_ELIMINATION) {
-          if (outcome.eliminatedPlayerId) {
-            _bountyOnElimination(room, outcome.eliminatedPlayerId);
-          }
-          applyPostElimSystemHooks(io, room);
-          await maybeRecordGroupWinner(io, room, leaderboardRepo);
-        }
-
-        // #141 — On an Assassin BACKFIRE (the accuser called CORRECTLY), turn
-        // priority STAYS with the caller so they can still play a card or
-        // activate a power card this turn. applyBluffOutcome already set
-        // phase='playing' + cardPlayedThisTurn=false; the old advanceTurn here
-        // wrongly auto-ended the correct caller's turn. The WRONG-call path
-        // (FORCED_ELIMINATION) passes the turn to the next clockwise player via
-        // eliminateFromTurnOrder inside finaliseAssassinElimination.
-
-        if (room.phase === 'spin_pending') {
-          _maybeOpenBetting(io, room);
-        }
-
-        await saveRoom(room);
-        emitPowerCardEvents(io, code, events);
-        await broadcastRoomState(io, code);
+        await _resolveOnlineBluff(io, code, room, playerId, leaderboardRepo);
         return callback({ success: true });
       }
 
@@ -278,6 +344,60 @@ function register(io, socket, deps) {
       callback({ success: true });
     } catch (err) {
       callback({ success: false, error: err.message });
+    }
+  });
+
+  // ─── ACCUSED: Respond to a bluff during the interception window (§1.1) ──
+  // The bluffed player either arms a defensive card (`cardId` present) or
+  // passes (`cardId` omitted). Either way the window closes and the bluff
+  // resolves immediately via the shared resolver — which now sees any card
+  // they just armed.
+  socket.on('bluff_intercept', async ({ roomCode, cardId } = {}, callback) => {
+    try {
+      if (!socket.userId) return callback?.({ success: false, error: 'Not authenticated' });
+      const code = roomCode?.toUpperCase();
+      const room = await getRoom(code);
+      if (!room) return callback?.({ success: false, error: 'Room not found' });
+      if (room.phase !== 'bluff_intercept_pending') {
+        return callback?.({ success: false, error: 'No interception pending' });
+      }
+      const pending = room.pendingBluffIntercept;
+      if (!pending || pending.accusedId !== socket.userId) {
+        return callback?.({ success: false, error: 'Not your interception' });
+      }
+
+      _clearBluffInterceptTimer(code);
+
+      let armedPower = null;
+      if (cardId) {
+        const res = engine.armInterceptCard(room, socket.userId, cardId);
+        if (!res.ok) {
+          // Malformed pick — keep the window open for whatever time is left.
+          const remaining = Math.max(0, (pending.deadline || 0) - Date.now());
+          _scheduleBluffInterceptTimeout(io, code, leaderboardRepo, remaining);
+          return callback?.({ success: false, error: res.error });
+        }
+        armedPower = res.power;
+      }
+
+      const accuserId = pending.accuserId;
+      room.pendingBluffIntercept = null;
+      room.phase = 'playing';
+
+      if (armedPower) {
+        io.to(code).emit('power_card_triggered', {
+          kind: 'bluff_intercept_armed',
+          holderId: socket.userId,
+          holderName: pending.accusedName || null,
+          power: armedPower,
+        });
+        console.log(`[Room ${code}] ${pending.accusedName || socket.userId} intercepted with ${armedPower}`);
+      }
+
+      await _resolveOnlineBluff(io, code, room, accuserId, leaderboardRepo);
+      return callback?.({ success: true, armed: armedPower });
+    } catch (err) {
+      callback?.({ success: false, error: err.message });
     }
   });
 
