@@ -27,6 +27,12 @@ const COLLECTOR_POWER_CARD_CAP = 3;
 // (tracked per-player as `medicSavesUsed`, enforced in roles.js +
 // handlers/roles.js). A 4th attempt is rejected server-side.
 const MEDIC_MAX_SAVES = 3;
+// #142 — a Medic save costs +2 cards, so it is refused once the Medic's hand
+// is already this large. Sized to the 6-shape-card starting hand (#139) plus
+// the 2-card save cost: a Medic CAN save from a fresh starting hand, but must
+// play cards down before stacking another save. (Previously hard-coded to 6,
+// which silently blocked every Medic the moment the deal grew to 6 shapes.)
+const MEDIC_SAVE_HAND_CAP = 8;
 
 // ─── v2 Phase G — Pre-game selection & role reveal (#116) ────
 // How long the private role-reveal card lingers before the server
@@ -180,6 +186,7 @@ module.exports = {
   ROLES_AT_MIN_ALIVE,
   COLLECTOR_POWER_CARD_CAP,
   MEDIC_MAX_SAVES,
+  MEDIC_SAVE_HAND_CAP,
   ROLE_REVEAL_DISPLAY_MS,
   PRE_GAME_SELECTION_TIMEOUT_MS,
   CARD_TYPES_DISCRIMINATOR,

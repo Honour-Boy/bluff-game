@@ -5,7 +5,7 @@
 // role appears at most once per game; Gambler may appear 1-2 times.
 // Remaining players are Barehand.
 
-const { ROLES, ROLES_AT_MIN_ALIVE, MODES, MEDIC_MAX_SAVES } = require('./constants');
+const { ROLES, ROLES_AT_MIN_ALIVE, MODES, MEDIC_MAX_SAVES, MEDIC_SAVE_HAND_CAP } = require('./constants');
 const { addBulletToChamber } = require('./chamber');
 const { drawCardForPlayer } = require('./cards');
 const { _countPowerCardsInHand, _powerCardCapForPlayer } = require('./handHelpers');
@@ -71,8 +71,9 @@ function isBarehandVisible(playerCount) {
 
 /**
  * Return the alive Medic player who can still use their save ability
- * AND has hand-room (< 6 cards), or null. The Medic may revive up to
- * MEDIC_MAX_SAVES times per game (#120).
+ * AND has hand-room (< MEDIC_SAVE_HAND_CAP cards), or null. The Medic may
+ * revive up to MEDIC_MAX_SAVES times per game (#120). The hand-room cap is
+ * sized so a Medic can always save from a fresh 6-shape starting hand (#142).
  */
 function findAvailableMedic(room) {
   const medic = room.players.find(p =>
@@ -83,7 +84,7 @@ function findAvailableMedic(room) {
   if (!medic) return null;
   if (room.mode === MODES.ONLINE) {
     const hand = room.hands?.get(medic.id) || [];
-    if (hand.length >= 6) return null;
+    if (hand.length >= MEDIC_SAVE_HAND_CAP) return null;
   }
   return medic;
 }
