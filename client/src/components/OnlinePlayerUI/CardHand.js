@@ -1,7 +1,7 @@
 import { ShapeIcon } from '../shared/ShapeIcon';
 import { POWER_META, POWER_ICONS } from '../shared/PowerCard';
 
-function renderOneCard({ card, index, isSelected, interactive, onCardClick }) {
+function renderOneCard({ card, index, isSelected, interactive, onCardClick, onPowerCardClick }) {
   const isPower = card.type === 'power';
   const isWhot = !isPower && card.shape === 'whot';
   const powerMeta = isPower ? POWER_META[card.power] : null;
@@ -10,6 +10,15 @@ function renderOneCard({ card, index, isSelected, interactive, onCardClick }) {
   const isArmed = card.armed === true;
   const cardInteractive = interactive && !isArmed;
   const armedLabel = 'Activated — awaiting trigger';
+
+  // #139 — power cards are activated through their own confirmation flow and
+  // must NEVER be routed through the normal play path (onCardClick). Shape
+  // cards keep the play flow; power cards open the activation modal.
+  const handleClick = () => {
+    if (!cardInteractive) return;
+    if (isPower) onPowerCardClick && onPowerCardClick(card.id);
+    else onCardClick && onCardClick(card.id);
+  };
 
   const borderColor = isPower
     ? powerColor
@@ -34,7 +43,7 @@ function renderOneCard({ card, index, isSelected, interactive, onCardClick }) {
   return (
     <div
       key={card.id}
-      onClick={() => cardInteractive && onCardClick && onCardClick(card.id)}
+      onClick={handleClick}
       title={isArmed ? armedLabel : powerTooltip}
       aria-label={isPower && powerMeta ? `Power card: ${powerMeta.label}` : undefined}
       data-armed={isArmed ? 'true' : undefined}
@@ -119,25 +128,41 @@ function renderOneCard({ card, index, isSelected, interactive, onCardClick }) {
       {isArmed && (
         <span
           aria-label={armedLabel}
+          title={armedLabel}
           role="img"
           style={{
             position: 'absolute',
-            top: 2,
-            right: 2,
-            fontSize: 12,
-            lineHeight: 1,
+            top: -6,
+            right: -6,
+            width: 20,
+            height: 20,
+            borderRadius: '50%',
+            background: 'var(--surface)',
+            border: `1.5px solid ${powerColor}`,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            boxShadow: `0 0 8px ${powerColor}99`,
             pointerEvents: 'none',
-            filter: 'drop-shadow(0 1px 2px rgba(0,0,0,0.7))',
           }}
         >
-          LOCK
+          <svg width={11} height={11} viewBox="0 0 24 24" aria-hidden>
+            <path
+              d="M7 10V7a5 5 0 0 1 10 0v3"
+              fill="none"
+              stroke={powerColor}
+              strokeWidth="2"
+              strokeLinecap="round"
+            />
+            <rect x="5" y="10" width="14" height="9" rx="2" fill={powerColor} />
+          </svg>
         </span>
       )}
     </div>
   );
 }
 
-export function CardHand({ hand, powerCardSlot = [], selectedCardId, onCardClick, interactive = true }) {
+export function CardHand({ hand, powerCardSlot = [], selectedCardId, onCardClick, onPowerCardClick, interactive = true }) {
   const shapeCards = hand.filter(c => c?.type !== 'power');
 
   if (shapeCards.length === 0 && powerCardSlot.length === 0) {
@@ -165,7 +190,7 @@ export function CardHand({ hand, powerCardSlot = [], selectedCardId, onCardClick
             }}
           >
             {shapeCards.map((card, index) =>
-              renderOneCard({ card, index, isSelected: selectedCardId === card.id, interactive, onCardClick })
+              renderOneCard({ card, index, isSelected: selectedCardId === card.id, interactive, onCardClick, onPowerCardClick })
             )}
           </div>
         </div>
@@ -175,7 +200,7 @@ export function CardHand({ hand, powerCardSlot = [], selectedCardId, onCardClick
         <div style={{ flexShrink: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4, paddingBottom: 4 }}>
           <div style={{ fontSize: 9, color: 'var(--text-dim)', letterSpacing: '0.12em' }}>POWER</div>
           {powerCardSlot.map((card, index) =>
-            renderOneCard({ card, index, isSelected: selectedCardId === card.id, interactive, onCardClick })
+            renderOneCard({ card, index, isSelected: selectedCardId === card.id, interactive, onCardClick, onPowerCardClick })
           )}
         </div>
       )}

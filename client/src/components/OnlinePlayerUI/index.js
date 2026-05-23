@@ -145,7 +145,8 @@ export function OnlinePlayerUI({
     }
   }
 
-  const showPowerPrompt = (
+  // #139 — eligibility to show the activation modal at all (turn/state gating).
+  const powerModalEligible = (
     isMyTurn
     && !isEliminated
     && !showSpectatorView
@@ -154,10 +155,13 @@ export function OnlinePlayerUI({
     && !bluffUsedThisTurn
     && !!heldPowerCard
     && !armedPowerCard
-    && ui.powerPromptDismissedFor !== ui.powerPromptTurnKey
     && !ui.spinData
     && !ui.justEliminated
   );
+  // Auto turn-start prompt (suppressed once dismissed for this turn).
+  const showPowerPrompt = powerModalEligible && ui.powerPromptDismissedFor !== ui.powerPromptTurnKey;
+  // The modal also opens on demand when the player taps their power card.
+  const showPowerModal = powerModalEligible && (showPowerPrompt || ui.powerConfirmOpen);
 
   const isSwapPending = roomState?.phase === 'swap_pending';
   const amSwapHolder = isSwapPending && roomState?.swapHolderId === myPlayer?.id;
@@ -283,6 +287,7 @@ export function OnlinePlayerUI({
         myPowerCardSlot={myPowerCardSlot}
         selectedCardId={ui.selectedCardId}
         handleCardClick={ui.handleCardClick}
+        handlePowerCardClick={ui.handlePowerCardClick}
         phase={phase}
         leaveGame={leaveGame}
       />
@@ -317,7 +322,7 @@ export function OnlinePlayerUI({
         setShowHowToPlay={ui.setShowHowToPlay}
         showTurnModal={ui.showTurnModal}
         isEliminated={isEliminated}
-        showPowerPrompt={showPowerPrompt}
+        showPowerPrompt={showPowerModal}
         amSwapHolder={amSwapHolder}
         peekedCard={ui.peekedCard}
         isFirstTurn={isFirstTurn}
@@ -329,7 +334,7 @@ export function OnlinePlayerUI({
       />
 
       <PowerFlowOverlays
-        showPowerPrompt={showPowerPrompt}
+        showPowerPrompt={showPowerModal}
         heldPowerCard={heldPowerCard}
         handleActivatePower={ui.handleActivatePower}
         activating={ui.activating}
