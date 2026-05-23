@@ -28,6 +28,7 @@ export function useOnlinePlayerUiController({
   const [pendingCard, setPendingCard] = useState(null);
   const [whotPickerCard, setWhotPickerCard] = useState(null);
   const [showTurnModal, setShowTurnModal] = useState(false);
+  const turnNoticeShownRef = useRef(false);
   const tableCenterRef = useRef(null);
   const [spectatingId, setSpectatingId] = useState(null);
   const [spectatedHand, setSpectatedHand] = useState([]);
@@ -144,13 +145,22 @@ export function useOnlinePlayerUiController({
     }
   }, [spinDismissed, spinComplete, spinData]);
 
+  // Turn-start notice: a once-per-turn "it's your turn" acknowledgement, NOT a
+  // re-derived prompt. It pops on the rising edge of (my turn + playing + alive)
+  // and is dismissed with OK. It must NOT re-appear after the player acts mid-
+  // turn (play / bluff / power) or after a same-turn bluff→spin (which keeps the
+  // turn with us). The latch re-arms only once the turn actually leaves us.
   useEffect(() => {
-    if (isMyTurn && isPlaying && !roomState?.cardPlayedThisTurn && myPlayer?.status === 'alive') {
-      setShowTurnModal(true);
-    } else {
+    if (!isMyTurn) {
+      turnNoticeShownRef.current = false;
       setShowTurnModal(false);
+      return;
     }
-  }, [isMyTurn, isPlaying, roomState?.cardPlayedThisTurn, myPlayer?.status]);
+    if (isPlaying && myPlayer?.status === 'alive' && !turnNoticeShownRef.current) {
+      turnNoticeShownRef.current = true;
+      setShowTurnModal(true);
+    }
+  }, [isMyTurn, isPlaying, myPlayer?.status]);
 
   useEffect(() => {
     if (!peekedCard) return undefined;
@@ -192,16 +202,15 @@ export function useOnlinePlayerUiController({
   }, [spectatePlayer]);
 
   // #139 — open the activation confirmation modal by tapping the held power
-  // card. Playtest §1.1 — a power card may be armed at any point in the
-  // holder's own turn, INCLUDING after a normal card has been played (arming a
-  // defensive Shield/Mirror post-play is the intended set-up). We still block
-  // once a bluff has been called this turn or once the player is armed.
+  // card. The three turn actions (play / call bluff / activate power) are fully
+  // order-independent: a power card may be armed at any point in the holder's
+  // own turn — before OR after a card is played, and before OR after a bluff is
+  // called. The only block is being already armed (one activation per turn).
   const handlePowerCardClick = useCallback(() => {
     if (!isMyTurn || !isPlaying) return;
-    if (roomState?.bluffUsedThisTurn) return;
     if (myPlayer?.armedPowerCard) return;
     setPowerConfirmOpen(true);
-  }, [isMyTurn, isPlaying, roomState?.bluffUsedThisTurn, myPlayer?.armedPowerCard]);
+  }, [isMyTurn, isPlaying, myPlayer?.armedPowerCard]);
 
   const handleActivatePower = useCallback(async () => {
     if (!activatePowerCard || activating) return;

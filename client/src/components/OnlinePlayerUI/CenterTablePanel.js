@@ -1,7 +1,7 @@
 import { CardShape } from '../shared/CardShape';
 import { ShapeIcon } from '../shared/ShapeIcon';
 import { ActionLog } from '../ActionLog';
-import { WaitingForPlayerBanner } from '../TurnActionModal';
+import { WaitingForPlayerBanner } from '../TurnStartNotice';
 import { LeaderboardPanel } from '../LeaderboardPanel';
 import { PreGameSettingsPanel } from '../screens/PreGameSettingsPanel';
 import { LobbyConfigSummary } from '../LobbyConfigSummary';

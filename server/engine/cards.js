@@ -26,6 +26,11 @@ function newCardType(room) {
 function validateAndPlayCard(room, playerId, cardId) {
   if (room.mode !== MODES.ONLINE) return { ok: false, error: 'Not in online mode' };
 
+  // One shape card per turn. The turn-action UI lets a player play / call
+  // bluff / activate a power card in any order, so the only authoritative
+  // guard against a double-play lives here, not in the (now order-free) UI.
+  if (room.cardPlayedThisTurn) return { ok: false, error: 'You already played a card this turn' };
+
   const hand = room.hands.get(playerId);
   if (!hand) return { ok: false, error: 'Player has no hand' };
 

@@ -147,12 +147,6 @@ export function OnlinePlayerUI({
   }, [myPlayer.id, players, turnOrder]);
   const distributed = useMemo(() => distributePlayers(otherPlayers), [otherPlayers]);
 
-  const myTurnIdx = turnOrder?.indexOf(myPlayer.id) ?? -1;
-  const prevPlayerId = myTurnIdx >= 0 && turnOrder?.length > 1
-    ? turnOrder[(myTurnIdx - 1 + turnOrder.length) % turnOrder.length]
-    : null;
-  const prevPlayer = prevPlayerId ? players?.find((player) => player.id === prevPlayerId) : null;
-
   let actionHint = '';
   if (isMyTurn && isPlaying) {
     if (!bluffUsedThisTurn && !cardPlayedThisTurn) {
@@ -171,14 +165,15 @@ export function OnlinePlayerUI({
   }
 
   // #139 — eligibility to show the activation modal at all (turn/state gating).
-  // Playtest §1.1 — `cardPlayedThisTurn` is intentionally NOT a gate here:
-  // arming a power card after a normal card has been played is allowed.
+  // The three turn actions are order-independent: neither `cardPlayedThisTurn`
+  // nor `bluffUsedThisTurn` gates power activation — it's allowed before or
+  // after a card is played and before or after a bluff is called. The only
+  // block is already being armed (one activation per turn).
   const powerModalEligible = (
     isMyTurn
     && !isEliminated
     && !showSpectatorView
     && isPlaying
-    && !bluffUsedThisTurn
     && !!heldPowerCard
     && !armedPowerCard
     && !ui.spinData
@@ -355,11 +350,7 @@ export function OnlinePlayerUI({
         amSwapHolder={amSwapHolder}
         peekedCard={ui.peekedCard}
         isFirstTurn={isFirstTurn}
-        bluffUsedThisTurn={bluffUsedThisTurn}
-        cardPlayedThisTurn={cardPlayedThisTurn}
         bluffBlockedThisTurn={bluffBlockedThisTurn}
-        prevPlayerName={prevPlayer?.username || null}
-        callBluff={callBluff}
         setShowTurnModal={ui.setShowTurnModal}
       />
 

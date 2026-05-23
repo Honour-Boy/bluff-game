@@ -1,7 +1,7 @@
 import { lazy, Suspense } from 'react';
 import { CardShape } from '../shared/CardShape';
 import { ShapeIcon } from '../shared/ShapeIcon';
-import { TurnActionModal } from '../TurnActionModal';
+import { TurnStartNotice } from '../TurnStartNotice';
 import { SpinOverlay } from './SpinOverlay';
 
 const HowToPlayModal = lazy(() =>
@@ -31,11 +31,7 @@ export function CoreGameOverlays({
   amSwapHolder,
   peekedCard,
   isFirstTurn,
-  bluffUsedThisTurn,
-  cardPlayedThisTurn,
   bluffBlockedThisTurn,
-  prevPlayerName,
-  callBluff,
   setShowTurnModal,
 }) {
   return (
@@ -231,18 +227,11 @@ export function CoreGameOverlays({
         </Suspense>
       )}
 
-      <TurnActionModal
+      <TurnStartNotice
         visible={showTurnModal && !isEliminated && !showPowerPrompt && !amSwapHolder && !peekedCard}
         isFirstTurn={isFirstTurn}
-        bluffUsed={bluffUsedThisTurn}
-        cardPlayed={cardPlayedThisTurn}
         bluffBlocked={bluffBlockedThisTurn}
-        prevPlayerName={prevPlayerName}
-        onCallBluff={() => {
-          callBluff();
-          setShowTurnModal(false);
-        }}
-        onClose={() => setShowTurnModal(false)}
+        onAcknowledge={() => setShowTurnModal(false)}
       />
     </>
   );
