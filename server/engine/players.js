@@ -73,7 +73,36 @@ function advanceTurn(room) {
     room.bluffBlockedThisTurn = true;
   }
 
+  _resetStaleArmedPowerCard(room);
   return room;
+}
+
+// #163 — reset a stale armed power card at the START of the holder's turn.
+// A holder can only be bluffed by the player immediately after them
+// (`call_bluff` always targets the previous player), so an armed Shield /
+// Mirror / Assassin that survived unconsumed all the way back to the holder's
+// next turn can no longer fire for the play it was armed for. Clearing the
+// armed flag here means a stale card never fires on an unintended later play,
+// and the holder must explicitly re-confirm (re-arm) for their new turn. The
+// card itself stays in the slot, ready to re-arm.
+//
+// Excluded:
+//   • Freeze — consumed at end_turn via consumeFreezeOnTurnEnd, never survives.
+//   • Swap   — armed early but only becomes activatable after a full turn
+//              cycle (swapPendingPlayerIds), so it MUST persist across turns.
+function _resetStaleArmedPowerCard(room) {
+  const playerId = room.turnOrder[room.currentTurnIndex] || null;
+  if (!playerId) return;
+  const player = room.players.find(p => p.id === playerId);
+  const armed = player?.armedPowerCard;
+  if (!armed || armed.power === 'freeze' || armed.power === 'swap') return;
+
+  const slot = room.powerCardSlot?.[playerId];
+  if (Array.isArray(slot)) {
+    const card = slot.find(c => c?.id === armed.cardId);
+    if (card) card.armed = false;
+  }
+  player.armedPowerCard = null;
 }
 
 function eliminateFromTurnOrder(room, playerId) {
