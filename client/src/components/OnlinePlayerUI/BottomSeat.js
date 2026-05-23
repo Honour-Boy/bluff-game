@@ -25,6 +25,7 @@ export function BottomSeat({
   myPowerCardSlot = [],
   selectedCardId,
   handleCardClick,
+  handlePowerCardClick,
   phase,
   leaveGame,
 }) {
@@ -206,6 +207,7 @@ export function BottomSeat({
               powerCardSlot={myPowerCardSlot}
               selectedCardId={isMyTurn && isPlaying && !cardPlayedThisTurn ? selectedCardId : null}
               onCardClick={handleCardClick}
+              onPowerCardClick={handlePowerCardClick}
               interactive={isMyTurn && isPlaying && !cardPlayedThisTurn}
             />
           </div>

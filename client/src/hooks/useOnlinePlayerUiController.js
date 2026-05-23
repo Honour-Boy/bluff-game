@@ -42,6 +42,10 @@ export function useOnlinePlayerUiController({
   const [powerPromptTurnKey, setPowerPromptTurnKey] = useState(null);
   const [powerPromptDismissedFor, setPowerPromptDismissedFor] = useState(null);
   const [peekedCard, setPeekedCard] = useState(null);
+  // #139 — manual (click-to-open) power-card activation confirmation. The
+  // turn-start auto-prompt still fires; this lets the player re-open the same
+  // styled modal by tapping their held power card after dismissing it.
+  const [powerConfirmOpen, setPowerConfirmOpen] = useState(false);
   const [activating, setActivating] = useState(false);
   const [swapping, setSwapping] = useState(false);
   const [roleRevealSeen, setRoleRevealSeen] = useState(false);
@@ -195,12 +199,23 @@ export function useOnlinePlayerUiController({
     });
   }, [spectatePlayer]);
 
+  // #139 — open the activation confirmation modal by tapping the held power
+  // card. Gated so a power card can never be activated off-turn or after a
+  // card/bluff has been committed this turn.
+  const handlePowerCardClick = useCallback(() => {
+    if (!isMyTurn || !isPlaying) return;
+    if (roomState?.cardPlayedThisTurn || roomState?.bluffUsedThisTurn) return;
+    if (myPlayer?.armedPowerCard) return;
+    setPowerConfirmOpen(true);
+  }, [isMyTurn, isPlaying, roomState?.cardPlayedThisTurn, roomState?.bluffUsedThisTurn, myPlayer?.armedPowerCard]);
+
   const handleActivatePower = useCallback(async () => {
     if (!activatePowerCard || activating) return;
     setActivating(true);
     try {
       const response = await activatePowerCard();
       setPowerPromptDismissedFor(powerPromptTurnKey);
+      setPowerConfirmOpen(false);
       if (response?.success && response?.power === 'peek') {
         setPeekedCard(response.peekedCard || { _empty: true });
       }
@@ -211,6 +226,7 @@ export function useOnlinePlayerUiController({
 
   const handleSkipPower = useCallback(() => {
     setPowerPromptDismissedFor(powerPromptTurnKey);
+    setPowerConfirmOpen(false);
   }, [powerPromptTurnKey]);
 
   const handleSwapPick = useCallback(async (cardId) => {
@@ -281,6 +297,7 @@ export function useOnlinePlayerUiController({
     powerPromptTurnKey,
     powerPromptDismissedFor,
     peekedCard,
+    powerConfirmOpen,
     activating,
     swapping,
     roleRevealSeen,
@@ -299,6 +316,7 @@ export function useOnlinePlayerUiController({
     speechEnabled,
     toggleSpeech,
     handleCardClick,
+    handlePowerCardClick,
     handleSpectatePlayer,
     handleActivatePower,
     handleSkipPower,
