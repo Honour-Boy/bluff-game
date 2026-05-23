@@ -20,7 +20,13 @@ import { ShapeIcon } from "./shared/ShapeIcon";
 //   totalCount  : number  — alive players
 //   selectedId  : string  — server-confirmed pick id (null until confirmed)
 //   busy        : bool    — a pick request is in flight
-//   onSelect    : (optionId) => void
+//   reviewUntil : number  — ms-epoch end of a private late-pick review buffer
+//                           (§2.1); when set the modal stays on the reveal
+//                           with its own countdown instead of the waiting copy.
+//   onSelect    : (optionId) => Promise<{ success, late, reviewMs }>
+//   onLatePick  : (reviewMs, optionId) => void  — raised when the server flags
+//                           the pick as late (≥12s in), so the parent can hold
+//                           this player's reveal open past the shared finalize.
 // ──────────────────────────────────────────────────────────────
 
 function RevealedCard({ card }) {
@@ -84,7 +90,9 @@ export function PreGameSelectionModal({
   totalCount = 0,
   selectedId = null,
   busy = false,
+  reviewUntil = null,
   onSelect,
+  onLatePick,
 }) {
   const [localPickId, setLocalPickId] = useState(null);
   const confirmedId = selectedId || localPickId;
@@ -104,12 +112,33 @@ export function PreGameSelectionModal({
     return () => clearInterval(id);
   }, [deadline]);
 
+  // §2.1 — private review buffer countdown for a late pick. Independent of
+  // the auto-pick `deadline`; it ticks down the parent-held reviewUntil so the
+  // late picker gets a guaranteed look at their card before joining the table.
+  const [reviewSecondsLeft, setReviewSecondsLeft] = useState(null);
+  useEffect(() => {
+    if (!reviewUntil) {
+      setReviewSecondsLeft(null);
+      return undefined;
+    }
+    const tick = () => setReviewSecondsLeft(Math.max(0, Math.ceil((reviewUntil - Date.now()) / 1000)));
+    tick();
+    const id = setInterval(tick, 250);
+    return () => clearInterval(id);
+  }, [reviewUntil]);
+
   const handlePick = async (optionId) => {
     if (busy || confirmed) return;
     setLocalPickId(optionId); // optimistic — flip to the locked-in view
     const res = await onSelect?.(optionId);
     // Revert if the server rejected the pick (e.g. window already closed).
-    if (res && res.success === false) setLocalPickId(null);
+    if (res && res.success === false) {
+      setLocalPickId(null);
+      return;
+    }
+    // §2.1 — a late pick earns a private review buffer; hand the parent the
+    // reviewMs + chosen id so it can keep this reveal mounted past finalize.
+    if (res && res.late && res.reviewMs) onLatePick?.(res.reviewMs, optionId);
   };
 
   const accent = "var(--accent)";
@@ -202,15 +231,31 @@ export function PreGameSelectionModal({
             <div style={{ display: "flex", justifyContent: "center", marginBottom: 16 }}>
               <RevealedCard card={revealed} />
             </div>
-            <div style={{ fontSize: 13, color: "var(--text-dim)", lineHeight: 1.5 }}>
-              {pendingCount > 0
-                ? `Waiting for ${pendingCount} ${pendingCount === 1 ? "player" : "players"} to choose…`
-                : "All players ready — dealing in…"}
-            </div>
-            {totalCount > 0 && (
-              <div style={{ fontFamily: "'Space Mono', monospace", fontSize: 11, color: "var(--text-dim)", letterSpacing: "0.08em", marginTop: 6, opacity: 0.7 }}>
-                {totalCount - pendingCount}/{totalCount} ready
-              </div>
+            {reviewUntil ? (
+              <>
+                <div style={{ fontSize: 13, color: "var(--text-dim)", lineHeight: 1.5 }}>
+                  Picked late — here&apos;s a private look before you join. You sit
+                  out the opening turn.
+                </div>
+                {reviewSecondsLeft != null && (
+                  <div style={{ fontFamily: "'Space Mono', monospace", fontSize: 12, color: "var(--accent)", letterSpacing: "0.1em", marginTop: 8 }}>
+                    Joining in {reviewSecondsLeft}s
+                  </div>
+                )}
+              </>
+            ) : (
+              <>
+                <div style={{ fontSize: 13, color: "var(--text-dim)", lineHeight: 1.5 }}>
+                  {pendingCount > 0
+                    ? `Waiting for ${pendingCount} ${pendingCount === 1 ? "player" : "players"} to choose…`
+                    : "All players ready — dealing in…"}
+                </div>
+                {totalCount > 0 && (
+                  <div style={{ fontFamily: "'Space Mono', monospace", fontSize: 11, color: "var(--text-dim)", letterSpacing: "0.08em", marginTop: 6, opacity: 0.7 }}>
+                    {totalCount - pendingCount}/{totalCount} ready
+                  </div>
+                )}
+              </>
             )}
           </>
         )}

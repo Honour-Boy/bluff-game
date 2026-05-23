@@ -226,29 +226,42 @@ export function BottomSeat({
         )
       )}
 
-      <button
-        onClick={() => {
-          const isMidGame = !!phase && !['lobby', 'game_over'].includes(phase);
-          if (isMidGame && !window.confirm(
-            'Leave the game? You will forfeit and cannot rejoin this round.',
-          )) return;
-          leaveGame();
-        }}
-        style={{
-          alignSelf: 'center',
-          fontSize: 11,
-          color: 'var(--text-dim)',
-          border: 'none',
-          background: 'none',
-          padding: 0,
-          textDecoration: 'underline',
-          cursor: 'pointer',
-          marginTop: 10,
-          marginBottom: 24,
-        }}
-      >
-        Leave game
-      </button>
+      {/* §2.2 — Leave is available to host and members alike, but never
+          mid-action: blocking it during your own active turn stops a player
+          from abandoning a turn the table is waiting on. Host migration /
+          group reset is handled server-side in leave_room. */}
+      {(() => {
+        const leaveBlocked = isMyTurn && isPlaying && !isEliminated;
+        return (
+          <button
+            onClick={() => {
+              if (leaveBlocked) return;
+              const isMidGame = !!phase && !['lobby', 'game_over'].includes(phase);
+              if (isMidGame && !window.confirm(
+                'Leave the game? You will forfeit and cannot rejoin this round.',
+              )) return;
+              leaveGame();
+            }}
+            disabled={leaveBlocked}
+            title={leaveBlocked ? 'Finish or end your turn before leaving' : undefined}
+            style={{
+              alignSelf: 'center',
+              fontSize: 11,
+              color: 'var(--text-dim)',
+              border: 'none',
+              background: 'none',
+              padding: 0,
+              textDecoration: 'underline',
+              cursor: leaveBlocked ? 'not-allowed' : 'pointer',
+              opacity: leaveBlocked ? 0.4 : 1,
+              marginTop: 10,
+              marginBottom: 24,
+            }}
+          >
+            Leave game
+          </button>
+        );
+      })()}
     </div>
   );
 }

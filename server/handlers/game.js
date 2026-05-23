@@ -183,14 +183,19 @@ function register(io, socket, deps) {
         totalCount: result.totalCount,
       });
       await broadcastRoomState(io, code);
-      callback?.({ success: true, pendingCount: result.pendingCount });
 
-      // Last player in → resolve immediately and cancel the timer so
-      // there's no race between the final pick and the 15s auto-resolve.
-      if (result.allReady) {
-        _clearPreGameTimer(code);
-        await finalizePreGameAndBroadcast(io, code);
-      }
+      // §2.1 Rule 1 — the 15s selection window ALWAYS runs to completion. We no
+      // longer finalise the instant the last player confirms (that "snap
+      // forward" denied late pickers their review time and felt abrupt); the
+      // schedulePreGameFinalize timer is the single resolve path.
+      // §2.1 Rule 2 — a late confirmation (at/after the 12s mark) earns the
+      // picker a private review buffer; flag it + the duration back to them.
+      callback?.({
+        success: true,
+        pendingCount: result.pendingCount,
+        late: !!result.late,
+        reviewMs: result.late ? engine.PRE_GAME_LATE_REVIEW_MS : 0,
+      });
     } catch (err) {
       callback?.({ success: false, error: err.message });
     }

@@ -162,6 +162,21 @@ function reconnectPlayer(room, playerId, newSocketId) {
   return player;
 }
 
+// Playtest §2.2 — when the acting host leaves a live game, hand the in-room
+// host seat to a random still-present alive player. In a 2-player game the
+// lone survivor is BOTH the winner and the new host. Returns the chosen
+// player, or null if nobody is left to take over (the room is being torn down).
+// For persistent group rooms the ORIGINAL owner reclaims on rejoin — join_room
+// re-stamps room.hostUserId from group.host_user_id — so this only governs the
+// temporary in-room host while the owner is away.
+function pickReplacementHost(room, leavingPlayerId) {
+  const candidates = room.players.filter(
+    p => p.id !== leavingPlayerId && p.status === 'alive',
+  );
+  if (candidates.length === 0) return null;
+  return candidates[Math.floor(Math.random() * candidates.length)];
+}
+
 module.exports = {
   createPlayer,
   getCurrentPlayer,
@@ -172,4 +187,5 @@ module.exports = {
   checkGameOver,
   declareRoundWinner,
   reconnectPlayer,
+  pickReplacementHost,
 };

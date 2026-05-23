@@ -16,6 +16,7 @@ const {
   SHAPES,
   POWER_TYPES,
   PRE_GAME_SELECTION_TIMEOUT_MS,
+  PRE_GAME_LATE_THRESHOLD_MS,
 } = require('./constants');
 const { shuffleDeck } = require('./deck');
 
@@ -73,6 +74,9 @@ function beginPreGame(room) {
   room.pregameSelectionsReady = new Set();
   room.pregameSelectionOpen = false;
   room.pregameSelectionDeadline = null;
+  // §2.1 — ids of players who confirmed at/after the 12s threshold. They get a
+  // private review buffer client-side and are kept off the first active turn.
+  room.pregameLateSelectors = [];
 
   for (const p of _alivePlayers(room)) {
     room.pregamePools[p.id] = generateSelectionPool(p.id);
@@ -123,8 +127,21 @@ function applyPreGameSelection(room, playerId, optionId) {
   room.pregameSelections[playerId] = chosen;
   room.pregameSelectionsReady.add(playerId);
 
+  // §2.1 Rule 2 — a confirmation landing at/after the 12s threshold (i.e. with
+  // at most TIMEOUT-THRESHOLD ms left on the clock) is "late". Record it so the
+  // finaliser keeps the picker off the first turn, and flag it back to the
+  // caller so the client can show the private review buffer.
+  const remaining = room.pregameSelectionDeadline
+    ? room.pregameSelectionDeadline - Date.now()
+    : PRE_GAME_SELECTION_TIMEOUT_MS;
+  const late = remaining <= (PRE_GAME_SELECTION_TIMEOUT_MS - PRE_GAME_LATE_THRESHOLD_MS);
+  if (late) {
+    if (!Array.isArray(room.pregameLateSelectors)) room.pregameLateSelectors = [];
+    if (!room.pregameLateSelectors.includes(playerId)) room.pregameLateSelectors.push(playerId);
+  }
+
   const counts = _readyCounts(room);
-  return { ok: true, ...counts, allReady: counts.pendingCount === 0 };
+  return { ok: true, ...counts, late, allReady: counts.pendingCount === 0 };
 }
 
 /**
@@ -173,13 +190,19 @@ function finalizePreGame(room) {
     }
   }
 
-  // #140 — deprioritise non-responders from the first active turn so a player
-  // who never picked (auto-assigned) doesn't open the game and stall it. Seed
-  // the turn to the first player in order who selected on their own; if every
-  // alive player was auto-assigned, fall back to the existing start index.
+  // #140 + §2.1 Rule 3 — deprioritise non-responders AND late pickers from the
+  // first active turn. A player who never picked (auto-assigned) shouldn't open
+  // the game and stall it; a late picker (§2.1) is mid-review-buffer and must
+  // not be put on the clock for the opening turn. Seed the turn to the first
+  // player in order who confirmed on time; if everyone was late/auto-assigned,
+  // fall back to the existing start index.
   if (Array.isArray(room.turnOrder) && room.turnOrder.length > 0) {
+    const deprioritised = new Set([
+      ...autoAssigned,
+      ...(Array.isArray(room.pregameLateSelectors) ? room.pregameLateSelectors : []),
+    ]);
     const onTimeIdx = room.turnOrder.findIndex(
-      id => id && !autoAssigned.includes(id) && aliveIds.includes(id),
+      id => id && !deprioritised.has(id) && aliveIds.includes(id),
     );
     room.currentTurnIndex = onTimeIdx === -1 ? 0 : onTimeIdx;
   }
@@ -192,6 +215,7 @@ function finalizePreGame(room) {
   delete room.pregameSelectionsReady;
   delete room.pregameSelectionOpen;
   delete room.pregameSelectionDeadline;
+  delete room.pregameLateSelectors;
 
   return { ok: true, assignments, autoAssigned };
 }

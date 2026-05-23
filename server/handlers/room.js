@@ -4,11 +4,15 @@
 
 const engine = require('../gameEngine');
 const {
+  rooms,
   getRoom,
   saveRoom,
   hostDisconnectTimers,
   playerDisconnectTimers,
   dcKey,
+  _clearBettingTimer,
+  _clearGhostVoteTimer,
+  _clearPreGameTimer,
 } = require('../lib/state');
 const { socketRateLimit } = require('../lib/rateLimiter');
 const { broadcastRoomState } = require('../lib/broadcast');
@@ -18,6 +22,7 @@ const {
   maybeRecordGroupWinner,
 } = require('../lib/roomBuilders');
 const { resolveLeaverPendingPauses } = require('../lib/orchestration');
+const { discardLobbyIdleState } = require('../lib/idleSweep');
 
 function register(io, socket, deps) {
   const { groupsRepo, groupSettingsRepo, leaderboardRepo } = deps;
@@ -224,41 +229,84 @@ function register(io, socket, deps) {
       }
 
       const idx = room.players.findIndex(p => p.id === playerId);
-      if (idx !== -1) {
-        const player = room.players[idx];
-        const isMidGame = !['lobby', 'game_over'].includes(room.phase);
+      if (idx === -1) return;
 
-        if (isMidGame) {
-          resolveLeaverPendingPauses(io, code, room, playerId);
-          if (player.status !== 'eliminated') {
-            player.status = 'eliminated';
-            player.isSpectator = true;
-            engine.eliminateFromTurnOrder(room, playerId);
-          }
-          room.lastAction = {
-            type: 'left_game',
-            playerId: player.id,
-            playerName: player.username,
-          };
-          console.log(`[Room ${code}] ${player.username} forfeited mid-game`);
+      const player = room.players[idx];
+      const wasHost = room.hostUserId === playerId;
+      const isMidGame = !['lobby', 'game_over'].includes(room.phase);
 
-          const gameOverWinner = engine.checkGameOver(room);
-          if (gameOverWinner) {
-            room.phase = 'game_over';
-            room.lastAction = { type: 'game_over', winnerId: gameOverWinner.id, winnerName: gameOverWinner.username };
-            await maybeRecordGroupWinner(io, room, leaderboardRepo);
-          }
-        } else {
-          // Lobby or game_over: clean removal.
-          room.players.splice(idx, 1);
+      if (isMidGame) {
+        resolveLeaverPendingPauses(io, code, room, playerId);
+        if (player.status !== 'eliminated') {
+          player.status = 'eliminated';
+          player.isSpectator = true;
           engine.eliminateFromTurnOrder(room, playerId);
-          console.log(`[Room ${code}] ${player.username} left (${room.phase})`);
         }
+        room.lastAction = {
+          type: 'left_game',
+          playerId: player.id,
+          playerName: player.username,
+        };
+        console.log(`[Room ${code}] ${player.username} forfeited mid-game`);
 
-        await saveRoom(room);
-        socket.leave(code);
-        await broadcastRoomState(io, code);
+        // §2.2 — in a 2-player game this leaves a single survivor, who wins by
+        // default (checkGameOver) AND inherits the host seat below.
+        const gameOverWinner = engine.checkGameOver(room);
+        if (gameOverWinner) {
+          room.phase = 'game_over';
+          room.lastAction = { type: 'game_over', winnerId: gameOverWinner.id, winnerName: gameOverWinner.username };
+          await maybeRecordGroupWinner(io, room, leaderboardRepo);
+        }
+      } else {
+        // Lobby or game_over: clean removal.
+        room.players.splice(idx, 1);
+        engine.eliminateFromTurnOrder(room, playerId);
+        console.log(`[Room ${code}] ${player.username} left (${room.phase})`);
       }
+
+      // ─── §2.2 Host migration ──────────────────────────────
+      // If the acting host left while anyone is still seated, hand the in-room
+      // host seat to a random remaining alive player (>2 players), or to the
+      // lone survivor (2-player → they're also the winner). Persistent group
+      // rooms keep the DB owner as canonical host: when the original owner
+      // rejoins, join_room re-stamps room.hostUserId from group.host_user_id,
+      // so this stand-in seat hands back automatically.
+      if (wasHost) {
+        const replacement = engine.pickReplacementHost(room, playerId);
+        if (replacement) {
+          room.hostUserId = replacement.id;
+          room.hostSocketId = replacement.socketId || null;
+          io.to(code).emit('host_migrated', {
+            newHostId: replacement.id,
+            newHostName: replacement.username,
+          });
+          console.log(`[Room ${code}] host migrated to ${replacement.username}`);
+        }
+      }
+
+      socket.leave(code);
+
+      // ─── §2.3 Ghosting teardown ───────────────────────────
+      // If nobody is left to play (lobby emptied, or every player has left /
+      // been eliminated), tear the in-memory room down so it can't hang in a
+      // "game started" state that blocks rejoin. Ad-hoc rooms are destroyed
+      // outright; persistent group rooms are dropped from memory so the next
+      // join rebuilds a clean lobby from the DB-backed group — preserving the
+      // group's settings and leaderboard, which live in the database, not here.
+      const noOneLeft = room.players.length === 0
+        || !room.players.some(p => p.status === 'alive');
+      if (noOneLeft) {
+        _clearBettingTimer(code);
+        _clearGhostVoteTimer(code);
+        _clearPreGameTimer(code);
+        discardLobbyIdleState(code);
+        rooms.delete(code);
+        console.log(`[Room ${code}] last participant left — room torn down (${room.groupId ? 'group: rebuildable' : 'ad-hoc: destroyed'})`);
+        return;
+      }
+
+      await saveRoom(room);
+      await broadcastRoomState(io, code);
     } catch (err) {
       console.error('[leave_room]', err.message);
     }

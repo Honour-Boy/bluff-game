@@ -41,6 +41,8 @@ module.exports = {
   MEDIC_SAVE_HAND_CAP: constants.MEDIC_SAVE_HAND_CAP,
   ROLE_REVEAL_DISPLAY_MS: constants.ROLE_REVEAL_DISPLAY_MS,
   PRE_GAME_SELECTION_TIMEOUT_MS: constants.PRE_GAME_SELECTION_TIMEOUT_MS,
+  PRE_GAME_LATE_THRESHOLD_MS: constants.PRE_GAME_LATE_THRESHOLD_MS,
+  PRE_GAME_LATE_REVIEW_MS: constants.PRE_GAME_LATE_REVIEW_MS,
   RESOLUTION_TIERS: constants.RESOLUTION_TIERS,
   GAME_EVENT_TYPES: constants.GAME_EVENT_TYPES,
   MAX_PLAYERS: constants.MAX_PLAYERS,
@@ -94,6 +96,7 @@ module.exports = {
   checkGameOver: players.checkGameOver,
   declareRoundWinner: players.declareRoundWinner,
   reconnectPlayer: players.reconnectPlayer,
+  pickReplacementHost: players.pickReplacementHost,
 
   // ─── Roles ───────────────────────────────────────────────
   assignRoles: roles.assignRoles,
