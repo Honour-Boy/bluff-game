@@ -212,10 +212,12 @@ function register(io, socket, deps) {
         const finalise = () => {
           engine.eliminateFromTurnOrder(room, player.id);
           engine.newCardType(room);
-          if (room.mode === engine.MODES.ONLINE) {
-            const currentPlayerId = room.turnOrder[room.currentTurnIndex];
-            if (currentPlayerId) engine.drawCardForPlayer(room, currentPlayerId);
-          }
+          // NOTE (bugfix): do NOT deal the current player an extra card here.
+          // The §1.1 global reshuffle below re-deals EVERY alive player's hand
+          // to its CURRENT size, so an extra draw at this point inflates the
+          // on-turn player by one card (e.g. a correct bluff that eliminates the
+          // previous player left the accuser holding 4→5). The reshuffle is now
+          // the single hand-refresh on a bluff/spin resolution.
           const gameOverWinner = engine.checkGameOver(room);
           if (gameOverWinner) {
             room.pendingGameOver = { id: gameOverWinner.id, name: gameOverWinner.username };
