@@ -173,3 +173,28 @@ describe('intercept → pipeline resolution (§1.1)', () => {
     expect(room.powerCardSlot.p0).toHaveLength(0);
   });
 });
+
+// ─── §1.2 — passing / timing out the intercept never ends a turn ──────────────
+//
+// The intercept window is the accused's (OFF-turn) defensive chance. The handler
+// closes it by restoring `phase = 'playing'` and resolving the bluff — it must
+// never call advanceTurn, so the on-turn ACCUSER keeps priority and can still
+// act. resolveBluff is the exact resolution the pass / timeout paths funnel into.
+describe('intercept pass / timeout retains the on-turn player (§1.2)', () => {
+  it('resolving a passed bluff (no defence armed) does NOT advance the turn', () => {
+    const room = makeRoom([]); // p1 on turn (accuser); p0 accused; no defensive card
+    room.currentCardType = 'circle'; // played square-3 vs circle ⇒ a correct call
+    const turnIndexBefore = room.currentTurnIndex;
+    const onTurnBefore = room.turnOrder[room.currentTurnIndex];
+
+    const { outcome } = resolveBluff(room, 'p1');
+
+    // The bluff resolved, but the turn pointer is untouched — the accuser is
+    // NOT force-ended, exactly the §1.2 guarantee.
+    expect(['spin', 'blocked', 'eliminated', 'assassin_backfire']).toContain(outcome.kind);
+    expect(room.currentTurnIndex).toBe(turnIndexBefore);
+    expect(room.turnOrder[room.currentTurnIndex]).toBe(onTurnBefore);
+    // No implicit "played a card" was stamped on the on-turn player.
+    expect(room.cardPlayedThisTurn).toBeFalsy();
+  });
+});

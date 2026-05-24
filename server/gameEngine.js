@@ -125,6 +125,7 @@ module.exports = {
   spinGun: spin.spinGun,
   getSpinModifiers: spin.getSpinModifiers,
   resetHandOnSurvival: spin.resetHandOnSurvival,
+  applyGlobalBluffReshuffle: spin.applyGlobalBluffReshuffle,
   onSurvivalForBounty: spin.onSurvivalForBounty,
   onEliminationForBounty: spin.onEliminationForBounty,
   collectBounty: spin.collectBounty,
