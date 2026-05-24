@@ -15,6 +15,7 @@ import {
   MODES,
   SHAPES,
   applyGlobalBluffReshuffle,
+  eliminateFromTurnOrder,
   GAME_EVENT_TYPES,
 } from '../gameEngine.js';
 import { applyBluffOutcome } from '../lib/orchestration.js';
@@ -89,6 +90,35 @@ describe('§1.1 applyGlobalBluffReshuffle (engine)', () => {
     const res = applyGlobalBluffReshuffle(room);
     expect(res.reshuffled).toBe(false);
     expect(res.playerIds).toEqual([]);
+  });
+
+  // Regression: a correct bluff that eliminates the previous player used to deal
+  // the on-turn accuser an EXTRA card before the reshuffle, leaving them at
+  // count+1 ("global re-deal adds cards"). The reshuffle re-deals to the CURRENT
+  // size only, so once the redundant draw is gone the accuser stays at 4.
+  it('does NOT inflate the on-turn player after an elimination (4 stays 4)', () => {
+    const room = onlineRoom(['prev', 'accuser', 'bystander']);
+    room.currentTurnIndex = 1; // accuser on turn
+    room.hands.set('prev', [{ id: 'pv', type: 'shape', shape: 'circle', number: 1 }]);
+    room.hands.set('accuser', [
+      { id: 'a1', type: 'shape', shape: 'circle', number: 1 },
+      { id: 'a2', type: 'shape', shape: 'square', number: 2 },
+      { id: 'a3', type: 'shape', shape: 'triangle', number: 3 },
+      { id: 'a4', type: 'shape', shape: 'star', number: 4 },
+    ]);
+    room.hands.set('bystander', [
+      { id: 'b1', type: 'shape', shape: 'circle', number: 5 },
+      { id: 'b2', type: 'shape', shape: 'square', number: 6 },
+      { id: 'b3', type: 'shape', shape: 'triangle', number: 7 },
+    ]);
+
+    // The corrected resolution sequence: eliminate the previous player, then the
+    // single hand-refresh (no extra per-player draw beforehand).
+    eliminateFromTurnOrder(room, 'prev');
+    applyGlobalBluffReshuffle(room);
+
+    expect(room.hands.get('accuser').filter(c => c.type !== 'power')).toHaveLength(4);
+    expect(room.hands.get('bystander').filter(c => c.type !== 'power')).toHaveLength(3);
   });
 });
 

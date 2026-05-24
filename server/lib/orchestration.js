@@ -365,10 +365,9 @@ async function runMirrorMatchSpin(io, room, pending) {
       const finalise = () => {
         engine.eliminateFromTurnOrder(room, target.id);
         engine.newCardType(room);
-        if (room.mode === engine.MODES.ONLINE) {
-          const currentPlayerId = room.turnOrder[room.currentTurnIndex];
-          if (currentPlayerId) engine.drawCardForPlayer(room, currentPlayerId);
-        }
+        // NOTE (bugfix): no extra draw for the current player on elimination —
+        // it inflates their hand by one (the "re-deal adds cards" bug). Hand
+        // refresh is owned by the survival reset / §1.1 global reshuffle.
         const gameOverWinner = engine.checkGameOver(room);
         if (gameOverWinner) {
           room.pendingGameOver = { id: gameOverWinner.id, name: gameOverWinner.username };
