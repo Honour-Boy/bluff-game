@@ -11,6 +11,7 @@ const {
   saveRoom,
   pregameTimers,
   _clearPreGameTimer,
+  logTurnState,
 } = require('../lib/state');
 const { broadcastRoomState } = require('../lib/broadcast');
 const { socketRateLimit } = require('../lib/rateLimiter');
@@ -280,6 +281,7 @@ function register(io, socket, deps) {
       const physPlayer = room.players.find(p => p.id === playerId);
       room.lastAction = { type: 'card_played', playerId, playerName: physPlayer?.username || null };
       room.cardPlayedThisTurn = true;
+      logTurnState(code, playerId, 'play_card', room);
 
       await saveRoom(room);
       await broadcastRoomState(io, code);
@@ -319,6 +321,7 @@ function register(io, socket, deps) {
         playerId,
         playerName: actingPlayer?.username || null,
       };
+      logTurnState(code, playerId, 'play_card', room, { cardId });
 
       await saveRoom(room);
       await broadcastRoomState(io, code);
@@ -339,6 +342,7 @@ function register(io, socket, deps) {
 
       const result = engine.activatePowerCard(room, socket.userId);
       if (!result.ok) return callback?.({ success: false, error: result.error });
+      logTurnState(code, socket.userId, 'activate_power', room, { power: result.power });
 
       await saveRoom(room);
       await broadcastRoomState(io, code);
@@ -401,6 +405,9 @@ function register(io, socket, deps) {
       room.cardPlayedThisTurn = false;
       room.bluffUsedThisTurn = false;
       engine.advanceTurn(room);
+      // §5 — turn ended: the ledger is cleared and the next player's window
+      // opens. advanceTurn also resets powerActivatedThisTurn.
+      logTurnState(code, room.turnOrder[room.currentTurnIndex], 'turn_advanced', room, { endedBy: playerId });
 
       // v2 Phase E2 — Sudden Death tick.
       const suddenDeathBanner = engine.tickSuddenDeath(room);

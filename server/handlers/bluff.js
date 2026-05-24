@@ -13,6 +13,7 @@ const {
   _clearBettingTimer,
   bluffInterceptTimers,
   _clearBluffInterceptTimer,
+  logTurnState,
 } = require('../lib/state');
 const { broadcastRoomState, emitPowerCardEvents } = require('../lib/broadcast');
 const { maybeRecordGroupWinner } = require('../lib/roomBuilders');
@@ -260,6 +261,10 @@ function register(io, socket, deps) {
       // a second card after the spin (the post-bluff double-play exploit). The
       // ledger clears only on advanceTurn (end_turn).
       room.bluffUsedThisTurn = true;
+      // §5 — the spin (bluff's tail) has resolved; log the post-resolution
+      // ledger so the trace shows the Absolute Lockout engaging when a card was
+      // also played this turn (locked=true ⇒ only End Turn / power remain).
+      logTurnState(code, room.turnOrder[room.currentTurnIndex], 'bluff_resolved_spin', room, { spunBy: player.id, eliminated: spinResult.eliminated });
 
       room.lastAction = {
         type: 'spin_result',
@@ -308,6 +313,7 @@ function register(io, socket, deps) {
 
       room.bluffUsedThisTurn = true;
       const callerPlayer = room.players.find(p => p.id === playerId);
+      logTurnState(code, playerId, 'call_bluff', room, { accusedId: engine.getPreviousTurnPlayerId(room) });
 
       if (room.mode === engine.MODES.ONLINE) {
         // §1.1 — interception window. If the accused (the previous player, who
