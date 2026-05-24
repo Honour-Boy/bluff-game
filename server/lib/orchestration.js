@@ -237,25 +237,33 @@ function applyBluffOutcome(room, outcome) {
   if (eventType === E.BLUFF_BLOCKED) {
     room.phase = 'playing';
     room.spinTargetId = null;
+    // §1.1 — global hand reshuffle + target-card cycle on this resolved bluff.
+    const reshuffle = engine.applyGlobalBluffReshuffle(room);
     room.lastAction = {
       type: 'bluff_blocked',
       // §1.3 — the Shield holder is the event target (the accused for a
       // Tier-1 block, the accuser for an Assassin-strike block).
       shieldHolderId: outcome.shieldHolderId ?? outcome.accusedId,
       accuserId: outcome.accuserId,
+      ...(reshuffle.reshuffled ? { globalReshuffle: true, newCardType: reshuffle.cardType } : {}),
     };
     return outcome;
   }
 
   if (eventType === E.FORCED_ELIMINATION) {
     finaliseAssassinElimination(room, outcome);
+    // §1.1 — reshuffle once the strike has settled, unless the elimination
+    // already ended the game (no point re-dealing a finished table).
+    if (room.phase !== 'game_over') engine.applyGlobalBluffReshuffle(room);
     return outcome;
   }
 
   if (eventType === E.ASSASSIN_BACKFIRE) {
     room.phase = 'playing';
     room.spinTargetId = null;
-    // §1.1 — turn-action ledger intentionally preserved (see
+    // §1.1 — global hand reshuffle + target-card cycle on this resolved bluff.
+    const reshuffle = engine.applyGlobalBluffReshuffle(room);
+    // §1.1 turn-action ledger intentionally preserved (see
     // finaliseAssassinElimination): the on-turn player keeps their used-up
     // play/bluff so they can't act twice after the bluff resolves.
     room.lastAction = {
@@ -265,6 +273,7 @@ function applyBluffOutcome(room, outcome) {
       accuserId: outcome.accuserId,
       accuserName: room.players.find(p => p.id === outcome.accuserId)?.username || null,
       cardsDrawn: outcome.cardsToDrawForAccused || 0,
+      ...(reshuffle.reshuffled ? { globalReshuffle: true, newCardType: reshuffle.cardType } : {}),
     };
     return outcome;
   }

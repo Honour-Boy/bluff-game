@@ -96,8 +96,14 @@ function _scheduleBluffInterceptTimeout(io, code, leaderboardRepo, ms = engine.B
       const room = await getRoom(code);
       if (!room || room.phase !== 'bluff_intercept_pending') return;
       const accuserId = room.pendingBluffIntercept?.accuserId || null;
+      // §1.2 — closing the window must NOT end anyone's turn. The accused only
+      // ever DEFENDED (off-turn); the on-turn player is the accuser, who keeps
+      // priority. We clear the window + restore `playing` here (never advance
+      // the turn) so a timed-out pass routes straight back into normal play.
+      const onTurnBefore = room.turnOrder?.[room.currentTurnIndex] ?? null;
       room.pendingBluffIntercept = null;
       room.phase = 'playing';
+      console.log(`[Room ${code}] bluff-intercept window TIMED OUT (no defence) — on-turn player ${onTurnBefore} retains the turn; resolving bluff.`);
       if (!accuserId) {
         await saveRoom(room);
         await broadcastRoomState(io, code);
@@ -217,10 +223,9 @@ function register(io, socket, deps) {
 
         medicPaused = maybeStartMedicPause(io, room, player.id, 'spin', finalise);
         if (!medicPaused) finalise();
-      } else if (room.mode === engine.MODES.ONLINE) {
-        // Issue #56 / Section 7 hand reset.
-        engine.resetHandOnSurvival(room, player.id);
       }
+      // NOTE: the single-player Section 7 survival reset is gone — the §1.1
+      // global reshuffle below re-deals the survivor along with everyone else.
 
       if (!medicPaused) {
         room.phase = 'playing';
@@ -233,6 +238,21 @@ function register(io, socket, deps) {
           }
         }
       }
+
+      // §1.1 — global bluff reshuffle once the spin (the bluff's tail) settles:
+      // re-deal EVERY alive player's hand + cycle the target card. Skipped while
+      // a Medic is still deciding, when the game is ending, or after the table
+      // moved into Last Stand / Ghost Vote (those own their hand handling).
+      let reshuffle = { reshuffled: false, cardType: room.currentCardType };
+      if (
+        !medicPaused
+        && room.mode === engine.MODES.ONLINE
+        && room.phase === 'playing'
+        && !room.pendingGameOver
+      ) {
+        reshuffle = engine.applyGlobalBluffReshuffle(room);
+      }
+
       room.spinTargetId = null;
       // §1.1 — a spin only happens as the tail of a bluff the on-turn player
       // already called. Mark the bluff used; do NOT clear cardPlayedThisTurn —
@@ -253,7 +273,9 @@ function register(io, socket, deps) {
         riskLevel: spinResult.riskLevel,
         riskLevelBefore,
         medicPending: medicPaused,
-        ...(spinResult.eliminated && !medicPaused ? { newCardType: room.currentCardType } : {}),
+        ...(reshuffle.reshuffled
+          ? { globalReshuffle: true, newCardType: reshuffle.cardType }
+          : (spinResult.eliminated && !medicPaused ? { newCardType: room.currentCardType } : {})),
       };
 
       await saveRoom(room);
@@ -381,6 +403,11 @@ function register(io, socket, deps) {
       }
 
       const accuserId = pending.accuserId;
+      // §1.2 — close the window WITHOUT ending any turn. Whether the accused
+      // armed a defence or passed, the on-turn accuser keeps priority; we only
+      // restore `playing` + clear the pending state and let the bluff resolve.
+      // Passing here never routes into an implicit turn-end.
+      const onTurnBefore = room.turnOrder?.[room.currentTurnIndex] ?? null;
       room.pendingBluffIntercept = null;
       room.phase = 'playing';
 
@@ -392,6 +419,8 @@ function register(io, socket, deps) {
           power: armedPower,
         });
         console.log(`[Room ${code}] ${pending.accusedName || socket.userId} intercepted with ${armedPower}`);
+      } else {
+        console.log(`[Room ${code}] ${pending.accusedName || socket.userId} PASSED the bluff-intercept — on-turn player ${onTurnBefore} retains the turn; resolving bluff.`);
       }
 
       await _resolveOnlineBluff(io, code, room, accuserId, leaderboardRepo);

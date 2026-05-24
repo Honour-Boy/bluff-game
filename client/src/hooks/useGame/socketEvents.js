@@ -99,6 +99,13 @@ export function useGameSocketEvents({
       }
     };
 
+    // §2.1 — answer the server's keepalive heartbeat so there's a steady trickle
+    // of INBOUND traffic (on top of the engine-level pong), helping free-tier
+    // hosts keep the instance awake during a live game. Pure liveness; no state.
+    const onServerKeepalive = () => {
+      try { socket.emit('client_keepalive'); } catch (_) { /* transport hiccup — non-fatal */ }
+    };
+
     const onBluffCalled = () => notify('Bluff called! Host: reveal the last card.', 'warning');
     const onSpinAcknowledged = () => setSpinDismissed(true);
     const onPowerCardTriggered = (event) => {
@@ -145,6 +152,7 @@ export function useGameSocketEvents({
 
     socket.on('connect', onConnect);
     socket.on('disconnect', onDisconnect);
+    socket.on('server_keepalive', onServerKeepalive);
     socket.on('room_state', onRoomState);
     socket.on('chat_message', onChatMessage);
     socket.on('bluff_called', onBluffCalled);
@@ -161,6 +169,7 @@ export function useGameSocketEvents({
     return () => {
       socket.off('connect', onConnect);
       socket.off('disconnect', onDisconnect);
+      socket.off('server_keepalive', onServerKeepalive);
       socket.off('room_state', onRoomState);
       socket.off('chat_message', onChatMessage);
       socket.off('bluff_called', onBluffCalled);

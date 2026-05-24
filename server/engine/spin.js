@@ -8,7 +8,7 @@
 
 const { MODES, BOUNTY_THRESHOLD } = require('./constants');
 const { pullTrigger } = require('./chamber');
-const { drawCardForPlayer } = require('./cards');
+const { drawCardForPlayer, newCardType } = require('./cards');
 
 /**
  * Pluck the risk-modifier flags out of room.config defensively. Used
@@ -96,6 +96,37 @@ function resetHandOnSurvival(room, playerId, cardsToDeal = null) {
     else break;
   }
   return dealt;
+}
+
+/**
+ * §1.1 — Global bluff reshuffle.
+ *
+ * The moment a Bluff ("Block") challenge is CALLED AND RESOLVED, the table is
+ * rotated uniformly for everyone still in the match — not just the player who
+ * survived/lost the specific interaction:
+ *
+ *   • Global Card Change: EVERY alive player has their SHAPE hand discarded and
+ *     re-dealt a fresh batch of equal size. Power cards are retained (same rule
+ *     as a survival reset) so the power economy isn't wiped.
+ *   • Required Target Shift: the match's "card to clear" (`currentCardType`)
+ *     cycles to a fresh random type immediately.
+ *
+ * Online-only — hands and the target type only exist in online mode. No-op (and
+ * safe) for physical rooms or rooms without a dealt deck. Returns a summary the
+ * caller can fold into `lastAction` / telemetry.
+ */
+function applyGlobalBluffReshuffle(room) {
+  if (!room || room.mode !== MODES.ONLINE) {
+    return { reshuffled: false, playerIds: [], cardType: room?.currentCardType ?? null };
+  }
+  const aliveIds = room.players.filter(p => p.status === 'alive').map(p => p.id);
+  for (const id of aliveIds) {
+    // Re-deal each alive player's shape hand to an equal-sized fresh batch
+    // (cardsToDeal omitted ⇒ "deal as many as you just discarded").
+    resetHandOnSurvival(room, id);
+  }
+  newCardType(room);
+  return { reshuffled: true, playerIds: aliveIds, cardType: room.currentCardType ?? null };
 }
 
 // ─── v2 Phase F — Bounty ─────────────────────────────────────
@@ -186,6 +217,7 @@ module.exports = {
   getSpinModifiers,
   spinGun,
   resetHandOnSurvival,
+  applyGlobalBluffReshuffle,
   onSurvivalForBounty,
   onEliminationForBounty,
   collectBounty,
