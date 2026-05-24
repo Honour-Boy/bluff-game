@@ -107,11 +107,10 @@ export function useOnlinePlayerUiController({
     };
   }, [roomState?.lastAction]);
 
-  useEffect(() => {
-    if (roomState?.spectatedHand && Array.isArray(roomState.spectatedHand)) {
-      setSpectatedHand(roomState.spectatedHand);
-    }
-  }, [roomState?.spectatedHand]);
+  // §3.2 — spectator hand lockout. The server no longer emits `spectatedHand`,
+  // so there is nothing to sync. `spectatedHand` stays an empty array and
+  // `spectatingId` stays null; the picker UI is replaced by a hands-hidden
+  // notice (see BottomSeat). Kept as inert state so prop contracts are stable.
 
   useEffect(() => {
     const currentStatus = myPlayer?.status || null;
@@ -194,12 +193,11 @@ export function useOnlinePlayerUiController({
     setPendingCard(card);
   }, [isMyTurn, isPlaying, myHand, roomState?.cardPlayedThisTurn]);
 
-  const handleSpectatePlayer = useCallback((targetId) => {
-    setSpectatingId(targetId);
-    spectatePlayer(targetId, (response) => {
-      setSpectatedHand(response.hand || []);
-    });
-  }, [spectatePlayer]);
+  // §3.2 — spectating an opponent's hand is disabled (anti-cheat lockout). This
+  // is intentionally a no-op: eliminated / dead players can watch the table but
+  // never reveal a living opponent's cards. Kept so callers don't need to drop
+  // the handler wiring.
+  const handleSpectatePlayer = useCallback(() => {}, []);
 
   // #139 — open the activation confirmation modal by tapping the held power
   // card. The three turn actions (play / call bluff / activate power) are fully
@@ -209,8 +207,12 @@ export function useOnlinePlayerUiController({
   const handlePowerCardClick = useCallback(() => {
     if (!isMyTurn || !isPlaying) return;
     if (myPlayer?.armedPowerCard) return;
+    // §1.1 — one power activation per turn. `armedPowerCard` misses a consumed
+    // Peek (it leaves no armed marker), so also honour the server's ledger flag
+    // to keep a Collector from Peeking then arming in the same turn.
+    if (roomState?.powerActivatedThisTurn) return;
     setPowerConfirmOpen(true);
-  }, [isMyTurn, isPlaying, myPlayer?.armedPowerCard]);
+  }, [isMyTurn, isPlaying, myPlayer?.armedPowerCard, roomState?.powerActivatedThisTurn]);
 
   const handleActivatePower = useCallback(async () => {
     if (!activatePowerCard || activating) return;

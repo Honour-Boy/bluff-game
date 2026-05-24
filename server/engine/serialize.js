@@ -11,26 +11,19 @@ const { isBarehandVisible } = require('./roles');
 
 function serializeRoom(room, requestingPlayerId = null, opts = {}) {
   const isOnline = room.mode === MODES.ONLINE;
-  const { spectatingTargetId = null } = opts;
 
-  // Spectator gating (issue #81): a caller is treated as a spectator
-  // ONLY if their own player record is eliminated / isSpectator.
-  // Living players never receive `spectatedHand` or
-  // `currentPromptTarget`, regardless of any client-side claim.
+  // §3.2 Spectator anti-cheat lockout. Eliminated / dead players must NEVER
+  // receive an opponent's hand. The old #81 "spectate one chosen player's hand"
+  // feature is fully removed: `spectatedHand` is no longer emitted to anyone, so
+  // there is no payload path that carries a living opponent's cards off-server.
+  // `currentPromptTarget` (below) carries only a player id + prompt kind — no
+  // card data — and stays gated to eliminated callers for the ghost overlays.
   const requestingPlayer = requestingPlayerId
     ? room.players.find(p => p.id === requestingPlayerId)
     : null;
   const isSpectatorCaller =
     !!requestingPlayer
     && (requestingPlayer.status === 'eliminated' || requestingPlayer.isSpectator);
-  const spectatedPlayer =
-    isOnline && isSpectatorCaller && spectatingTargetId
-      ? room.players.find(p => p.id === spectatingTargetId) || null
-      : null;
-  const spectatedHand =
-    spectatedPlayer && room.hands && spectatedPlayer.status !== 'eliminated'
-      ? (room.hands.get(spectatingTargetId) || [])
-      : undefined;
   let currentPromptTarget = null;
   if (isOnline && isSpectatorCaller) {
     if (room.phase === 'medic_pending' && room.pendingMedicSave) {
@@ -102,6 +95,7 @@ function serializeRoom(room, requestingPlayerId = null, opts = {}) {
     lastAction: room.lastAction,
     bluffUsedThisTurn: room.bluffUsedThisTurn || false,
     cardPlayedThisTurn: room.cardPlayedThisTurn || false,
+    powerActivatedThisTurn: room.powerActivatedThisTurn || false,
     bluffBlockedThisTurn: room.bluffBlockedThisTurn || false,
     spinTargetId: room.spinTargetId || null,
     isFirstTurn: room.isFirstTurn || false,
@@ -114,8 +108,6 @@ function serializeRoom(room, requestingPlayerId = null, opts = {}) {
     myPowerCardSlot: isOnline && requestingPlayerId && room.powerCardSlot
       ? (room.powerCardSlot[requestingPlayerId] || [])
       : undefined,
-    spectatedHand,
-    spectatedPlayerId: spectatedPlayer ? spectatingTargetId : undefined,
     currentPromptTarget,
     chatLog: room.chatLog || [],
     config: room.config || null,

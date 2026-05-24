@@ -251,10 +251,26 @@ function createGroupsRepo(supabase) {
     return findUserByUsername(identifier);
   }
 
+  // §3.3 — active group names must be unique. Case-insensitive exact match
+  // against non-deleted groups (ilike with no wildcards = whole-string compare).
+  async function getActiveGroupByName(name) {
+    const result = await supabase
+      .from('groups')
+      .select('id, name')
+      .ilike('name', name)
+      .is('deleted_at', null)
+      .limit(1);
+    return maybeSingle(requireData(result));
+  }
+
   async function createGroup({ hostUserId, name }) {
     if (!isPersistentUserId(hostUserId)) throw new Error('Groups require an authenticated account');
     const normalizedName = normalizeGroupName(name);
     if (!normalizedName) throw new Error('Group name must be between 1 and 64 characters');
+
+    // §3.3 — block duplicate active group names before allocating a code.
+    const nameClash = await getActiveGroupByName(normalizedName);
+    if (nameClash) throw new Error('A group with that name already exists');
 
     const code = await pickUniqueGroupCode(async (candidate) => {
       const existing = await getActiveGroupByCode(candidate);
@@ -694,6 +710,7 @@ function createGroupsRepo(supabase) {
     removeMember,
     leaveGroup,
     getActiveGroupByCode,
+    getActiveGroupByName,
     getActiveGroupById,
     isGroupMember,
   };

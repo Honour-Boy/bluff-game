@@ -97,12 +97,6 @@ export function useGame(getAccessToken, getGuestAuth, authIdentityKey = null) {
     }, 3500);
   }, []);
 
-  const failError = useCallback((res) => {
-    const msg = res?.error || 'Action failed';
-    setError(msg);
-    notify(msg, 'error');
-  }, [notify]);
-
   const clearSession = useCallback(() => {
     setRoomCode(null);
     setPlayerId(null);
@@ -112,6 +106,20 @@ export function useGame(getAccessToken, getGuestAuth, authIdentityKey = null) {
     setChatUnread(0);
     setChatOpen(false);
   }, []);
+
+  const failError = useCallback((res) => {
+    const msg = res?.error || 'Action failed';
+    setError(msg);
+    notify(msg, 'error');
+    // §2.3 — if the server says the room is gone, never leave the player stuck
+    // in a frozen in-room view. Force the same local teardown + redirect to the
+    // dashboard that an explicit leave does (the socket is fine; only the room
+    // vanished — e.g. host left, inactivity sweep, server restart).
+    if (/room not found/i.test(msg)) {
+      try { sessionStorage.removeItem('bluff_session'); } catch (_) { /* non-fatal */ }
+      clearSession();
+    }
+  }, [notify, clearSession]);
 
   const authenticateSocket = useCallback(() => {
     return new Promise(async (resolve) => {
@@ -217,6 +225,28 @@ export function useGame(getAccessToken, getGuestAuth, authIdentityKey = null) {
     setChatUnread,
     clearSession,
   });
+
+  // §3.4 — empty-hand recovery. If we're alive and playing in an online room but
+  // our hand arrived empty (a dropped initial deal / state packet), re-pull our
+  // authoritative state once. Guarded by a ref keyed on the room so it fires at
+  // most once per empty episode and never loops. A successful re-pull lands a
+  // populated room_state and the guard clears when the hand is non-empty again.
+  const emptyHandRetryRef = useRef(null);
+  useEffect(() => {
+    if (!roomState || roomState.mode !== 'online' || roomState.phase !== 'playing') return undefined;
+    const me = roomState.players?.find((p) => p.id === playerId);
+    const handEmpty = (roomState.myHand?.length ?? 0) === 0;
+    if (!me || me.status !== 'alive') return undefined;
+    if (!handEmpty) {
+      emptyHandRetryRef.current = null;
+      return undefined;
+    }
+    const key = `${roomState.code}:${roomState.roundNumber}`;
+    if (emptyHandRetryRef.current === key) return undefined;
+    emptyHandRetryRef.current = key;
+    const t = setTimeout(() => gameActions.refreshRoomState(), 1500);
+    return () => clearTimeout(t);
+  }, [roomState, playerId, gameActions]);
 
   const myPlayer = roomState?.players?.find((player) => player.id === playerId) || null;
   const isMyTurn = roomState?.currentPlayerId === playerId;

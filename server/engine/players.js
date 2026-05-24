@@ -118,8 +118,15 @@ function advanceTurn(room) {
   _advanceTurnIndex(room);
   room.lastAction = null;
   room.phase = 'playing';
+  // §1.1 — the turn-action ledger. advanceTurn is the SINGLE authoritative
+  // reset point for a genuine turn change: each of the three once-per-turn
+  // actions (card play / bluff call / power activation) re-opens here and
+  // nowhere else. Mid-turn resolutions (bluff/spin/assassin) must NOT clear
+  // these or the on-turn player would get a second play (the post-bluff
+  // double-play exploit).
   room.bluffUsedThisTurn = false;
   room.cardPlayedThisTurn = false;
+  room.powerActivatedThisTurn = false;
   room.isFirstTurn = false;
   room.bluffBlockedThisTurn = false;
 

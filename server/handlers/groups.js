@@ -8,6 +8,25 @@ const { broadcastRoomState } = require('../lib/broadcast');
 const { getGroupAuthError, maybeRecordGroupWinner } = require('../lib/roomBuilders');
 const { socketRateLimit } = require('../lib/rateLimiter');
 
+// §3.3 — live pre-room occupancy for the groups directory. Reads the in-memory
+// room (if any) backing a group so the directory can show who is already
+// waiting BEFORE an outside member commits to entering. Returns null when no
+// live room exists yet for the group.
+function buildLiveRoom(groupId) {
+  if (!groupId) return null;
+  for (const room of rooms.values()) {
+    if (room.groupId !== groupId) continue;
+    const players = Array.isArray(room.players) ? room.players : [];
+    return {
+      playerCount: players.length,
+      phase: room.phase,
+      inLobby: room.phase === 'lobby',
+      players: players.map(p => ({ id: p.id, username: p.username, status: p.status })),
+    };
+  }
+  return null;
+}
+
 function register(io, socket, deps) {
   const { groupsRepo, leaderboardRepo } = deps;
 
@@ -33,7 +52,14 @@ function register(io, socket, deps) {
       const authError = getGroupAuthError(socket);
       if (authError) return callback?.({ success: false, error: authError });
       const groups = await groupsRepo.listMyGroups({ userId: socket.userId });
-      callback?.({ success: true, groups });
+      // §3.3 — attach live pre-room occupancy + subscribe this socket to each
+      // group channel so the directory receives push `group_room_status` updates
+      // while it's open (no need to re-poll to see players gathering).
+      const withLive = (groups || []).map((g) => {
+        socket.join(`group:${g.id}`);
+        return { ...g, liveRoom: buildLiveRoom(g.id) };
+      });
+      callback?.({ success: true, groups: withLive });
     } catch (err) {
       callback?.({ success: false, error: err.message });
     }
@@ -51,7 +77,7 @@ function register(io, socket, deps) {
         userId: socket.userId,
       });
       socket.join(`group:${group.id}`);
-      callback?.({ success: true, group });
+      callback?.({ success: true, group: { ...group, liveRoom: buildLiveRoom(group.id) } });
     } catch (err) {
       callback?.({ success: false, error: err.message });
     }

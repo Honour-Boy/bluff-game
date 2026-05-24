@@ -13,6 +13,7 @@ const {
   _clearBettingTimer,
   _clearGhostVoteTimer,
   _clearPreGameTimer,
+  logRoomDeletion,
 } = require('../lib/state');
 const { socketRateLimit } = require('../lib/rateLimiter');
 const { broadcastRoomState } = require('../lib/broadcast');
@@ -40,6 +41,7 @@ function register(io, socket, deps) {
       room.hostUserId = socket.userId;
       room.cardPlayedThisTurn = false;
       room.bluffUsedThisTurn = false;
+      room.powerActivatedThisTurn = false;
       await saveRoom(room);
 
       socket.join(room.code);
@@ -153,6 +155,7 @@ function register(io, socket, deps) {
       if (hostDisconnectTimers.has(code)) {
         clearTimeout(hostDisconnectTimers.get(code));
         hostDisconnectTimers.delete(code);
+        console.log(`[Socket] host of ${code} reconnected within grace — teardown cancelled`);
       }
 
       room.hostSocketId = socket.id;
@@ -181,6 +184,7 @@ function register(io, socket, deps) {
       if (playerDisconnectTimers.has(key)) {
         clearTimeout(playerDisconnectTimers.get(key));
         playerDisconnectTimers.delete(key);
+        console.log(`[Socket] player ${socket.userId} reconnected to ${code} within grace — elimination cancelled`);
       }
 
       engine.reconnectPlayer(room, socket.userId, socket.id);
@@ -190,6 +194,29 @@ function register(io, socket, deps) {
       await broadcastRoomState(io, code);
     } catch (err) {
       callback({ success: false, error: err.message });
+    }
+  });
+
+  // ─── Re-pull authoritative state (#empty-hand recovery, §3.4) ──────────
+  // A client whose deal/state packet was dropped (initial setup race or a
+  // reconnect that landed before the broadcast) can ask for a fresh push. We
+  // re-serialise for THIS socket only — so `myHand` is included — without
+  // disturbing anyone else. Safe to call any time; it never mutates state.
+  socket.on('request_room_state', async ({ roomCode } = {}, callback) => {
+    try {
+      const code = roomCode?.toUpperCase();
+      const room = await getRoom(code);
+      if (!room) return callback?.({ success: false, error: 'Room not found' });
+
+      const player = room.players.find(p => p.socketId === socket.id);
+      const playerId = player ? player.id : null;
+      const view = room.mode === engine.MODES.ONLINE
+        ? engine.serializeRoom(room, playerId, {})
+        : engine.serializeRoom(room);
+      socket.emit('room_state', view);
+      callback?.({ success: true });
+    } catch (err) {
+      callback?.({ success: false, error: err.message });
     }
   });
 
@@ -214,11 +241,16 @@ function register(io, socket, deps) {
   });
 
   // ─── Intentional leave ───────────────────────────────────
-  socket.on('leave_room', async ({ roomCode, playerId } = {}) => {
+  // §2.2 — accepts an optional ack callback so the SAME centralized cleanup is
+  // used by every leave entry point (the in-game "Leave Room" buttons and the
+  // lobby "Leave Game" button) and the client can confirm teardown finished.
+  // The client never blocks on this ack (§2.3 fail-safe) — it's purely
+  // confirmatory — but it lets a present client know the server cleaned up.
+  socket.on('leave_room', async ({ roomCode, playerId } = {}, callback) => {
     try {
       const code = roomCode?.toUpperCase();
       const room = await getRoom(code);
-      if (!room) return;
+      if (!room) return callback?.({ success: true, alreadyGone: true });
 
       if (playerId) {
         const key = dcKey(code, playerId);
@@ -229,7 +261,7 @@ function register(io, socket, deps) {
       }
 
       const idx = room.players.findIndex(p => p.id === playerId);
-      if (idx === -1) return;
+      if (idx === -1) return callback?.({ success: true, notInRoom: true });
 
       const player = room.players[idx];
       const wasHost = room.hostUserId === playerId;
@@ -300,15 +332,33 @@ function register(io, socket, deps) {
         _clearGhostVoteTimer(code);
         _clearPreGameTimer(code);
         discardLobbyIdleState(code);
+        logRoomDeletion(code, 'last_participant_left', {
+          phase: room.phase,
+          groupId: room.groupId || undefined,
+          rebuildable: !!room.groupId,
+        });
+        // §3.3 — the live room is gone; clear the directory's occupancy badge.
+        if (room.groupId) {
+          io.to(`group:${room.groupId}`).emit('group_room_status', {
+            groupId: room.groupId,
+            code,
+            playerCount: 0,
+            phase: 'closed',
+            inLobby: false,
+            players: [],
+          });
+        }
         rooms.delete(code);
         console.log(`[Room ${code}] last participant left — room torn down (${room.groupId ? 'group: rebuildable' : 'ad-hoc: destroyed'})`);
-        return;
+        return callback?.({ success: true, roomClosed: true });
       }
 
       await saveRoom(room);
       await broadcastRoomState(io, code);
+      callback?.({ success: true });
     } catch (err) {
       console.error('[leave_room]', err.message);
+      callback?.({ success: false, error: err.message });
     }
   });
 

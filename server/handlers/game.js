@@ -428,32 +428,14 @@ function register(io, socket, deps) {
     }
   });
 
-  // ─── Spectate a player's hand (#81) ─────────────────────
-  socket.on('spectate_player', async ({ roomCode, targetPlayerId } = {}, callback) => {
-    try {
-      const code = roomCode?.toUpperCase();
-      const room = await getRoom(code);
-      if (!room) return callback?.({ success: false, error: 'Room not found' });
-
-      const isHost = room.hostUserId === socket.userId;
-      const isMember = room.players.some(p => p.id === socket.userId);
-      if (!isHost && !isMember) return callback?.({ success: false, error: 'Not a member of this room' });
-
-      if (!targetPlayerId) {
-        if (socket.data) socket.data.spectatingTargetId = null;
-        return callback?.({ success: true, hand: [] });
-      }
-
-      const hand = room.hands?.get(targetPlayerId);
-      if (!hand) return callback?.({ success: false, error: 'Player has no hand' });
-
-      socket.data = socket.data || {};
-      socket.data.spectatingTargetId = targetPlayerId;
-
-      callback?.({ success: true, hand });
-    } catch (err) {
-      callback?.({ success: false, error: err.message });
-    }
+  // ─── Spectate a player's hand (REMOVED — §3.2 anti-cheat lockout) ────────
+  // Eliminated / dead players may no longer view any living opponent's hand.
+  // The event is kept as an inert stub so older clients don't error: it never
+  // stores a spectate target and always returns an empty hand. The hand is also
+  // no longer present in any room_state payload (see serializeRoom §3.2).
+  socket.on('spectate_player', async (_payload = {}, callback) => {
+    if (socket.data) socket.data.spectatingTargetId = null;
+    return callback?.({ success: true, hand: [] });
   });
 
   // ─── Spin result acknowledgement (synced overlay dismiss) ─
