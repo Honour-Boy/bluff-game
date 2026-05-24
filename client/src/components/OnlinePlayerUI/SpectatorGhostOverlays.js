@@ -70,31 +70,9 @@ export function SpectatorGhostOverlays({
 
         return null;
       })()}
-
-      {(() => {
-        if (roomState?.phase !== 'playing') return null;
-        if (roomState?.currentPlayerId !== spectatingId) return null;
-        if (roomState?.cardPlayedThisTurn || roomState?.bluffUsedThisTurn) return null;
-        if (!targetPlayer || targetPlayer.armedPowerCard) return null;
-        const targetHand = roomState?.spectatedHand || spectatedHand || [];
-        const targetPower = targetHand.find((card) => card?.type === 'power');
-        if (!targetPower) return null;
-        return (
-          <div data-testid="spectator-ghost-activate" style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.65)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 9020, padding: 24, pointerEvents: 'none' }}>
-            <div className="card" style={{ maxWidth: 360, width: '100%', textAlign: 'center', padding: '22px 20px', border: '1px solid var(--accent)', opacity: 0.55 }}>
-              <div style={{ fontSize: 10, color: 'var(--accent)', letterSpacing: '0.18em', marginBottom: 8 }}>
-                👁 SPECTATING · {targetPlayer?.username || 'Player'}
-              </div>
-              <div style={{ fontFamily: "'Bebas Neue', sans-serif", fontSize: 20, color: 'var(--text)', letterSpacing: '0.06em', marginBottom: 6 }}>
-                ACTIVATE POWER CARD?
-              </div>
-              <div style={{ fontSize: 11, color: 'var(--text-dim)' }}>
-                {targetPlayer?.username || 'They'} are deciding whether to use {targetPower.power || 'their power'}.
-              </div>
-            </div>
-          </div>
-        );
-      })()}
+      {/* §3.2 — the hand-derived "activate power card?" ghost overlay was
+          removed: it inferred a living opponent's held power card from their
+          hand, which eliminated players may no longer see. */}
     </>
   );
 }

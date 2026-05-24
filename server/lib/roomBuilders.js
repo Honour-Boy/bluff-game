@@ -46,6 +46,7 @@ function buildPersistentGroupRoom(group, opts = {}) {
     : null;
   room.cardPlayedThisTurn = false;
   room.bluffUsedThisTurn = false;
+  room.powerActivatedThisTurn = false;
   return room;
 }
 

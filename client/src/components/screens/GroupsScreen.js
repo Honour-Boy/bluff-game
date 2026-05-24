@@ -1,6 +1,7 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
+import { getSocket } from '../../lib/socket';
 
 function formatInviteDate(value) {
   if (!value) return 'Pending';
@@ -71,6 +72,21 @@ export function GroupsScreen({
 }) {
   const [groupName, setGroupName] = useState('');
   const [busyAction, setBusyAction] = useState(null);
+
+  // §3.3 — live pre-room occupancy. Seeded from each group's `liveRoom` (sent by
+  // list_my_groups) and kept current by `group_room_status` pushes while this
+  // screen is open, so the directory shows players gathering in real time
+  // before anyone commits to entering.
+  const [liveOverrides, setLiveOverrides] = useState({});
+  useEffect(() => {
+    const socket = getSocket();
+    const onStatus = (status) => {
+      if (!status?.groupId) return;
+      setLiveOverrides((prev) => ({ ...prev, [status.groupId]: status }));
+    };
+    socket.on('group_room_status', onStatus);
+    return () => socket.off('group_room_status', onStatus);
+  }, []);
 
   const sortedGroups = useMemo(
     () => [...(groups || [])].sort((a, b) => a.name.localeCompare(b.name)),
@@ -199,7 +215,13 @@ export function GroupsScreen({
               </div>
             )}
 
-            {sortedGroups.map((group) => (
+            {sortedGroups.map((group) => {
+              const live = liveOverrides[group.id] || group.liveRoom || null;
+              const liveCount = live && live.phase !== 'closed' ? (live.playerCount || 0) : 0;
+              const liveLabel = liveCount > 0
+                ? (live.inLobby ? `${liveCount} waiting in lobby` : `${liveCount} in game`)
+                : null;
+              return (
               <button
                 key={group.id}
                 type="button"
@@ -208,7 +230,7 @@ export function GroupsScreen({
                   textAlign: 'left',
                   padding: 16,
                   borderRadius: 'var(--radius)',
-                  border: '1px solid var(--border)',
+                  border: `1px solid ${liveCount > 0 ? 'var(--alive)' : 'var(--border)'}`,
                   background: 'rgba(255, 255, 255, 0.03)',
                   cursor: 'pointer',
                 }}
@@ -228,6 +250,12 @@ export function GroupsScreen({
                     <div style={{ marginTop: 6, fontSize: 11, color: 'var(--text-dim)', letterSpacing: '0.12em' }}>
                       CODE {group.code}
                     </div>
+                    {liveLabel && (
+                      <div style={{ marginTop: 8, display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 11, color: 'var(--alive)', letterSpacing: '0.06em' }}>
+                        <span style={{ width: 7, height: 7, borderRadius: '50%', background: 'var(--alive)', display: 'inline-block', boxShadow: '0 0 6px var(--alive)' }} aria-hidden />
+                        {liveLabel}
+                      </div>
+                    )}
                   </div>
                   <div style={{ textAlign: 'right' }}>
                     <div
@@ -245,7 +273,8 @@ export function GroupsScreen({
                   </div>
                 </div>
               </button>
-            ))}
+              );
+            })}
           </div>
         </section>
 

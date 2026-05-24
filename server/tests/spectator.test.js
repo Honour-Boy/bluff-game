@@ -1,16 +1,13 @@
 // ============================================================
-// Tests for issue #81 — spectator view in serializeRoom
+// Tests for §3.2 — spectator anti-cheat lockout in serializeRoom
 //
-// Covers:
-//   - spectatedHand exposed only to eliminated callers with a target
-//   - spectatedHand never leaked to living players (defense in depth
-//     against a malicious spectatingTargetId)
-//   - currentPromptTarget exposed only to eliminated callers during
-//     medic_pending / sniper_pending — never to living players, which
-//     would leak the secret-role identity
-//   - spectatedHand returns the target's actual hand contents
-//   - spectatedHand omitted when the target itself is eliminated
-//     (avoids exposing an empty hand or stale leak window)
+// The old #81 "spectate one chosen player's hand" feature is removed:
+// an eliminated / dead player must NEVER receive any opponent hand in a
+// room_state payload. These tests pin that no path emits `spectatedHand`.
+//
+// `currentPromptTarget` (player id + prompt kind, NO card data) is
+// retained and still gated to eliminated callers for ghost overlays;
+// its privacy tests are unchanged below.
 // ============================================================
 
 import { describe, it, expect } from 'vitest';
@@ -43,8 +40,8 @@ function setHand(room, playerId, cards) {
   room.hands.set(playerId, cards);
 }
 
-describe('serializeRoom — spectator hand gating (#81)', () => {
-  it('exposes spectatedHand to an eliminated caller with a target set', () => {
+describe('serializeRoom — spectator hand lockout (§3.2)', () => {
+  it('NEVER exposes spectatedHand to an eliminated caller, even with a target', () => {
     const room = makeOnlineRoom(3);
     const [eliminated, alive1] = room.players;
     eliminated.status = 'eliminated';
@@ -53,8 +50,8 @@ describe('serializeRoom — spectator hand gating (#81)', () => {
     setHand(room, alive1.id, aliveHand);
 
     const view = serializeRoom(room, eliminated.id, { spectatingTargetId: alive1.id });
-    expect(view.spectatedHand).toEqual(aliveHand);
-    expect(view.spectatedPlayerId).toBe(alive1.id);
+    expect(view.spectatedHand).toBeUndefined();
+    expect(view.spectatedPlayerId).toBeUndefined();
   });
 
   it('omits spectatedHand for living callers even if they claim a target', () => {
@@ -67,27 +64,21 @@ describe('serializeRoom — spectator hand gating (#81)', () => {
     expect(view.spectatedPlayerId).toBeUndefined();
   });
 
-  it('omits spectatedHand when no target is selected', () => {
+  it('only the caller ever sees a hand — opponents are limited to handSize', () => {
     const room = makeOnlineRoom(3);
-    const [eliminated] = room.players;
+    const [eliminated, alive1, alive2] = room.players;
     eliminated.status = 'eliminated';
     eliminated.isSpectator = true;
+    setHand(room, alive1.id, [{ id: 'c1', type: 'shape', shape: 'circle' }]);
+    setHand(room, alive2.id, [{ id: 'c2', type: 'shape', shape: 'square' }]);
 
-    const view = serializeRoom(room, eliminated.id);
-    expect(view.spectatedHand).toBeUndefined();
-    expect(view.spectatedPlayerId).toBeUndefined();
-  });
-
-  it('omits spectatedHand when the target itself is eliminated', () => {
-    const room = makeOnlineRoom(3);
-    const [eliminated, alsoEliminated] = room.players;
-    eliminated.status = 'eliminated';
-    eliminated.isSpectator = true;
-    alsoEliminated.status = 'eliminated';
-    alsoEliminated.isSpectator = true;
-    setHand(room, alsoEliminated.id, [{ id: 'leftover', type: 'shape', shape: 'circle' }]);
-
-    const view = serializeRoom(room, eliminated.id, { spectatingTargetId: alsoEliminated.id });
+    const view = serializeRoom(room, eliminated.id, { spectatingTargetId: alive1.id });
+    // No opponent hand array reaches the eliminated client — only counts.
+    const opponents = view.players.filter(p => p.id !== eliminated.id);
+    for (const p of opponents) {
+      expect(p).not.toHaveProperty('hand');
+      expect(typeof p.handSize).toBe('number');
+    }
     expect(view.spectatedHand).toBeUndefined();
   });
 });

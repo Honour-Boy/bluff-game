@@ -118,8 +118,10 @@ function finaliseAssassinElimination(room, outcome) {
   }
   room.phase = 'playing';
   room.spinTargetId = null;
-  room.cardPlayedThisTurn = false;
-  room.bluffUsedThisTurn = false;
+  // §1.1 — do NOT clear the turn-action ledger here. This resolves a bluff
+  // mid-turn; the accuser is still the on-turn player. Clearing cardPlayedThisTurn
+  // would re-open a second card play (the post-bluff double-play exploit). The
+  // ledger is cleared only by advanceTurn when the turn genuinely changes.
   room.lastAction = {
     type: 'assassin_strike',
     eliminatedId,
@@ -253,7 +255,9 @@ function applyBluffOutcome(room, outcome) {
   if (eventType === E.ASSASSIN_BACKFIRE) {
     room.phase = 'playing';
     room.spinTargetId = null;
-    room.cardPlayedThisTurn = false;
+    // §1.1 — turn-action ledger intentionally preserved (see
+    // finaliseAssassinElimination): the on-turn player keeps their used-up
+    // play/bluff so they can't act twice after the bluff resolves.
     room.lastAction = {
       type: 'assassin_backfire',
       accusedId: outcome.accusedId,

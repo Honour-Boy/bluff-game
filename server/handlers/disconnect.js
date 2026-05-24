@@ -12,6 +12,7 @@ const {
   _clearBettingTimer,
   _clearGhostVoteTimer,
   _clearPreGameTimer,
+  logRoomDeletion,
   saveRoom,
 } = require('../lib/state');
 const { broadcastRoomState, emitPowerCardEvents } = require('../lib/broadcast');
@@ -27,9 +28,12 @@ function register(io, socket, deps) {
 
     for (const [code, room] of rooms.entries()) {
       if (room.hostSocketId === socket.id) {
-        // 30s host grace.
+        // 30s host grace — a refresh / brief drop must NOT instantly kill the
+        // room. The timer is cancelled on host_reconnect (handlers/room.js).
+        console.log(`[Socket] host of ${code} dropped — 30s grace started (phase=${room.phase})`);
         io.to(code).emit('host_disconnecting', { countdown: 30 });
         const timer = setTimeout(() => {
+          logRoomDeletion(code, 'host_grace_expired', { phase: room.phase, groupId: room.groupId || undefined });
           io.to(code).emit('game_ended', { reason: 'The host left the game.' });
           _clearBettingTimer(code);
           _clearGhostVoteTimer(code);

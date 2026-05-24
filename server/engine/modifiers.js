@@ -210,6 +210,7 @@ function enterLastStand(room) {
   room.spinTargetId = null;
   room.cardPlayedThisTurn = false;
   room.bluffUsedThisTurn = false;
+  room.powerActivatedThisTurn = false;
   const orderedFinalists = room.turnOrder.filter(id =>
     alive.some(p => p.id === id)
   );

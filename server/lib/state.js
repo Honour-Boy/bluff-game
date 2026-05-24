@@ -48,6 +48,18 @@ function _clearBluffInterceptTimer(code) {
   if (t) { clearTimeout(t); bluffInterceptTimers.delete(code); }
 }
 
+// §2.1 — verbose, single-line structured logging for every room teardown so
+// "Room not found" reports can be traced to an explicit cause (cleanup sweep,
+// host-grace expiry, last participant out, idle dismiss). `reason` is a stable
+// code; `detail` carries context (phase, player counts, idle ms).
+function logRoomDeletion(code, reason, detail = {}) {
+  const parts = Object.entries(detail)
+    .filter(([, v]) => v !== undefined && v !== null)
+    .map(([k, v]) => `${k}=${typeof v === 'object' ? JSON.stringify(v) : v}`)
+    .join(' ');
+  console.log(`[room-gc] DELETE ${code} reason=${reason}${parts ? ' ' + parts : ''}`);
+}
+
 async function getRoom(code) {
   return rooms.get(code) || null;
 }
@@ -72,6 +84,7 @@ module.exports = {
   _clearGhostVoteTimer,
   _clearPreGameTimer,
   _clearBluffInterceptTimer,
+  logRoomDeletion,
   getRoom,
   saveRoom,
 };

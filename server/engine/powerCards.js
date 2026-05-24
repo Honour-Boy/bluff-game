@@ -256,6 +256,10 @@ function activatePowerCard(room, playerId) {
   if (!player) return { ok: false, error: 'Player not found' };
   if (player.status !== 'alive') return { ok: false, error: 'Player not alive' };
   if (player.armedPowerCard)    return { ok: false, error: 'Already armed' };
+  // §1.1 — single power activation per turn. `armedPowerCard` only catches
+  // arm-style powers; Peek is consumed-on-use and leaves no armed marker, so a
+  // Collector could Peek then arm a second power without this ledger guard.
+  if (room.powerActivatedThisTurn) return { ok: false, error: 'Already used a power card this turn' };
 
   const slot = room.powerCardSlot?.[playerId] || [];
   const powerCard = slot[0] ?? null;
@@ -271,6 +275,7 @@ function activatePowerCard(room, playerId) {
   if (powerCard.power === 'peek') {
     room.powerCardSlot[playerId] = slot.filter(c => c.id !== powerCard.id);
     room.discardPile.push(powerCard);
+    room.powerActivatedThisTurn = true; // §1.1 — counts as this turn's one power use
     // Peek reveals the previous player's play — the same snapshotted card a
     // bluff targets — NOT the live lastPlayedCard, which would be this player's
     // own card if they already played this turn (order-free actions).
@@ -286,6 +291,7 @@ function activatePowerCard(room, playerId) {
 
   // All other powers: arm the player and mark the card armed.
   powerCard.armed = true;
+  room.powerActivatedThisTurn = true; // §1.1 — counts as this turn's one power use
   player.armedPowerCard = {
     power: powerCard.power,
     cardId: powerCard.id,

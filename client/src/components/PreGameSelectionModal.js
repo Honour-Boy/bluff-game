@@ -255,6 +255,14 @@ export function PreGameSelectionModal({
                     {totalCount - pendingCount}/{totalCount} ready
                   </div>
                 )}
+                {/* §3.1 — the shared 15s selection countdown stays visible AFTER
+                    a player locks in, so they always see how long the window has
+                    left instead of the timer vanishing on confirm. */}
+                {secondsLeft != null && (
+                  <div style={{ fontFamily: "'Space Mono', monospace", fontSize: 12, color: secondsLeft <= 5 ? "var(--eliminated)" : "var(--text-dim)", letterSpacing: "0.1em", marginTop: 10 }}>
+                    {secondsLeft}s left
+                  </div>
+                )}
               </>
             )}
           </>

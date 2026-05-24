@@ -181,9 +181,28 @@ export function useGameActions({
 
   const closeChat = useCallback(() => setChatOpen(false), [setChatOpen]);
 
+  // §2.2 / §2.3 — single fail-safe leave path shared by every "Leave Room" /
+  // "Leave Game" button. Local cleanup + redirect (clearSession) ALWAYS run,
+  // even if the socket is disconnected, the room is already gone, or the server
+  // never answers — so a broken socket / "Room not found" can never trap the
+  // player in a dead view. The server notify is best-effort (try/catch) and the
+  // client never blocks on its ack.
   const leaveGame = useCallback(() => {
-    if (roomCode) socket.emit('leave_room', { roomCode, playerId });
-    sessionStorage.removeItem('bluff_session');
+    try {
+      if (roomCode && socket?.connected) {
+        socket.emit('leave_room', { roomCode, playerId }, () => {});
+      } else if (roomCode) {
+        // Socket down: fire anyway in case it flushes on reconnect, but don't rely on it.
+        try { socket?.emit('leave_room', { roomCode, playerId }); } catch (_) { /* ignore */ }
+      }
+    } catch (_) {
+      // Never let a transport error block the local exit below.
+    }
+    try {
+      sessionStorage.removeItem('bluff_session');
+    } catch (_) {
+      // sessionStorage can throw (SSR / privacy mode) — non-fatal.
+    }
     clearSession();
   }, [clearSession, playerId, roomCode, socket]);
 
@@ -193,6 +212,18 @@ export function useGameActions({
       if (!res?.success) failError(res);
     });
   }, [failError, roomCode, socket]);
+
+  // §3.4 — empty-hand recovery. Re-pull authoritative state (with myHand) when a
+  // deal/state packet was dropped. Fire-and-forget and idempotent: the server
+  // just re-emits room_state to this socket; never blocks or mutates anything.
+  const refreshRoomState = useCallback(() => {
+    if (!roomCode) return;
+    try {
+      socket.emit('request_room_state', { roomCode }, () => {});
+    } catch (_) {
+      // Transport hiccup — the next room_state push will recover us anyway.
+    }
+  }, [roomCode, socket]);
 
   return {
     createRoom,
@@ -225,5 +256,6 @@ export function useGameActions({
     closeChat,
     leaveGame,
     restartRoom,
+    refreshRoomState,
   };
 }

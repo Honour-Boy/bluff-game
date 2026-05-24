@@ -46,6 +46,7 @@ function createRoom(hostSocketId, mode = MODES.PHYSICAL, config = null) {
     lastAction: null,
     bluffUsedThisTurn: false,
     cardPlayedThisTurn: false,
+    powerActivatedThisTurn: false,
     spinTargetId: null,
     createdAt: Date.now(),
     lastActivityAt: Date.now(),

@@ -10,6 +10,7 @@ const {
   _clearBettingTimer,
   _clearGhostVoteTimer,
   _clearPreGameTimer,
+  logRoomDeletion,
   saveRoom,
 } = require('./state');
 const { broadcastRoomState } = require('./broadcast');
@@ -28,8 +29,30 @@ function startInactivitySweep(io) {
     const now = Date.now();
     for (const [code, room] of rooms.entries()) {
       const last = room.lastActivityAt ?? room.createdAt ?? now;
-      if (now - last <= INACTIVITY_THRESHOLD_MS) continue;
+      const idleMs = now - last;
+      if (idleMs <= INACTIVITY_THRESHOLD_MS) continue;
 
+      // §2.1 Retention Override — a persistent group room is protected from the
+      // generic sweep while a session is still live: anyone seated, or a game
+      // in progress, keeps it alive no matter how quiet the socket traffic has
+      // been (a long Sniper/Medic deliberation can look "idle"). Only a fully
+      // empty group room is collected; even then the next join rebuilds it from
+      // the DB-backed group, so no settings/leaderboard are lost. Ad-hoc rooms
+      // keep the original behaviour.
+      if (room.groupId) {
+        const hasParticipants = Array.isArray(room.players) && room.players.length > 0;
+        const sessionLive = !['lobby', 'game_over'].includes(room.phase);
+        if (hasParticipants || sessionLive) {
+          continue;
+        }
+      }
+
+      logRoomDeletion(code, 'inactivity_sweep', {
+        idleMs,
+        phase: room.phase,
+        groupId: room.groupId || undefined,
+        players: Array.isArray(room.players) ? room.players.length : 0,
+      });
       io.to(code).emit('game_ended', {
         reason: 'Room closed after long inactivity.',
       });
@@ -218,6 +241,7 @@ async function dismissIdleLobby(io, code, reason) {
       playerDisconnectTimers.delete(key);
     }
   }
+  logRoomDeletion(code, 'host_idle_dismiss', { reason });
   rooms.delete(code);
   console.log(`[host_idle] Dismissed ${code}: ${reason}`);
 }

@@ -164,43 +164,18 @@ export function BottomSeat({
       )}
 
       {showSpectatorView ? (
+        // §3.2 — anti-cheat lockout. An eliminated / dead player watches the
+        // table but can NO LONGER reveal any living opponent's hand. The old
+        // per-player hand picker is removed; only public info (risk, hand sizes
+        // on the chips, announcements) remains visible.
         <div className="card" style={{ marginTop: 4 }}>
           <div style={{ fontSize: 10, color: 'var(--text-dim)', letterSpacing: '0.12em', marginBottom: 10 }}>
             SPECTATING
           </div>
-          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 12 }}>
-            {alivePlayers.map((player) => (
-              <button
-                key={player.id}
-                onClick={() => handleSpectatePlayer(player.id)}
-                style={{
-                  padding: '6px 12px',
-                  fontSize: 12,
-                  border: `1px solid ${spectatingId === player.id ? 'var(--accent)' : 'var(--border)'}`,
-                  background: spectatingId === player.id ? 'rgba(232,255,74,0.06)' : 'var(--surface2)',
-                  color: spectatingId === player.id ? 'var(--accent)' : 'var(--text)',
-                  borderRadius: 'var(--radius)',
-                  cursor: 'pointer',
-                }}
-              >
-                {player.username} [{player.handSize ?? '?'}]
-              </button>
-            ))}
+          <div style={{ fontSize: 11, color: 'var(--text-dim)', lineHeight: 1.5 }}>
+            You&apos;ve been eliminated. You can follow the game, but opponents&apos;
+            hands are hidden.
           </div>
-          {spectatingId && spectatedHand.length > 0 && (
-            <>
-              <div style={{ fontSize: 10, color: 'var(--text-dim)', marginBottom: 8 }}>
-                {alivePlayers.find((player) => player.id === spectatingId)?.username}&apos;s hand
-              </div>
-              <CardHand hand={spectatedHand} selectedCardId={null} interactive={false} />
-            </>
-          )}
-          {spectatingId && spectatedHand.length === 0 && (
-            <div style={{ fontSize: 11, color: 'var(--text-dim)' }}>No cards to show.</div>
-          )}
-          {!spectatingId && (
-            <div style={{ fontSize: 11, color: 'var(--text-dim)' }}>Select a player above to see their hand.</div>
-          )}
         </div>
       ) : (
         !isLobby && !isGameOver && (

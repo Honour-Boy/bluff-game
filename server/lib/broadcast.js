@@ -21,6 +21,21 @@ async function broadcastRoomState(io, roomCode) {
   const room = await getRoom(roomCode);
   if (!room) return;
 
+  // §3.3 — push live pre-room occupancy to anyone watching this group's
+  // directory (members are subscribed to `group:<id>` via list_my_groups /
+  // get_group). Compact payload — no hands, just who's gathered and the phase.
+  if (room.groupId) {
+    const players = Array.isArray(room.players) ? room.players : [];
+    io.to(`group:${room.groupId}`).emit('group_room_status', {
+      groupId: room.groupId,
+      code: room.code,
+      playerCount: players.length,
+      phase: room.phase,
+      inLobby: room.phase === 'lobby',
+      players: players.map(p => ({ id: p.id, username: p.username, status: p.status })),
+    });
+  }
+
   if (room.mode === engine.MODES.ONLINE) {
     const sockets = await io.in(roomCode).fetchSockets();
     for (const s of sockets) {

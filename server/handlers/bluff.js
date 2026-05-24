@@ -234,7 +234,11 @@ function register(io, socket, deps) {
         }
       }
       room.spinTargetId = null;
-      room.cardPlayedThisTurn = false;
+      // §1.1 — a spin only happens as the tail of a bluff the on-turn player
+      // already called. Mark the bluff used; do NOT clear cardPlayedThisTurn —
+      // the turn has not advanced, and re-opening it would let the accuser play
+      // a second card after the spin (the post-bluff double-play exploit). The
+      // ledger clears only on advanceTurn (end_turn).
       room.bluffUsedThisTurn = true;
 
       room.lastAction = {

@@ -141,6 +141,7 @@ function resetRoundOnline(room) {
   room.prevTurnPlayerId = null;
   room.bluffUsedThisTurn = false;
   room.cardPlayedThisTurn = false;
+  room.powerActivatedThisTurn = false;
   room.isFirstTurn = true;
   room.skipNextPlayer = false;
   room.bluffBlockedThisTurn = false;
