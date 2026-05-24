@@ -9,11 +9,21 @@ const engine = require('./gameEngine');
 // ─── Supabase admin client (server-side only) ─────────────────
 // Used to verify JWT tokens and look up profiles.
 // Requires SUPABASE_URL + SUPABASE_SERVICE_ROLE_KEY env vars.
-const supabase = createClient(
-  process.env.SUPABASE_URL,
-  process.env.SUPABASE_SERVICE_ROLE_KEY,
-  { auth: { autoRefreshToken: false, persistSession: false } }
-);
+// Lazily initialised so a missing .env file doesn't crash the
+// process at startup — the authenticate handler returns a clear
+// error instead.
+let _supabase = null;
+function getSupabase() {
+  if (_supabase) return _supabase;
+  const url = process.env.SUPABASE_URL;
+  const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  if (!url || !key) {
+    console.warn('[supabase] SUPABASE_URL / SUPABASE_SERVICE_ROLE_KEY not set — auth will be unavailable.');
+    return null;
+  }
+  _supabase = createClient(url, key, { auth: { autoRefreshToken: false, persistSession: false } });
+  return _supabase;
+}
 
 /**
  * In-memory store: roomCode → roomState
@@ -64,6 +74,9 @@ function registerSocketHandlers(io, socket) {
   // Must be called once after connecting, before any game events.
   socket.on('authenticate', async ({ token } = {}, callback) => {
     if (!token) return callback?.({ success: false, error: 'No token provided' });
+
+    const supabase = getSupabase();
+    if (!supabase) return callback?.({ success: false, error: 'Auth not configured on server — set SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY' });
 
     try {
       const { data, error } = await supabase.auth.getUser(token);
@@ -794,3 +807,4 @@ function registerSocketHandlers(io, socket) {
 }
 
 module.exports = { registerSocketHandlers, rooms };
+
