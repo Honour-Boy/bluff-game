@@ -60,6 +60,28 @@ function logRoomDeletion(code, reason, detail = {}) {
   console.log(`[room-gc] DELETE ${code} reason=${reason}${parts ? ' ' + parts : ''}`);
 }
 
+// §5 — verbose turn-action state-machine telemetry. One structured line per
+// accepted turn action so a play-test trace shows exactly how the per-turn
+// ledger evolved: card / bluff / power are each capped at once-per-turn, and
+// `locked` flags the Absolute Lockout (both a card played AND a bluff resolved
+// this turn ⇒ only End Turn / post-resolution power remain). Temporary debug
+// aid — pairs with logRoomDeletion + the diagnostics interval in index.js.
+function logTurnState(code, playerId, action, room, extra = {}) {
+  const card = !!room?.cardPlayedThisTurn;
+  const bluff = !!room?.bluffUsedThisTurn;
+  const power = !!room?.powerActivatedThisTurn;
+  const locked = card && bluff;
+  const ctx = Object.entries(extra)
+    .filter(([, v]) => v !== undefined && v !== null)
+    .map(([k, v]) => `${k}=${typeof v === 'object' ? JSON.stringify(v) : v}`)
+    .join(' ');
+  console.log(
+    `[turn-state] ${code} player=${playerId} action=${action} `
+    + `ledger={card:${card},bluff:${bluff},power:${power}} locked=${locked} `
+    + `phase=${room?.phase} turnIdx=${room?.currentTurnIndex}${ctx ? ' ' + ctx : ''}`,
+  );
+}
+
 async function getRoom(code) {
   return rooms.get(code) || null;
 }
@@ -85,6 +107,7 @@ module.exports = {
   _clearPreGameTimer,
   _clearBluffInterceptTimer,
   logRoomDeletion,
+  logTurnState,
   getRoom,
   saveRoom,
 };
