@@ -13,6 +13,8 @@ const {
   _clearBettingTimer,
   _clearGhostVoteTimer,
   _clearPreGameTimer,
+  _clearSpinPendingTimer,
+  _clearGameOverTimer,
   logRoomDeletion,
 } = require('../lib/state');
 const { socketRateLimit } = require('../lib/rateLimiter');
@@ -331,6 +333,8 @@ function register(io, socket, deps) {
         _clearBettingTimer(code);
         _clearGhostVoteTimer(code);
         _clearPreGameTimer(code);
+        _clearSpinPendingTimer(code);
+        _clearGameOverTimer(code);
         discardLobbyIdleState(code);
         logRoomDeletion(code, 'last_participant_left', {
           phase: room.phase,

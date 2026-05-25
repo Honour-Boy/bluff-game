@@ -23,6 +23,15 @@ const pregameTimers = new Map();    // roomCode → setTimeout handle
 // the bluff resolves with no interception. Cleared early on arm/pass/leave.
 const bluffInterceptTimers = new Map();  // roomCode → setTimeout handle
 
+// Spin state-machine safety timers (anti-hang). One handle per room.
+//   spinPendingTimers — auto-resolves a spin the target never performs
+//                       (engine.spinGun is server-authoritative either way).
+//   gameOverTimers    — finalises a pendingGameOver the client never
+//                       acknowledges, so a decided match can't strand the room
+//                       in 'playing'. See engine/constants timeout values.
+const spinPendingTimers = new Map();  // roomCode → setTimeout handle
+const gameOverTimers = new Map();     // roomCode → setTimeout handle
+
 // Host / player disconnect grace timers.
 const hostDisconnectTimers = new Map();
 // Player disconnect timers must be visible across socket connections —
@@ -46,6 +55,14 @@ function _clearPreGameTimer(code) {
 function _clearBluffInterceptTimer(code) {
   const t = bluffInterceptTimers.get(code);
   if (t) { clearTimeout(t); bluffInterceptTimers.delete(code); }
+}
+function _clearSpinPendingTimer(code) {
+  const t = spinPendingTimers.get(code);
+  if (t) { clearTimeout(t); spinPendingTimers.delete(code); }
+}
+function _clearGameOverTimer(code) {
+  const t = gameOverTimers.get(code);
+  if (t) { clearTimeout(t); gameOverTimers.delete(code); }
 }
 
 // §2.1 — verbose, single-line structured logging for every room teardown so
@@ -99,6 +116,8 @@ module.exports = {
   ghostVoteTimers,
   pregameTimers,
   bluffInterceptTimers,
+  spinPendingTimers,
+  gameOverTimers,
   hostDisconnectTimers,
   playerDisconnectTimers,
   dcKey,
@@ -106,6 +125,8 @@ module.exports = {
   _clearGhostVoteTimer,
   _clearPreGameTimer,
   _clearBluffInterceptTimer,
+  _clearSpinPendingTimer,
+  _clearGameOverTimer,
   logRoomDeletion,
   logTurnState,
   getRoom,

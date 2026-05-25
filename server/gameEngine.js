@@ -56,6 +56,8 @@ module.exports = {
   DMH_VOTE_WINDOW_MS: constants.DMH_VOTE_WINDOW_MS,
   DMH_THRESHOLD_MARGIN: constants.DMH_THRESHOLD_MARGIN,
   SUDDEN_DEATH_THRESHOLD: constants.SUDDEN_DEATH_THRESHOLD,
+  SPIN_PENDING_TIMEOUT_MS: constants.SPIN_PENDING_TIMEOUT_MS,
+  PENDING_GAME_OVER_TIMEOUT_MS: constants.PENDING_GAME_OVER_TIMEOUT_MS,
   defaultRoomConfig: constants.defaultRoomConfig,
   normalizeRoomConfig: constants.normalizeRoomConfig,
 

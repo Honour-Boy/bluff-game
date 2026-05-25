@@ -13,6 +13,7 @@ const {
   _clearBettingTimer,
   bluffInterceptTimers,
   _clearBluffInterceptTimer,
+  _clearSpinPendingTimer,
   logTurnState,
 } = require('../lib/state');
 const { broadcastRoomState, emitPowerCardEvents } = require('../lib/broadcast');
@@ -23,11 +24,10 @@ const {
   finaliseAssassinElimination,
   applyBluffOutcome,
   applyPostElimSystemHooks,
-  _bountyOnSurvival,
+  applySpinAndBroadcast,
+  _scheduleSpinPendingTimeout,
   _bountyOnElimination,
   _maybeOpenBetting,
-  _enterLastStand,
-  _openGhostVote,
 } = require('../lib/orchestration');
 
 // ─── Shared online bluff resolution ──────────────────────────
@@ -78,7 +78,11 @@ async function _resolveOnlineBluff(io, code, room, accuserId, leaderboardRepo) {
     await maybeRecordGroupWinner(io, room, leaderboardRepo);
   }
 
-  if (room.phase === 'spin_pending') _maybeOpenBetting(io, room);
+  if (room.phase === 'spin_pending') {
+    _maybeOpenBetting(io, room);
+    // Issue 1 — guard against a spin that never gets performed.
+    _scheduleSpinPendingTimeout(io, room.code, leaderboardRepo);
+  }
 
   await saveRoom(room);
   emitPowerCardEvents(io, code, events);
@@ -143,6 +147,8 @@ function register(io, socket, deps) {
         spinTargetName: spinTarget.username,
         bluffCorrect: bluffIsCorrect,
       };
+      // Issue 1 — guard against a spin that never gets performed.
+      _scheduleSpinPendingTimeout(io, room.code, leaderboardRepo);
 
       await saveRoom(room);
       await broadcastRoomState(io, roomCode);
@@ -176,121 +182,10 @@ function register(io, socket, deps) {
       const player = room.players.find(p => p.id === playerId);
       if (!player) return callback({ success: false, error: 'Player not found' });
 
-      const riskLevelBefore = player.riskLevel;
-      const chamberBefore = [...player.chamber];
-      const spinResult = engine.spinGun(player, engine.getSpinModifiers(room));
-
-      // v2 Phase E2 — Mirror Match: queue an opposite-player spin.
-      if (
-        room.mirrorMatchActive
-        && !room._mirrorMatchInFlight
-        && room.mode === engine.MODES.ONLINE
-      ) {
-        const oppositeId = engine.getMirrorMatchOpposite(room, player.id);
-        if (oppositeId && oppositeId !== player.id) {
-          room.pendingMirrorMatchSpin = {
-            targetId: oppositeId,
-            triggeredBy: player.id,
-          };
-        }
-      }
-
-      // v2 Phase F — Bounty + Betting evaluation.
-      const bountyEvents = [];
-      if (spinResult.eliminated) {
-        _bountyOnElimination(room, player.id);
-      } else {
-        const placed = _bountyOnSurvival(room, player.id);
-        if (placed) bountyEvents.push(placed);
-      }
-      const betEvents = engine.evaluateBets(room, spinResult.eliminated);
-      _clearBettingTimer(code);
-
-      // v2 Phase D — Medic interception for spin elimination.
-      let medicPaused = false;
-      if (spinResult.eliminated) {
-        const finalise = () => {
-          engine.eliminateFromTurnOrder(room, player.id);
-          engine.newCardType(room);
-          // NOTE (bugfix): do NOT deal the current player an extra card here.
-          // The §1.1 global reshuffle below re-deals EVERY alive player's hand
-          // to its CURRENT size, so an extra draw at this point inflates the
-          // on-turn player by one card (e.g. a correct bluff that eliminates the
-          // previous player left the accuser holding 4→5). The reshuffle is now
-          // the single hand-refresh on a bluff/spin resolution.
-          const gameOverWinner = engine.checkGameOver(room);
-          if (gameOverWinner) {
-            room.pendingGameOver = { id: gameOverWinner.id, name: gameOverWinner.username };
-          }
-        };
-
-        medicPaused = maybeStartMedicPause(io, room, player.id, 'spin', finalise);
-        if (!medicPaused) finalise();
-      }
-      // NOTE: the single-player Section 7 survival reset is gone — the §1.1
-      // global reshuffle below re-deals the survivor along with everyone else.
-
-      if (!medicPaused) {
-        room.phase = 'playing';
-        // v2 Phase F — post-elim system check.
-        if (spinResult.eliminated && room.mode === engine.MODES.ONLINE) {
-          if (engine.shouldEnterLastStand(room)) {
-            _enterLastStand(io, room);
-          } else if (engine.shouldOpenGhostVote(room)) {
-            _openGhostVote(io, room);
-          }
-        }
-      }
-
-      // §1.1 — global bluff reshuffle once the spin (the bluff's tail) settles:
-      // re-deal EVERY alive player's hand + cycle the target card. Skipped while
-      // a Medic is still deciding, when the game is ending, or after the table
-      // moved into Last Stand / Ghost Vote (those own their hand handling).
-      let reshuffle = { reshuffled: false, cardType: room.currentCardType };
-      if (
-        !medicPaused
-        && room.mode === engine.MODES.ONLINE
-        && room.phase === 'playing'
-        && !room.pendingGameOver
-      ) {
-        reshuffle = engine.applyGlobalBluffReshuffle(room);
-      }
-
-      room.spinTargetId = null;
-      // §1.1 — a spin only happens as the tail of a bluff the on-turn player
-      // already called. Mark the bluff used; do NOT clear cardPlayedThisTurn —
-      // the turn has not advanced, and re-opening it would let the accuser play
-      // a second card after the spin (the post-bluff double-play exploit). The
-      // ledger clears only on advanceTurn (end_turn).
-      room.bluffUsedThisTurn = true;
-      // §5 — the spin (bluff's tail) has resolved; log the post-resolution
-      // ledger so the trace shows the Absolute Lockout engaging when a card was
-      // also played this turn (locked=true ⇒ only End Turn / power remain).
-      logTurnState(code, room.turnOrder[room.currentTurnIndex], 'bluff_resolved_spin', room, { spunBy: player.id, eliminated: spinResult.eliminated });
-
-      room.lastAction = {
-        type: 'spin_result',
-        spinTargetId: player.id,
-        spinTargetName: player.username,
-        spinIndex: spinResult.spinIndex,
-        chamber: chamberBefore,
-        chamberAfter: spinResult.chamber,
-        roll: spinResult.spinIndex,
-        eliminated: spinResult.eliminated,
-        riskLevel: spinResult.riskLevel,
-        riskLevelBefore,
-        medicPending: medicPaused,
-        ...(reshuffle.reshuffled
-          ? { globalReshuffle: true, newCardType: reshuffle.cardType }
-          : (spinResult.eliminated && !medicPaused ? { newCardType: room.currentCardType } : {})),
-      };
-
-      await saveRoom(room);
-      console.log(`[Room ${code}] ${player.username} spun slot ${spinResult.spinIndex} → ${spinResult.eliminated ? (medicPaused ? 'ELIM (Medic deciding)' : 'ELIMINATED') : 'survived'}`);
-      await broadcastRoomState(io, code);
-      // Post-spin banners (bounty + betting streak) AFTER broadcast.
-      for (const ev of bountyEvents) io.to(code).emit('power_card_triggered', ev);
-      for (const ev of betEvents) io.to(code).emit('power_card_triggered', ev);
+      // A real spin arrived — cancel the spin_pending auto-resolve safety timer
+      // (Issue 1) before running the shared spin pipeline.
+      _clearSpinPendingTimer(room.code);
+      const spinResult = await applySpinAndBroadcast(io, code, room, player, leaderboardRepo);
       callback({ success: true, spinResult });
     } catch (err) {
       callback({ success: false, error: err.message });
@@ -498,6 +393,8 @@ function register(io, socket, deps) {
 
       if (room.phase === 'spin_pending') {
         _maybeOpenBetting(io, room);
+        // Issue 1 — guard against a spin that never gets performed.
+        _scheduleSpinPendingTimeout(io, room.code, leaderboardRepo);
       }
 
       await saveRoom(room);

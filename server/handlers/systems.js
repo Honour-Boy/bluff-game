@@ -5,8 +5,10 @@
 const engine = require('../gameEngine');
 const { getRoom, saveRoom, _clearGhostVoteTimer } = require('../lib/state');
 const { broadcastRoomState } = require('../lib/broadcast');
+const { _stampPendingGameOver } = require('../lib/orchestration');
 
-function register(io, socket) {
+function register(io, socket, deps = {}) {
+  const { leaderboardRepo } = deps;
   // ─── PLAYER: Place a bet ────────────────────────────────
   // While the betting window is open, every alive player except the
   // spin target can submit `prediction: 'survive' | 'eliminated'`.
@@ -96,7 +98,9 @@ function register(io, socket) {
         engine.eliminateFromTurnOrder(room, socket.userId);
         const winner = engine.checkGameOver(room);
         if (winner) {
-          room.pendingGameOver = { id: winner.id, name: winner.username };
+          // Defer the reveal to spin_acknowledged AND arm the safety timer so a
+          // missing ack can't strand a decided Last Stand (Issue 2).
+          _stampPendingGameOver(io, room, winner, leaderboardRepo);
         }
       } else {
         // Auto-pass on survive (#69).

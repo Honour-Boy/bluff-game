@@ -7,7 +7,7 @@ const engine = require('../gameEngine');
 const { getRoom, saveRoom } = require('../lib/state');
 const { broadcastRoomState } = require('../lib/broadcast');
 const { maybeRecordGroupWinner } = require('../lib/roomBuilders');
-const { applyBluffOutcome, _maybeOpenBetting } = require('../lib/orchestration');
+const { applyBluffOutcome, _maybeOpenBetting, _scheduleSpinPendingTimeout } = require('../lib/orchestration');
 
 function register(io, socket, deps) {
   const { leaderboardRepo } = deps;
@@ -176,6 +176,8 @@ function register(io, socket, deps) {
 
       if (room.phase === 'spin_pending') {
         _maybeOpenBetting(io, room);
+        // Issue 1 — guard against a spin that never gets performed.
+        _scheduleSpinPendingTimeout(io, room.code, leaderboardRepo);
       }
 
       await saveRoom(room);

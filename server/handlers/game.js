@@ -11,12 +11,13 @@ const {
   saveRoom,
   pregameTimers,
   _clearPreGameTimer,
+  _clearGameOverTimer,
   logTurnState,
 } = require('../lib/state');
 const { broadcastRoomState } = require('../lib/broadcast');
 const { socketRateLimit } = require('../lib/rateLimiter');
 const { maybeRecordGroupWinner } = require('../lib/roomBuilders');
-const { runMirrorMatchSpin } = require('../lib/orchestration');
+const { runMirrorMatchSpin, resolvePendingGameOver } = require('../lib/orchestration');
 
 // ─── Pre-game selection orchestration (#116) ─────────────────
 // Pure phase/state logic lives in engine/pregame.js; these helpers
@@ -450,24 +451,20 @@ function register(io, socket, deps) {
     const code = roomCode?.toUpperCase();
     if (!code) return;
 
+    // The ack arrived in time — cancel the pendingGameOver safety net (Issue 2).
+    _clearGameOverTimer(code);
+
     const room = await getRoom(code);
     if (room?.pendingGameOver) {
-      const { id, name } = room.pendingGameOver;
-      room.phase = 'game_over';
-      room.lastAction = { type: 'game_over', winnerId: id, winnerName: name };
-      delete room.pendingGameOver;
-      delete room.pendingMirrorMatchSpin;
-      await maybeRecordGroupWinner(io, room, leaderboardRepo);
-      await saveRoom(room);
-      io.to(code).emit('spin_acknowledged');
-      await broadcastRoomState(io, code);
+      // Shared with the safety timer: identical game_over transition either way.
+      await resolvePendingGameOver(io, room, leaderboardRepo);
       return;
     }
 
     if (room?.pendingMirrorMatchSpin) {
       const pending = room.pendingMirrorMatchSpin;
       delete room.pendingMirrorMatchSpin;
-      await runMirrorMatchSpin(io, room, pending);
+      await runMirrorMatchSpin(io, room, pending, leaderboardRepo);
       io.to(code).emit('spin_acknowledged');
       return;
     }
