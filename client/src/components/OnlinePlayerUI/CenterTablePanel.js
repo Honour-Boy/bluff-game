@@ -60,6 +60,7 @@ export function CenterTablePanel({
   leaderboardUpdateNonce,
   myPlayer,
   lastAction,
+  displayedLastAction,
   isMySpinTurn,
   isEliminated,
   playerSpin,
@@ -198,7 +199,10 @@ export function CenterTablePanel({
         </div>
       )}
 
-      {lastAction && <ActionLog lastAction={lastAction} />}
+      {/* #185 — the Last Event line reads `displayedLastAction`, which holds a
+          spin outcome back until its cylinder animation finishes. All other
+          action types are identical to `lastAction`. */}
+      {displayedLastAction && <ActionLog lastAction={displayedLastAction} />}
       {!isMyTurn && isPlaying && currentPlayer && !isEliminated && (
         <WaitingForPlayerBanner playerName={currentPlayer.username} />
       )}
