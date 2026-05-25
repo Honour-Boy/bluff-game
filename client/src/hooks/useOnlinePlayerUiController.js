@@ -35,6 +35,10 @@ export function useOnlinePlayerUiController({
   const lastSpinKeyRef = useRef(null);
   const [spinData, setSpinData] = useState(null);
   const [spinComplete, setSpinComplete] = useState(false);
+  // #185 — what the "Last Event" panel renders. Mirrors roomState.lastAction
+  // for every action type EXCEPT a spin_result, which is held back until its
+  // cylinder animation finishes (see the spin effect below).
+  const [displayedLastAction, setDisplayedLastAction] = useState(null);
   const [cylinderRotation, setCylinderRotation] = useState(0);
   const [cylinderAnimating, setCylinderAnimating] = useState(false);
   const prevStatusRef = useRef(null);
@@ -100,11 +104,28 @@ export function useOnlinePlayerUiController({
       setCylinderRotation(finalAngle);
     }, 80);
 
-    const completeTimer = setTimeout(() => setSpinComplete(true), 8080);
+    const completeTimer = setTimeout(() => {
+      setSpinComplete(true);
+      // #185 — only now, once the cylinder has stopped, surface the spin
+      // outcome to the Last Event panel. Until here `displayedLastAction` keeps
+      // showing the pre-spin event so the result isn't readable mid-animation.
+      setDisplayedLastAction(action);
+    }, 8080);
     return () => {
       clearTimeout(startTimer);
       clearTimeout(completeTimer);
     };
+  }, [roomState?.lastAction]);
+
+  // #185 — gate ONLY the spin outcome. Every non-spin action flows into the
+  // Last Event panel immediately; a `spin_result` is withheld here and revealed
+  // by the spin effect's completion timer above. The withhold path leaves
+  // `displayedLastAction` untouched, so the pre-spin event stays visible while
+  // the gun spins.
+  useEffect(() => {
+    const action = roomState?.lastAction || null;
+    if (action?.type === 'spin_result') return;
+    setDisplayedLastAction(action);
   }, [roomState?.lastAction]);
 
   // §3.2 — spectator hand lockout. The server no longer emits `spectatedHand`,
@@ -293,6 +314,7 @@ export function useOnlinePlayerUiController({
     setSpinData,
     spinComplete,
     setSpinComplete,
+    displayedLastAction,
     cylinderRotation,
     cylinderAnimating,
     justEliminated,

@@ -289,6 +289,7 @@ export function OnlinePlayerUI({
         leaderboardUpdateNonce={leaderboardUpdateNonce}
         myPlayer={myPlayer}
         lastAction={lastAction}
+        displayedLastAction={ui.displayedLastAction}
         isMySpinTurn={isMySpinTurn}
         isEliminated={isEliminated}
         playerSpin={playerSpin}
