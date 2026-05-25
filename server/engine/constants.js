@@ -122,6 +122,21 @@ const DMH_VOTE_WINDOW_MS = 15_000;
 const DMH_THRESHOLD_MARGIN = 2;
 const SUDDEN_DEATH_THRESHOLD = 4;
 
+// ─── Spin state-machine safety timeouts (server-side anti-hang) ──
+// The spin is fully server-authoritative (chambers live on the server). If the
+// spin target never emits player_spin — the spin UI fails to mount, or a
+// transient network blip swallows the emit — the server auto-resolves the spin
+// on their behalf after this window instead of parking the room forever in
+// spin_pending. Generous, because players need time to read the prompt (and a
+// 10s betting window may run first).
+const SPIN_PENDING_TIMEOUT_MS = 90_000;
+// A spin that ends the game holds in room.pendingGameOver so the game-over
+// reveal stays in sync with the spin overlay's dismissal (the client's
+// spin_acknowledged). If that ack never arrives (both overlays glitch), the
+// server finalises game_over itself after this short grace, so a decided match
+// can't strand the room in 'playing' with every socket still alive.
+const PENDING_GAME_OVER_TIMEOUT_MS = 10_000;
+
 // ─── v2 config defaults ───────────────────────────────────────
 function defaultRoomConfig() {
   return {
@@ -223,6 +238,8 @@ module.exports = {
   DMH_VOTE_WINDOW_MS,
   DMH_THRESHOLD_MARGIN,
   SUDDEN_DEATH_THRESHOLD,
+  SPIN_PENDING_TIMEOUT_MS,
+  PENDING_GAME_OVER_TIMEOUT_MS,
   defaultRoomConfig,
   normalizeRoomConfig,
 };

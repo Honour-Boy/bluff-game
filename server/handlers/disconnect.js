@@ -12,6 +12,8 @@ const {
   _clearBettingTimer,
   _clearGhostVoteTimer,
   _clearPreGameTimer,
+  _clearSpinPendingTimer,
+  _clearGameOverTimer,
   logRoomDeletion,
   saveRoom,
 } = require('../lib/state');
@@ -38,6 +40,8 @@ function register(io, socket, deps) {
           _clearBettingTimer(code);
           _clearGhostVoteTimer(code);
           _clearPreGameTimer(code);
+          _clearSpinPendingTimer(code);
+          _clearGameOverTimer(code);
           discardLobbyIdleState(code);
           rooms.delete(code);
           hostDisconnectTimers.delete(code);

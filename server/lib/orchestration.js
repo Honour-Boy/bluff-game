@@ -10,13 +10,19 @@ const bluffPipeline = require('../bluffPipeline');
 const {
   bettingTimers,
   ghostVoteTimers,
+  spinPendingTimers,
+  gameOverTimers,
   getRoom,
   saveRoom,
   _clearBettingTimer,
   _clearGhostVoteTimer,
   _clearBluffInterceptTimer,
+  _clearSpinPendingTimer,
+  _clearGameOverTimer,
+  logTurnState,
 } = require('./state');
 const { broadcastRoomState, emitPowerCardEvents } = require('./broadcast');
+const { maybeRecordGroupWinner } = require('./roomBuilders');
 
 /**
  * Compute the alive Sniper's eligible redirect targets — every
@@ -338,6 +344,210 @@ function applyPostElimSystemHooks(io, room) {
   return { transitioned: null };
 }
 
+// ─── Spin resolution + state-machine safety timeouts ─────────
+//
+// `applySpinAndBroadcast` is the shared spin pipeline: pull the trigger for
+// `player`, run the full post-spin flow (Mirror Match queue, Bounty/Betting,
+// Medic pause, post-elim systems, global reshuffle), stamp the spin_result
+// lastAction and broadcast. The interactive `player_spin` handler calls it after
+// its own validation + betting gate; the spin_pending auto-resolve timer calls
+// it server-side when the target never spins. Keeping ONE implementation means
+// an auto-spin produces byte-for-byte the same result as a manual one.
+
+/**
+ * Run a spin for `player` and broadcast the result. Assumes the caller has
+ * already validated phase/target. Returns the raw spinResult.
+ */
+async function applySpinAndBroadcast(io, code, room, player, leaderboardRepo) {
+  // Auto-spin path: a betting window may still be open (the 10s window is
+  // shorter than the spin timeout, but close it defensively so the spin can
+  // proceed exactly as the interactive handler does once betting clears).
+  if (room.betting && !room.betting.closed) {
+    engine.closeBettingWindow(room);
+    _clearBettingTimer(code);
+  }
+
+  const riskLevelBefore = player.riskLevel;
+  const chamberBefore = [...player.chamber];
+  const spinResult = engine.spinGun(player, engine.getSpinModifiers(room));
+
+  // v2 Phase E2 — Mirror Match: queue an opposite-player spin.
+  if (
+    room.mirrorMatchActive
+    && !room._mirrorMatchInFlight
+    && room.mode === engine.MODES.ONLINE
+  ) {
+    const oppositeId = engine.getMirrorMatchOpposite(room, player.id);
+    if (oppositeId && oppositeId !== player.id) {
+      room.pendingMirrorMatchSpin = { targetId: oppositeId, triggeredBy: player.id };
+    }
+  }
+
+  // v2 Phase F — Bounty + Betting evaluation.
+  const bountyEvents = [];
+  if (spinResult.eliminated) {
+    _bountyOnElimination(room, player.id);
+  } else {
+    const placed = _bountyOnSurvival(room, player.id);
+    if (placed) bountyEvents.push(placed);
+  }
+  const betEvents = engine.evaluateBets(room, spinResult.eliminated);
+  _clearBettingTimer(code);
+
+  // v2 Phase D — Medic interception for spin elimination.
+  let medicPaused = false;
+  if (spinResult.eliminated) {
+    const finalise = () => {
+      engine.eliminateFromTurnOrder(room, player.id);
+      engine.newCardType(room);
+      // NOTE (bugfix): do NOT deal the current player an extra card here. The
+      // §1.1 global reshuffle below re-deals EVERY alive player's hand to its
+      // CURRENT size, so an extra draw here inflates the on-turn player by one.
+      const gameOverWinner = engine.checkGameOver(room);
+      if (gameOverWinner) {
+        // Stamp the deferred game-over AND arm its safety timeout. Running this
+        // inside finalise covers the deferred Medic-decline path too (medic_decide
+        // calls this same closure).
+        _stampPendingGameOver(io, room, gameOverWinner, leaderboardRepo);
+      }
+    };
+
+    medicPaused = maybeStartMedicPause(io, room, player.id, 'spin', finalise);
+    if (!medicPaused) finalise();
+  }
+
+  if (!medicPaused) {
+    room.phase = 'playing';
+    // v2 Phase F — post-elim system check.
+    if (spinResult.eliminated && room.mode === engine.MODES.ONLINE) {
+      if (engine.shouldEnterLastStand(room)) {
+        _enterLastStand(io, room);
+      } else if (engine.shouldOpenGhostVote(room)) {
+        _openGhostVote(io, room);
+      }
+    }
+  }
+
+  // §1.1 — global bluff reshuffle once the spin (the bluff's tail) settles:
+  // re-deal EVERY alive player's hand + cycle the target card. Skipped while a
+  // Medic is deciding, when the game is ending, or after Last Stand / Ghost Vote
+  // (those own their hand handling).
+  let reshuffle = { reshuffled: false, cardType: room.currentCardType };
+  if (
+    !medicPaused
+    && room.mode === engine.MODES.ONLINE
+    && room.phase === 'playing'
+    && !room.pendingGameOver
+  ) {
+    reshuffle = engine.applyGlobalBluffReshuffle(room);
+  }
+
+  room.spinTargetId = null;
+  // §1.1 — a spin only happens as the tail of a bluff the on-turn player already
+  // called. Mark the bluff used; do NOT clear cardPlayedThisTurn (the turn has
+  // not advanced — re-opening it would allow a post-bluff double play). The
+  // ledger clears only on advanceTurn (end_turn).
+  room.bluffUsedThisTurn = true;
+  logTurnState(code, room.turnOrder[room.currentTurnIndex], 'bluff_resolved_spin', room, { spunBy: player.id, eliminated: spinResult.eliminated });
+
+  room.lastAction = {
+    type: 'spin_result',
+    spinTargetId: player.id,
+    spinTargetName: player.username,
+    spinIndex: spinResult.spinIndex,
+    chamber: chamberBefore,
+    chamberAfter: spinResult.chamber,
+    roll: spinResult.spinIndex,
+    eliminated: spinResult.eliminated,
+    riskLevel: spinResult.riskLevel,
+    riskLevelBefore,
+    medicPending: medicPaused,
+    ...(reshuffle.reshuffled
+      ? { globalReshuffle: true, newCardType: reshuffle.cardType }
+      : (spinResult.eliminated && !medicPaused ? { newCardType: room.currentCardType } : {})),
+  };
+
+  await saveRoom(room);
+  console.log(`[Room ${code}] ${player.username} spun slot ${spinResult.spinIndex} → ${spinResult.eliminated ? (medicPaused ? 'ELIM (Medic deciding)' : 'ELIMINATED') : 'survived'}`);
+  await broadcastRoomState(io, code);
+  // Post-spin banners (bounty + betting streak) AFTER broadcast.
+  for (const ev of bountyEvents) io.to(code).emit('power_card_triggered', ev);
+  for (const ev of betEvents) io.to(code).emit('power_card_triggered', ev);
+  return spinResult;
+}
+
+/**
+ * Issue 1 — arm the spin_pending auto-resolve timer. If the target never emits
+ * player_spin within SPIN_PENDING_TIMEOUT_MS (and the room is still parked on
+ * the same spin), the server performs the spin itself. Cleared on player_spin
+ * and on room teardown. Idempotent: re-arming clears any prior handle.
+ */
+function _scheduleSpinPendingTimeout(io, code, leaderboardRepo) {
+  _clearSpinPendingTimer(code);
+  const handle = setTimeout(async () => {
+    spinPendingTimers.delete(code);
+    try {
+      const room = await getRoom(code);
+      // Only auto-spin if still genuinely waiting on the same spin.
+      if (!room || room.phase !== 'spin_pending') return;
+      const player = room.players.find(p => p.id === room.spinTargetId);
+      if (!player || player.status !== 'alive') return;
+      console.log(`[Room ${code}] spin_pending TIMED OUT — auto-spinning for ${player.username} server-side.`);
+      await applySpinAndBroadcast(io, code, room, player, leaderboardRepo);
+    } catch (err) {
+      console.error('[spin_pending timeout]', err);
+    }
+  }, engine.SPIN_PENDING_TIMEOUT_MS);
+  spinPendingTimers.set(code, handle);
+}
+
+/**
+ * Stamp room.pendingGameOver and arm its auto-finalise timer (Issue 2). The
+ * game-over reveal is deferred to the client's spin_acknowledged so it lands in
+ * sync with the spin overlay; this timer guarantees it still resolves if that
+ * ack never arrives.
+ */
+function _stampPendingGameOver(io, room, winner, leaderboardRepo) {
+  room.pendingGameOver = { id: winner.id, name: winner.username };
+  _scheduleGameOverTimeout(io, room.code, leaderboardRepo);
+}
+
+function _scheduleGameOverTimeout(io, code, leaderboardRepo) {
+  _clearGameOverTimer(code);
+  const handle = setTimeout(async () => {
+    gameOverTimers.delete(code);
+    try {
+      const room = await getRoom(code);
+      if (!room || !room.pendingGameOver) return;
+      console.log(`[Room ${code}] pendingGameOver auto-finalised — spin_acknowledged never arrived.`);
+      await resolvePendingGameOver(io, room, leaderboardRepo);
+    } catch (err) {
+      console.error('[pendingGameOver timeout]', err);
+    }
+  }, engine.PENDING_GAME_OVER_TIMEOUT_MS);
+  gameOverTimers.set(code, handle);
+}
+
+/**
+ * Transition a held pendingGameOver into the final game_over state. The single
+ * implementation shared by the spin_acknowledged handler (client-driven) and
+ * the pendingGameOver safety timer (server-driven) — identical behaviour either
+ * way.
+ */
+async function resolvePendingGameOver(io, room, leaderboardRepo) {
+  const code = room.code;
+  _clearGameOverTimer(code);
+  const { id, name } = room.pendingGameOver;
+  room.phase = 'game_over';
+  room.lastAction = { type: 'game_over', winnerId: id, winnerName: name };
+  delete room.pendingGameOver;
+  delete room.pendingMirrorMatchSpin;
+  await maybeRecordGroupWinner(io, room, leaderboardRepo);
+  await saveRoom(room);
+  io.to(code).emit('spin_acknowledged');
+  await broadcastRoomState(io, code);
+}
+
 /**
  * v2 Phase E2 — Mirror Match second-spin runner.
  * Called from spin_acknowledged after the primary spin's overlay is
@@ -345,7 +555,7 @@ function applyPostElimSystemHooks(io, room) {
  * opposite-player target, broadcasts a spin_result lastAction, and
  * handles game-over hold-back identically to the primary path.
  */
-async function runMirrorMatchSpin(io, room, pending) {
+async function runMirrorMatchSpin(io, room, pending, leaderboardRepo) {
   if (!room || !pending?.targetId) return;
   const code = room.code;
   const target = room.players.find(p => p.id === pending.targetId);
@@ -370,7 +580,7 @@ async function runMirrorMatchSpin(io, room, pending) {
         // refresh is owned by the survival reset / §1.1 global reshuffle.
         const gameOverWinner = engine.checkGameOver(room);
         if (gameOverWinner) {
-          room.pendingGameOver = { id: gameOverWinner.id, name: gameOverWinner.username };
+          _stampPendingGameOver(io, room, gameOverWinner, leaderboardRepo);
         }
       };
 
@@ -485,6 +695,10 @@ module.exports = {
   _enterLastStand,
   applyBluffOutcome,
   applyPostElimSystemHooks,
+  applySpinAndBroadcast,
+  _scheduleSpinPendingTimeout,
+  _stampPendingGameOver,
+  resolvePendingGameOver,
   runMirrorMatchSpin,
   resolveLeaverPendingPauses,
 };
