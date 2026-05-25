@@ -723,7 +723,7 @@ describe('resetHandOnSurvival (Section 7)', () => {
     return room;
   }
 
-  it('discards shape cards and deals 6 fresh shapes on normal survival; retains held power cards (#62)', () => {
+  it('returns surrendered shape cards to the draw pile and deals 6 fresh shapes on normal survival; retains held power cards (#62, #184)', () => {
     const room = setupSurvivor();
     const before = room.hands.get('p0').slice();
     const retainedPowers = before.filter(c => c.type === 'power');
@@ -737,11 +737,15 @@ describe('resetHandOnSurvival (Section 7)', () => {
     for (const pc of retainedPowers) {
       expect(after.find(c => c.id === pc.id)).toBeTruthy();
     }
-    // The old SHAPE cards landed in the discard pile (power cards did not).
+    // #184 — the surrendered SHAPE cards go back into the DRAW PILE (not the
+    // discard pile, which is never recycled). Retained power cards stay in hand,
+    // so they're in neither pile.
     for (const card of shapesBefore) {
-      expect(room.discardPile.find(c => c.id === card.id)).toBeTruthy();
+      expect(room.deck.find(c => c.id === card.id)).toBeTruthy();
+      expect(room.discardPile.find(c => c.id === card.id)).toBeFalsy();
     }
     for (const pc of retainedPowers) {
+      expect(room.deck.find(c => c.id === pc.id)).toBeFalsy();
       expect(room.discardPile.find(c => c.id === pc.id)).toBeFalsy();
     }
   });

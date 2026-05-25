@@ -15,6 +15,7 @@ import {
   MODES,
   SHAPES,
   applyGlobalBluffReshuffle,
+  resetHandOnSurvival,
   eliminateFromTurnOrder,
   GAME_EVENT_TYPES,
 } from '../gameEngine.js';
@@ -140,5 +141,85 @@ describe('§1.1 reshuffle fires on a resolved bluff (orchestration)', () => {
     expect(SHAPES).toContain(room.lastAction.newCardType);
     expect(room.hands.get('p0').some(c => c.id === 'o0')).toBe(false);
     expect(room.hands.get('p1').some(c => c.id === 'o1')).toBe(false);
+  });
+});
+
+// ─── #184 — draw-pile count invariance ───────────────────────
+//
+// The reshuffle is a full-hand SWAP: every surrendered shape card is returned
+// to the draw pile before fresh ones are drawn, so the pile count is unchanged.
+// Previously the surrendered cards were pushed to room.discardPile, which
+// ensureDrawPile NEVER recycles — so the draw pile bled down on every reshuffle
+// and drifted further wrong the more bluffs resolved.
+describe('#184 — draw-pile count stays constant across reshuffles', () => {
+  it('keeps the draw-pile (deck) count invariant across a single global reshuffle', () => {
+    const room = onlineRoom(['p0', 'p1', 'p2']);
+    room.hands.set('p0', [
+      { id: 'old-0a', type: 'shape', shape: 'circle', number: 1 },
+      { id: 'old-0b', type: 'shape', shape: 'circle', number: 2 },
+      { id: 'pow-0', type: 'power', power: 'shield' },
+    ]);
+    room.hands.set('p1', [{ id: 'old-1a', type: 'shape', shape: 'square', number: 3 }]);
+    room.hands.set('p2', [
+      { id: 'old-2a', type: 'shape', shape: 'triangle', number: 4 },
+      { id: 'old-2b', type: 'shape', shape: 'triangle', number: 5 },
+    ]);
+    const deckBefore = room.deck.length;
+
+    applyGlobalBluffReshuffle(room);
+
+    expect(room.deck.length).toBe(deckBefore);
+    // Nothing leaked into the never-recycled discard pile.
+    expect(room.discardPile).toHaveLength(0);
+  });
+
+  it('does NOT drift the draw-pile count across repeated reshuffles (the cumulative bug)', () => {
+    const room = onlineRoom(['p0', 'p1']);
+    room.hands.set('p0', [
+      { id: 'a1', type: 'shape', shape: 'circle', number: 1 },
+      { id: 'a2', type: 'shape', shape: 'square', number: 2 },
+      { id: 'a3', type: 'shape', shape: 'triangle', number: 3 },
+    ]);
+    room.hands.set('p1', [
+      { id: 'b1', type: 'shape', shape: 'star', number: 4 },
+      { id: 'b2', type: 'shape', shape: 'cross', number: 5 },
+    ]);
+    const deckBefore = room.deck.length;
+
+    for (let i = 0; i < 6; i++) applyGlobalBluffReshuffle(room);
+
+    expect(room.deck.length).toBe(deckBefore);
+    expect(room.discardPile).toHaveLength(0);
+  });
+
+  it('resetHandOnSurvival returns surrendered shapes to the draw pile (not discard) and never re-deals them to their owner', () => {
+    const room = onlineRoom(['p0']);
+    room.hands.set('p0', [
+      { id: 's1', type: 'shape', shape: 'circle', number: 1 },
+      { id: 's2', type: 'shape', shape: 'square', number: 2 },
+      { id: 's3', type: 'shape', shape: 'triangle', number: 3 },
+    ]);
+    const deckBefore = room.deck.length;
+
+    const dealt = resetHandOnSurvival(room, 'p0'); // equal swap (3 → 3)
+
+    expect(dealt).toHaveLength(3);
+    expect(room.deck.length).toBe(deckBefore); // 3 returned, 3 drawn → net 0
+    expect(room.discardPile).toHaveLength(0);
+    expect(room.hands.get('p0').some(c => ['s1', 's2', 's3'].includes(c.id))).toBe(false);
+  });
+
+  it('grows the draw pile when fewer cards are re-dealt than surrendered (redemption 5 → 3)', () => {
+    const room = onlineRoom(['p0']);
+    room.hands.set('p0', Array.from({ length: 5 }).map((_, i) => ({
+      id: `s${i}`, type: 'shape', shape: 'circle', number: i + 1,
+    })));
+    const deckBefore = room.deck.length;
+
+    const dealt = resetHandOnSurvival(room, 'p0', 3); // redemption: surrender 5, draw 3
+
+    expect(dealt).toHaveLength(3);
+    expect(room.deck.length).toBe(deckBefore + 2); // returned 5 − drew 3
+    expect(room.discardPile).toHaveLength(0);
   });
 });
