@@ -9,6 +9,7 @@
 const { MODES, BOUNTY_THRESHOLD } = require('./constants');
 const { pullTrigger } = require('./chamber');
 const { drawCardForPlayer, newCardType } = require('./cards');
+const { shuffleDeck } = require('./deck');
 
 /**
  * Pluck the risk-modifier flags out of room.config defensively. Used
@@ -54,13 +55,22 @@ function spinGun(player, modifiers = {}) {
 
 /**
  * Survive-and-reset (Section 7 of v2 spec, locked):
- * When an online-mode player SURVIVES a spin, their existing SHAPE
- * hand is discarded and they are dealt a fresh batch of cards. Power
- * cards survive the spin (issue #62).
+ * When an online-mode player SURVIVES a spin, their existing SHAPE hand is
+ * surrendered and they are dealt a fresh batch of cards. Power cards survive
+ * the spin (issue #62).
  *
- *   - Normal spin survival → fresh cards EQUAL to the surviving SHAPE
+ *   - Normal spin survival → fresh cards EQUAL to the surrendered SHAPE
  *     count (omit cardsToDeal).
  *   - Redemption Spin survival → 3 fresh cards (caller passes 3).
+ *
+ * #184 — the surrendered cards are returned to the DRAW PILE (`room.deck`) and
+ * reshuffled, NOT pushed to the discard pile. The discard pile is never recycled
+ * (ensureDrawPile only feeds off the played pile), so discarding here permanently
+ * bled the draw-pile count down on every survival/global reshuffle. Returning
+ * them keeps an equal-sized swap net-zero on the draw-pile count, and an unequal
+ * redeal (redemption: surrender N, draw 3) changes the pile by exactly N − dealt.
+ * We deal FIRST, then return, so a player can never be re-dealt the very cards
+ * they just surrendered.
  */
 function resetHandOnSurvival(room, playerId, cardsToDeal = null) {
   if (room.mode !== MODES.ONLINE) return [];
@@ -70,16 +80,12 @@ function resetHandOnSurvival(room, playerId, cardsToDeal = null) {
   if (!player) return [];
   if (player.status !== 'alive') return [];
 
-  if (!room.discardPile) room.discardPile = [];
-
   const oldHand = room.hands.get(playerId) || [];
   const retainedPowerCards = oldHand.filter(c => c?.type === 'power');
   const shapeCards = oldHand.filter(c => c?.type !== 'power');
   const targetCount = cardsToDeal == null ? shapeCards.length : cardsToDeal;
 
-  for (const card of shapeCards) {
-    room.discardPile.push(card);
-  }
+  // Clear to the retained power cards before redealing.
   room.hands.set(playerId, retainedPowerCards.slice());
 
   if (player.armedPowerCard) {
@@ -89,12 +95,20 @@ function resetHandOnSurvival(room, playerId, cardsToDeal = null) {
     }
   }
 
+  // Deal the fresh hand from the CURRENT draw pile first (the surrendered cards
+  // are not back in the pile yet, so they can't be re-dealt to their owner).
   const dealt = [];
   for (let i = 0; i < targetCount; i++) {
     const card = drawCardForPlayer(room, playerId);
     if (card) dealt.push(card);
     else break;
   }
+
+  // Return the surrendered shape cards to the draw pile and reshuffle (#184).
+  if (shapeCards.length) {
+    room.deck = shuffleDeck([...(room.deck || []), ...shapeCards]);
+  }
+
   return dealt;
 }
 
