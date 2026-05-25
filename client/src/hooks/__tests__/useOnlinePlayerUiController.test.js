@@ -74,6 +74,41 @@ describe('useOnlinePlayerUiController — Last Event spin gating (#185)', () => 
     expect(result.current.displayedLastAction).toEqual(SPIN_RESULT);
   });
 
+  it('does not blank the panel: holds the last renderable event through the spin_pending "must spin" marker', () => {
+    // Real online sequence is card_played_online -> spin_pending -> spin_result.
+    // ActionLog renders nothing for spin_pending, so it must NOT replace the
+    // displayed event — otherwise the panel goes blank during the wait + spin.
+    const cardPlayed = {
+      type: 'card_played_online',
+      playerName: 'Alice',
+      card: { shape: 'circle', number: 3 },
+    };
+    const spinPending = {
+      type: 'spin_pending',
+      spinTargetName: 'Bob',
+      bluffCorrect: true,
+      autoResolved: true,
+    };
+    const { result, rerender } = renderHook(
+      (props) => useOnlinePlayerUiController(props),
+      { initialProps: makeProps(cardPlayed) },
+    );
+    expect(result.current.displayedLastAction).toEqual(cardPlayed);
+
+    // "Must spin" marker arrives — panel keeps the card, does not go blank.
+    act(() => rerender(makeProps(spinPending)));
+    expect(result.current.displayedLastAction).toEqual(cardPlayed);
+
+    // The spin animates — still the card, never blank, never the outcome yet.
+    act(() => rerender(makeProps(SPIN_RESULT)));
+    act(() => vi.advanceTimersByTime(4000));
+    expect(result.current.displayedLastAction).toEqual(cardPlayed);
+
+    // Cylinder stops — outcome revealed.
+    act(() => vi.advanceTimersByTime(4080));
+    expect(result.current.displayedLastAction).toEqual(SPIN_RESULT);
+  });
+
   it('passes non-spin actions through immediately (only spin_result is gated)', () => {
     const cardPlayed = {
       type: 'card_played_online',

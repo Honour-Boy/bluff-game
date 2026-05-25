@@ -117,14 +117,17 @@ export function useOnlinePlayerUiController({
     };
   }, [roomState?.lastAction]);
 
-  // #185 — gate ONLY the spin outcome. Every non-spin action flows into the
-  // Last Event panel immediately; a `spin_result` is withheld here and revealed
-  // by the spin effect's completion timer above. The withhold path leaves
-  // `displayedLastAction` untouched, so the pre-spin event stays visible while
-  // the gun spins.
+  // #185 — keep the Last Event panel showing the event that LED to the spin
+  // while the cylinder animates, then reveal the outcome only once it stops.
+  // Two action types are withheld here so `displayedLastAction` retains the
+  // prior *renderable* event instead of going blank:
+  //   • `spin_result`  — surfaced by the spin effect's completion timer above.
+  //   • `spin_pending` — the "must spin" marker; ActionLog renders nothing for
+  //     it, so letting it through would empty the panel during the wait + spin.
+  // Every other (renderable) action still flows straight through.
   useEffect(() => {
     const action = roomState?.lastAction || null;
-    if (action?.type === 'spin_result') return;
+    if (action?.type === 'spin_result' || action?.type === 'spin_pending') return;
     setDisplayedLastAction(action);
   }, [roomState?.lastAction]);
 
