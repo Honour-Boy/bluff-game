@@ -14,6 +14,7 @@ const {
   bluffInterceptTimers,
   _clearBluffInterceptTimer,
   logTurnState,
+  nextActionId,
 } = require('../lib/state');
 const { broadcastRoomState, emitPowerCardEvents } = require('../lib/broadcast');
 const { maybeRecordGroupWinner } = require('../lib/roomBuilders');
@@ -270,6 +271,9 @@ function register(io, socket, deps) {
 
       room.lastAction = {
         type: 'spin_result',
+        // Stable id so the client keys the spin animation on identity, not on
+        // the lastAction object ref (which a rebroadcast would change mid-spin).
+        actionId: nextActionId(),
         spinTargetId: player.id,
         spinTargetName: player.username,
         spinIndex: spinResult.spinIndex,

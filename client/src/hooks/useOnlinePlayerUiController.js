@@ -32,7 +32,7 @@ export function useOnlinePlayerUiController({
   const tableCenterRef = useRef(null);
   const [spectatingId, setSpectatingId] = useState(null);
   const [spectatedHand, setSpectatedHand] = useState([]);
-  const lastSpinKeyRef = useRef(null);
+  const latestSpinActionRef = useRef(null);
   const [spinData, setSpinData] = useState(null);
   const [spinComplete, setSpinComplete] = useState(false);
   const [cylinderRotation, setCylinderRotation] = useState(0);
@@ -67,13 +67,24 @@ export function useOnlinePlayerUiController({
 
   useAnnouncementSpeech(announcementHead, { enabled: speechEnabled });
 
-  useEffect(() => {
-    const action = roomState?.lastAction;
-    if (action?.type !== 'spin_result') return undefined;
+  // The same spin_result rebroadcasts on every room_state push (serializeRoom
+  // rebuilds lastAction each time). Key the animation on the server's stable
+  // `actionId` — NOT the lastAction object ref — so an incidental rebroadcast
+  // (a reconnect / join / config change) during the ~8s spin can't re-run this
+  // effect, cancel the completion timer, and leave the full-screen overlay
+  // hung. Falls back to the immutable spin fields for any payload predating
+  // actionId. The ref hands the effect the latest spin snapshot without putting
+  // the ever-changing object into the dependency array.
+  const spinAction = roomState?.lastAction?.type === 'spin_result' ? roomState.lastAction : null;
+  const spinResultId = spinAction
+    ? (spinAction.actionId ?? `${spinAction.spinTargetId}:${spinAction.spinIndex}:${spinAction.eliminated}`)
+    : null;
+  latestSpinActionRef.current = spinAction;
 
-    const actionKey = `${action.spinTargetId}:${JSON.stringify(action.chamber)}`;
-    if (lastSpinKeyRef.current === actionKey) return undefined;
-    lastSpinKeyRef.current = actionKey;
+  useEffect(() => {
+    if (spinResultId == null) return undefined;
+    const action = latestSpinActionRef.current;
+    if (!action) return undefined;
 
     const { spinIndex, eliminated, spinTargetName, spinTargetId: targetId, chamber } = action;
     const landingChamberIndex = spinIndex ?? 0;
@@ -105,7 +116,7 @@ export function useOnlinePlayerUiController({
       clearTimeout(startTimer);
       clearTimeout(completeTimer);
     };
-  }, [roomState?.lastAction]);
+  }, [spinResultId]);
 
   // §3.2 — spectator hand lockout. The server no longer emits `spectatedHand`,
   // so there is nothing to sync. `spectatedHand` stays an empty array and

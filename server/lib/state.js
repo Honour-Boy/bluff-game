@@ -82,6 +82,20 @@ function logTurnState(code, playerId, action, room, extra = {}) {
   );
 }
 
+// Monotonic per-process action id. Stamped onto transient `lastAction`
+// payloads (currently spin results) so the client can key its spin animation
+// on a STABLE identity instead of the lastAction object reference. serializeRoom
+// rebuilds lastAction on every broadcast, so without a stable id an incidental
+// rebroadcast (a reconnect / join / config change) landing mid-animation tears
+// the client's effect down and hangs the spin overlay. Strictly increasing, so
+// each new spin is always distinct from the one before it. Rooms are in-memory,
+// so ids never need to survive a restart.
+let _actionSeq = 0;
+function nextActionId() {
+  _actionSeq += 1;
+  return _actionSeq;
+}
+
 async function getRoom(code) {
   return rooms.get(code) || null;
 }
@@ -108,6 +122,7 @@ module.exports = {
   _clearBluffInterceptTimer,
   logRoomDeletion,
   logTurnState,
+  nextActionId,
   getRoom,
   saveRoom,
 };

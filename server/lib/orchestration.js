@@ -15,6 +15,7 @@ const {
   _clearBettingTimer,
   _clearGhostVoteTimer,
   _clearBluffInterceptTimer,
+  nextActionId,
 } = require('./state');
 const { broadcastRoomState, emitPowerCardEvents } = require('./broadcast');
 
@@ -385,6 +386,9 @@ async function runMirrorMatchSpin(io, room, pending) {
 
     room.lastAction = {
       type: 'spin_result',
+      // Stable id — see handlers/bluff.js player_spin. Keeps the client's spin
+      // animation keyed on identity rather than the rebuilt lastAction object.
+      actionId: nextActionId(),
       spinTargetId: target.id,
       spinTargetName: target.username,
       spinIndex: spinResult.spinIndex,
