@@ -17,6 +17,17 @@ function emitPowerCardEvents(io, roomCode, events) {
   }
 }
 
+/**
+ * Tell every player in the room that the acting host changed — a group
+ * stand-in was appointed (`reason: 'standin'`) or host was reclaimed /
+ * handed back to the owner (`reason: 'reclaimed'`). Host *controls* still
+ * follow room_state's `amHost`; this event only drives the toast (#183).
+ */
+function emitHostChanged(io, roomCode, { hostId, hostName, reason } = {}) {
+  if (!roomCode || !hostId || !hostName) return;
+  io.to(roomCode).emit('host_changed', { hostId, hostName, reason });
+}
+
 async function broadcastRoomState(io, roomCode) {
   const room = await getRoom(roomCode);
   if (!room) return;
@@ -54,5 +65,6 @@ async function broadcastRoomState(io, roomCode) {
 
 module.exports = {
   emitPowerCardEvents,
+  emitHostChanged,
   broadcastRoomState,
 };

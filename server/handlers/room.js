@@ -18,7 +18,7 @@ const {
   logRoomDeletion,
 } = require('../lib/state');
 const { socketRateLimit } = require('../lib/rateLimiter');
-const { broadcastRoomState } = require('../lib/broadcast');
+const { broadcastRoomState, emitHostChanged } = require('../lib/broadcast');
 const {
   buildAdHocRoom,
   buildPersistentGroupRoom,
@@ -154,7 +154,12 @@ function register(io, socket, deps) {
         return callback({ success: false, error: 'Not the host of this room' });
       }
 
-      if (hostDisconnectTimers.has(code)) {
+      // Was a teardown actually pending? Only then did the room see the host
+      // drop (and get the `host_disconnecting` countdown), so only then should
+      // the return be announced — this also avoids a duplicate toast if
+      // host_reconnect fires twice for one reconnect.
+      const wasDisconnected = hostDisconnectTimers.has(code);
+      if (wasDisconnected) {
         clearTimeout(hostDisconnectTimers.get(code));
         hostDisconnectTimers.delete(code);
         console.log(`[Socket] host of ${code} reconnected within grace — teardown cancelled`);
@@ -165,6 +170,19 @@ function register(io, socket, deps) {
       socket.join(code);
       callback({ success: true, isHost: true, mode: room.mode });
       await broadcastRoomState(io, code);
+
+      // #183 — pair the `host_disconnecting` countdown with a "host is back"
+      // toast so the table learns the original host reclaimed controls. The
+      // host may not be seated as a player (physical mode), so fall back to the
+      // authenticated socket username.
+      if (wasDisconnected) {
+        const hostPlayer = room.players.find(p => p.id === socket.userId);
+        emitHostChanged(io, code, {
+          hostId: socket.userId,
+          hostName: hostPlayer?.username || socket.username,
+          reason: 'reclaimed',
+        });
+      }
     } catch (err) {
       callback({ success: false, error: err.message });
     }

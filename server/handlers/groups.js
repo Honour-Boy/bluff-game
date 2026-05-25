@@ -4,7 +4,7 @@
 
 const engine = require('../gameEngine');
 const { rooms, saveRoom } = require('../lib/state');
-const { broadcastRoomState } = require('../lib/broadcast');
+const { broadcastRoomState, emitHostChanged } = require('../lib/broadcast');
 const { getGroupAuthError, maybeRecordGroupWinner } = require('../lib/roomBuilders');
 const { socketRateLimit } = require('../lib/rateLimiter');
 
@@ -121,7 +121,8 @@ function register(io, socket, deps) {
 
   // Point any live rooms for this group at the new acting host so in-game
   // host controls follow the stand-in / reclaim / hand-back. #145
-  async function syncLiveRoomHosts(groupId, newHostUserId) {
+  // `reason` ('standin' | 'reclaimed') drives the #183 host_changed toast.
+  async function syncLiveRoomHosts(groupId, newHostUserId, reason) {
     for (const room of rooms.values()) {
       if (room.groupId !== groupId) continue;
       const nextHostPlayer = room.players.find((player) => player.id === newHostUserId);
@@ -136,6 +137,13 @@ function register(io, socket, deps) {
       room.hostSocketId = nextHostPlayer.socketId || null;
       await saveRoom(room);
       await broadcastRoomState(io, room.code);
+      // #183 — room_state already moves the host controls; this dedicated event
+      // is what every client toasts so the table knows who now holds them.
+      emitHostChanged(io, room.code, {
+        hostId: newHostUserId,
+        hostName: nextHostPlayer.username,
+        reason,
+      });
     }
   }
 
@@ -202,7 +210,7 @@ function register(io, socket, deps) {
         hostUserId: socket.userId,
         newHostUserId,
       });
-      await syncLiveRoomHosts(groupId, result.hostUserId);
+      await syncLiveRoomHosts(groupId, result.hostUserId, 'standin');
       callback?.({ success: true });
     } catch (err) {
       callback?.({ success: false, error: err.message });
@@ -215,7 +223,7 @@ function register(io, socket, deps) {
       const authError = getGroupAuthError(socket);
       if (authError) return callback?.({ success: false, error: authError });
       const result = await groupsRepo.reclaimHost({ groupId, userId: socket.userId });
-      await syncLiveRoomHosts(groupId, result.hostUserId);
+      await syncLiveRoomHosts(groupId, result.hostUserId, 'reclaimed');
       callback?.({ success: true });
     } catch (err) {
       callback?.({ success: false, error: err.message });
@@ -228,7 +236,7 @@ function register(io, socket, deps) {
       const authError = getGroupAuthError(socket);
       if (authError) return callback?.({ success: false, error: authError });
       const result = await groupsRepo.handBackHost({ groupId, userId: socket.userId });
-      await syncLiveRoomHosts(groupId, result.hostUserId);
+      await syncLiveRoomHosts(groupId, result.hostUserId, 'reclaimed');
       callback?.({ success: true });
     } catch (err) {
       callback?.({ success: false, error: err.message });
