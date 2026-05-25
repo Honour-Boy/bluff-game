@@ -122,6 +122,24 @@ export function useGameSocketEvents({
     const onHostDisconnecting = ({ countdown } = {}) => {
       notify(`Host disconnected. Game ends in ${countdown ?? 30}s if they don't return.`, 'error');
     };
+    // #183 — a group stand-in was appointed, or the owner reclaimed / was
+    // handed host back. Host controls already followed via room_state; this
+    // toast just tells the table who now holds them.
+    const onHostChanged = ({ hostName, reason } = {}) => {
+      if (!hostName) return;
+      notify(
+        reason === 'reclaimed'
+          ? `${hostName} has reclaimed host controls.`
+          : `${hostName} is now the host.`,
+        'info',
+      );
+    };
+    // #183 — the acting host left mid-game and the seat migrated to a remaining
+    // player (handlers/room.js leave_room). Same user-facing notice.
+    const onHostMigrated = ({ newHostName } = {}) => {
+      if (!newHostName) return;
+      notify(`${newHostName} is now the host.`, 'info');
+    };
     const onGameEnded = ({ reason } = {}) => {
       sessionStorage.removeItem('bluff_session');
       clearSession();
@@ -158,6 +176,8 @@ export function useGameSocketEvents({
     socket.on('bluff_called', onBluffCalled);
     socket.on('spin_acknowledged', onSpinAcknowledged);
     socket.on('host_disconnecting', onHostDisconnecting);
+    socket.on('host_changed', onHostChanged);
+    socket.on('host_migrated', onHostMigrated);
     socket.on('game_ended', onGameEnded);
     socket.on('removed_from_group', onRemovedFromGroup);
     socket.on('power_card_triggered', onPowerCardTriggered);
@@ -175,6 +195,8 @@ export function useGameSocketEvents({
       socket.off('bluff_called', onBluffCalled);
       socket.off('spin_acknowledged', onSpinAcknowledged);
       socket.off('host_disconnecting', onHostDisconnecting);
+      socket.off('host_changed', onHostChanged);
+      socket.off('host_migrated', onHostMigrated);
       socket.off('game_ended', onGameEnded);
       socket.off('removed_from_group', onRemovedFromGroup);
       socket.off('power_card_triggered', onPowerCardTriggered);
