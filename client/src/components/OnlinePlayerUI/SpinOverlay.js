@@ -99,15 +99,16 @@ export function SpinOverlay({
     >
       <div
         style={{
-          fontFamily: "'Bebas Neue', sans-serif",
-          fontSize: 22,
-          letterSpacing: '0.15em',
+          fontFamily: "'Crimson Text', serif",
+          fontSize: 20,
+          fontStyle: 'italic',
+          letterSpacing: '0.04em',
           color: 'var(--text-dim)',
           marginBottom: 32,
           textAlign: 'center',
         }}
       >
-        {spinData.spinTargetName} pulls the trigger...
+        {spinData.spinTargetName} pulls the trigger…
       </div>
 
       <CylinderSVG
@@ -122,18 +123,18 @@ export function SpinOverlay({
         <div style={{ marginTop: 36, textAlign: 'center' }}>
           <div
             style={{
-              fontFamily: "'Bebas Neue', sans-serif",
-              fontSize: 56,
-              letterSpacing: '0.05em',
+              fontFamily: "'Cinzel Decorative', 'Cinzel', serif",
+              fontSize: 42,
+              letterSpacing: '0.08em',
               lineHeight: 1,
               color: spinData.eliminated ? 'var(--accent2)' : 'var(--alive)',
               textShadow: spinData.eliminated
-                ? '0 0 30px rgba(255,74,110,0.7)'
+                ? '0 0 30px rgba(155,28,28,0.7)'
                 : '0 0 30px rgba(74,255,128,0.7)',
               marginBottom: 14,
             }}
           >
-            {spinData.eliminated ? '💀 ELIMINATED' : '😮‍💨 SURVIVED'}
+            {spinData.eliminated ? 'ELIMINATED' : 'SURVIVED'}
           </div>
           <div style={{ fontSize: 12, color: 'var(--text-dim)', marginBottom: 28 }}>
             Chamber {spinData.landingChamberIndex + 1} · {spinData.eliminated ? 'bullet found' : 'empty'}

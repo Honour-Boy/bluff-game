@@ -62,7 +62,7 @@ export function OnlinePlayerUI({
   chatUnread = 0,
 }) {
   const wrapperRef = useRef(null);
-  const { triggerShake, triggerAudio } = useAtmosphere(wrapperRef);
+  const { triggerShake, triggerAudio, startSpinAudio, stopSpinAudio } = useAtmosphere(wrapperRef);
 
   const myHand = roomState?.myHand || [];
   const myPowerCardSlot = roomState?.myPowerCardSlot || [];
@@ -83,10 +83,13 @@ export function OnlinePlayerUI({
     powerEventQueue,
   });
 
-  // ── Phase 3: atmospheric triggers ──────────────────────────────────────────
-  // Watch phase + lastAction to fire shake/audio on key moments.
+  // ── Atmospheric triggers ────────────────────────────────────────────────────
   const prevPhaseRef = useRef(null);
   const prevLastActionRef = useRef(null);
+  // Holds the setTimeout ID for the 80 ms spin-audio start delay so it can be
+  // cancelled on unmount or if a second spin_result arrives before the first fires.
+  const spinAudioDelayRef = useRef(null);
+
   useEffect(() => {
     if (!roomState) return;
     const phase = roomState.phase;
@@ -94,16 +97,24 @@ export function OnlinePlayerUI({
     const prevPhase = prevPhaseRef.current;
     const prevLa = prevLastActionRef.current;
 
-    // Bluff resolution — shake + bell sound when spin_pending starts
+    // Bluff resolution — shake + bell when spin_pending starts
     if (phase === 'spin_pending' && prevPhase !== 'spin_pending') {
       triggerShake();
       triggerAudio('bluff');
     }
-    // Spin result — shake when cylinder result lands
+
+    // Spin result — shake immediately, then start the click engine at the
+    // same moment the CSS transition begins (+80 ms, matching useOnlinePlayerUiController).
+    // The old flat spin-whir (`triggerAudio('spin'/'eliminate')`) is intentionally
+    // removed here; it now plays only after spinComplete (see effect below).
     if (la && la !== prevLa && la.type === 'spin_result') {
       triggerShake();
-      triggerAudio(la.eliminated ? 'eliminate' : 'spin');
+      const spinIndex = la.spinIndex ?? 0;
+      const finalAngle = 10 * 360 - spinIndex * 60;
+      clearTimeout(spinAudioDelayRef.current);
+      spinAudioDelayRef.current = setTimeout(() => startSpinAudio(finalAngle, 8000), 80);
     }
+
     // Card played — soft knock
     if (la && la !== prevLa && la.type === 'card_played') {
       triggerAudio('card');
@@ -115,7 +126,27 @@ export function OnlinePlayerUI({
 
     prevPhaseRef.current = phase;
     prevLastActionRef.current = la;
-  }, [roomState?.phase, roomState?.lastAction, triggerShake, triggerAudio]); // eslint-disable-line
+  }, [roomState?.phase, roomState?.lastAction, triggerShake, triggerAudio, startSpinAudio]); // eslint-disable-line
+
+  // Fire the result-reveal sound (survive/eliminate) once the cylinder animation
+  // completes — not when the server event first arrives. Also stop any remaining
+  // click timeouts (defensive; the last click already fired the clunk by this point).
+  const prevSpinCompleteRef = useRef(false);
+  useEffect(() => {
+    if (ui.spinComplete && !prevSpinCompleteRef.current) {
+      stopSpinAudio();
+      if (ui.spinData) {
+        triggerAudio(ui.spinData.eliminated ? 'eliminate' : 'spin');
+      }
+    }
+    prevSpinCompleteRef.current = ui.spinComplete;
+  }, [ui.spinComplete, ui.spinData, stopSpinAudio, triggerAudio]);
+
+  // Cleanup spin audio timers on unmount
+  useEffect(() => () => {
+    clearTimeout(spinAudioDelayRef.current);
+    stopSpinAudio();
+  }, [stopSpinAudio]);
 
   // §2.1 — private late-pick review buffer. When the server flags a pick as
   // late (≥12s into the 15s window) it returns a reviewMs grace period. We
