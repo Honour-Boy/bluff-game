@@ -1,5 +1,6 @@
 import { VoiceIndicator } from '../VoicePanel';
 
+// ─── Mini chamber dots — shown as risk bullets inside the chip ────────────────
 function MiniRiskDots({ riskLevel = 1 }) {
   return (
     <div style={{ display: 'flex', alignItems: 'center', gap: 2 }}>
@@ -16,7 +17,10 @@ function MiniRiskDots({ riskLevel = 1 }) {
               background: loaded
                 ? (danger ? 'var(--accent2)' : 'var(--warning)')
                 : 'transparent',
-              border: `1px solid ${loaded ? (danger ? 'var(--accent2)' : 'var(--warning)') : 'var(--border)'}`,
+              border: `1px solid ${loaded
+                ? (danger ? 'var(--accent2)' : 'var(--warning)')
+                : 'var(--border)'}`,
+              boxShadow: loaded && danger ? '0 0 4px rgba(155,28,28,0.6)' : 'none',
             }}
           />
         );
@@ -25,6 +29,7 @@ function MiniRiskDots({ riskLevel = 1 }) {
   );
 }
 
+// ─── PlayerChip — carved wooden seat around the table ─────────────────────────
 export function PlayerChip({
   player,
   isCurrentTurn,
@@ -37,17 +42,30 @@ export function PlayerChip({
 }) {
   const alive = player.status === 'alive';
   const width = compact ? 64 : 80;
-  const height = compact ? 88 : 110;
+  const height = compact ? 88 : 108;
   const streak = player.consecutiveCorrectBets || 0;
   const showStreak = bettingEnabled && streak > 0;
   const name = player.username || '';
-  const truncated = name.length > 12 ? `${name.slice(0, 11)}...` : name;
+  const truncated = name.length > 12 ? `${name.slice(0, 11)}…` : name;
 
+  // Border colour: amber for active turn, blood-red for spin target
   const borderColor = isCurrentTurn && alive
     ? 'var(--warning)'
     : isSpinTarget
       ? 'var(--accent2)'
-      : 'var(--border)';
+      : 'var(--border-lit)';
+
+  const chipBg = isCurrentTurn && alive
+    ? 'linear-gradient(160deg, #2a1e0a 0%, #1a1205 100%)'
+    : isSpinTarget
+      ? 'linear-gradient(160deg, #2a0a0a 0%, #1a0505 100%)'
+      : 'linear-gradient(160deg, var(--surface3) 0%, var(--surface2) 100%)';
+
+  const animationName = isCurrentTurn && alive
+    ? 'chipTurnPulse'
+    : isSpinTarget
+      ? 'spinTargetPulse'
+      : 'none';
 
   return (
     <button
@@ -59,10 +77,10 @@ export function PlayerChip({
         height,
         flexShrink: 0,
         padding: compact ? 5 : 7,
-        background: 'var(--surface2)',
+        background: chipBg,
         border: `2px solid ${borderColor}`,
-        borderRadius: 8,
-        opacity: alive ? 1 : 0.4,
+        borderRadius: 6,
+        opacity: alive ? 1 : 0.38,
         display: 'flex',
         flexDirection: 'column',
         alignItems: 'center',
@@ -71,13 +89,16 @@ export function PlayerChip({
         cursor: onClick ? 'pointer' : 'default',
         color: 'var(--text)',
         textAlign: 'center',
-        boxShadow: isCurrentTurn && alive ? '0 0 12px rgba(255,170,74,0.35)' : 'none',
-        animation: isCurrentTurn && alive ? 'chipTurnPulse 1.6s ease-in-out infinite' : 'none',
+        animation: `${animationName} 1.8s ease-in-out infinite`,
         position: 'relative',
         userSelect: 'none',
         WebkitTapHighlightColor: 'transparent',
+        transition: 'border-color 0.2s',
+        /* Subtle raised edge */
+        boxShadow: '0 3px 10px rgba(0,0,0,0.5), inset 0 1px 0 rgba(255,255,255,0.04)',
       }}
     >
+      {/* Bounty marker — tiny crimson badge */}
       {alive && player.hasBounty && (
         <span
           title="Bounty placed"
@@ -85,32 +106,38 @@ export function PlayerChip({
             position: 'absolute',
             top: 2,
             right: 4,
-            fontSize: compact ? 9 : 11,
-            color: '#ff3552',
+            fontFamily: "'Cinzel', serif",
+            fontSize: compact ? 8 : 9,
+            color: 'var(--accent2)',
             lineHeight: 1,
+            letterSpacing: 0,
           }}
         >
           B
         </span>
       )}
 
-      <div
-        style={{
-          fontSize: compact ? 9 : 11,
-          fontWeight: 700,
-          color: isCurrentTurn && alive ? 'var(--warning)' : 'var(--text)',
-          whiteSpace: 'nowrap',
-          overflow: 'hidden',
-          textOverflow: 'ellipsis',
-          maxWidth: '100%',
-          letterSpacing: '0.02em',
-          textDecoration: !alive ? 'line-through' : 'none',
-          display: 'flex',
-          alignItems: 'center',
-          gap: 3,
-          justifyContent: 'center',
-        }}
-      >
+      {/* Username */}
+      <div style={{
+        fontFamily: "'Cinzel', serif",
+        fontSize: compact ? 8 : 10,
+        fontWeight: 700,
+        color: isCurrentTurn && alive
+          ? 'var(--accent)'
+          : isSpinTarget
+            ? '#c85050'
+            : 'var(--text)',
+        whiteSpace: 'nowrap',
+        overflow: 'hidden',
+        textOverflow: 'ellipsis',
+        maxWidth: '100%',
+        letterSpacing: '0.04em',
+        textDecoration: !alive ? 'line-through' : 'none',
+        display: 'flex',
+        alignItems: 'center',
+        gap: 3,
+        justifyContent: 'center',
+      }}>
         {voice && (
           <VoiceIndicator
             playerId={player.id}
@@ -126,12 +153,13 @@ export function PlayerChip({
           <span
             title={`Correct bet streak: ${streak}`}
             style={{
-              fontSize: compact ? 8 : 9,
+              fontFamily: "'Cinzel', serif",
+              fontSize: compact ? 7 : 8,
               fontWeight: 700,
               color: 'var(--accent)',
-              background: 'rgba(232,255,74,0.12)',
-              border: '1px solid var(--accent)',
-              borderRadius: 6,
+              background: 'rgba(200,146,46,0.12)',
+              border: '1px solid var(--accent-dim)',
+              borderRadius: 4,
               padding: compact ? '0 3px' : '0 4px',
               lineHeight: 1.4,
               letterSpacing: 0,
@@ -143,37 +171,40 @@ export function PlayerChip({
         )}
       </div>
 
-      <div
-        style={{
-          fontSize: compact ? 9 : 10,
-          color: 'var(--text-dim)',
-          letterSpacing: '0.04em',
-        }}
-      >
+      {/* Hand size */}
+      <div style={{
+        fontFamily: "'Crimson Text', serif",
+        fontSize: compact ? 9 : 11,
+        color: 'var(--text-dim)',
+        letterSpacing: '0.02em',
+        fontStyle: 'italic',
+      }}>
         {player.handSize ?? '?'} cards
       </div>
 
+      {/* Risk dots */}
       {alive && <MiniRiskDots riskLevel={player.riskLevel} />}
 
-      <div
-        style={{
-          fontSize: compact ? 8 : 9,
-          letterSpacing: '0.08em',
-          minHeight: compact ? 10 : 12,
-          color: isCurrentTurn && alive
-            ? 'var(--warning)'
-            : isSpinTarget
-              ? 'var(--accent2)'
-              : isNextTurn && alive
-                ? 'var(--accent)'
-                : 'transparent',
-        }}
-      >
-        {isCurrentTurn && alive
-          ? 'TURN'
+      {/* Status label */}
+      <div style={{
+        fontFamily: "'Cinzel', serif",
+        fontSize: compact ? 7 : 8,
+        letterSpacing: '0.14em',
+        textTransform: 'uppercase',
+        minHeight: compact ? 10 : 11,
+        color: isCurrentTurn && alive
+          ? 'var(--accent)'
           : isSpinTarget
-            ? 'SPIN'
-            : (isNextTurn && alive ? 'NEXT' : '.')}
+            ? 'var(--accent2)'
+            : isNextTurn && alive
+              ? 'var(--accent-dim)'
+              : 'transparent',
+      }}>
+        {isCurrentTurn && alive
+          ? 'Turn'
+          : isSpinTarget
+            ? 'Spin'
+            : (isNextTurn && alive ? 'Next' : '.')}
       </div>
     </button>
   );

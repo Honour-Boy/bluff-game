@@ -1,5 +1,68 @@
 # UI Redesign Headlines
 
+## 2026-05-28 — Phase 2: Online Game Board & Active Table (Deployed to Staging)
+
+**Branch:** `feature/ui-redesign-phase-2`  
+**PR:** Design: UI Redesign — Game Board & Active Table (Phase 2)  
+**Scope:** OnlinePlayerUI table, chips, cards, center panel, BottomSeat, RoomHeader, CylinderSVG
+
+---
+
+### What Changed
+
+The entire active game board has been transformed into a first-person dark-wood poker table environment:
+
+| Component | Before | After |
+|---|---|---|
+| **TableScene** | Flat dark surface | Radial felt-green table oval fading to mahogany rail; `tableEntrance` fade-in animation |
+| **RoomHeader** | Flat yellow BLUFF + border box | Cinzel header with wax-seal room code, candlelight glow on hover, tavern panel background |
+| **PlayerChip** | Flat surface2 box, neon border | Dark oak gradient chip, amber chipTurnPulse, blood-red spinTargetPulse, Cinzel labels |
+| **CenterTablePanel** | Flat card panel | Dark felt-green radial background, carved frame for required card, leather-back deck stacks, revolver trigger button for spin |
+| **CardHand** | Flat cards in a scrollable row | Physically fanned cards with rotation angle + vertical stagger; selected card lifts 22px with gold glow; wooden cardholder trough border |
+| **BottomSeat** | Flat bottom bar | First-person wooden table-rail (dark gradient + border-top), Cinzel nameplate, blood-red chamber dots, bell SVG "Call Bluff" button with `[B]` hotkey label |
+| **CylinderSVG** (Host+Player) | Blue-grey cyberpunk fill | Dark iron `#1a1208` body, copper `#4a3520` ring, tarnished brass centre pin, blood-red bullets |
+| **GAME_UI_STYLE** | Basic animations | + `cardPlayPhysics`, `spinTargetPulse`, `tableEntrance`, `cardDealIn`, `spinResultFlash` |
+
+### Files Modified
+
+```
+client/src/components/OnlinePlayerUI/helpers.js        — New GAME_UI_STYLE animations
+client/src/components/OnlinePlayerUI/RoomHeader.js     — Tavern header + wax-seal room code
+client/src/components/OnlinePlayerUI/PlayerChip.js     — Carved wood seat chips
+client/src/components/OnlinePlayerUI/TableScene.js     — Felt-green table surface
+client/src/components/OnlinePlayerUI/CenterTablePanel.js — Leather decks, carved frame, revolver trigger
+client/src/components/OnlinePlayerUI/CardHand.js       — Physical fan hand in wooden trough
+client/src/components/OnlinePlayerUI/BottomSeat.js     — First-person rail, bell Bluff button, [B] hotkey
+client/src/components/HostUI/shared.js                 — CylinderSVG: iron/brass palette
+client/src/components/PlayerUI/shared.js               — CylinderSVG: iron/brass palette
+```
+
+### Keyboard Additions (Phase 2)
+
+| Key | Location | Action |
+|---|---|---|
+| `B` | BottomSeat (active turn) | Call Bluff (dispatches event + shown as kbd hint on button) |
+| `P` | Global (via useKeyboardNav) | Power card hotkey — dispatches `power-hotkey` event |
+| `W`/`S` | Action button row | Navigate between Call Bluff / End Turn |
+| `Enter`/`Space` | Action button row | Confirm focused action button |
+
+### QA Checklist (Phase 2)
+
+- [ ] Online mode lobby: table loads with `tableEntrance` fade, felt-green centre visible
+- [ ] Player chips: active turn chip shows amber glow pulse; spin target shows blood-red pulse
+- [ ] Room header: room code styled as wax seal, glows gold on hover, click copies
+- [ ] Card hand: 3+ cards fan out with angle/stagger; selected card lifts with gold glow
+- [ ] Selected card plays on click; hand updates
+- [ ] Center panel deck stacks show leather-back card texture + filigree SVG
+- [ ] Required card type shown in carved frame with gold border glow
+- [ ] Spin pending: "Pull the Trigger" button appears with cylinder icon + blood-red styling
+- [ ] Game over: "Victory" / "[Name] Prevails" in Cinzel Decorative with gold text shadow
+- [ ] Cylinder (spin animation): dark iron body, copper ring, blood-red bullets land in crimson
+- [ ] `[B]` hotkey label visible on Call Bluff button when it's your turn
+- [ ] Mobile (≤640px): chip sizes shrink, hand still scrollable, action buttons full-width
+
+---
+
 ## 2026-05-28 — Phase 1: Liar's Bar Tavern Aesthetic (Deployed to Staging)
 
 **Branch:** `feature/ui-redesign-phase-1`  
