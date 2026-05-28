@@ -1,219 +1,366 @@
-@import url('https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Space+Mono:ital,wght@0,400;0,700;1,400&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Cinzel:wght@400;600;700;900&family=Cinzel+Decorative:wght@400;700&family=Crimson+Text:ital,wght@0,400;0,600;1,400&family=Space+Mono:ital,wght@0,400;0,700;1,400&display=swap');
 
+/* ─── Tavern Design System ──────────────────────────────────────────────────── */
 :root {
-  --bg: #0a0a0b;
-  --surface: #111114;
-  --surface2: #18181d;
-  --border: #2a2a33;
-  --accent: #e8ff4a;
-  --accent2: #ff4a6e;
-  --accent3: #4affdb;
-  --text: #e8e8f0;
-  --text-dim: #6b6b80;
-  --alive: #4affdb;
-  --eliminated: #ff4a6e;
-  --warning: #ffaa4a;
-  --radius: 4px;
+  /* Backgrounds — dark seasoned hardwood */
+  --bg:        #090705;
+  --surface:   #100d09;
+  --surface2:  #1a1510;
+  --surface3:  #241d14;
+
+  /* Borders — wood-grain edges */
+  --border:       #3a2c1c;
+  --border-lit:   #5e4527;
+  --border-glow:  #8a6335;
+
+  /* Accent palette — candlelight, blood, verdigris */
+  --accent:     #c8922e;   /* tarnished gold / candlelight */
+  --accent-dim: #8a5e18;
+  --accent2:    #9b1c1c;   /* deep crimson / danger */
+  --accent3:    #3a7a52;   /* aged verdigris / success */
+
+  /* Text — aged parchment tones */
+  --text:     #e8d8b8;
+  --text-dim: #7a6848;
+  --text-mid: #a89070;
+
+  /* Game states */
+  --alive:      #3a7a52;
+  --eliminated: #9b1c1c;
+  --warning:    #c8922e;
+
+  /* Glow / shadow utilities */
+  --glow-gold:    rgba(200, 146, 46, 0.22);
+  --glow-crimson: rgba(155, 28, 28, 0.22);
+  --glow-green:   rgba(58, 122, 82, 0.22);
+
+  /* Shape */
+  --radius: 3px;
+  --radius-lg: 6px;
+
+  /* 3D perspective depth */
+  --perspective: 1200px;
+
+  /* Timing */
+  --transition: 0.18s ease;
 }
 
+/* ─── Reset & base ──────────────────────────────────────────────────────────── */
 * { box-sizing: border-box; margin: 0; padding: 0; }
 
 html, body {
   background: var(--bg);
   color: var(--text);
-  font-family: 'Space Mono', monospace;
-  font-size: 14px;
-  line-height: 1.6;
+  font-family: 'Crimson Text', 'Georgia', serif;
+  font-size: 16px;
+  line-height: 1.65;
   min-height: 100vh;
   overflow-x: hidden;
 }
 
-/* Scanline overlay */
+/* ─── Global tavern atmosphere — wood grain + vignette ─────────────────────── */
 body::before {
   content: '';
   position: fixed;
   inset: 0;
-  background: repeating-linear-gradient(
-    0deg,
-    transparent,
-    transparent 2px,
-    rgba(0,0,0,0.03) 2px,
-    rgba(0,0,0,0.03) 4px
-  );
+  background:
+    radial-gradient(ellipse 80% 60% at 50% -10%, rgba(200,146,46,0.07) 0%, transparent 65%),
+    repeating-linear-gradient(
+      88deg,
+      transparent 0px,
+      transparent 18px,
+      rgba(0,0,0,0.06) 18px,
+      rgba(0,0,0,0.06) 19px
+    ),
+    repeating-linear-gradient(
+      2deg,
+      transparent 0px,
+      transparent 35px,
+      rgba(255,255,255,0.015) 35px,
+      rgba(255,255,255,0.015) 36px
+    );
   pointer-events: none;
-  z-index: 9999;
+  z-index: 9998;
 }
 
+/* Vignette border */
+body::after {
+  content: '';
+  position: fixed;
+  inset: 0;
+  background: radial-gradient(ellipse 100% 100% at 50% 50%, transparent 50%, rgba(0,0,0,0.72) 100%);
+  pointer-events: none;
+  z-index: 9997;
+}
+
+/* ─── Typography ────────────────────────────────────────────────────────────── */
 h1, h2, h3, h4 {
-  font-family: 'Bebas Neue', sans-serif;
-  letter-spacing: 0.05em;
+  font-family: 'Cinzel', 'Georgia', serif;
+  font-weight: 700;
+  letter-spacing: 0.08em;
   line-height: 1.1;
+  color: var(--text);
 }
 
+/* ─── Buttons — textured wooden plaques / metal seals ──────────────────────── */
 button {
   cursor: pointer;
-  font-family: 'Space Mono', monospace;
+  font-family: 'Cinzel', serif;
   font-size: 12px;
-  font-weight: 700;
-  letter-spacing: 0.1em;
+  font-weight: 600;
+  letter-spacing: 0.14em;
   text-transform: uppercase;
-  border: 1px solid var(--border);
+  border: 1px solid var(--border-lit);
   border-radius: var(--radius);
-  padding: 10px 20px;
-  background: var(--surface2);
-  color: var(--text);
-  transition: all 0.15s ease;
+  padding: 11px 22px;
+  background: linear-gradient(160deg, var(--surface3) 0%, var(--surface2) 50%, var(--surface) 100%);
+  color: var(--text-mid);
+  transition: all var(--transition);
   outline: none;
+  position: relative;
+  overflow: hidden;
+}
+
+/* Inner wood sheen highlight */
+button::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(180deg, rgba(255,255,255,0.04) 0%, transparent 50%);
+  pointer-events: none;
+  border-radius: inherit;
 }
 
 button:hover:not(:disabled) {
+  border-color: var(--border-glow);
+  color: var(--accent);
+  background: linear-gradient(160deg, var(--surface3) 0%, var(--surface2) 100%);
+  box-shadow: 0 0 14px var(--glow-gold), inset 0 1px 0 rgba(200,146,46,0.12);
+  transform: translateY(-1px);
+}
+
+button:focus-visible {
   border-color: var(--accent);
   color: var(--accent);
-  background: rgba(232, 255, 74, 0.05);
+  box-shadow: 0 0 0 2px rgba(200,146,46,0.35), 0 0 18px var(--glow-gold), inset 0 1px 0 rgba(200,146,46,0.15);
+  outline: none;
+  transform: translateY(-1px);
 }
 
 button:active:not(:disabled) {
-  transform: scale(0.98);
+  transform: translateY(0) scale(0.99);
+  box-shadow: none;
 }
 
 button:disabled {
-  opacity: 0.3;
+  opacity: 0.32;
   cursor: not-allowed;
+  transform: none;
 }
 
+/* Primary — gilded gold seal */
 button.primary {
-  background: var(--accent);
-  color: #0a0a0b;
-  border-color: var(--accent);
+  background: linear-gradient(160deg, #a0721e 0%, #c8922e 45%, #a0721e 100%);
+  border-color: #8a5e18;
+  color: #0d0a06;
+  font-weight: 700;
+  text-shadow: 0 1px 0 rgba(255,220,140,0.3);
+  box-shadow: 0 2px 8px rgba(0,0,0,0.5), inset 0 1px 0 rgba(255,220,100,0.25);
 }
 
 button.primary:hover:not(:disabled) {
-  background: #fff;
-  border-color: #fff;
-  color: #0a0a0b;
+  background: linear-gradient(160deg, #b8841e 0%, #e0a83e 45%, #b8841e 100%);
+  border-color: #c8922e;
+  color: #0a0804;
+  box-shadow: 0 4px 16px rgba(200,146,46,0.4), inset 0 1px 0 rgba(255,230,120,0.35);
+  transform: translateY(-2px);
 }
 
+button.primary:focus-visible {
+  box-shadow: 0 0 0 2px rgba(200,146,46,0.5), 0 4px 20px rgba(200,146,46,0.5), inset 0 1px 0 rgba(255,230,120,0.35);
+}
+
+/* Danger — crimson wax */
 button.danger {
-  border-color: var(--accent2);
-  color: var(--accent2);
+  border-color: #6b1818;
+  color: #c85050;
 }
-
 button.danger:hover:not(:disabled) {
-  background: rgba(255, 74, 110, 0.1);
+  border-color: var(--accent2);
+  color: #e87070;
+  background: linear-gradient(160deg, var(--surface3), var(--surface2));
+  box-shadow: 0 0 14px var(--glow-crimson);
+}
+button.danger:focus-visible {
+  box-shadow: 0 0 0 2px rgba(155,28,28,0.4), 0 0 18px var(--glow-crimson);
 }
 
+/* Success — verdigris copper */
 button.success {
-  border-color: var(--accent3);
-  color: var(--accent3);
+  border-color: #2a5a3a;
+  color: #4a9a62;
 }
-
 button.success:hover:not(:disabled) {
-  background: rgba(74, 255, 219, 0.1);
+  border-color: var(--accent3);
+  color: #6ab87a;
+  box-shadow: 0 0 14px var(--glow-green);
+}
+button.success:focus-visible {
+  box-shadow: 0 0 0 2px rgba(58,122,82,0.4), 0 0 18px var(--glow-green);
 }
 
+/* ─── Inputs — parchment ink-wells ─────────────────────────────────────────── */
 input {
-  font-family: 'Space Mono', monospace;
-  font-size: 13px;
-  background: var(--surface2);
+  font-family: 'Crimson Text', 'Georgia', serif;
+  font-size: 15px;
+  background: rgba(10, 8, 5, 0.7);
   border: 1px solid var(--border);
   border-radius: var(--radius);
   color: var(--text);
-  padding: 10px 14px;
+  padding: 11px 14px;
   outline: none;
   width: 100%;
-  transition: border-color 0.15s;
+  transition: border-color var(--transition), box-shadow var(--transition);
 }
 
 input:focus {
-  border-color: var(--accent);
+  border-color: var(--border-glow);
+  box-shadow: 0 0 0 2px rgba(200,146,46,0.12), inset 0 1px 3px rgba(0,0,0,0.4);
 }
 
 input::placeholder {
   color: var(--text-dim);
+  font-style: italic;
 }
 
+/* ─── Card / Panel — dark lacquered wood ────────────────────────────────────── */
 .card {
-  background: var(--surface);
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
-  padding: 20px;
+  background: linear-gradient(160deg, var(--surface2) 0%, var(--surface) 100%);
+  border: 1px solid var(--border-lit);
+  border-radius: var(--radius-lg);
+  padding: 22px;
+  box-shadow:
+    0 8px 32px rgba(0,0,0,0.6),
+    inset 0 1px 0 rgba(255,255,255,0.04),
+    inset 0 -1px 0 rgba(0,0,0,0.3);
 }
 
+/* ─── Tilt panel — 3D tabletop perspective ──────────────────────────────────── */
+.tilt-panel {
+  transform: perspective(var(--perspective)) rotateY(-2.5deg) rotateX(1deg);
+  transform-style: preserve-3d;
+  transition: transform 0.35s ease;
+}
+.tilt-panel:hover {
+  transform: perspective(var(--perspective)) rotateY(-1deg) rotateX(0.5deg);
+}
+@media (max-width: 640px) {
+  .tilt-panel { transform: none; }
+  .tilt-panel:hover { transform: none; }
+}
+
+/* ─── Tags — branded wax-press labels ───────────────────────────────────────── */
 .tag {
   display: inline-block;
-  font-size: 10px;
+  font-family: 'Cinzel', serif;
+  font-size: 9px;
   font-weight: 700;
-  letter-spacing: 0.12em;
+  letter-spacing: 0.16em;
   text-transform: uppercase;
-  padding: 3px 8px;
+  padding: 3px 9px;
   border-radius: 2px;
   border: 1px solid currentColor;
 }
 
-.tag.alive { color: var(--alive); }
-.tag.eliminated { color: var(--eliminated); }
-.tag.host { color: var(--accent); border-color: var(--accent); }
-.tag.current { color: var(--warning); border-color: var(--warning); }
+.tag.alive     { color: var(--alive); border-color: var(--alive); }
+.tag.eliminated{ color: var(--eliminated); border-color: var(--eliminated); }
+.tag.host      { color: var(--accent); border-color: var(--accent); }
+.tag.current   { color: var(--warning); border-color: var(--warning); }
 
-/* Pulse animation for current player */
-@keyframes pulse-glow {
-  0%, 100% { box-shadow: 0 0 0 0 rgba(255, 170, 74, 0); }
-  50% { box-shadow: 0 0 12px 2px rgba(255, 170, 74, 0.25); }
+/* ─── Keyboard nav — atmospheric focus glow ────────────────────────────────── */
+.kb-focus {
+  outline: none;
+  border-color: var(--accent) !important;
+  box-shadow: 0 0 0 2px rgba(200,146,46,0.35), 0 0 22px var(--glow-gold) !important;
 }
 
+/* All interactive elements: visible focus ring */
+:focus-visible {
+  outline: 2px solid rgba(200,146,46,0.5);
+  outline-offset: 2px;
+}
+
+/* ─── Animations ─────────────────────────────────────────────────────────────── */
+
+/* Candle flicker — ambient ambient atmosphere */
+@keyframes candle-flicker {
+  0%, 100% { opacity: 1; text-shadow: 0 0 30px rgba(200,146,46,0.6); }
+  25%       { opacity: 0.96; text-shadow: 0 0 20px rgba(200,146,46,0.45); }
+  50%       { opacity: 1; text-shadow: 0 0 40px rgba(200,146,46,0.7); }
+  75%       { opacity: 0.97; text-shadow: 0 0 18px rgba(200,146,46,0.4); }
+}
+.candle-title { animation: candle-flicker 4s ease-in-out infinite; }
+
+/* Ember pulse — for active/current player */
+@keyframes ember-pulse {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(200,146,46,0); }
+  50%       { box-shadow: 0 0 14px 3px rgba(200,146,46,0.22); }
+}
 .current-player-row {
-  animation: pulse-glow 2s ease-in-out infinite;
+  animation: ember-pulse 2.4s ease-in-out infinite;
   border-color: var(--warning) !important;
 }
 
-/* Spin animation */
+/* Roulette spin */
 @keyframes spin-roulette {
-  0% { transform: rotate(0deg); }
-  60% { transform: rotate(720deg); }
-  80% { transform: rotate(680deg); }
-  90% { transform: rotate(705deg); }
+  0%   { transform: rotate(0deg); }
+  60%  { transform: rotate(720deg); }
+  80%  { transform: rotate(680deg); }
+  90%  { transform: rotate(705deg); }
   100% { transform: rotate(720deg); }
 }
+.spinning { animation: spin-roulette 1.5s cubic-bezier(0.2, 0, 0.3, 1) forwards; }
 
-.spinning {
-  animation: spin-roulette 1.5s cubic-bezier(0.2, 0, 0.3, 1) forwards;
+/* Tavern title reveal — carved stone emerge */
+@keyframes title-emerge {
+  0%   { opacity: 0; transform: perspective(600px) translateZ(-40px) translateY(12px); filter: blur(4px); }
+  100% { opacity: 1; transform: perspective(600px) translateZ(0px) translateY(0); filter: blur(0); }
 }
+.title-emerge { animation: title-emerge 0.7s cubic-bezier(0.22,1,0.36,1) forwards; }
 
-/* Glitch text effect */
-@keyframes glitch {
-  0%, 100% { text-shadow: none; transform: none; }
-  20% { text-shadow: -2px 0 var(--accent2); transform: translateX(2px); }
-  40% { text-shadow: 2px 0 var(--accent3); transform: translateX(-2px); }
-  60% { text-shadow: -2px 0 var(--accent); transform: translateX(1px); }
-}
-
-.glitch { animation: glitch 4s ease-in-out infinite; }
-
-/* Fade-in */
+/* Fade up */
 @keyframes fadeIn {
-  from { opacity: 0; transform: translateY(8px); }
-  to { opacity: 1; transform: translateY(0); }
+  from { opacity: 0; transform: translateY(10px); }
+  to   { opacity: 1; transform: translateY(0); }
 }
+.fade-in { animation: fadeIn 0.35s ease forwards; }
 
-.fade-in { animation: fadeIn 0.3s ease forwards; }
-
-/* Notification */
+/* Slide in from right (notifications) */
 @keyframes slideIn {
   from { transform: translateX(120%); opacity: 0; }
-  to { transform: translateX(0); opacity: 1; }
+  to   { transform: translateX(0); opacity: 1; }
 }
+.notification { animation: slideIn 0.3s ease forwards; }
 
-.notification {
-  animation: slideIn 0.3s ease forwards;
-}
+/* Staggered children */
+.stagger-child:nth-child(1) { animation-delay: 0.00s; }
+.stagger-child:nth-child(2) { animation-delay: 0.06s; }
+.stagger-child:nth-child(3) { animation-delay: 0.12s; }
+.stagger-child:nth-child(4) { animation-delay: 0.18s; }
+.stagger-child:nth-child(5) { animation-delay: 0.24s; }
 
-/* Scrollbar */
-::-webkit-scrollbar { width: 6px; }
+/* Refresh spin */
+@keyframes groups-refresh-spin { to { transform: rotate(360deg); } }
+.groups-refresh-icon { display: inline-block; font-size: 13px; line-height: 1; }
+.groups-refresh-icon--spin { animation: groups-refresh-spin 0.8s linear infinite; }
+
+/* ─── Scrollbar — aged iron track ────────────────────────────────────────────── */
+::-webkit-scrollbar { width: 5px; }
 ::-webkit-scrollbar-track { background: var(--surface); }
-::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
-::-webkit-scrollbar-thumb:hover { background: var(--text-dim); }
+::-webkit-scrollbar-thumb { background: var(--border-lit); border-radius: 3px; }
+::-webkit-scrollbar-thumb:hover { background: var(--border-glow); }
 
-/* Card shape icons */
+/* ─── Shape icons ────────────────────────────────────────────────────────────── */
 .shape-icon {
   display: inline-flex;
   align-items: center;
@@ -221,4 +368,13 @@ input::placeholder {
   width: 32px;
   height: 32px;
   font-size: 18px;
+}
+
+/* ─── Reduced-motion safety ─────────────────────────────────────────────────── */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
 }

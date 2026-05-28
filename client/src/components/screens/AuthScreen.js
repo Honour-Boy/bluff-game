@@ -2,77 +2,67 @@
 
 import { useState } from 'react';
 import { ShapeIcon } from '../shared/ShapeIcon';
+import { useKeyboardNav } from '../../hooks/useKeyboardNav';
 
-// ─── Shared input style helper ────────────────────────────────
-const INPUT_STYLE = {
-  width: '100%',
-  padding: '11px 14px',
-  background: 'var(--surface2)',
-  border: '1px solid var(--border)',
-  borderRadius: 'var(--radius)',
-  color: 'var(--text)',
-  fontSize: 13,
-  outline: 'none',
-  boxSizing: 'border-box',
-};
+// ─── Tavern divider ───────────────────────────────────────────────────────────
+function TavernDivider({ label = 'or' }) {
+  return (
+    <div style={{ display: 'flex', alignItems: 'center', gap: 12, margin: '6px 0' }}>
+      <div style={{ flex: 1, height: 1, background: 'var(--border-lit)', opacity: 0.6 }} />
+      <span style={{
+        fontFamily: "'Cinzel', serif",
+        fontSize: 9,
+        color: 'var(--text-dim)',
+        letterSpacing: '0.22em',
+        textTransform: 'uppercase',
+      }}>
+        {label}
+      </span>
+      <div style={{ flex: 1, height: 1, background: 'var(--border-lit)', opacity: 0.6 }} />
+    </div>
+  );
+}
 
-// ─── Google button ────────────────────────────────────────────
-function GoogleButton({ onClick, label = 'Continue with Google' }) {
+// ─── Google button — polished brass seal ─────────────────────────────────────
+function GoogleButton({ onClick }) {
   return (
     <button
       type="button"
       onClick={onClick}
+      data-nav-item
       style={{
         width: '100%',
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
         gap: 10,
-        padding: '11px 16px',
-        background: 'var(--surface2)',
-        border: '1px solid var(--border)',
+        padding: '12px 16px',
+        background: 'linear-gradient(160deg, var(--surface3) 0%, var(--surface2) 100%)',
+        border: '1px solid var(--border-lit)',
         borderRadius: 'var(--radius)',
-        color: 'var(--text)',
-        fontSize: 13,
+        color: 'var(--text-mid)',
+        fontFamily: "'Cinzel', serif",
+        fontSize: 11,
+        letterSpacing: '0.12em',
         cursor: 'pointer',
-        transition: 'border-color 0.15s',
+        transition: 'all var(--transition)',
       }}
-      onMouseEnter={e => e.currentTarget.style.borderColor = 'var(--accent)'}
-      onMouseLeave={e => e.currentTarget.style.borderColor = 'var(--border)'}
     >
-      <svg width="18" height="18" viewBox="0 0 48 48">
+      <svg width="17" height="17" viewBox="0 0 48 48" aria-hidden="true">
         <path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z" />
         <path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z" />
         <path fill="#FBBC05" d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z" />
         <path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.18 1.48-4.97 2.31-8.16 2.31-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z" />
       </svg>
-      {label}
+      Continue with Google
     </button>
   );
 }
 
-function Divider() {
-  return (
-    <div style={{ display: 'flex', alignItems: 'center', gap: 12, margin: '4px 0' }}>
-      <div style={{ flex: 1, height: 1, background: 'var(--border)' }} />
-      <span style={{ fontSize: 10, color: 'var(--text-dim)', letterSpacing: '0.1em' }}>OR</span>
-      <div style={{ flex: 1, height: 1, background: 'var(--border)' }} />
-    </div>
-  );
-}
-
-// ─── AuthScreen — passwordless magic link OR anonymous play ───
-// Single email field. signInWithOtp creates the user if new and
-// signs in if existing — same flow either way. The email contains
-// a magic link; clicking it opens an authenticated session. We don't
-// ask for the OTP code separately because the link makes that step
-// redundant.
-//
-// Guest path (onGuestSignIn): user types a display name + clicks
-// "Continue as guest". Identity lives in sessionStorage only and
-// vanishes when the tab closes — sign-in remains the persistent
-// option. The guest form is a sibling stage of the email form,
-// reachable via "Play as guest" toggle.
+// ─── AuthScreen — the tavern gate ────────────────────────────────────────────
+// Redesigned as a moody inn-registry: sign your name in the ledger or produce
+// your seal (Google) to enter. Guests may enter under a pseudonym, but their
+// place at the table vanishes when they leave.
 export function AuthScreen({ onSendEmailOtp, onGoogleSignIn, onGuestSignIn, error, setError }) {
   const [email, setEmail] = useState('');
   const [guestName, setGuestName] = useState('');
@@ -80,21 +70,21 @@ export function AuthScreen({ onSendEmailOtp, onGoogleSignIn, onGuestSignIn, erro
   const [stage, setStage] = useState('email');
   const [submitting, setSubmitting] = useState(false);
 
+  // Item count: google + email/guest CTA buttons (rough count for arrow nav)
+  const { navRef, handleKeyDown } = useKeyboardNav(3, {
+    onEscape: () => { setError(null); },
+  });
+
   const handleSendLink = async (e) => {
     e.preventDefault();
     setError(null);
-    if (!email.trim()) return setError('Enter your email');
+    if (!email.trim()) return setError('Enter your email address');
     setSubmitting(true);
     const ok = await onSendEmailOtp({ email: email.trim() });
     setSubmitting(false);
     if (ok) setStage('sent');
   };
 
-  // Guest sign-in is synchronous — no server round-trip until the
-  // socket authenticate event later. We just validate locally and
-  // hand the typed name to useAuth.signInAsGuest, which mints the
-  // UUID + persists to sessionStorage. The page-level effect picks
-  // up the new user and renders LandingScreen automatically.
   const handleGuest = (e) => {
     e.preventDefault();
     setError(null);
@@ -104,70 +94,123 @@ export function AuthScreen({ onSendEmailOtp, onGoogleSignIn, onGuestSignIn, erro
   };
 
   return (
-    <div style={{
-      minHeight: '100vh',
-      display: 'flex',
-      flexDirection: 'column',
-      alignItems: 'center',
-      justifyContent: 'center',
-      padding: 24,
-    }}>
+    <div
+      style={{
+        minHeight: '100vh',
+        display: 'flex',
+        flexDirection: 'column',
+        alignItems: 'center',
+        justifyContent: 'center',
+        padding: 24,
+        position: 'relative',
+      }}
+    >
+      {/* Tavern floor — diagonal planks */}
       <div style={{
-        position: 'fixed', inset: 0,
-        backgroundImage: `
-          linear-gradient(rgba(232,255,74,0.03) 1px, transparent 1px),
-          linear-gradient(90deg, rgba(232,255,74,0.03) 1px, transparent 1px)
+        position: 'fixed', inset: 0, pointerEvents: 'none',
+        background: `
+          repeating-linear-gradient(
+            -45deg,
+            transparent 0px,
+            transparent 28px,
+            rgba(255,255,255,0.012) 28px,
+            rgba(255,255,255,0.012) 29px
+          )
         `,
-        backgroundSize: '40px 40px',
+      }} />
+
+      {/* Ambient candlelight from top */}
+      <div style={{
+        position: 'fixed', top: 0, left: '50%', transform: 'translateX(-50%)',
+        width: '70%', height: '35vh',
+        background: 'radial-gradient(ellipse at 50% 0%, rgba(200,146,46,0.1) 0%, transparent 70%)',
         pointerEvents: 'none',
       }} />
 
-      <div className="fade-in" style={{ width: '100%', maxWidth: 420, position: 'relative', zIndex: 1 }}>
+      <div
+        ref={navRef}
+        onKeyDown={handleKeyDown}
+        className="fade-in"
+        style={{ width: '100%', maxWidth: 420, position: 'relative', zIndex: 1 }}
+      >
+        {/* Title: inn signboard */}
         <div style={{ textAlign: 'center', marginBottom: 36 }}>
-          <h1 style={{
-            fontFamily: "'Bebas Neue', sans-serif",
-            fontSize: 80, color: 'var(--accent)',
-            lineHeight: 0.9, letterSpacing: '0.06em',
-            margin: 0,
-          }}>
+          <h1
+            className="candle-title title-emerge"
+            style={{
+              fontFamily: "'Cinzel Decorative', 'Cinzel', serif",
+              fontSize: 72,
+              color: 'var(--accent)',
+              lineHeight: 0.95,
+              letterSpacing: '0.1em',
+              textShadow: '0 0 40px rgba(200,146,46,0.5), 0 2px 0 rgba(0,0,0,0.8)',
+            }}
+          >
             BLUFF
           </h1>
-          <div style={{ color: 'var(--text-dim)', fontSize: 11, letterSpacing: '0.2em', marginTop: 6 }}>
-            {stage === 'guest' ? 'Play as guest' : 'Sign in to play'}
+          <div style={{
+            fontFamily: "'Cinzel', serif",
+            color: 'var(--text-dim)',
+            fontSize: 10,
+            letterSpacing: '0.28em',
+            marginTop: 8,
+            textTransform: 'uppercase',
+          }}>
+            {stage === 'guest' ? 'Enter under a false name' : 'Sign the inn ledger'}
           </div>
-          <div style={{ display: 'flex', justifyContent: 'center', gap: 12, marginTop: 16, opacity: 0.4 }}>
+          <div style={{ display: 'flex', justifyContent: 'center', gap: 14, marginTop: 18, opacity: 0.35 }}>
             {['circle', 'square', 'triangle', 'cross', 'star'].map(shape => (
-              <ShapeIcon key={shape} shape={shape} size={18} />
+              <ShapeIcon key={shape} shape={shape} size={17} />
             ))}
           </div>
         </div>
 
-        <div className="card" style={{ padding: '24px 20px' }}>
+        {/* Main card — the inn registry */}
+        <div
+          className="card tilt-panel"
+          style={{
+            padding: '26px 22px',
+            boxShadow: '0 12px 48px rgba(0,0,0,0.8), 0 0 0 1px rgba(255,255,255,0.03)',
+          }}
+        >
           {error && (
             <div style={{
               padding: '10px 14px',
-              background: 'rgba(255,74,110,0.08)',
+              background: 'rgba(155,28,28,0.12)',
               border: '1px solid var(--accent2)',
               borderRadius: 'var(--radius)',
-              color: 'var(--accent2)',
-              fontSize: 12, marginBottom: 16,
+              color: '#c85050',
+              fontFamily: "'Crimson Text', serif",
+              fontSize: 14,
+              marginBottom: 16,
+              lineHeight: 1.5,
             }}>
               {error}
             </div>
           )}
 
+          {/* Google + divider only on non-guest stages */}
           {stage !== 'guest' && (
             <>
               <GoogleButton onClick={onGoogleSignIn} />
-              <Divider />
+              <TavernDivider />
             </>
           )}
 
+          {/* ── Email stage ── */}
           {stage === 'email' && (
-            <form onSubmit={handleSendLink} style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+            <form onSubmit={handleSendLink} style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
               <div>
-                <label style={{ fontSize: 10, color: 'var(--text-dim)', letterSpacing: '0.1em', display: 'block', marginBottom: 5 }}>
-                  EMAIL
+                <label style={{
+                  display: 'block',
+                  marginBottom: 6,
+                  fontFamily: "'Cinzel', serif",
+                  fontSize: 9,
+                  color: 'var(--text-dim)',
+                  letterSpacing: '0.2em',
+                  textTransform: 'uppercase',
+                }}>
+                  Your Post Address
                 </label>
                 <input
                   type="email"
@@ -177,57 +220,60 @@ export function AuthScreen({ onSendEmailOtp, onGoogleSignIn, onGuestSignIn, erro
                   autoComplete="email"
                   autoFocus
                   required
-                  style={INPUT_STYLE}
+                  data-nav-item
+                  style={{ letterSpacing: '0.04em' }}
                 />
-                <div style={{ fontSize: 11, color: 'var(--text-dim)', marginTop: 6, lineHeight: 1.5 }}>
-                  We'll email a sign-in link. No password required — same flow whether you've played before or not.
+                <div style={{
+                  fontFamily: "'Crimson Text', serif",
+                  fontSize: 13,
+                  color: 'var(--text-dim)',
+                  marginTop: 7,
+                  lineHeight: 1.6,
+                  fontStyle: 'italic',
+                }}>
+                  A sign-in scroll will be dispatched to your address — no passphrase required.
                 </div>
               </div>
-              <button type="submit" className="primary" style={{ padding: '12px', marginTop: 4 }} disabled={submitting}>
-                {submitting ? 'Sending…' : 'Continue →'}
+              <button
+                type="submit"
+                className="primary"
+                data-nav-item
+                style={{ padding: '13px', marginTop: 4 }}
+                disabled={submitting}
+              >
+                {submitting ? 'Dispatching scroll…' : 'Send Sign-In Link →'}
               </button>
 
-              {/* Guest path — sibling CTA. Persists only for the
-                  current tab; sign-in is the path that survives a
-                  new browser session. */}
               {onGuestSignIn && (
                 <>
-                  <Divider />
+                  <TavernDivider />
                   <button
                     type="button"
+                    data-nav-item
                     onClick={() => { setStage('guest'); setError(null); }}
-                    style={{
-                      width: '100%',
-                      padding: '11px 16px',
-                      background: 'transparent',
-                      border: '1px solid var(--border)',
-                      borderRadius: 'var(--radius)',
-                      color: 'var(--text-dim)',
-                      fontSize: 13,
-                      cursor: 'pointer',
-                      transition: 'border-color 0.15s, color 0.15s',
-                    }}
-                    onMouseEnter={e => {
-                      e.currentTarget.style.borderColor = 'var(--accent)';
-                      e.currentTarget.style.color = 'var(--text)';
-                    }}
-                    onMouseLeave={e => {
-                      e.currentTarget.style.borderColor = 'var(--border)';
-                      e.currentTarget.style.color = 'var(--text-dim)';
-                    }}
+                    style={{ width: '100%', padding: '12px 16px', color: 'var(--text-dim)', letterSpacing: '0.1em' }}
                   >
-                    🎭 Play as guest
+                    Enter as a Stranger
                   </button>
                 </>
               )}
             </form>
           )}
 
+          {/* ── Guest stage ── */}
           {stage === 'guest' && (
-            <form onSubmit={handleGuest} style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+            <form onSubmit={handleGuest} style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
               <div>
-                <label style={{ fontSize: 10, color: 'var(--text-dim)', letterSpacing: '0.1em', display: 'block', marginBottom: 5 }}>
-                  DISPLAY NAME
+                <label style={{
+                  display: 'block',
+                  marginBottom: 6,
+                  fontFamily: "'Cinzel', serif",
+                  fontSize: 9,
+                  color: 'var(--text-dim)',
+                  letterSpacing: '0.2em',
+                  textTransform: 'uppercase',
+                }}>
+                  Alias at This Table
                 </label>
                 <input
                   type="text"
@@ -239,45 +285,76 @@ export function AuthScreen({ onSendEmailOtp, onGoogleSignIn, onGuestSignIn, erro
                   required
                   minLength={4}
                   maxLength={20}
-                  style={INPUT_STYLE}
+                  data-nav-item
                 />
-                <div style={{ fontSize: 11, color: 'var(--text-dim)', marginTop: 6, lineHeight: 1.5 }}>
-                  4–20 characters. No email required — but your name and stats only stick around for this tab. Sign in to save them.
+                <div style={{
+                  fontFamily: "'Crimson Text', serif",
+                  fontSize: 13,
+                  color: 'var(--text-dim)',
+                  marginTop: 7,
+                  lineHeight: 1.6,
+                  fontStyle: 'italic',
+                }}>
+                  4–20 characters. Your name and deeds survive only this session — sign in to preserve your legacy.
                 </div>
               </div>
-              <button type="submit" className="primary" style={{ padding: '12px', marginTop: 4 }}>
-                Continue as guest →
+              <button
+                type="submit"
+                className="primary"
+                data-nav-item
+                style={{ padding: '13px', marginTop: 4 }}
+              >
+                Take a Seat →
               </button>
               <button
                 type="button"
+                data-nav-item
                 onClick={() => { setStage('email'); setError(null); }}
-                style={{ fontSize: 11, padding: '8px', background: 'none', border: 'none', color: 'var(--text-dim)', cursor: 'pointer', marginTop: 4 }}
+                style={{ fontSize: 11, padding: '8px', background: 'none', border: 'none', color: 'var(--text-dim)', cursor: 'pointer' }}
               >
-                ← Sign in instead
+                ← Sign in with a real identity
               </button>
             </form>
           )}
 
+          {/* ── Sent stage ── */}
           {stage === 'sent' && (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 14, textAlign: 'center' }}>
-              <div style={{ fontSize: 32, lineHeight: 1, marginTop: 4 }}>📬</div>
-              <div style={{ fontSize: 14, color: 'var(--text)', lineHeight: 1.6 }}>
-                Sign-in link sent to<br />
-                <strong style={{ color: 'var(--accent)' }}>{email}</strong>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 16, textAlign: 'center' }}>
+              {/* Envelope icon — SVG, no emoji */}
+              <svg width="38" height="38" viewBox="0 0 24 24" fill="none" aria-hidden="true" style={{ margin: '4px auto 0' }}>
+                <rect x="2" y="4" width="20" height="16" rx="2" stroke="var(--accent)" strokeWidth="1.5"/>
+                <path d="M2 7l10 7 10-7" stroke="var(--accent)" strokeWidth="1.5" strokeLinecap="round"/>
+              </svg>
+              <div style={{ fontFamily: "'Crimson Text', serif", fontSize: 16, color: 'var(--text)', lineHeight: 1.65 }}>
+                A scroll has been sent to<br />
+                <strong style={{ color: 'var(--accent)', fontStyle: 'italic' }}>{email}</strong>
               </div>
-              <div style={{ fontSize: 11, color: 'var(--text-dim)', lineHeight: 1.6 }}>
-                Open the email and click the link to sign in.<br />
-                Check spam if it doesn't arrive within a minute — the address might be wrong.
+              <div style={{ fontFamily: "'Crimson Text', serif", fontSize: 13, color: 'var(--text-dim)', lineHeight: 1.65, fontStyle: 'italic' }}>
+                Open the scroll and follow the seal to gain entry. Check your refuse pile if it does not arrive shortly.
               </div>
               <button
                 type="button"
+                data-nav-item
                 onClick={() => { setStage('email'); setError(null); }}
-                style={{ fontSize: 11, padding: '8px', background: 'none', border: 'none', color: 'var(--text-dim)', cursor: 'pointer', marginTop: 4 }}
+                style={{ fontSize: 11, padding: '8px', background: 'none', border: 'none', color: 'var(--text-dim)', cursor: 'pointer' }}
               >
-                ← Use a different email
+                ← Use a different address
               </button>
             </div>
           )}
+        </div>
+
+        {/* Keyboard hint */}
+        <div style={{
+          marginTop: 18,
+          textAlign: 'center',
+          fontFamily: "'Cinzel', serif",
+          fontSize: 9,
+          color: 'var(--text-dim)',
+          letterSpacing: '0.18em',
+          opacity: 0.5,
+        }}>
+          [W] [S] Navigate · [Enter] Confirm · [Esc] Clear
         </div>
       </div>
     </div>
