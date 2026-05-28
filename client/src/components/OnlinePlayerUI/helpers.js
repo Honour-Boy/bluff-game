@@ -1,19 +1,57 @@
 export const SHAPES = ['circle', 'triangle', 'cross', 'square', 'star'];
 
 export const GAME_UI_STYLE = `
+  /* ── Tavern table animations ── */
   @keyframes pulse {
     0%, 100% { opacity: 1; }
     50% { opacity: 0.5; }
   }
+  /* Card flips in from face-down — physics slide */
   @keyframes cardFlipIn {
-    0% { transform: rotateY(90deg) scaleX(0.4); opacity: 0; }
-    60% { transform: rotateY(-8deg) scaleX(1.02); opacity: 1; }
-    100% { transform: rotateY(0deg) scaleX(1); opacity: 1; }
+    0%   { transform: rotateY(90deg) scaleX(0.3) translateY(8px); opacity: 0; }
+    55%  { transform: rotateY(-6deg) scaleX(1.03) translateY(-2px); opacity: 1; }
+    100% { transform: rotateY(0deg) scaleX(1) translateY(0); opacity: 1; }
   }
+  /* Card slides to center pile when played */
+  @keyframes cardPlayPhysics {
+    0%   { transform: translateY(0) rotate(0deg) scale(1); opacity: 1; }
+    40%  { transform: translateY(-30px) rotate(-4deg) scale(1.08); opacity: 1; }
+    100% { transform: translateY(-80px) rotate(var(--card-land-rot,2deg)) scale(0.92); opacity: 0.85; }
+  }
+  /* Active-turn chip: warm amber candlelight pulse */
   @keyframes chipTurnPulse {
-    0%, 100% { box-shadow: 0 0 8px rgba(255,170,74,0.25); }
-    50% { box-shadow: 0 0 18px rgba(255,170,74,0.55); }
+    0%, 100% { box-shadow: 0 0 8px rgba(200,146,46,0.3), 0 2px 8px rgba(0,0,0,0.6); }
+    50%       { box-shadow: 0 0 22px rgba(200,146,46,0.65), 0 2px 8px rgba(0,0,0,0.6); }
   }
+  /* Spin target: blood-red pulsing doom ring */
+  @keyframes spinTargetPulse {
+    0%, 100% { box-shadow: 0 0 8px rgba(155,28,28,0.4); }
+    50%       { box-shadow: 0 0 24px rgba(155,28,28,0.8), 0 0 48px rgba(155,28,28,0.2); }
+  }
+  /* Table surface entrance */
+  @keyframes tableEntrance {
+    0%   { opacity: 0; transform: perspective(800px) translateZ(-20px); }
+    100% { opacity: 1; transform: perspective(800px) translateZ(0); }
+  }
+  /* Dealt card fan-in */
+  @keyframes cardDealIn {
+    0%   { opacity: 0; transform: translateY(18px) rotate(var(--deal-rot,0deg)); }
+    100% { opacity: 1; transform: translateY(0) rotate(var(--deal-rot,0deg)); }
+  }
+  /* Spin result flash */
+  @keyframes spinResultFlash {
+    0%, 100% { opacity: 1; }
+    30%       { opacity: 0.3; }
+    60%       { opacity: 1; }
+  }
+
+  .topdown-table-scene {
+    animation: tableEntrance 0.5s ease-out forwards;
+  }
+  .card-play-physics {
+    animation: cardPlayPhysics 0.45s cubic-bezier(0.22,1,0.36,1) forwards;
+  }
+
   @media (max-width: 640px) {
     .topdown-middle { gap: 6px !important; }
     .topdown-side { max-height: 48vh !important; }

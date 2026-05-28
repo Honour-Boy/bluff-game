@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { VoicePanel } from '../VoicePanel';
 
+// ─── Share dropdown — tavern-styled ──────────────────────────────────────────
 function ShareButton({ roomCode, senderName }) {
   const [showFallback, setShowFallback] = useState(false);
 
@@ -17,7 +18,7 @@ function ShareButton({ roomCode, senderName }) {
         if (error.name === 'AbortError') return;
       }
     }
-    setShowFallback((current) => !current);
+    setShowFallback((c) => !c);
   };
 
   const encode = encodeURIComponent;
@@ -33,36 +34,35 @@ function ShareButton({ roomCode, senderName }) {
       <button
         onClick={handleShare}
         style={{
-          fontSize: 11,
+          fontFamily: "'Cinzel', serif",
+          fontSize: 9,
           color: 'var(--accent)',
-          border: '1px solid var(--accent)',
-          background: 'rgba(232,255,74,0.04)',
+          border: '1px solid var(--accent-dim)',
+          background: 'rgba(200,146,46,0.06)',
           padding: '5px 12px',
-          borderRadius: 4,
+          borderRadius: 3,
           cursor: 'pointer',
-          letterSpacing: '0.06em',
+          letterSpacing: '0.12em',
         }}
       >
-        Share Room
+        Share Table
       </button>
       {showFallback && (
-        <div
-          style={{
-            position: 'absolute',
-            top: 'calc(100% + 6px)',
-            left: 0,
-            background: 'var(--surface2)',
-            border: '1px solid var(--border)',
-            borderRadius: 6,
-            padding: 8,
-            zIndex: 2000,
-            display: 'flex',
-            flexDirection: 'column',
-            gap: 4,
-            minWidth: 170,
-            boxShadow: '0 4px 20px rgba(0,0,0,0.4)',
-          }}
-        >
+        <div style={{
+          position: 'absolute',
+          top: 'calc(100% + 6px)',
+          left: 0,
+          background: 'linear-gradient(160deg, var(--surface3) 0%, var(--surface2) 100%)',
+          border: '1px solid var(--border-lit)',
+          borderRadius: 4,
+          padding: 8,
+          zIndex: 2000,
+          display: 'flex',
+          flexDirection: 'column',
+          gap: 4,
+          minWidth: 150,
+          boxShadow: '0 8px 28px rgba(0,0,0,0.6)',
+        }}>
           {links.map(({ label, href }) => (
             <a
               key={label}
@@ -73,30 +73,24 @@ function ShareButton({ roomCode, senderName }) {
               style={{
                 display: 'block',
                 padding: '7px 10px',
+                fontFamily: "'Cinzel', serif",
+                fontSize: 10,
+                letterSpacing: '0.1em',
                 color: 'var(--text)',
-                fontSize: 12,
                 textDecoration: 'none',
-                borderRadius: 4,
+                borderRadius: 3,
                 background: 'transparent',
+                transition: 'background 0.15s',
               }}
-              onMouseEnter={(event) => { event.currentTarget.style.background = 'var(--surface)'; }}
-              onMouseLeave={(event) => { event.currentTarget.style.background = 'transparent'; }}
+              onMouseEnter={(e) => { e.currentTarget.style.background = 'rgba(200,146,46,0.08)'; }}
+              onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent'; }}
             >
               {label}
             </a>
           ))}
           <button
             onClick={() => setShowFallback(false)}
-            style={{
-              marginTop: 2,
-              padding: '5px',
-              fontSize: 11,
-              color: 'var(--text-dim)',
-              background: 'none',
-              border: 'none',
-              cursor: 'pointer',
-              textDecoration: 'underline',
-            }}
+            style={{ marginTop: 2, padding: '5px', fontFamily: "'Cinzel', serif", fontSize: 9, color: 'var(--text-dim)', background: 'none', border: 'none', cursor: 'pointer', textDecoration: 'underline', letterSpacing: '0.1em' }}
           >
             Cancel
           </button>
@@ -106,6 +100,7 @@ function ShareButton({ roomCode, senderName }) {
   );
 }
 
+// ─── RoomHeader — the tavern table's nameplate ────────────────────────────────
 export function RoomHeader({
   roomCode,
   roundNumber,
@@ -118,49 +113,65 @@ export function RoomHeader({
   onShowHowToPlay,
 }) {
   return (
-    <div
-      style={{
-        display: 'flex',
-        alignItems: 'flex-start',
-        justifyContent: 'space-between',
-        gap: 12,
-        flexWrap: 'wrap',
-        padding: '4px 4px 12px',
-      }}
-    >
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-        <h1
-          style={{
-            fontSize: 24,
-            color: isEliminated ? 'var(--accent2)' : 'var(--accent)',
-            lineHeight: 1,
-            fontFamily: "'Bebas Neue', sans-serif",
-            margin: 0,
-          }}
-        >
+    <div style={{
+      display: 'flex',
+      alignItems: 'flex-start',
+      justifyContent: 'space-between',
+      gap: 12,
+      flexWrap: 'wrap',
+      padding: '6px 8px 10px',
+      borderBottom: '1px solid var(--border)',
+      background: 'linear-gradient(180deg, rgba(16,12,8,0.96) 0%, rgba(10,8,5,0.8) 100%)',
+      boxShadow: '0 2px 12px rgba(0,0,0,0.5)',
+    }}>
+      {/* Left: title + room code wax seal */}
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
+        <h1 style={{
+          fontFamily: "'Cinzel Decorative', 'Cinzel', serif",
+          fontSize: 20,
+          color: isEliminated ? 'var(--accent2)' : 'var(--accent)',
+          lineHeight: 1,
+          margin: 0,
+          textShadow: isEliminated
+            ? '0 0 14px rgba(155,28,28,0.5)'
+            : '0 0 18px rgba(200,146,46,0.4)',
+          letterSpacing: '0.1em',
+        }}>
           BLUFF
         </h1>
+        {/* Room code — wax seal style */}
         <div
-          title="Click to copy"
+          title="Tap to copy cipher"
           onClick={() => navigator.clipboard?.writeText(roomCode)}
           style={{
-            fontFamily: "'Bebas Neue', sans-serif",
-            fontSize: 18,
-            letterSpacing: '0.18em',
+            fontFamily: "'Cinzel', serif",
+            fontSize: 15,
+            fontWeight: 700,
+            letterSpacing: '0.22em',
             color: 'var(--accent)',
-            border: '1px solid var(--accent)',
-            padding: '2px 10px',
-            borderRadius: 'var(--radius)',
-            background: 'rgba(232,255,74,0.04)',
+            border: '1px solid var(--accent-dim)',
+            padding: '3px 10px',
+            borderRadius: 3,
+            background: 'rgba(200,146,46,0.07)',
             cursor: 'pointer',
             display: 'inline-block',
-            lineHeight: 1.2,
+            lineHeight: 1.3,
             alignSelf: 'flex-start',
+            boxShadow: '0 0 8px rgba(200,146,46,0.1)',
+            transition: 'box-shadow 0.15s',
           }}
+          onMouseEnter={(e) => { e.currentTarget.style.boxShadow = '0 0 16px rgba(200,146,46,0.28)'; }}
+          onMouseLeave={(e) => { e.currentTarget.style.boxShadow = '0 0 8px rgba(200,146,46,0.1)'; }}
         >
           {roomCode}
         </div>
-        <div style={{ fontSize: 9, color: 'var(--text-dim)', letterSpacing: '0.08em' }}>
+        <div style={{
+          fontFamily: "'Cinzel', serif",
+          fontSize: 8,
+          color: 'var(--text-dim)',
+          letterSpacing: '0.14em',
+          textTransform: 'uppercase',
+        }}>
           Round {roundNumber} · tap to copy
         </div>
         {isLobby && myPlayer && (
@@ -168,23 +179,27 @@ export function RoomHeader({
         )}
         {voice && !isMobile && <VoicePanel {...voice} />}
       </div>
-      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 5 }}>
+
+      {/* Right: status + how-to */}
+      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 6 }}>
         <span className={`tag ${isEliminated ? 'eliminated' : 'alive'}`}>
           {isEliminated ? 'Eliminated' : isHost ? 'Host · Alive' : 'Alive'}
         </span>
         <button
           onClick={onShowHowToPlay}
           style={{
-            fontSize: 10,
+            fontFamily: "'Cinzel', serif",
+            fontSize: 9,
             color: 'var(--text-dim)',
             border: '1px solid var(--border)',
             background: 'none',
-            padding: '3px 8px',
-            borderRadius: 4,
+            padding: '4px 10px',
+            borderRadius: 3,
             cursor: 'pointer',
+            letterSpacing: '0.1em',
           }}
         >
-          ? How to Play
+          Rules
         </button>
       </div>
     </div>

@@ -22,7 +22,7 @@ export function CylinderSVG({ bulletChambers, landingChamberIndex, rotation, ani
       <svg width={CYL} height={CYL} style={{ position: 'absolute', top: 0, left: 0, pointerEvents: 'none', zIndex: 2 }}>
         <polygon
           points={`${CX},${CY - ORBIT - CHAM_R + 2} ${CX - 9},${CY - ORBIT - CHAM_R - 14} ${CX + 9},${CY - ORBIT - CHAM_R - 14}`}
-          fill="var(--accent)"
+          fill="#c8922e"
         />
       </svg>
       <svg
@@ -37,7 +37,8 @@ export function CylinderSVG({ bulletChambers, landingChamberIndex, rotation, ani
           transition: animating ? 'transform 8s cubic-bezier(0.1, 0, 0.2, 1)' : 'none',
         }}
       >
-        <circle cx={CX} cy={CY} r={ORBIT + CHAM_R + 8} fill="#111118" stroke="#2a2a35" strokeWidth={2} />
+        {/* Cylinder body — dark iron/copper with tavern patina */}
+        <circle cx={CX} cy={CY} r={ORBIT + CHAM_R + 8} fill="#1a1208" stroke="#4a3520" strokeWidth={2} />
         {chambers.map((chamber, index) => (
           <g key={index}>
             {chamber.isLanding && (
@@ -48,15 +49,15 @@ export function CylinderSVG({ bulletChambers, landingChamberIndex, rotation, ani
                 fill="none"
                 stroke={chamber.isBullet ? 'var(--accent2)' : 'var(--alive)'}
                 strokeWidth={3}
-                opacity={0.8}
+                opacity={0.85}
               />
             )}
             <circle
               cx={chamber.x}
               cy={chamber.y}
               r={CHAM_R}
-              fill={chamber.isBullet ? '#3a0808' : '#0d0d18'}
-              stroke={chamber.isLanding ? (chamber.isBullet ? 'var(--accent2)' : 'var(--alive)') : '#333'}
+              fill={chamber.isBullet ? '#2a0606' : '#100c08'}
+              stroke={chamber.isLanding ? (chamber.isBullet ? 'var(--accent2)' : 'var(--alive)') : '#3a2c1c'}
               strokeWidth={chamber.isLanding ? 2.5 : 1.5}
             />
             {chamber.isBullet && (
@@ -64,12 +65,13 @@ export function CylinderSVG({ bulletChambers, landingChamberIndex, rotation, ani
                 cx={chamber.x}
                 cy={chamber.y}
                 r={CHAM_R * 0.42}
-                fill={chamber.isLanding ? '#ff3344' : '#882222'}
+                fill={chamber.isLanding ? '#cc2233' : '#6a1818'}
               />
             )}
           </g>
         ))}
-        <circle cx={CX} cy={CY} r={9} fill="#222230" stroke="#444" strokeWidth={1.5} />
+        {/* Centre pin — tarnished brass */}
+        <circle cx={CX} cy={CY} r={9} fill="#2a1e0e" stroke="#5a4020" strokeWidth={1.5} />
       </svg>
     </div>
   );
