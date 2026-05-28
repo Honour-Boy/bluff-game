@@ -1,5 +1,46 @@
 # UI Redesign Headlines
 
+## 2026-05-28 — Dynamic Mechanical Spin Audio Overhaul (PR #194, Merged to Staging)
+
+**Branch:** `feature/playtest-dynamic-spin-audio`  
+**Scope:** Replace flat spin-whir with a velocity-mapped angular-tick click engine synced to the cylinder CSS transition
+
+---
+
+### Audio Engine Changes
+
+**`client/src/hooks/useAtmosphere.js`**
+
+New primitives:
+- `playSpinClick(ctx)` — 15 ms white-noise burst through bandpass filter at 3 800 Hz / Q 1.8; the crisp metallic chamber-detent click
+- `playSpinClunk(ctx)` — 250 ms sine wave descending 95 → 30 Hz at gain 0.48; the heavy hammer lock on the final chamber
+
+New cubic-bezier engine for `cubic-bezier(0.1, 0, 0.15, 1)`:
+- `easeY(t)` / `easeX(t)` — parametric Bezier evaluators (P1=(0.1,0), P2=(0.15,1))
+- `progressToTimeFraction(progress)` — binary search (26 iterations) solving the inverse curve: given a rotation-progress fraction (0–1), returns the CSS normalized time (0–1)
+
+New hook exports:
+- `startSpinAudio(finalAngle, durationMs=8000)` — iterates every 60° chamber crossing, converts each progress fraction to an absolute delay via `progressToTimeFraction`, schedules a `playSpinClick` at that delay; the final crossing fires `playSpinClunk` instead. IDs stored in `spinClickIdsRef` for cancellation.
+- `stopSpinAudio()` — clears all pending click/clunk timeouts (unmount / early dismiss)
+
+Semantic change: `playSpinSound` (rising sawtooth whir) retained but repurposed as the **survived** result-reveal sound — no longer the spin-phase sound.
+
+**`client/src/components/OnlinePlayerUI/index.js`**
+
+- Destructures `startSpinAudio` / `stopSpinAudio` from `useAtmosphere`
+- On `spin_result` lastAction: `triggerShake()` fires immediately; `startSpinAudio(finalAngle, 8000)` is scheduled at +80 ms via `spinAudioDelayRef` to align with the CSS transition start (`setCylinderAnimating(true)` also fires at +80 ms in `useOnlinePlayerUiController`)
+- Removed the old `triggerAudio(eliminated ? 'eliminate' : 'spin')` call from the spin_result block
+- Added `prevSpinCompleteRef` + effect: when `ui.spinComplete` rises from false → true, fires `stopSpinAudio()` (defensive cleanup) then `triggerAudio(eliminated ? 'eliminate' : 'spin')` — result sound now plays post-animation, not at event arrival
+- Added unmount cleanup effect clearing `spinAudioDelayRef` + `stopSpinAudio()`
+
+**`client/src/components/OnlinePlayerUI/SpinOverlay.js`**
+
+- Replaced `'Bebas Neue'` header with `'Crimson Text', serif` (italic, 20px) to match tavern theme
+- Replaced `'Bebas Neue'` result headline with `'Cinzel Decorative', 'Cinzel', serif`
+- Removed emoji result labels (`💀`/`😮‍💨`); plain `ELIMINATED` / `SURVIVED` in the design-system colour
+
+---
+
 ## 2026-05-28 — Keyboard Nav Removal + Phase 3: Shaders, Audio & Polish (Deployed to Staging)
 
 **Branch:** `feature/ui-redesign-phase-3`  
