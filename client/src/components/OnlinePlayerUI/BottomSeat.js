@@ -1,6 +1,5 @@
 import { VoiceIndicator } from '../VoicePanel';
 import { CardHand } from './CardHand';
-import { useKeyboardNav } from '../../hooks/useKeyboardNav';
 
 // ─── BottomSeat — the player's first-person view at the table ─────────────────
 // This is the cardholder trough and action controls at the bottom of the screen.
@@ -38,17 +37,6 @@ export function BottomSeat({
   const shapeCardCount = myHand.filter((card) => card?.type !== 'power').length;
   const powerCardCount = (myPowerCardSlot?.length || 0)
     + myHand.filter((card) => card?.type === 'power').length;
-
-  // Keyboard nav for the action buttons row
-  const actionButtonCount = [
-    !isFirstTurn && isMyTurn && isPlaying && !isEliminated,
-    cardPlayedThisTurn && isMyTurn && isPlaying,
-  ].filter(Boolean).length;
-
-  const { navRef: actionNavRef, handleKeyDown: actionKeyDown } = useKeyboardNav(
-    Math.max(actionButtonCount, 1),
-    { onEscape: undefined },
-  );
 
   return (
     <div
@@ -192,17 +180,12 @@ export function BottomSeat({
 
       {/* ── Action buttons: Bluff + End Turn ── */}
       {isMyTurn && isPlaying && !isEliminated && (
-        <div
-          ref={actionNavRef}
-          onKeyDown={actionKeyDown}
-          style={{ padding: '0 12px 10px' }}
-        >
+        <div style={{ padding: '0 12px 10px' }}>
           <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
             {!isFirstTurn && (
               <button
                 className="danger"
                 onClick={callBluff}
-                data-nav-item
                 disabled={bluffUsedThisTurn || bluffBlockedThisTurn}
                 title={bluffBlockedThisTurn ? 'No card to challenge — last turn was frozen' : undefined}
                 style={{
@@ -222,15 +205,13 @@ export function BottomSeat({
                   <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
                   <path d="M13.73 21a2 2 0 0 1-3.46 0" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
                 </svg>
-                {/* [B] hotkey hint */}
-                Call Bluff <kbd style={{ fontSize: 9, opacity: 0.5, fontFamily: 'monospace', padding: '0 3px', border: '1px solid currentColor', borderRadius: 2 }}>B</kbd>
+                Call Bluff
               </button>
             )}
             {cardPlayedThisTurn && (
               <button
                 className="primary"
                 onClick={endTurn}
-                data-nav-item
                 style={{
                   flex: 1,
                   padding: '14px',

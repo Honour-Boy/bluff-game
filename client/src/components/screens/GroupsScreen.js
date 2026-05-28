@@ -2,7 +2,6 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import { getSocket } from '../../lib/socket';
-import { useKeyboardNav } from '../../hooks/useKeyboardNav';
 
 function formatInviteDate(value) {
   if (!value) return 'Pending';
@@ -94,11 +93,6 @@ export function GroupsScreen({
     [groups],
   );
 
-  const { navRef: groupNavRef, handleKeyDown: groupKeyDown } = useKeyboardNav(
-    sortedGroups.length,
-    { onEscape: onBack },
-  );
-
   const handleCreate = async (event) => {
     event.preventDefault();
     const trimmed = groupName.trim();
@@ -187,7 +181,6 @@ export function GroupsScreen({
             type="button"
             onClick={onBack}
             className="groups-screen__back-btn"
-            data-nav-item
             style={{ minWidth: 140 }}
           >
             ← Back to Tavern
@@ -251,11 +244,7 @@ export function GroupsScreen({
             <RefreshButton onRefresh={onRefresh} loading={loading} />
           </div>
 
-          <div
-            ref={groupNavRef}
-            onKeyDown={groupKeyDown}
-            style={{ display: 'flex', flexDirection: 'column', gap: 10 }}
-          >
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
             {sortedGroups.length === 0 && !loading && (
               <div style={{
                 padding: '18px 16px',
@@ -282,7 +271,7 @@ export function GroupsScreen({
                 <button
                   key={group.id}
                   type="button"
-                  data-nav-item
+
                   onClick={() => onOpenGroup(group.id)}
                   style={{
                     textAlign: 'left',
@@ -365,18 +354,6 @@ export function GroupsScreen({
             })}
           </div>
 
-          {/* Keyboard hint */}
-          <div style={{
-            marginTop: 14,
-            fontFamily: "'Cinzel', serif",
-            fontSize: 8,
-            color: 'var(--text-dim)',
-            letterSpacing: '0.16em',
-            opacity: 0.4,
-            textTransform: 'uppercase',
-          }}>
-            [W][S] Navigate Guilds · [Enter] Open
-          </div>
         </section>
 
         {/* Right column — create + invites */}
@@ -411,13 +388,13 @@ export function GroupsScreen({
                   onChange={(event) => setGroupName(event.target.value)}
                   maxLength={64}
                   placeholder="Friday Night Bluff"
-                  data-nav-item
+
                 />
               </div>
               <button
                 type="submit"
                 className="primary"
-                data-nav-item
+
                 disabled={busyAction === 'create' || !groupName.trim()}
               >
                 {busyAction === 'create' ? 'Founding…' : 'Found Guild'}
@@ -510,7 +487,7 @@ export function GroupsScreen({
                     <button
                       type="button"
                       className="primary"
-                      data-nav-item
+    
                       onClick={() => handleInviteResponse(invite.id, true)}
                       disabled={busyAction === `accept:${invite.id}` || busyAction === `decline:${invite.id}`}
                     >
@@ -518,7 +495,7 @@ export function GroupsScreen({
                     </button>
                     <button
                       type="button"
-                      data-nav-item
+    
                       onClick={() => handleInviteResponse(invite.id, false)}
                       disabled={busyAction === `accept:${invite.id}` || busyAction === `decline:${invite.id}`}
                     >

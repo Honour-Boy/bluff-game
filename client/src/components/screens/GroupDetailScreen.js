@@ -1,7 +1,6 @@
 'use client';
 
 import { useState } from 'react';
-import { useKeyboardNav } from '../../hooks/useKeyboardNav';
 
 function formatJoinedDate(value) {
   if (!value) return 'Joined recently';
@@ -88,10 +87,6 @@ export function GroupDetailScreen({
   const isOwner = !!ownerUserId && currentUserId === ownerUserId;
   const isActingHost = !!actingHostId && currentUserId === actingHostId;
   const standInActive = !!ownerUserId && !!actingHostId && ownerUserId !== actingHostId;
-
-  const { navRef: headerNavRef, handleKeyDown: headerKeyDown } = useKeyboardNav(2, {
-    onEscape: onBack,
-  });
 
   if (!group) {
     return (
@@ -186,8 +181,6 @@ export function GroupDetailScreen({
     >
       {/* Header */}
       <div
-        ref={headerNavRef}
-        onKeyDown={headerKeyDown}
         className="group-detail__header"
         style={{ display: 'flex', justifyContent: 'space-between', gap: 16, flexWrap: 'wrap' }}
       >
@@ -235,10 +228,10 @@ export function GroupDetailScreen({
           className="group-detail__header-actions"
           style={{ display: 'flex', gap: 10, flexWrap: 'wrap', alignItems: 'flex-start' }}
         >
-          <button type="button" data-nav-item onClick={onBack}>
+          <button type="button" onClick={onBack}>
             ← Back to Guilds
           </button>
-          <button type="button" className="primary" data-nav-item onClick={onEnterRoom}>
+          <button type="button" className="primary" onClick={onEnterRoom}>
             Enter the Room →
           </button>
         </div>

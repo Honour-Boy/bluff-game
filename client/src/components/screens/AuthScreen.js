@@ -2,7 +2,6 @@
 
 import { useState } from 'react';
 import { ShapeIcon } from '../shared/ShapeIcon';
-import { useKeyboardNav } from '../../hooks/useKeyboardNav';
 
 // ─── Tavern divider ───────────────────────────────────────────────────────────
 function TavernDivider({ label = 'or' }) {
@@ -29,7 +28,7 @@ function GoogleButton({ onClick }) {
     <button
       type="button"
       onClick={onClick}
-      data-nav-item
+
       style={{
         width: '100%',
         display: 'flex',
@@ -69,11 +68,6 @@ export function AuthScreen({ onSendEmailOtp, onGoogleSignIn, onGuestSignIn, erro
   // 'email' | 'guest' | 'sent'
   const [stage, setStage] = useState('email');
   const [submitting, setSubmitting] = useState(false);
-
-  // Item count: google + email/guest CTA buttons (rough count for arrow nav)
-  const { navRef, handleKeyDown } = useKeyboardNav(3, {
-    onEscape: () => { setError(null); },
-  });
 
   const handleSendLink = async (e) => {
     e.preventDefault();
@@ -128,8 +122,6 @@ export function AuthScreen({ onSendEmailOtp, onGoogleSignIn, onGuestSignIn, erro
       }} />
 
       <div
-        ref={navRef}
-        onKeyDown={handleKeyDown}
         className="fade-in"
         style={{ width: '100%', maxWidth: 420, position: 'relative', zIndex: 1 }}
       >
@@ -220,7 +212,7 @@ export function AuthScreen({ onSendEmailOtp, onGoogleSignIn, onGuestSignIn, erro
                   autoComplete="email"
                   autoFocus
                   required
-                  data-nav-item
+
                   style={{ letterSpacing: '0.04em' }}
                 />
                 <div style={{
@@ -237,7 +229,7 @@ export function AuthScreen({ onSendEmailOtp, onGoogleSignIn, onGuestSignIn, erro
               <button
                 type="submit"
                 className="primary"
-                data-nav-item
+          
                 style={{ padding: '13px', marginTop: 4 }}
                 disabled={submitting}
               >
@@ -249,7 +241,7 @@ export function AuthScreen({ onSendEmailOtp, onGoogleSignIn, onGuestSignIn, erro
                   <TavernDivider />
                   <button
                     type="button"
-                    data-nav-item
+  
                     onClick={() => { setStage('guest'); setError(null); }}
                     style={{ width: '100%', padding: '12px 16px', color: 'var(--text-dim)', letterSpacing: '0.1em' }}
                   >
@@ -285,7 +277,7 @@ export function AuthScreen({ onSendEmailOtp, onGoogleSignIn, onGuestSignIn, erro
                   required
                   minLength={4}
                   maxLength={20}
-                  data-nav-item
+
                 />
                 <div style={{
                   fontFamily: "'Crimson Text', serif",
@@ -301,14 +293,14 @@ export function AuthScreen({ onSendEmailOtp, onGoogleSignIn, onGuestSignIn, erro
               <button
                 type="submit"
                 className="primary"
-                data-nav-item
+          
                 style={{ padding: '13px', marginTop: 4 }}
               >
                 Take a Seat →
               </button>
               <button
                 type="button"
-                data-nav-item
+          
                 onClick={() => { setStage('email'); setError(null); }}
                 style={{ fontSize: 11, padding: '8px', background: 'none', border: 'none', color: 'var(--text-dim)', cursor: 'pointer' }}
               >
@@ -334,7 +326,7 @@ export function AuthScreen({ onSendEmailOtp, onGoogleSignIn, onGuestSignIn, erro
               </div>
               <button
                 type="button"
-                data-nav-item
+          
                 onClick={() => { setStage('email'); setError(null); }}
                 style={{ fontSize: 11, padding: '8px', background: 'none', border: 'none', color: 'var(--text-dim)', cursor: 'pointer' }}
               >
@@ -344,18 +336,6 @@ export function AuthScreen({ onSendEmailOtp, onGoogleSignIn, onGuestSignIn, erro
           )}
         </div>
 
-        {/* Keyboard hint */}
-        <div style={{
-          marginTop: 18,
-          textAlign: 'center',
-          fontFamily: "'Cinzel', serif",
-          fontSize: 9,
-          color: 'var(--text-dim)',
-          letterSpacing: '0.18em',
-          opacity: 0.5,
-        }}>
-          [W] [S] Navigate · [Enter] Confirm · [Esc] Clear
-        </div>
       </div>
     </div>
   );

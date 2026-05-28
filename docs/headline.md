@@ -1,5 +1,68 @@
 # UI Redesign Headlines
 
+## 2026-05-28 — Keyboard Nav Removal + Phase 3: Shaders, Audio & Polish (Deployed to Staging)
+
+**Branch:** `feature/ui-redesign-phase-3`  
+**Scope:** Remove keyboard navigation entirely; add screen-shake, smoke overlays, vignette, Web Audio cues
+
+---
+
+### Keyboard Nav — Fully Removed
+
+All keyboard navigation code stripped from the merged codebase:
+- `useKeyboardNav` hook no longer imported or called in any component
+- All `data-nav-item` attributes removed from every element
+- All `ref={navRef}` / `onKeyDown={handleKeyDown}` container bindings removed
+- All keyboard hint strips (`[W][S] Navigate`, `[Enter] Select`, etc.) removed
+- `[B]` hotkey `<kbd>` label removed from Call Bluff button
+- `.kb-focus` CSS class removed from globals.css
+- `useKeyboardNav.js` file retained (dead code, unused) — safe to delete later
+
+Files cleaned: `AuthScreen.js`, `LandingScreen.js`, `GroupsScreen.js`, `GroupDetailScreen.js`, `BottomSeat.js`, `CardHand.js`, `CenterTablePanel.js`, `globals.css`
+
+---
+
+### Phase 3 — Atmospheric Polish
+
+**New files:**
+- `client/src/hooks/useAtmosphere.js` — screen-shake + Web Audio synthesis hook
+- `client/src/components/shared/SmokeLayer.js` — drifting smoke wisps (CSS radial-gradient + animation)
+
+**CSS additions to globals.css:**
+- `screen-shake` keyframe animation (11-step physics shake, 0.55s)
+- `smoke-drift` + `smoke-drift-b` keyframes (wisps drift upward and fade)
+- `vignette-intensify` keyframe (crimson vignette pulses during spin_pending)
+- All guarded by `prefers-reduced-motion` block
+
+**`useAtmosphere(wrapperRef)` hook:**
+| Trigger | Shake | Sound |
+|---|---|---|
+| Phase enters `spin_pending` | Yes | Bell toll (bluff called) |
+| `spin_result` lastAction | Yes | Metallic whir or elimination boom |
+| `card_played` lastAction | No | Wood knock |
+| Phase enters `game_over` | No | Three-chord fanfare |
+
+Web Audio sounds are synthesised entirely via the Web Audio API — no audio files required. All frequencies are in the warm/low range (60–440 Hz) for the tavern feel.
+
+**SmokeLayer:** renders 2–4 staggered radial-gradient blobs drifting upward. Active during `playing` phase (low intensity) and `spin_pending` (high intensity, more wisps + higher opacity).
+
+### QA Checklist (Phase 3)
+
+- [ ] Smoke wisps visible on the table during active play (subtle, amber-tinted)
+- [ ] Smoke intensity increases visibly when spin_pending starts
+- [ ] Screen shakes when a bluff is called and spin_pending begins
+- [ ] Screen shakes again when spin result lands
+- [ ] Brief wood-knock sound when a card is played (requires user gesture first)
+- [ ] Bell sound when bluff is called
+- [ ] Deep metallic spin whir during cylinder animation
+- [ ] Boom sound on elimination
+- [ ] Three-chord fanfare on game_over
+- [ ] `prefers-reduced-motion`: smoke, shake, and animations all suppressed
+- [ ] Mobile: no broken layout from smoke layer (position:fixed, pointer-events:none)
+- [ ] Joining a room with a code still works — no keyboard interference on any input
+
+---
+
 ## 2026-05-28 — Phase 2: Online Game Board & Active Table (Deployed to Staging)
 
 **Branch:** `feature/ui-redesign-phase-2`  
