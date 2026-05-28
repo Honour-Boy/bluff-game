@@ -2,7 +2,7 @@ import { ShapeIcon } from '../shared/ShapeIcon';
 import { POWER_META, POWER_ICONS } from '../shared/PowerCard';
 
 // ─── Single card — physical card in a wooden cardholder ──────────────────────
-function renderOneCard({ card, index, totalCards, isSelected, interactive, powerInteractive, onCardClick, onPowerCardClick }) {
+function renderOneCard({ card, index, totalCards, isSelected, isJustPlayed = false, interactive, powerInteractive, onCardClick, onPowerCardClick }) {
   const isPower = card.type === 'power';
   const isWhot = !isPower && card.shape === 'whot';
   const powerMeta = isPower ? POWER_META[card.power] : null;
@@ -57,17 +57,17 @@ function renderOneCard({ card, index, totalCards, isSelected, interactive, power
       title={isArmed ? armedLabel : (isPower && powerMeta ? `${powerMeta.label} — ${powerMeta.flavor}` : undefined)}
       aria-label={isPower && powerMeta ? `Power card: ${powerMeta.label}` : undefined}
       data-armed={isArmed ? 'true' : undefined}
-
+      className={isJustPlayed ? 'card-play-physics' : undefined}
       style={{
         position: 'relative',
         width: 58,
         height: 84,
         flexShrink: 0,
-        transform,
-        zIndex: isSelected ? 100 : index + 1,
+        transform: isJustPlayed ? undefined : transform,
+        zIndex: isJustPlayed ? 200 : isSelected ? 100 : index + 1,
         cursor: cardInteractive ? 'pointer' : 'default',
         pointerEvents: isArmed ? 'none' : 'auto',
-        transition: 'transform 0.2s cubic-bezier(0.22,1,0.36,1), box-shadow 0.2s ease',
+        transition: isJustPlayed ? 'none' : 'transform 0.2s cubic-bezier(0.22,1,0.36,1), box-shadow 0.2s ease',
         transformOrigin: 'bottom center',
       }}
     >
@@ -190,6 +190,7 @@ export function CardHand({
   onPowerCardClick,
   interactive = true,
   powerInteractive = undefined,
+  justPlayedCardId = null,
 }) {
   const shapeCards = hand.filter(c => c?.type !== 'power');
 
@@ -241,6 +242,7 @@ export function CardHand({
                 index,
                 totalCards: shapeCards.length,
                 isSelected: selectedCardId === card.id,
+                isJustPlayed: justPlayedCardId === card.id,
                 interactive,
                 powerInteractive,
                 onCardClick,

@@ -1,3 +1,4 @@
+import { useEffect, useRef, useState } from 'react';
 import { VoiceIndicator } from '../VoicePanel';
 import { CardHand } from './CardHand';
 
@@ -37,6 +38,24 @@ export function BottomSeat({
   const shapeCardCount = myHand.filter((card) => card?.type !== 'power').length;
   const powerCardCount = (myPowerCardSlot?.length || 0)
     + myHand.filter((card) => card?.type === 'power').length;
+
+  // Track which card was just played so CardHand can animate it sliding to the pile.
+  // Capture the selectedCardId the moment cardPlayedThisTurn transitions false→true.
+  const prevPlayedRef = useRef(false);
+  const prevSelectedRef = useRef(null);
+  const [justPlayedCardId, setJustPlayedCardId] = useState(null);
+
+  useEffect(() => {
+    if (selectedCardId) prevSelectedRef.current = selectedCardId;
+    if (!prevPlayedRef.current && cardPlayedThisTurn && prevSelectedRef.current) {
+      setJustPlayedCardId(prevSelectedRef.current);
+      // Clear after the animation duration (450 ms) so the card returns to normal
+      const t = setTimeout(() => setJustPlayedCardId(null), 500);
+      return () => clearTimeout(t);
+    }
+    prevPlayedRef.current = !!cardPlayedThisTurn;
+    return undefined;
+  }, [cardPlayedThisTurn, selectedCardId]);
 
   return (
     <div
@@ -309,6 +328,7 @@ export function BottomSeat({
               onPowerCardClick={handlePowerCardClick}
               interactive={isMyTurn && isPlaying && !cardPlayedThisTurn}
               powerInteractive={isMyTurn && isPlaying}
+              justPlayedCardId={justPlayedCardId}
             />
           </div>
         )

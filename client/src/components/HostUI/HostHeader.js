@@ -9,34 +9,84 @@ export function HostHeader({
   onShowHowToPlay,
 }) {
   return (
-    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 12 }}>
+    <div style={{
+      display: 'flex',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      flexWrap: 'wrap',
+      gap: 12,
+      padding: '6px 0 12px',
+      borderBottom: '1px solid var(--border)',
+    }}>
       <div>
-        <h1 className="glitch" style={{ fontSize: 52, color: 'var(--accent)', lineHeight: 1 }}>BLUFF</h1>
-        <div style={{ fontSize: 11, color: 'var(--text-dim)', letterSpacing: '0.15em', marginTop: 2 }}>
-          GAME MASTER PANEL
+        <h1
+          className="candle-title"
+          style={{
+            fontFamily: "'Cinzel Decorative', 'Cinzel', serif",
+            fontSize: 44,
+            color: 'var(--accent)',
+            lineHeight: 0.95,
+            letterSpacing: '0.1em',
+            textShadow: '0 0 30px rgba(200,146,46,0.4)',
+          }}
+        >
+          BLUFF
+        </h1>
+        <div style={{
+          fontFamily: "'Cinzel', serif",
+          fontSize: 9,
+          color: 'var(--text-dim)',
+          letterSpacing: '0.22em',
+          marginTop: 4,
+          textTransform: 'uppercase',
+        }}>
+          Game Master
         </div>
       </div>
+
       <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 8 }}>
         <div style={{ textAlign: 'right' }}>
-          <div style={{ fontSize: 10, color: 'var(--text-dim)', letterSpacing: '0.12em', marginBottom: 4 }}>ROOM CODE</div>
+          <div style={{
+            fontFamily: "'Cinzel', serif",
+            fontSize: 8,
+            color: 'var(--text-dim)',
+            letterSpacing: '0.2em',
+            textTransform: 'uppercase',
+            marginBottom: 5,
+          }}>
+            Chamber Cipher
+          </div>
           <div
             style={{
-              fontFamily: "'Bebas Neue', sans-serif",
-              fontSize: 36,
-              letterSpacing: '0.2em',
+              fontFamily: "'Cinzel', serif",
+              fontSize: 28,
+              fontWeight: 700,
+              letterSpacing: '0.22em',
               color: 'var(--accent)',
-              border: '1px solid var(--accent)',
+              border: '1px solid var(--accent-dim)',
               padding: '4px 16px',
               borderRadius: 'var(--radius)',
-              background: 'rgba(232,255,74,0.04)',
+              background: 'rgba(200,146,46,0.06)',
               cursor: 'pointer',
+              display: 'inline-block',
+              boxShadow: '0 0 10px rgba(200,146,46,0.1)',
+              transition: 'box-shadow 0.15s',
             }}
             title="Click to copy"
             onClick={() => navigator.clipboard?.writeText(roomCode)}
+            onMouseEnter={e => { e.currentTarget.style.boxShadow = '0 0 20px rgba(200,146,46,0.28)'; }}
+            onMouseLeave={e => { e.currentTarget.style.boxShadow = '0 0 10px rgba(200,146,46,0.1)'; }}
           >
             {roomCode}
           </div>
-          <div style={{ fontSize: 9, color: 'var(--text-dim)', marginTop: 4 }}>
+          <div style={{
+            fontFamily: "'Cinzel', serif",
+            fontSize: 8,
+            color: 'var(--text-dim)',
+            letterSpacing: '0.14em',
+            textTransform: 'uppercase',
+            marginTop: 5,
+          }}>
             {alivePlayersCount} alive · Round {roundNumber}
           </div>
           <div style={{ marginTop: 8 }}>
@@ -50,9 +100,19 @@ export function HostHeader({
         </div>
         <button
           onClick={onShowHowToPlay}
-          style={{ fontSize: 10, color: 'var(--text-dim)', border: '1px solid var(--border)', background: 'none', padding: '3px 8px', borderRadius: 4, cursor: 'pointer' }}
+          style={{
+            fontFamily: "'Cinzel', serif",
+            fontSize: 9,
+            color: 'var(--text-dim)',
+            border: '1px solid var(--border)',
+            background: 'none',
+            padding: '4px 10px',
+            borderRadius: 3,
+            cursor: 'pointer',
+            letterSpacing: '0.1em',
+          }}
         >
-          ? How to Play
+          Rules
         </button>
       </div>
     </div>
