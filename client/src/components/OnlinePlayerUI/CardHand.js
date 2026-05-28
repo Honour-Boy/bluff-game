@@ -57,7 +57,7 @@ function renderOneCard({ card, index, totalCards, isSelected, interactive, power
       title={isArmed ? armedLabel : (isPower && powerMeta ? `${powerMeta.label} — ${powerMeta.flavor}` : undefined)}
       aria-label={isPower && powerMeta ? `Power card: ${powerMeta.label}` : undefined}
       data-armed={isArmed ? 'true' : undefined}
-      data-nav-item={cardInteractive ? '' : undefined}
+
       style={{
         position: 'relative',
         width: 58,

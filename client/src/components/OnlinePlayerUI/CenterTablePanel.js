@@ -364,7 +364,7 @@ export function CenterTablePanel({
               <button
                 className="danger"
                 onClick={playerSpin}
-                data-nav-item
+
                 style={{
                   width: '100%',
                   fontSize: 15,

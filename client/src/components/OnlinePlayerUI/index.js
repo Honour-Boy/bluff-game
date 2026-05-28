@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { CardHand } from './CardHand';
 import { PlayerChip } from './PlayerChip';
 import { RoomHeader } from './RoomHeader';
@@ -11,12 +11,14 @@ import { RolePromptOverlays } from './RolePromptOverlays';
 import { SystemsLayer } from './SystemsLayer';
 import { BluffInterceptOverlay } from './BluffInterceptOverlay';
 import { PreGameSelectionModal } from '../PreGameSelectionModal';
+import { SmokeLayer } from '../shared/SmokeLayer';
 import {
   distributePlayers,
   GAME_UI_STYLE,
   orderClockwiseFromLocal,
 } from './helpers';
 import { useOnlinePlayerUiController } from '../../hooks/useOnlinePlayerUiController';
+import { useAtmosphere } from '../../hooks/useAtmosphere';
 
 export { CardHand, distributePlayers, orderClockwiseFromLocal };
 
@@ -59,6 +61,9 @@ export function OnlinePlayerUI({
   openChat,
   chatUnread = 0,
 }) {
+  const wrapperRef = useRef(null);
+  const { triggerShake, triggerAudio } = useAtmosphere(wrapperRef);
+
   const myHand = roomState?.myHand || [];
   const myPowerCardSlot = roomState?.myPowerCardSlot || [];
   const ui = useOnlinePlayerUiController({
@@ -77,6 +82,40 @@ export function OnlinePlayerUI({
     spinDismissed,
     powerEventQueue,
   });
+
+  // ── Phase 3: atmospheric triggers ──────────────────────────────────────────
+  // Watch phase + lastAction to fire shake/audio on key moments.
+  const prevPhaseRef = useRef(null);
+  const prevLastActionRef = useRef(null);
+  useEffect(() => {
+    if (!roomState) return;
+    const phase = roomState.phase;
+    const la = roomState.lastAction;
+    const prevPhase = prevPhaseRef.current;
+    const prevLa = prevLastActionRef.current;
+
+    // Bluff resolution — shake + bell sound when spin_pending starts
+    if (phase === 'spin_pending' && prevPhase !== 'spin_pending') {
+      triggerShake();
+      triggerAudio('bluff');
+    }
+    // Spin result — shake when cylinder result lands
+    if (la && la !== prevLa && la.type === 'spin_result') {
+      triggerShake();
+      triggerAudio(la.eliminated ? 'eliminate' : 'spin');
+    }
+    // Card played — soft knock
+    if (la && la !== prevLa && la.type === 'card_played') {
+      triggerAudio('card');
+    }
+    // Game over — win fanfare
+    if (phase === 'game_over' && prevPhase !== 'game_over') {
+      triggerAudio('win');
+    }
+
+    prevPhaseRef.current = phase;
+    prevLastActionRef.current = la;
+  }, [roomState?.phase, roomState?.lastAction, triggerShake, triggerAudio]); // eslint-disable-line
 
   // §2.1 — private late-pick review buffer. When the server flags a pick as
   // late (≥12s into the 15s window) it returns a reviewMs grace period. We
@@ -244,8 +283,11 @@ export function OnlinePlayerUI({
   void medicPrompt;
   void lastStandEndTurn;
 
+  const isSpinPendingPhase = roomState?.phase === 'spin_pending';
+
   return (
     <div
+      ref={wrapperRef}
       style={{
         position: 'relative',
         minHeight: '100vh',
@@ -255,6 +297,12 @@ export function OnlinePlayerUI({
         paddingBottom: 'env(safe-area-inset-bottom, 0px)',
       }}
     >
+      {/* Phase 3: ambient smoke drifting across the table during play */}
+      <SmokeLayer
+        active={roomState?.phase === 'playing' || isSpinPendingPhase}
+        intensity={isSpinPendingPhase ? 'high' : 'low'}
+      />
+
       <RoomHeader
         roomCode={roomCode}
         roundNumber={roundNumber}

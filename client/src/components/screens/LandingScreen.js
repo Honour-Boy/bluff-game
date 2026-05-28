@@ -1,7 +1,6 @@
 'use client';
 
 import { useState, useEffect, lazy, Suspense } from 'react';
-import { useKeyboardNav } from '../../hooks/useKeyboardNav';
 
 const HowToPlayModal = lazy(() =>
   import('./HowToPlayModal').then((m) => ({ default: m.HowToPlayModal })),
@@ -26,13 +25,12 @@ function SuitMark({ shape, delay = 0 }) {
 }
 
 // ─── Wooden plaque button ─────────────────────────────────────────────────────
-function PlaqueButton({ children, onClick, primary, disabled, style = {}, navItem = true }) {
+function PlaqueButton({ children, onClick, primary, disabled, style = {} }) {
   return (
     <button
       className={primary ? 'primary' : undefined}
       onClick={onClick}
       disabled={disabled}
-      data-nav-item={navItem ? '' : undefined}
       style={{
         width: '100%',
         padding: '17px 24px',
@@ -79,20 +77,6 @@ export function LandingScreen({
       setMode('join');
     }
   }, [initialJoinCode]); // eslint-disable-line
-
-  // Main menu item count (create + join + [groups] + how-to)
-  const mainItemCount = isGuest ? 3 : 4;
-  const { navRef: mainNavRef, handleKeyDown: mainKeyDown } = useKeyboardNav(mainItemCount, {
-    onEscape: () => { setError(null); setMode(null); },
-  });
-
-  const { navRef: hostNavRef, handleKeyDown: hostKeyDown } = useKeyboardNav(4, {
-    onEscape: () => { setMode(null); setError(null); },
-  });
-
-  const { navRef: joinNavRef, handleKeyDown: joinKeyDown } = useKeyboardNav(2, {
-    onEscape: () => { setMode(null); setError(null); },
-  });
 
   const handleJoin = (e) => {
     e.preventDefault();
@@ -328,11 +312,7 @@ export function LandingScreen({
 
         {/* ── Main menu ── */}
         {!mode && (
-          <div
-            ref={mainNavRef}
-            onKeyDown={mainKeyDown}
-            style={{ display: 'flex', flexDirection: 'column', gap: 10 }}
-          >
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
             <PlaqueButton primary onClick={() => setMode('host')} disabled={!connected}>
               {/* Dice icon */}
               <svg width="15" height="15" viewBox="0 0 24 24" fill="none" aria-hidden="true">
@@ -396,26 +376,12 @@ export function LandingScreen({
               </div>
             )}
 
-            {/* Keyboard hint strip */}
-            <div style={{
-              marginTop: 10,
-              textAlign: 'center',
-              fontFamily: "'Cinzel', serif",
-              fontSize: 8,
-              color: 'var(--text-dim)',
-              letterSpacing: '0.18em',
-              opacity: 0.45,
-            }}>
-              [W][S] or [↑][↓] Navigate · [Enter] Select
-            </div>
           </div>
         )}
 
         {/* ── Host: game mode selection ── */}
         {mode === 'host' && (
           <form
-            ref={hostNavRef}
-            onKeyDown={hostKeyDown}
             onSubmit={handleCreate}
             style={{ display: 'flex', flexDirection: 'column', gap: 16 }}
           >
@@ -462,9 +428,7 @@ export function LandingScreen({
                     key={key}
                     role="button"
                     tabIndex={0}
-                    data-nav-item
                     onClick={() => setSelectedGameMode(key)}
-                    onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setSelectedGameMode(key); } }}
                     style={{
                       flex: '1 1 180px',
                       padding: '16px',
@@ -555,34 +519,20 @@ export function LandingScreen({
             <button
               type="submit"
               className="primary"
-              data-nav-item
               style={{ padding: '16px', fontSize: 13, opacity: !selectedGameMode ? 0.45 : 1 }}
               disabled={!selectedGameMode}
             >
               Open the Table →
             </button>
-            <button type="button" data-nav-item style={{ fontSize: 11 }} onClick={handleBackFromHost}>
+            <button type="button" style={{ fontSize: 11 }} onClick={handleBackFromHost}>
               ← Back to the Bar
             </button>
-
-            <div style={{
-              textAlign: 'center',
-              fontFamily: "'Cinzel', serif",
-              fontSize: 8,
-              color: 'var(--text-dim)',
-              letterSpacing: '0.18em',
-              opacity: 0.45,
-            }}>
-              [A][D] or [←][→] Switch Mode · [Enter] Confirm · [Esc] Back
-            </div>
           </form>
         )}
 
         {/* ── Player: join room ── */}
         {mode === 'join' && (
           <form
-            ref={joinNavRef}
-            onKeyDown={joinKeyDown}
             onSubmit={handleJoin}
             style={{ display: 'flex', flexDirection: 'column', gap: 14 }}
           >
@@ -629,7 +579,6 @@ export function LandingScreen({
                 maxLength={6}
                 readOnly={codeLocked}
                 autoFocus
-                data-nav-item
                 style={{
                   letterSpacing: '0.28em',
                   fontSize: 18,
@@ -654,14 +603,12 @@ export function LandingScreen({
             <button
               type="submit"
               className="primary"
-              data-nav-item
               style={{ padding: '14px', fontSize: 13 }}
             >
               Enter the Room →
             </button>
             <button
               type="button"
-              data-nav-item
               style={{ fontSize: 11 }}
               onClick={() => {
                 setMode(null);
@@ -674,17 +621,6 @@ export function LandingScreen({
             >
               ← Back to the Bar
             </button>
-
-            <div style={{
-              textAlign: 'center',
-              fontFamily: "'Cinzel', serif",
-              fontSize: 8,
-              color: 'var(--text-dim)',
-              letterSpacing: '0.18em',
-              opacity: 0.45,
-            }}>
-              [Enter] Confirm · [Esc] Back
-            </div>
           </form>
         )}
       </div>
