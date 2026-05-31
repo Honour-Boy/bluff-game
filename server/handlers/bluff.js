@@ -28,6 +28,7 @@ const {
   _scheduleSpinPendingTimeout,
   _bountyOnElimination,
   _maybeOpenBetting,
+  resolveRedemption,
 } = require('../lib/orchestration');
 
 // ─── Shared online bluff resolution ──────────────────────────
@@ -189,6 +190,24 @@ function register(io, socket, deps) {
       callback({ success: true, spinResult });
     } catch (err) {
       callback({ success: false, error: err.message });
+    }
+  });
+
+  // ─── PLAYER: Take the offered redemption spin (Phase E1) ─────
+  socket.on('redemption_spin', async ({ roomCode } = {}, callback) => {
+    try {
+      if (!socket.userId) return callback?.({ success: false, error: 'Not authenticated' });
+      const code = roomCode?.toUpperCase();
+      const room = await getRoom(code);
+      if (!room) return callback?.({ success: false, error: 'Room not found' });
+      if (room.phase !== 'redemption_pending') return callback?.({ success: false, error: 'No redemption pending' });
+      if (room.redemption?.playerId !== socket.userId) {
+        return callback?.({ success: false, error: 'Not your redemption spin' });
+      }
+      const result = await resolveRedemption(io, code, room, leaderboardRepo);
+      callback?.({ success: true, result });
+    } catch (err) {
+      callback?.({ success: false, error: err.message });
     }
   });
 

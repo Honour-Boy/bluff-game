@@ -12,6 +12,7 @@ const {
   ghostVoteTimers,
   spinPendingTimers,
   gameOverTimers,
+  redemptionTimers,
   getRoom,
   saveRoom,
   _clearBettingTimer,
@@ -19,6 +20,7 @@ const {
   _clearBluffInterceptTimer,
   _clearSpinPendingTimer,
   _clearGameOverTimer,
+  _clearRedemptionTimer,
   logTurnState,
 } = require('./state');
 const { broadcastRoomState, emitPowerCardEvents } = require('./broadcast');
@@ -450,6 +452,15 @@ async function applySpinAndBroadcast(io, code, room, player, leaderboardRepo) {
   room.bluffUsedThisTurn = true;
   logTurnState(code, room.turnOrder[room.currentTurnIndex], 'bluff_resolved_spin', room, { spunBy: player.id, eliminated: spinResult.eliminated });
 
+  // Redemption Spin (Phase E1) — queue an offer for the just-eliminated player
+  // to fire once this spin is acknowledged (see beginRedemption). Mirrors the
+  // Mirror Match queue so it never interleaves with the spin overlay.
+  let redemptionPending = false;
+  if (spinResult.eliminated && !medicPaused && _redemptionEligible(room, player.id)) {
+    room.pendingRedemption = { playerId: player.id, playerName: player.username };
+    redemptionPending = true;
+  }
+
   room.lastAction = {
     type: 'spin_result',
     spinTargetId: player.id,
@@ -462,6 +473,7 @@ async function applySpinAndBroadcast(io, code, room, player, leaderboardRepo) {
     riskLevel: spinResult.riskLevel,
     riskLevelBefore,
     medicPending: medicPaused,
+    ...(redemptionPending ? { redemptionPending: true } : {}),
     ...(reshuffle.reshuffled
       ? { globalReshuffle: true, newCardType: reshuffle.cardType }
       : (spinResult.eliminated && !medicPaused ? { newCardType: room.currentCardType } : {})),
@@ -546,6 +558,134 @@ async function resolvePendingGameOver(io, room, leaderboardRepo) {
   await saveRoom(room);
   io.to(code).emit('spin_acknowledged');
   await broadcastRoomState(io, code);
+}
+
+// ─── Redemption Spin (Phase E1) ──────────────────────────────
+//
+// User decision: trigger AT ELIMINATION. When a spin eliminates a player and
+// the modifier is on, that player is offered ONE redemption spin — survive and
+// rejoin (fresh chamber + 3 cards, pushed back into turn order); take the
+// bullet and stay out. To avoid interleaving with the eliminating spin's
+// overlay (the documented spin-overlay fragility), the offer is QUEUED on the
+// room (room.pendingRedemption) and only fired once that spin is acknowledged,
+// exactly like the Mirror Match follow-up. The redemption spin's own result is
+// then surfaced as a normal `spin_result` (flagged `redemption: true`) so it
+// reuses the battle-tested spin overlay + ack path for its animation.
+
+/**
+ * Is `playerId` eligible to be offered a redemption spin right now? Scoped to
+ * spin eliminations in a live online game; skipped during Last Stand / Mirror
+ * Match, when the player already used their one-shot, and when the elimination
+ * ended the match (nothing to rejoin).
+ */
+function _redemptionEligible(room, playerId) {
+  if (!room || room.mode !== engine.MODES.ONLINE) return false;
+  if (!room.config?.riskModifiers?.redemptionSpin) return false;
+  if (room.lastStandActive) return false;
+  if (room.pendingMirrorMatchSpin || room._mirrorMatchInFlight) return false;
+  if (room.pendingGameOver) return false;
+  const p = room.players.find(pp => pp.id === playerId);
+  if (!p || p.status !== 'eliminated' || p._redemptionConsumed) return false;
+  // At least two players must remain alive — otherwise the elimination decided
+  // the match and there's no game left to rejoin.
+  const alive = room.players.filter(pp => pp.status === 'alive').length;
+  return alive >= 2;
+}
+
+/**
+ * Transition the room into redemption_pending for the queued candidate and arm
+ * the safety timeout. Caller emits the follow-up spin_acknowledged. If the
+ * candidate is no longer eligible (state moved on), fall back to playing.
+ */
+async function beginRedemption(io, room, leaderboardRepo) {
+  const code = room.code;
+  const pending = room.pendingRedemption;
+  delete room.pendingRedemption;
+
+  if (!pending || !_redemptionEligible(room, pending.playerId)) {
+    if (room.phase === 'redemption_pending') room.phase = 'playing';
+    await saveRoom(room);
+    await broadcastRoomState(io, code);
+    return;
+  }
+
+  room.phase = 'redemption_pending';
+  room.redemption = {
+    playerId: pending.playerId,
+    playerName: pending.playerName,
+    deadline: Date.now() + engine.REDEMPTION_PENDING_TIMEOUT_MS,
+  };
+  _scheduleRedemptionTimeout(io, code, leaderboardRepo);
+  await saveRoom(room);
+  await broadcastRoomState(io, code);
+}
+
+/**
+ * Run the offered redemption spin and return the room to play. Shared by the
+ * redemption_spin handler (player-driven) and the safety timeout
+ * (server-driven). The outcome is broadcast as a `spin_result` flagged
+ * `redemption: true` so the existing spin overlay animates it.
+ */
+async function resolveRedemption(io, code, room, leaderboardRepo) {
+  _clearRedemptionTimer(code);
+  const pending = room.redemption;
+  room.redemption = null;
+  if (!pending) {
+    if (room.phase === 'redemption_pending') room.phase = 'playing';
+    await saveRoom(room);
+    await broadcastRoomState(io, code);
+    return null;
+  }
+
+  const player = room.players.find(p => p.id === pending.playerId);
+  const result = engine.runRedemptionSpin(room, pending.playerId);
+  room.phase = 'playing';
+
+  if (!result) {
+    await saveRoom(room);
+    await broadcastRoomState(io, code);
+    return null;
+  }
+
+  room.lastAction = {
+    type: 'spin_result',
+    redemption: true,
+    spinTargetId: result.playerId,
+    spinTargetName: player?.username || pending.playerName || null,
+    spinIndex: result.spinIndex,
+    chamber: result.chamber,
+    chamberAfter: result.chamberAfter,
+    roll: result.spinIndex,
+    eliminated: result.eliminated,
+    riskLevel: result.riskLevel,
+    riskLevelBefore: result.riskLevel,
+  };
+
+  // A redemption can only KEEP someone out or bring them back — it can't end
+  // the game. Re-check defensively all the same.
+  const winner = engine.checkGameOver(room);
+  if (winner) _stampPendingGameOver(io, room, winner, leaderboardRepo);
+
+  await saveRoom(room);
+  console.log(`[Room ${code}] redemption spin for ${result.playerId} → ${result.eliminated ? 'STAYS OUT' : 'REJOINS'}`);
+  await broadcastRoomState(io, code);
+  return result;
+}
+
+function _scheduleRedemptionTimeout(io, code, leaderboardRepo) {
+  _clearRedemptionTimer(code);
+  const handle = setTimeout(async () => {
+    redemptionTimers.delete(code);
+    try {
+      const room = await getRoom(code);
+      if (!room || room.phase !== 'redemption_pending' || !room.redemption) return;
+      console.log(`[Room ${code}] redemption_pending TIMED OUT — spinning server-side for ${room.redemption.playerId}.`);
+      await resolveRedemption(io, code, room, leaderboardRepo);
+    } catch (err) {
+      console.error('[redemption_pending timeout]', err);
+    }
+  }, engine.REDEMPTION_PENDING_TIMEOUT_MS);
+  redemptionTimers.set(code, handle);
 }
 
 /**
@@ -701,4 +841,7 @@ module.exports = {
   resolvePendingGameOver,
   runMirrorMatchSpin,
   resolveLeaverPendingPauses,
+  _redemptionEligible,
+  beginRedemption,
+  resolveRedemption,
 };

@@ -32,6 +32,11 @@ const bluffInterceptTimers = new Map();  // roomCode → setTimeout handle
 const spinPendingTimers = new Map();  // roomCode → setTimeout handle
 const gameOverTimers = new Map();     // roomCode → setTimeout handle
 
+// Redemption Spin safety timer — auto-runs the offered redemption spin if the
+// eliminated player never takes it, so the room can't park in
+// redemption_pending. One handle per room.
+const redemptionTimers = new Map();   // roomCode → setTimeout handle
+
 // Host / player disconnect grace timers.
 const hostDisconnectTimers = new Map();
 // Player disconnect timers must be visible across socket connections —
@@ -63,6 +68,10 @@ function _clearSpinPendingTimer(code) {
 function _clearGameOverTimer(code) {
   const t = gameOverTimers.get(code);
   if (t) { clearTimeout(t); gameOverTimers.delete(code); }
+}
+function _clearRedemptionTimer(code) {
+  const t = redemptionTimers.get(code);
+  if (t) { clearTimeout(t); redemptionTimers.delete(code); }
 }
 
 // §2.1 — verbose, single-line structured logging for every room teardown so
@@ -118,6 +127,7 @@ module.exports = {
   bluffInterceptTimers,
   spinPendingTimers,
   gameOverTimers,
+  redemptionTimers,
   hostDisconnectTimers,
   playerDisconnectTimers,
   dcKey,
@@ -127,6 +137,7 @@ module.exports = {
   _clearBluffInterceptTimer,
   _clearSpinPendingTimer,
   _clearGameOverTimer,
+  _clearRedemptionTimer,
   logRoomDeletion,
   logTurnState,
   getRoom,

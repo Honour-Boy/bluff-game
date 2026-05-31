@@ -141,6 +141,12 @@ const SPIN_PENDING_TIMEOUT_MS = 90_000;
 // can't strand the room in 'playing' with every socket still alive.
 const PENDING_GAME_OVER_TIMEOUT_MS = 10_000;
 
+// Redemption Spin (riskModifiers.redemptionSpin) — once an eliminating spin is
+// acknowledged, the eliminated player is offered ONE redemption spin. If they
+// never take it (overlay glitch / they walked away), the server runs it on
+// their behalf after this window so the room can't park in redemption_pending.
+const REDEMPTION_PENDING_TIMEOUT_MS = 30_000;
+
 // ─── v2 config defaults ───────────────────────────────────────
 function defaultRoomConfig() {
   return {
@@ -244,6 +250,7 @@ module.exports = {
   SUDDEN_DEATH_THRESHOLD,
   SPIN_PENDING_TIMEOUT_MS,
   PENDING_GAME_OVER_TIMEOUT_MS,
+  REDEMPTION_PENDING_TIMEOUT_MS,
   defaultRoomConfig,
   normalizeRoomConfig,
 };

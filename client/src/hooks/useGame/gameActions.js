@@ -92,6 +92,16 @@ export function useGameActions({
     setSpinDismissed(true);
   }, [roomCode, setSpinDismissed, socket]);
 
+  // Redemption Spin (Phase E1) — the eliminated player takes their one offered
+  // spin. The result comes back as a normal spin_result, so reset the dismiss
+  // flag the same way playerSpin does so its overlay shows.
+  const redemptionSpin = useCallback(() => {
+    setSpinDismissed(false);
+    socket.emit('redemption_spin', { roomCode }, (res) => {
+      if (!res?.success) failError(res);
+    });
+  }, [failError, roomCode, setSpinDismissed, socket]);
+
   const declareRoundWin = useCallback((winnerPlayerId) => {
     socket.emit('round_win', { roomCode, playerId: winnerPlayerId }, (res) => {
       if (!res.success) failError(res);
@@ -235,6 +245,7 @@ export function useGameActions({
     endTurn,
     playerSpin,
     acknowledgeSpinResult,
+    redemptionSpin,
     declareRoundWin,
     callBluff,
     playCardOnline,

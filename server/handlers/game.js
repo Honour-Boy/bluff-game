@@ -17,7 +17,7 @@ const {
 const { broadcastRoomState } = require('../lib/broadcast');
 const { socketRateLimit } = require('../lib/rateLimiter');
 const { maybeRecordGroupWinner } = require('../lib/roomBuilders');
-const { runMirrorMatchSpin, resolvePendingGameOver } = require('../lib/orchestration');
+const { runMirrorMatchSpin, resolvePendingGameOver, beginRedemption } = require('../lib/orchestration');
 
 // ─── Pre-game selection orchestration (#116) ─────────────────
 // Pure phase/state logic lives in engine/pregame.js; these helpers
@@ -486,6 +486,14 @@ function register(io, socket, deps) {
       const pending = room.pendingMirrorMatchSpin;
       delete room.pendingMirrorMatchSpin;
       await runMirrorMatchSpin(io, room, pending, leaderboardRepo);
+      io.to(code).emit('spin_acknowledged');
+      return;
+    }
+
+    // Redemption Spin (Phase E1) — the eliminating spin's overlay has been
+    // dismissed; now open the redemption_pending offer to the eliminated player.
+    if (room?.pendingRedemption) {
+      await beginRedemption(io, room, leaderboardRepo);
       io.to(code).emit('spin_acknowledged');
       return;
     }

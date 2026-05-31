@@ -14,6 +14,7 @@ const {
   _clearPreGameTimer,
   _clearSpinPendingTimer,
   _clearGameOverTimer,
+  _clearRedemptionTimer,
   logRoomDeletion,
   saveRoom,
 } = require('../lib/state');
@@ -42,6 +43,7 @@ function register(io, socket, deps) {
           _clearPreGameTimer(code);
           _clearSpinPendingTimer(code);
           _clearGameOverTimer(code);
+          _clearRedemptionTimer(code);
           discardLobbyIdleState(code);
           rooms.delete(code);
           hostDisconnectTimers.delete(code);

@@ -10,6 +10,7 @@ import { PowerFlowOverlays } from './PowerFlowOverlays';
 import { RolePromptOverlays } from './RolePromptOverlays';
 import { SystemsLayer } from './SystemsLayer';
 import { BluffInterceptOverlay } from './BluffInterceptOverlay';
+import RedemptionOverlay from './RedemptionOverlay';
 import { PreGameSelectionModal } from '../PreGameSelectionModal';
 import { SmokeLayer } from '../shared/SmokeLayer';
 import {
@@ -37,6 +38,7 @@ export function OnlinePlayerUI({
   leaveGame,
   restartRoom,
   acknowledgeSpinResult,
+  redemptionSpin,
   spinDismissed,
   activatePowerCard,
   swapPick,
@@ -154,6 +156,18 @@ export function OnlinePlayerUI({
   // past the shared finalize, giving them a guaranteed private look before the
   // table appears. (They're already deprioritised off the opening turn server-
   // side.) Only the late picker ever sees this hold.
+  // Redemption Spin (Phase E1) — guard against a double-tap on the offer.
+  const [redemptionBusy, setRedemptionBusy] = useState(false);
+  const handleRedemptionSpin = useCallback(() => {
+    if (!redemptionSpin || redemptionBusy) return;
+    setRedemptionBusy(true);
+    redemptionSpin();
+  }, [redemptionSpin, redemptionBusy]);
+  // Reset the busy guard once the offer is no longer pending.
+  useEffect(() => {
+    if (roomState?.phase !== 'redemption_pending') setRedemptionBusy(false);
+  }, [roomState?.phase]);
+
   const [reviewSnapshot, setReviewSnapshot] = useState(null);
   const handleLatePick = useCallback((reviewMs, optionId) => {
     setReviewSnapshot({
@@ -469,6 +483,15 @@ export function OnlinePlayerUI({
         players={players}
         swapHolderId={roomState?.swapHolderId}
       />
+
+      {phase === 'redemption_pending' && roomState?.redemption && (
+        <RedemptionOverlay
+          redemption={roomState.redemption}
+          isMine={roomState.redemption.playerId === myPlayer?.id}
+          onSpin={handleRedemptionSpin}
+          busy={redemptionBusy}
+        />
+      )}
 
       {showPreGameSelection && (
         <PreGameSelectionModal
