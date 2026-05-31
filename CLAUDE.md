@@ -22,9 +22,13 @@ node index.js          # or: npm start
 npm install
 npm run dev            # Next.js dev on :3000
 npm run build && npm start
+
+# Tests
+cd server && npx vitest run   # server suite (runs on any Node 20.x+)
+cd client && npm test         # client suite — REQUIRES Node ^20.19.0 || >=22.12.0
 ```
 
-There are **no tests, no linter, and no typechecker** configured. Don't claim verification by running `npm test` — it won't exist. Verify changes by running both processes and exercising the flow in a browser.
+**Node baseline:** the client test toolchain (Vite 8 via Vitest) requires Node `^20.19.0 || >=22.12.0` — pinned in `client/package.json` `engines` and `.nvmrc`. On an older 20.x LTS the client runner dies at config load with `ERR_REQUIRE_ESM` in `std-env` (see issue #196). The server suite has no such requirement. There is no linter or typechecker configured.
 
 ## Environment variables
 
