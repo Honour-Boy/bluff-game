@@ -37,6 +37,12 @@ const gameOverTimers = new Map();     // roomCode → setTimeout handle
 // redemption_pending. One handle per room.
 const redemptionTimers = new Map();   // roomCode → setTimeout handle
 
+// Speed Mode — one per-turn countdown handle per room. Stamped when a new
+// player's turn opens (online + roomModifiers.speedMode); on expiry the server
+// auto-ends that player's turn. Re-armed on every turn change, paused whenever
+// the room leaves the `playing` phase (spins / resolution), cleared on teardown.
+const speedModeTimers = new Map();    // roomCode → setTimeout handle
+
 // Host / player disconnect grace timers.
 const hostDisconnectTimers = new Map();
 // Player disconnect timers must be visible across socket connections —
@@ -72,6 +78,10 @@ function _clearGameOverTimer(code) {
 function _clearRedemptionTimer(code) {
   const t = redemptionTimers.get(code);
   if (t) { clearTimeout(t); redemptionTimers.delete(code); }
+}
+function _clearSpeedModeTimer(code) {
+  const t = speedModeTimers.get(code);
+  if (t) { clearTimeout(t); speedModeTimers.delete(code); }
 }
 
 // §2.1 — verbose, single-line structured logging for every room teardown so
@@ -128,6 +138,7 @@ module.exports = {
   spinPendingTimers,
   gameOverTimers,
   redemptionTimers,
+  speedModeTimers,
   hostDisconnectTimers,
   playerDisconnectTimers,
   dcKey,
@@ -138,6 +149,7 @@ module.exports = {
   _clearSpinPendingTimer,
   _clearGameOverTimer,
   _clearRedemptionTimer,
+  _clearSpeedModeTimer,
   logRoomDeletion,
   logTurnState,
   getRoom,

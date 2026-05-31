@@ -42,6 +42,10 @@ export function ActionLog({ lastAction }) {
       return `🗡 Assassin struck.`;
     },
     swap_pending: () => `🔄 Swap activated — holder is choosing a card.`,
+    speed_timeout: ({ playerName }) =>
+      playerName
+        ? `⏱ ${playerName} ran out of time — turn auto-ended.`
+        : `⏱ Turn timed out — auto-ended.`,
   };
 
   const fn = messages[lastAction.type];
@@ -63,6 +67,7 @@ export function ActionLog({ lastAction }) {
     bluff_blocked: 'var(--alive)',
     assassin_strike: 'var(--accent2)',
     swap_pending: 'var(--warning)',
+    speed_timeout: 'var(--warning)',
   };
 
   const color = colors[lastAction.type] || 'var(--text-dim)';

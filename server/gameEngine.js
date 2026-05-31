@@ -59,6 +59,7 @@ module.exports = {
   SPIN_PENDING_TIMEOUT_MS: constants.SPIN_PENDING_TIMEOUT_MS,
   PENDING_GAME_OVER_TIMEOUT_MS: constants.PENDING_GAME_OVER_TIMEOUT_MS,
   REDEMPTION_PENDING_TIMEOUT_MS: constants.REDEMPTION_PENDING_TIMEOUT_MS,
+  SPEED_MODE_TURN_MS: constants.SPEED_MODE_TURN_MS,
   defaultRoomConfig: constants.defaultRoomConfig,
   normalizeRoomConfig: constants.normalizeRoomConfig,
 

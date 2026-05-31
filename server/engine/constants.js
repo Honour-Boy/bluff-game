@@ -147,6 +147,11 @@ const PENDING_GAME_OVER_TIMEOUT_MS = 10_000;
 // their behalf after this window so the room can't park in redemption_pending.
 const REDEMPTION_PENDING_TIMEOUT_MS = 30_000;
 
+// Speed Mode (roomModifiers.speedMode) — each player's turn is capped at this
+// many ms. When the deadline passes the server auto-ENDS the turn (no auto-spin
+// — #79 bans auto-spin in every mode). The lobby advertises a 15s turn timer.
+const SPEED_MODE_TURN_MS = 15_000;
+
 // ─── v2 config defaults ───────────────────────────────────────
 function defaultRoomConfig() {
   return {
@@ -251,6 +256,7 @@ module.exports = {
   SPIN_PENDING_TIMEOUT_MS,
   PENDING_GAME_OVER_TIMEOUT_MS,
   REDEMPTION_PENDING_TIMEOUT_MS,
+  SPEED_MODE_TURN_MS,
   defaultRoomConfig,
   normalizeRoomConfig,
 };
