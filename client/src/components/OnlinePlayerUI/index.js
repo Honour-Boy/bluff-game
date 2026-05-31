@@ -20,7 +20,7 @@ import {
   orderClockwiseFromLocal,
 } from './helpers';
 import { useOnlinePlayerUiController } from '../../hooks/useOnlinePlayerUiController';
-import { useAtmosphere } from '../../hooks/useAtmosphere';
+import { useAtmosphere, useMusic } from '../../hooks/useAtmosphere';
 
 export { CardHand, distributePlayers, orderClockwiseFromLocal };
 
@@ -65,25 +65,11 @@ export function OnlinePlayerUI({
   chatUnread = 0,
 }) {
   const wrapperRef = useRef(null);
-  const {
-    triggerShake, triggerAudio, startSpinAudio, stopSpinAudio,
-    startMusic, stopMusic, toggleMusic, musicEnabled,
-  } = useAtmosphere(wrapperRef);
-
-  // Background tavern ambience: start as soon as we're at the table. The
-  // AudioContext may be suspended until a user gesture, so also arm a one-shot
-  // gesture listener; startMusic is idempotent. Fades out + tears down on exit.
-  useEffect(() => {
-    startMusic();
-    const onGesture = () => startMusic();
-    window.addEventListener('pointerdown', onGesture, { once: true });
-    window.addEventListener('keydown', onGesture, { once: true });
-    return () => {
-      window.removeEventListener('pointerdown', onGesture);
-      window.removeEventListener('keydown', onGesture);
-      stopMusic();
-    };
-  }, [startMusic, stopMusic]);
+  const { triggerShake, triggerAudio, startSpinAudio, stopSpinAudio } = useAtmosphere(wrapperRef);
+  // The bed itself is started at the app root (so it plays from the landing).
+  // Here we only expose the mute toggle for the in-game menu; it shares the
+  // same store as the landing settings gear, so the two never drift.
+  const { musicEnabled, toggleMusic } = useMusic();
 
   const myHand = roomState?.myHand || [];
   const myPowerCardSlot = roomState?.myPowerCardSlot || [];

@@ -12,21 +12,13 @@ export const GAME_UI_STYLE = `
     55%  { transform: rotateY(-6deg) scaleX(1.03) translateY(-2px); opacity: 1; }
     100% { transform: rotateY(0deg) scaleX(1) translateY(0); opacity: 1; }
   }
-  /* Card lifts out of the hand and flies up to the centre pile, shrinking +
-     fading as it lands on the discard. */
+  /* Card slides up + fades when played (kept within the cardholder trough so it
+     never gets clipped by the row's overflow). */
   @keyframes cardPlayPhysics {
     0%   { transform: translateY(0) rotate(0deg) scale(1); opacity: 1; }
-    22%  { transform: translateY(-42px) rotate(-3deg) scale(1.1); opacity: 1; }
-    100% { transform: translateY(-210px) rotate(var(--card-land-rot,4deg)) scale(0.5); opacity: 0; }
+    40%  { transform: translateY(-30px) rotate(-4deg) scale(1.08); opacity: 1; }
+    100% { transform: translateY(-80px) rotate(var(--card-land-rot,2deg)) scale(0.92); opacity: 0.85; }
   }
-  /* Newly dealt / drawn card flourish — rises + scales up into place. Runs on
-     the inner face so it never fights the outer fan-arc rotation. */
-  @keyframes cardDealIn2 {
-    0%   { opacity: 0; transform: translateY(28px) scale(0.58); }
-    60%  { opacity: 1; }
-    100% { opacity: 1; transform: translateY(0) scale(1); }
-  }
-  .card-deal-in { animation: cardDealIn2 0.42s cubic-bezier(0.22,1,0.36,1) both; }
   /* Active-turn chip: warm amber candlelight pulse */
   @keyframes chipTurnPulse {
     0%, 100% { box-shadow: 0 0 8px rgba(200,146,46,0.3), 0 2px 8px rgba(0,0,0,0.6); }
@@ -58,7 +50,7 @@ export const GAME_UI_STYLE = `
     animation: tableEntrance 0.5s ease-out forwards;
   }
   .card-play-physics {
-    animation: cardPlayPhysics 0.5s cubic-bezier(0.4,0,0.2,1) forwards;
+    animation: cardPlayPhysics 0.45s cubic-bezier(0.22,1,0.36,1) forwards;
   }
 
   @media (max-width: 640px) {

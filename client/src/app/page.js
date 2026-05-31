@@ -2,9 +2,10 @@
 
 import { Suspense } from 'react';
 import { useSearchParams } from 'next/navigation';
-import { useCallback, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { useAuth } from '../hooks/useAuth';
 import { useGame } from '../hooks/useGame';
+import { useMusic } from '../hooks/useAtmosphere';
 import { useVoice } from '../hooks/useVoice';
 import { AuthScreen } from '../components/screens/AuthScreen';
 import { LandingScreen } from '../components/screens/LandingScreen';
@@ -78,6 +79,24 @@ function HomeContent() {
     lastStandSpin,
     lastStandEndTurn,
   } = game;
+
+  // ─── Background tavern music (#A) ──────────────────────────
+  // Start the ambience bed as soon as the app loads (from the landing on),
+  // not just in-game. Browsers gate audio until a user gesture, so arm a
+  // one-shot pointer/key listener; startMusic is idempotent. The bed then
+  // plays across every screen (landing → lobby → table) and is muteable from
+  // the settings gear. We never tear it down on screen changes.
+  const { musicEnabled, startMusic, toggleMusic } = useMusic();
+  useEffect(() => {
+    startMusic();
+    const onGesture = () => startMusic();
+    window.addEventListener('pointerdown', onGesture, { once: true });
+    window.addEventListener('keydown', onGesture, { once: true });
+    return () => {
+      window.removeEventListener('pointerdown', onGesture);
+      window.removeEventListener('keydown', onGesture);
+    };
+  }, [startMusic]);
 
   // ─── Groups cache (issue #106) ─────────────────────────────
   // In-memory only (sessionStorage is overkill for socket payloads
@@ -451,6 +470,8 @@ function HomeContent() {
         error={error}
         setError={setError}
         connected={connected}
+        musicEnabled={musicEnabled}
+        onToggleMusic={toggleMusic}
       />
     );
   }

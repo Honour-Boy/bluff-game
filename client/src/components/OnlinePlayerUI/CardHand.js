@@ -1,19 +1,8 @@
-import { useEffect, useRef, useState } from 'react';
 import { ShapeIcon } from '../shared/ShapeIcon';
 import { POWER_META, POWER_ICONS } from '../shared/PowerCard';
 
-const CARD_W = 58;
-const CARD_H = 84;
-
 // ─── Single card — physical card in a wooden cardholder ──────────────────────
-// `arc` (shape fan only): precomputed { angle, scale, z, lift } placing this
-// card on the shared-pivot fan. When omitted (power slot) the card renders
-// upright. `isDealtIn` plays a deal-from-deck flourish on the inner face so it
-// never fights the outer arc transform.
-function renderOneCard({
-  card, index, totalCards, isSelected, isJustPlayed = false, isDealtIn = false,
-  dealDelay = 0, interactive, powerInteractive, onCardClick, onPowerCardClick, arc = null,
-}) {
+function renderOneCard({ card, index, totalCards, isSelected, isJustPlayed = false, interactive, powerInteractive, onCardClick, onPowerCardClick }) {
   const isPower = card.type === 'power';
   const isWhot = !isPower && card.shape === 'whot';
   const powerMeta = isPower ? POWER_META[card.power] : null;
@@ -32,41 +21,13 @@ function renderOneCard({
     else onCardClick && onCardClick(card.id);
   };
 
-  // ── Fan placement ──
-  // Arc mode: every card shares one bottom-centre pivot and is fanned by a
-  // rotation, so the whole hand is a real arc (no horizontal slide). The
-  // card nearest the top (angle≈0) is lifted/scaled to read clearly.
-  let outerStyle;
-  if (arc) {
-    const transform = isSelected
-      ? `translateY(-26px) scale(1.12)`
-      : `rotate(${arc.angle}deg) scale(${arc.scale})`;
-    outerStyle = {
-      position: 'absolute',
-      left: `calc(50% - ${CARD_W / 2}px)`,
-      bottom: 8,
-      width: CARD_W,
-      height: CARD_H,
-      transformOrigin: 'bottom center',
-      transform: isJustPlayed ? undefined : transform,
-      zIndex: isJustPlayed ? 300 : isSelected ? 200 : arc.z,
-      transition: isJustPlayed ? 'none' : 'transform 0.22s cubic-bezier(0.22,1,0.36,1)',
-      cursor: cardInteractive ? 'pointer' : 'default',
-      pointerEvents: isArmed ? 'none' : 'auto',
-    };
-  } else {
-    // Power slot — single upright card, no arc.
-    outerStyle = {
-      position: 'relative',
-      width: CARD_W,
-      height: CARD_H,
-      flexShrink: 0,
-      cursor: cardInteractive ? 'pointer' : 'default',
-      pointerEvents: isArmed ? 'none' : 'auto',
-      transform: isSelected ? 'translateY(-10px) scale(1.06)' : undefined,
-      transition: 'transform 0.2s cubic-bezier(0.22,1,0.36,1)',
-    };
-  }
+  // Fan effect: slight rotation and slight vertical stagger
+  const fanAngle = totalCards > 1
+    ? ((index / (totalCards - 1)) - 0.5) * Math.min(totalCards * 4, 20)
+    : 0;
+  const fanLift = totalCards > 1
+    ? -Math.abs((index / (totalCards - 1)) - 0.5) * 6
+    : 0;
 
   const borderColor = isPower
     ? powerColor
@@ -76,6 +37,7 @@ function renderOneCard({
         ? 'var(--accent)'
         : 'var(--border-lit)';
 
+  // Shadow: selected card gets dramatic lift-and-glow
   const boxShadow = isSelected
     ? '0 16px 32px rgba(0,0,0,0.75), 0 0 18px rgba(200,146,46,0.3)'
     : isPower
@@ -83,6 +45,10 @@ function renderOneCard({
       : isWhot
         ? '0 4px 16px rgba(0,0,0,0.5), 0 0 8px rgba(200,146,46,0.25)'
         : '0 4px 12px rgba(0,0,0,0.5)';
+
+  const transform = isSelected
+    ? 'translateY(-22px) rotate(0deg) scale(1.08)'
+    : `translateY(${fanLift}px) rotate(${fanAngle}deg)`;
 
   return (
     <div
@@ -92,14 +58,22 @@ function renderOneCard({
       aria-label={isPower && powerMeta ? `Power card: ${powerMeta.label}` : undefined}
       data-armed={isArmed ? 'true' : undefined}
       className={isJustPlayed ? 'card-play-physics' : undefined}
-      style={outerStyle}
+      style={{
+        position: 'relative',
+        width: 58,
+        height: 84,
+        flexShrink: 0,
+        transform: isJustPlayed ? undefined : transform,
+        zIndex: isJustPlayed ? 200 : isSelected ? 100 : index + 1,
+        cursor: cardInteractive ? 'pointer' : 'default',
+        pointerEvents: isArmed ? 'none' : 'auto',
+        transition: isJustPlayed ? 'none' : 'transform 0.2s cubic-bezier(0.22,1,0.36,1), box-shadow 0.2s ease',
+        transformOrigin: 'bottom center',
+      }}
     >
-      {/* Inner face — carries the deal-in flourish so it never fights the
-          outer arc rotation. */}
+      {/* Card face */}
       <div
-        className={isDealtIn && !isJustPlayed ? 'card-deal-in' : undefined}
         style={{
-          animationDelay: isDealtIn && !isJustPlayed && dealDelay ? `${dealDelay}s` : undefined,
           width: '100%',
           height: '100%',
           background: isPower
@@ -117,6 +91,7 @@ function renderOneCard({
           transition: 'opacity 0.15s ease, box-shadow 0.2s ease',
           userSelect: 'none',
           overflow: 'hidden',
+          /* Parchment corner marks */
           position: 'relative',
         }}
       >
@@ -206,12 +181,7 @@ function renderOneCard({
   );
 }
 
-// ─── CardHand — true stacked fan with drag-to-rotate (#4) ─────────────────────
-// Shape cards share a single bottom-centre pivot and are fanned out by rotation
-// — a real semicircle, not a flat scrolling row. With more cards than fit
-// comfortably, dragging the fan left/right rotates the whole arc so the side
-// cards swing up to the readable centre (instead of sliding past). Tapping a
-// card still selects it; a drag is suppressed from also firing a tap.
+// ─── CardHand — physical fan in a wooden cardholder ──────────────────────────
 export function CardHand({
   hand,
   powerCardSlot = [],
@@ -223,45 +193,6 @@ export function CardHand({
   justPlayedCardId = null,
 }) {
   const shapeCards = hand.filter(c => c?.type !== 'power');
-  const n = shapeCards.length;
-
-  // Fan geometry: gentle per-card angle, capped so big hands still fit one arc.
-  const MAX_SPREAD = 92; // total degrees the fan may open to
-  const step = n > 1 ? Math.min(12, MAX_SPREAD / (n - 1)) : 0;
-  const spread = step * (n - 1);
-  const half = spread / 2;
-
-  // Rotation offset (deg) the player drags to bring either end of the fan up
-  // to the readable centre. Clamped so an end card can reach upright but no
-  // further. Re-clamped whenever the hand size changes.
-  const [rotateOffset, setRotateOffset] = useState(0);
-  const dragRef = useRef({ active: false, startX: 0, startOffset: 0, moved: false });
-  // Set true for the duration of a drag so the card's onClick can ignore the
-  // synthetic click that follows a pointer drag.
-  const draggedRef = useRef(false);
-
-  useEffect(() => {
-    setRotateOffset((o) => Math.max(-half, Math.min(half, o)));
-  }, [half]);
-
-  // Track which ids are newly arrived so freshly dealt/drawn cards animate in.
-  const prevIdsRef = useRef(null);
-  const [dealtInIds, setDealtInIds] = useState(() => new Set(shapeCards.map(c => c.id)));
-  useEffect(() => {
-    const curr = shapeCards.map(c => c.id);
-    const prev = prevIdsRef.current;
-    if (prev === null) {
-      // First mount: animate the whole opening hand in.
-      setDealtInIds(new Set(curr));
-    } else {
-      const prevSet = new Set(prev);
-      // Only ids not present last render animate in; everything else (incl. a
-      // play that just removed a card) settles to an empty animate-set.
-      setDealtInIds(new Set(curr.filter(id => !prevSet.has(id))));
-    }
-    prevIdsRef.current = curr;
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [shapeCards.map(c => c.id).join('|')]);
 
   if (shapeCards.length === 0 && powerCardSlot.length === 0) {
     return (
@@ -278,88 +209,46 @@ export function CardHand({
     );
   }
 
-  const draggable = n > 1;
-  const onPointerDown = (e) => {
-    if (!draggable) return;
-    dragRef.current = { active: true, startX: e.clientX, startOffset: rotateOffset, moved: false };
-    draggedRef.current = false;
-    try { e.currentTarget.setPointerCapture(e.pointerId); } catch (_) {}
-  };
-  const onPointerMove = (e) => {
-    const d = dragRef.current;
-    if (!d.active) return;
-    const dx = e.clientX - d.startX;
-    if (Math.abs(dx) > 5) { d.moved = true; draggedRef.current = true; }
-    // ~0.32° per px feels natural; positive drag-right rotates the fan so the
-    // left-hand cards swing up to centre.
-    const next = d.startOffset + dx * 0.32;
-    setRotateOffset(Math.max(-half, Math.min(half, next)));
-  };
-  const endPointer = (e) => {
-    const d = dragRef.current;
-    if (!d.active) return;
-    d.active = false;
-    try { e.currentTarget.releasePointerCapture(e.pointerId); } catch (_) {}
-    // Clear the drag flag on the next tick so the trailing click is swallowed.
-    setTimeout(() => { draggedRef.current = false; }, 0);
-  };
-
-  // Wrap card click so a drag does not also select.
-  const guardedCardClick = (id) => { if (!draggedRef.current) onCardClick && onCardClick(id); };
-  const guardedPowerClick = (id) => { if (!draggedRef.current) onPowerCardClick && onPowerCardClick(id); };
-
-  // Stagger only across the cards arriving THIS render (so a single drawn card
-  // pops immediately, while a full opening deal cascades in).
-  const dealRank = new Map();
-  shapeCards.filter(c => dealtInIds.has(c.id)).forEach((c, i) => dealRank.set(c.id, i));
-
   return (
     <div style={{ display: 'flex', gap: 14, alignItems: 'flex-end', flexWrap: 'wrap' }}>
       {/* Shape cards fan — wooden cardholder trough */}
-      {n > 0 && (
+      {shapeCards.length > 0 && (
         <div style={{
           flex: '1 1 auto',
           minWidth: 0,
+          /* Wooden cardholder trough */
           background: 'linear-gradient(180deg, rgba(16,10,6,0.0) 0%, rgba(12,8,4,0.7) 100%)',
           borderTop: '2px solid var(--border-lit)',
           borderRadius: '0 0 6px 6px',
           paddingTop: 6,
           paddingBottom: 4,
+          overflowX: 'auto',
+          WebkitOverflowScrolling: 'touch',
         }}>
-          <div
-            onPointerDown={onPointerDown}
-            onPointerMove={onPointerMove}
-            onPointerUp={endPointer}
-            onPointerCancel={endPointer}
-            style={{
-              position: 'relative',
-              height: 132,
-              touchAction: 'pan-y',
-              cursor: draggable ? 'grab' : 'default',
-            }}
-          >
-            {shapeCards.map((card, index) => {
-              // Card's angle on the fan, after the player's rotation sweep.
-              const angle = (index - (n - 1) / 2) * step + rotateOffset;
-              // Cards closest to upright read best: lift them in z + scale.
-              const centredness = 1 - Math.min(1, Math.abs(angle) / (MAX_SPREAD / 2 + 6));
-              const scale = 1 + centredness * 0.06;
-              const z = Math.round(centredness * 100) + 1;
-              return renderOneCard({
+          <div style={{
+            display: 'flex',
+            flexDirection: 'row',
+            alignItems: 'flex-end',
+            justifyContent: 'center',
+            gap: 4,
+            paddingLeft: 10,
+            paddingRight: 10,
+            paddingTop: 26,
+            minWidth: 'max-content',
+          }}>
+            {shapeCards.map((card, index) =>
+              renderOneCard({
                 card,
                 index,
-                totalCards: n,
+                totalCards: shapeCards.length,
                 isSelected: selectedCardId === card.id,
                 isJustPlayed: justPlayedCardId === card.id,
-                isDealtIn: dealtInIds.has(card.id),
-                dealDelay: Math.min((dealRank.get(card.id) || 0) * 0.05, 0.5),
                 interactive,
                 powerInteractive,
-                onCardClick: guardedCardClick,
-                onPowerCardClick: guardedPowerClick,
-                arc: { angle, scale, z, lift: centredness },
-              });
-            })}
+                onCardClick,
+                onPowerCardClick,
+              })
+            )}
           </div>
         </div>
       )}
@@ -391,9 +280,8 @@ export function CardHand({
               isSelected: selectedCardId === card.id,
               interactive,
               powerInteractive,
-              onCardClick: guardedCardClick,
-              onPowerCardClick: guardedPowerClick,
-              arc: null,
+              onCardClick,
+              onPowerCardClick,
             })
           )}
         </div>
