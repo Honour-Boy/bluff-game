@@ -34,6 +34,7 @@ import {
   POWER_TYPES,
   MODES,
 } from '../gameEngine.js';
+import { _powerCardCapForPlayer } from '../engine/handHelpers.js';
 
 // ─── Helpers ─────────────────────────────────────────────────
 
@@ -260,8 +261,11 @@ describe('startGame initial-deal hand cap', () => {
     for (const [pid, hand] of room.hands.entries()) {
       // Hands contain shape cards only after extraction.
       expect(hand.filter(c => c.type === 'power')).toHaveLength(0);
+      const player = room.players.find(p => p.id === pid);
       const slot = room.powerCardSlot?.[pid] || [];
-      expect(slot.length).toBeLessThanOrEqual(1);
+      // Cap is per-player: a Collector (assigned at 3+ alive since #198) lifts
+      // the cap to 3; everyone else is gated at 1.
+      expect(slot.length).toBeLessThanOrEqual(_powerCardCapForPlayer(player));
     }
   });
 
@@ -277,10 +281,14 @@ describe('startGame initial-deal hand cap', () => {
       // The playable hand is always 6 shape cards — power cards never count.
       expect(hand.filter(c => c.type === 'shape')).toHaveLength(6);
       expect(hand).toHaveLength(6);
-      // Power card is held separately (guaranteed one, capped at one here).
+      // Power card is held separately: at least the guaranteed one (#77), up to
+      // the player's cap — a Collector (assigned at 3+ alive since #198) may hold
+      // more than one.
+      const player = room.players.find(p => p.id === pid);
       const slot = room.powerCardSlot?.[pid] || [];
-      expect(slot).toHaveLength(1);
-      expect(slot[0].type).toBe('power');
+      expect(slot.length).toBeGreaterThanOrEqual(1);
+      expect(slot.length).toBeLessThanOrEqual(_powerCardCapForPlayer(player));
+      expect(slot.every(c => c.type === 'power')).toBe(true);
     }
   });
 
@@ -750,23 +758,28 @@ describe('resetHandOnSurvival (Section 7)', () => {
     }
   });
 
-  it('preserves armedPowerCard on survival when the armed card is still in hand (#62)', () => {
+  it('preserves armedPowerCard on survival when the armed card is still in the slot (#62, #195)', () => {
     const room = setupSurvivor();
     const player = room.players.find(p => p.id === 'p0');
-    // Pick a real power card from the player's hand to arm.
-    const heldPower = room.hands.get('p0').find(c => c.type === 'power');
-    if (!heldPower) return; // setup didn't deal a power card; nothing to assert
-    player.armedPowerCard = { id: heldPower.id, power: heldPower.power, activatedAtTurn: 0 };
+    // Power cards live in room.powerCardSlot (not room.hands) after startGame,
+    // and the armed marker keys the card by `cardId`. The deal is random, so
+    // inject a slot card deterministically and arm it the way production does.
+    const armedCard = { id: 'pc-armed-1', type: 'power', power: 'shield' };
+    room.powerCardSlot = room.powerCardSlot || {};
+    room.powerCardSlot.p0 = [armedCard];
+    player.armedPowerCard = { cardId: armedCard.id, power: 'shield', activatedAtTurn: 0 };
     resetHandOnSurvival(room, 'p0', 6);
     expect(player.armedPowerCard).not.toBeNull();
-    expect(player.armedPowerCard.id).toBe(heldPower.id);
+    expect(player.armedPowerCard.cardId).toBe(armedCard.id);
   });
 
-  it('clears armedPowerCard if the armed card is no longer in hand', () => {
+  it('clears armedPowerCard if the armed card is no longer in the slot (#195)', () => {
     const room = setupSurvivor();
     const player = room.players.find(p => p.id === 'p0');
-    // Armed card with an id that doesn't match any held power card.
-    player.armedPowerCard = { id: 'ghost-card-id', power: 'shield', activatedAtTurn: 0 };
+    // Armed marker points at a card that is no longer in the slot.
+    room.powerCardSlot = room.powerCardSlot || {};
+    room.powerCardSlot.p0 = [];
+    player.armedPowerCard = { cardId: 'ghost-card-id', power: 'shield', activatedAtTurn: 0 };
     resetHandOnSurvival(room, 'p0', 6);
     expect(player.armedPowerCard).toBeNull();
   });
