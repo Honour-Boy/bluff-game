@@ -5,6 +5,7 @@ import { WaitingForPlayerBanner } from '../TurnStartNotice';
 import { LeaderboardPanel } from '../LeaderboardPanel';
 import { PreGameSettingsPanel } from '../screens/PreGameSettingsPanel';
 import { LobbyConfigSummary } from '../LobbyConfigSummary';
+import { ShareRecap } from './ShareRecap';
 
 // ─── Face-down card stack — leather-back texture ──────────────────────────────
 function FaceDownStack({ count, label, warning = false }) {
@@ -436,6 +437,15 @@ export function CenterTablePanel({
           }}>
             The game concludes.
           </div>
+
+          {/* #207 — shareable end-of-game recap (lean v1) */}
+          <ShareRecap
+            didWin={lastAction?.winnerId === myPlayer?.id}
+            winnerName={lastAction?.winnerName}
+            totalPlayers={roomState?.players?.length || alivePlayers?.length || 1}
+            username={myPlayer?.username}
+          />
+
           {isHost ? (
             <div style={{ display: 'flex', gap: 10, justifyContent: 'center', flexWrap: 'wrap' }}>
               <button className="primary" onClick={restartRoom}>Deal Again</button>

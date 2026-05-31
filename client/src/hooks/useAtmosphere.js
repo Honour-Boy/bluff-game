@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useSyncExternalStore } from 'react';
 
 // ─── useAtmosphere ────────────────────────────────────────────────────────────
 // Phase 3: atmospheric effects hook.
@@ -301,6 +301,18 @@ function _musicMutedFromStorage() {
   catch (_) { return false; }
 }
 
+// Shared mute store so every consumer (the landing settings gear AND the
+// in-game menu) reflects the same on/off state via useSyncExternalStore —
+// toggling in one place updates everywhere, no per-instance desync.
+const _mutedListeners = new Set();
+function _subscribeMuted(cb) { _mutedListeners.add(cb); return () => _mutedListeners.delete(cb); }
+function _notifyMuted() { _mutedListeners.forEach((cb) => { try { cb(); } catch (_) {} }); }
+function _getMutedSnapshot() {
+  if (typeof window === 'undefined') return false;
+  const m = window.__bluffMusic;
+  return m ? !!m.muted : _musicMutedFromStorage();
+}
+
 // One soft plucked lute note into `dest` (the breathing pad bus).
 function _pluck(ctx, dest, freq) {
   const now = ctx.currentTime;
@@ -425,13 +437,15 @@ function _musicStop() {
 
 function _musicSetMuted(muted) {
   const m = _ensureMusicEngine();
-  if (!m) return;
-  m.muted = muted;
   try { window.localStorage.setItem('bluff_music_muted', muted ? '1' : '0'); } catch (_) {}
-  const now = m.ctx.currentTime;
-  m.musicGain.gain.cancelScheduledValues(now);
-  m.musicGain.gain.setValueAtTime(m.musicGain.gain.value, now);
-  m.musicGain.gain.linearRampToValueAtTime(muted ? 0 : MUSIC_BASE_GAIN, now + 0.35);
+  if (m) {
+    m.muted = muted;
+    const now = m.ctx.currentTime;
+    m.musicGain.gain.cancelScheduledValues(now);
+    m.musicGain.gain.setValueAtTime(m.musicGain.gain.value, now);
+    m.musicGain.gain.linearRampToValueAtTime(muted ? 0 : MUSIC_BASE_GAIN, now + 0.35);
+  }
+  _notifyMuted();
 }
 
 // Sidechain duck: pull the bed down while a cue sounds, then ease it back.
@@ -451,14 +465,32 @@ function _duckMusic(holdMs) {
 // How long to hold the duck per cue kind (ms), matched to each cue's tail.
 const DUCK_MS = { bluff: 700, card: 200, win: 1700, spin: 1600, eliminate: 1500 };
 
+// ─── useMusic ───────────────────────────────────────────────────────────────────
+// Standalone control surface for the background tavern bed, decoupled from the
+// per-screen atmosphere hook. Used at the app root (start on first gesture) and
+// by any settings UI (mute toggle). Mute state is shared via the module store
+// so the landing gear and the in-game menu never drift apart.
+//   startMusic() — idempotent; fades the bed in once the AudioContext runs.
+//   toggleMusic() — flip mute (persisted); unmuting (re)starts the bed.
+//   musicEnabled — boolean, reactive.
+export function useMusic() {
+  const muted = useSyncExternalStore(_subscribeMuted, _getMutedSnapshot, () => false);
+  const startMusic = useCallback(() => { try { _musicStart(); } catch (_) {} }, []);
+  const toggleMusic = useCallback(() => {
+    const willMute = !_getMutedSnapshot();
+    try {
+      _musicSetMuted(willMute);
+      if (!willMute) _musicStart();
+    } catch (_) {}
+  }, []);
+  return { musicEnabled: !muted, startMusic, toggleMusic };
+}
+
 // ─── Hook ─────────────────────────────────────────────────────────────────────
 export function useAtmosphere(wrapperRef) {
   const shakeTimeout = useRef(null);
   // IDs of all pending click/clunk setTimeout calls for the current spin
   const spinClickIdsRef = useRef([]);
-  const [musicEnabled, setMusicEnabled] = useState(
-    () => (typeof window === 'undefined' ? true : !_musicMutedFromStorage()),
-  );
 
   const triggerShake = useCallback(() => {
     const el = wrapperRef?.current;
@@ -530,27 +562,10 @@ export function useAtmosphere(wrapperRef) {
     spinClickIdsRef.current = [];
   }, []);
 
-  // ── Background tavern music controls ──
-  // startMusic is safe to call repeatedly (idempotent) and only actually makes
-  // sound once the AudioContext is running, so callers wire it to the first
-  // user gesture to satisfy autoplay policies.
-  const startMusic = useCallback(() => { try { _musicStart(); } catch (_) {} }, []);
-  const stopMusic = useCallback(() => { try { _musicStop(); } catch (_) {} }, []);
-  const toggleMusic = useCallback(() => {
-    setMusicEnabled((prev) => {
-      const next = !prev;
-      try { _musicSetMuted(!next); if (next) _musicStart(); } catch (_) {}
-      return next;
-    });
-  }, []);
-
   useEffect(() => () => {
     clearTimeout(shakeTimeout.current);
     spinClickIdsRef.current.forEach(clearTimeout);
   }, []);
 
-  return {
-    triggerShake, triggerAudio, startSpinAudio, stopSpinAudio,
-    startMusic, stopMusic, toggleMusic, musicEnabled,
-  };
+  return { triggerShake, triggerAudio, startSpinAudio, stopSpinAudio };
 }
