@@ -141,6 +141,11 @@ const SPIN_PENDING_TIMEOUT_MS = 90_000;
 // can't strand the room in 'playing' with every socket still alive.
 const PENDING_GAME_OVER_TIMEOUT_MS = 10_000;
 
+// Speed Mode (roomModifiers.speedMode) — each player's turn is capped at this
+// many ms. When the deadline passes the server auto-ENDS the turn (no auto-spin
+// — #79 bans auto-spin in every mode). The lobby advertises a 15s turn timer.
+const SPEED_MODE_TURN_MS = 15_000;
+
 // ─── v2 config defaults ───────────────────────────────────────
 function defaultRoomConfig() {
   return {
@@ -244,6 +249,7 @@ module.exports = {
   SUDDEN_DEATH_THRESHOLD,
   SPIN_PENDING_TIMEOUT_MS,
   PENDING_GAME_OVER_TIMEOUT_MS,
+  SPEED_MODE_TURN_MS,
   defaultRoomConfig,
   normalizeRoomConfig,
 };

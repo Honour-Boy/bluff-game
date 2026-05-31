@@ -63,7 +63,7 @@ const RISK_MODS = [
 ];
 
 const ROOM_MODS = [
-  { key: 'speedMode',        label: 'Speed Mode',        desc: '15s turn timer + auto-spin penalty' },
+  { key: 'speedMode',        label: 'Speed Mode',        desc: '15s turn timer — run out and your turn is auto-ended' },
   { key: 'suddenDeath',      label: 'Sudden Death',      desc: 'Risk bumps every 4 elimination-free turns' },
   { key: 'mirrorMatch',      label: 'Mirror Match',      desc: 'Spin lands on the player opposite the table' },
   { key: 'rouletteRotation', label: 'Roulette Rotation', desc: 'Turn order reshuffles every cycle (3+ players)' },

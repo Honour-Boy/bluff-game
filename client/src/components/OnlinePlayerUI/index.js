@@ -10,6 +10,7 @@ import { PowerFlowOverlays } from './PowerFlowOverlays';
 import { RolePromptOverlays } from './RolePromptOverlays';
 import { SystemsLayer } from './SystemsLayer';
 import { BluffInterceptOverlay } from './BluffInterceptOverlay';
+import SpeedModeTimer from './SpeedModeTimer';
 import { PreGameSelectionModal } from '../PreGameSelectionModal';
 import { SmokeLayer } from '../shared/SmokeLayer';
 import {
@@ -350,6 +351,18 @@ export function OnlinePlayerUI({
         isMobile={ui.isMobile}
         onShowHowToPlay={() => ui.setShowHowToPlay(true)}
       />
+
+      {/* Speed Mode — a turn countdown visible to ALL players (#speedMode). */}
+      {roomState?.config?.roomModifiers?.speedMode
+        && isPlaying
+        && typeof roomState?.speedModeMsRemaining === 'number' && (
+          <SpeedModeTimer
+            key={currentPlayerId || 'speed'}
+            msRemaining={roomState.speedModeMsRemaining}
+            playerName={currentPlayer?.username}
+            isMe={currentPlayerId === myPlayer?.id}
+          />
+        )}
 
       <TableScene
         tableCenterRef={ui.tableCenterRef}
