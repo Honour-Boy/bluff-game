@@ -21,7 +21,11 @@ const ROLES = {
   COLLECTOR: 'collector',
 };
 const ROLE_TYPES = Object.values(ROLES);
-const ROLES_AT_MIN_ALIVE = 9;
+// Secret roles activate once this many players are alive. Below it every
+// player is Barehand (no roles). Lowered 9 → 3 so small tables get roles too;
+// at 3–8 alive a random subset of the six specials is dealt (one each, no
+// Barehand fillers until 7+), and a full cohort + Barehands appears at 9+.
+const ROLES_AT_MIN_ALIVE = 3;
 const COLLECTOR_POWER_CARD_CAP = 3;
 // v2 #120 — Medic may revive at most this many eliminations per game
 // (tracked per-player as `medicSavesUsed`, enforced in roles.js +

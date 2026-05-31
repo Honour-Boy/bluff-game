@@ -8,7 +8,7 @@
 // Default config is exported so server + tests can share the
 // canonical shape. All toggles default OFF; copiesPerDeck = 1.
 // secretRoles is intentionally absent — that activates
-// automatically when alive count >= 9 and is not host-toggleable.
+// automatically when alive count >= 3 and is not host-toggleable.
 // ============================================================
 
 import { useState } from 'react';
@@ -77,7 +77,11 @@ const SYSTEMS = [
 ];
 
 // ─── Shared toggle row ────────────────────────────────────
-function ToggleRow({ id, label, desc, checked, onChange }) {
+// `disabled` greys the row out and blocks toggling; `disabledReason` is shown
+// in place of the description so the host sees WHY it can't be selected
+// (e.g. "Needs 3+ players"). A disabled option can never be switched on.
+function ToggleRow({ id, label, desc, checked, onChange, disabled = false, disabledReason = null }) {
+  const showChecked = checked && !disabled;
   return (
     <label
       htmlFor={id}
@@ -87,24 +91,26 @@ function ToggleRow({ id, label, desc, checked, onChange }) {
         gap: 12,
         padding: '10px 12px',
         minHeight: 44,
-        background: checked ? 'rgba(232,255,74,0.04)' : 'var(--surface)',
-        border: `1px solid ${checked ? 'var(--accent)' : 'var(--border)'}`,
+        background: showChecked ? 'rgba(232,255,74,0.04)' : 'var(--surface)',
+        border: `1px solid ${showChecked ? 'var(--accent)' : 'var(--border)'}`,
         borderRadius: 'var(--radius)',
-        cursor: 'pointer',
+        cursor: disabled ? 'not-allowed' : 'pointer',
         transition: 'border-color 0.15s, background 0.15s',
         userSelect: 'none',
+        opacity: disabled ? 0.5 : 1,
       }}
     >
       <input
         id={id}
         type="checkbox"
-        checked={checked}
-        onChange={(e) => onChange(e.target.checked)}
+        checked={showChecked}
+        disabled={disabled}
+        onChange={(e) => !disabled && onChange(e.target.checked)}
         style={{
           width: 20, height: 20,
           marginTop: 2,
           accentColor: 'var(--accent)',
-          cursor: 'pointer',
+          cursor: disabled ? 'not-allowed' : 'pointer',
           flexShrink: 0,
         }}
       />
@@ -112,13 +118,18 @@ function ToggleRow({ id, label, desc, checked, onChange }) {
         <div style={{
           fontSize: 12,
           letterSpacing: '0.08em',
-          color: checked ? 'var(--accent)' : 'var(--text)',
+          color: showChecked ? 'var(--accent)' : 'var(--text)',
           marginBottom: 2,
         }}>
           {label.toUpperCase()}
         </div>
-        <div style={{ fontSize: 11, color: 'var(--text-dim)', lineHeight: 1.5 }}>
-          {desc}
+        <div style={{
+          fontSize: 11,
+          color: disabled ? 'var(--eliminated)' : 'var(--text-dim)',
+          lineHeight: 1.5,
+          fontStyle: disabled ? 'italic' : 'normal',
+        }}>
+          {disabled && disabledReason ? disabledReason : desc}
         </div>
       </div>
     </label>
@@ -194,6 +205,35 @@ function setAllInGroup(items, value) {
   return out;
 }
 
+// ─── Player-count gating ──────────────────────────────────
+// A few modifiers/systems are meaningless or unfair below a player-count
+// threshold and the server auto-disables them at start_game anyway. We
+// reflect that in the lobby so the host never picks something that won't
+// apply. `mode: 'disable'` greys the toggle with a reason but keeps it
+// visible; `mode: 'hide'` removes the row entirely.
+//   • Roulette Rotation — needs 3+ (with 2 the only repeat-free order is
+//     plain alternation, so it's a no-op). Shown-but-disabled below 3.
+//   • Mirror Match — spins land on the opposite seat, so it needs an even
+//     table of 4+. Hidden otherwise.
+//   • Last Stand — the final-two duel only makes sense with a real field,
+//     so it's hidden at 4 players or fewer.
+// `playerCount == null` means "caller didn't supply a count" → no gating.
+function gatingFor(playerCount) {
+  if (playerCount == null) return {};
+  const even = playerCount % 2 === 0;
+  const gate = {};
+  if (playerCount < 3) {
+    gate.rouletteRotation = { mode: 'disable', reason: 'Needs 3 or more players' };
+  }
+  if (!(playerCount >= 4 && even)) {
+    gate.mirrorMatch = { mode: 'hide' };
+  }
+  if (playerCount < 5) {
+    gate.lastStand = { mode: 'hide' };
+  }
+  return gate;
+}
+
 function formatSavedMeta(savedMeta) {
   if (!savedMeta?.updatedAt) return null;
   try {
@@ -211,8 +251,28 @@ function formatSavedMeta(savedMeta) {
 }
 
 // ─── Main component ───────────────────────────────────────
-export function PreGameSettingsPanel({ config, onChange, isGroupRoom = false, savedMeta = null }) {
+export function PreGameSettingsPanel({ config, onChange, isGroupRoom = false, savedMeta = null, playerCount = null }) {
   const [open, setOpen] = useState(false);
+  const gating = gatingFor(playerCount);
+
+  // Render a toggle row, applying player-count gating: hidden rows return
+  // null; disabled rows render greyed-out with the reason in place of desc.
+  const renderToggle = (idPrefix, { key, label, desc }, checked, onToggle) => {
+    const g = gating[key];
+    if (g?.mode === 'hide') return null;
+    return (
+      <ToggleRow
+        key={key}
+        id={`${idPrefix}-${key}`}
+        label={label}
+        desc={desc}
+        checked={checked}
+        onChange={(v) => onToggle(key, v)}
+        disabled={g?.mode === 'disable'}
+        disabledReason={g?.reason || null}
+      />
+    );
+  };
 
   // Active count for collapsed-state hint
   const activeCount =
@@ -452,16 +512,9 @@ export function PreGameSettingsPanel({ config, onChange, isGroupRoom = false, sa
             onSelectAll={() => setAllRoom(true)}
             onDeselectAll={() => setAllRoom(false)}
           >
-            {ROOM_MODS.map(({ key, label, desc }) => (
-              <ToggleRow
-                key={key}
-                id={`room-${key}`}
-                label={label}
-                desc={desc}
-                checked={config.roomModifiers[key]}
-                onChange={(v) => setRoom(key, v)}
-              />
-            ))}
+            {ROOM_MODS.map((item) =>
+              renderToggle('room', item, config.roomModifiers[item.key], setRoom),
+            )}
           </Section>
 
           {/* Special Systems */}
@@ -480,20 +533,13 @@ export function PreGameSettingsPanel({ config, onChange, isGroupRoom = false, sa
                 borderRadius: 'var(--radius)',
                 marginTop: 4,
               }}>
-                Secret roles activate automatically when 9+ players are alive — not host-toggleable.
+                Secret roles activate automatically when 3+ players are alive — not host-toggleable.
               </div>
             }
           >
-            {SYSTEMS.map(({ key, label, desc }) => (
-              <ToggleRow
-                key={key}
-                id={`sys-${key}`}
-                label={label}
-                desc={desc}
-                checked={config.systems[key]}
-                onChange={(v) => setSystem(key, v)}
-              />
-            ))}
+            {SYSTEMS.map((item) =>
+              renderToggle('sys', item, config.systems[item.key], setSystem),
+            )}
           </Section>
           {isGroupRoom && (
             <div style={{

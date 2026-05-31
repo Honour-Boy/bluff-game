@@ -36,8 +36,16 @@ import {
 
 // ─── Helpers ─────────────────────────────────────────────────
 
+// Selection pools now mirror the host-enabled power set, so the pre-game tests
+// that exercise power picks need a room with every power card turned ON.
+function configAllPowers() {
+  const cfg = defaultRoomConfig();
+  Object.keys(cfg.powerCards.enabled).forEach((k) => { cfg.powerCards.enabled[k] = true; });
+  return cfg;
+}
+
 function makeOnlineRoom(playerCount, config = null) {
-  const room = createRoom('host-socket', MODES.ONLINE, config || defaultRoomConfig());
+  const room = createRoom('host-socket', MODES.ONLINE, config || configAllPowers());
   for (let i = 0; i < playerCount; i++) {
     room.players.push(createPlayer(`p${i}`, `Player${i}`, `sock-${i}`));
   }
@@ -58,10 +66,10 @@ function makeRoomInPreGameSelection(playerCount, config = null) {
 describe('isBarehandVisible', () => {
   it('hides the Barehand label at or below the role threshold', () => {
     expect(isBarehandVisible(2)).toBe(false);
-    expect(isBarehandVisible(ROLES_AT_MIN_ALIVE)).toBe(false); // exactly 9 → "Standard"
+    expect(isBarehandVisible(ROLES_AT_MIN_ALIVE)).toBe(false); // exactly 3 → "Standard"
   });
   it('shows the Barehand label above the threshold', () => {
-    expect(isBarehandVisible(ROLES_AT_MIN_ALIVE + 1)).toBe(true); // 10
+    expect(isBarehandVisible(ROLES_AT_MIN_ALIVE + 1)).toBe(true); // 4
     expect(isBarehandVisible(15)).toBe(true);
   });
 });
@@ -155,6 +163,36 @@ describe('beginPreGame', () => {
     beginPreGame(room);
     expect(room.phase).toBe('playing');
     expect(room.pregamePools).toBeUndefined();
+  });
+
+  it('only offers the host-enabled power types in each pool', () => {
+    const cfg = defaultRoomConfig();
+    cfg.powerCards.enabled.shield = true;
+    cfg.powerCards.enabled.peek = true; // everything else stays off
+    const room = makeOnlineRoom(3, cfg);
+    startGame(room);
+    beginPreGame(room);
+
+    for (const p of room.players) {
+      const pool = room.pregamePools[p.id];
+      const powers = pool.filter(c => c.type === 'power').map(c => c.power).sort();
+      expect(powers).toEqual(['peek', 'shield']);
+      // Disabled powers must never appear as a pickable option.
+      expect(pool.some(c => c.type === 'power' && c.power === 'assassin')).toBe(false);
+      // The Additional (shape) card is always present.
+      expect(pool.filter(c => c.type === 'shape')).toHaveLength(1);
+    }
+  });
+
+  it('offers only the Additional card when no power cards are enabled', () => {
+    const room = makeOnlineRoom(2, defaultRoomConfig()); // all powers off
+    startGame(room);
+    beginPreGame(room);
+    for (const p of room.players) {
+      const pool = room.pregamePools[p.id];
+      expect(pool).toHaveLength(1);
+      expect(pool[0].type).toBe('shape');
+    }
   });
 });
 

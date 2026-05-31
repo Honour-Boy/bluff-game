@@ -91,6 +91,7 @@ describe('start_game group settings persistence', () => {
       success: true,
       mirrorMatchAutoDisabled: false,
       rouletteRotationAutoDisabled: false,
+      lastStandAutoDisabled: false,
     });
     expect(groupSettingsRepo.upsertGroupSettings).toHaveBeenCalledWith(
       'group-75',
@@ -138,6 +139,7 @@ describe('start_game group settings persistence', () => {
       success: true,
       mirrorMatchAutoDisabled: false,
       rouletteRotationAutoDisabled: false,
+      lastStandAutoDisabled: false,
     });
     expect(groupSettingsRepo.upsertGroupSettings).not.toHaveBeenCalled();
   });
@@ -171,6 +173,7 @@ describe('start_game group settings persistence', () => {
       success: true,
       mirrorMatchAutoDisabled: false,
       rouletteRotationAutoDisabled: false,
+      lastStandAutoDisabled: false,
     });
     expect(errorSpy).toHaveBeenCalled();
     errorSpy.mockRestore();

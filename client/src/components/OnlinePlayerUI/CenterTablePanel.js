@@ -196,6 +196,7 @@ export function CenterTablePanel({
                   onChange={updateRoomConfig}
                   isGroupRoom={!!roomState?.groupId}
                   savedMeta={roomState?.groupSettingsMeta}
+                  playerCount={alivePlayers.length}
                 />
               )}
               <button

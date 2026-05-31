@@ -126,22 +126,28 @@ function register(io, socket, deps) {
     for (const room of rooms.values()) {
       if (room.groupId !== groupId) continue;
       const nextHostPlayer = room.players.find((player) => player.id === newHostUserId);
-      // #159 — a group-level stand-in who is NOT seated in this room must not
-      // be forced in as its host. Doing so nulls hostSocketId and leaves a
-      // hostless, locked room: players outside hit "Game already started" and
-      // neither they nor the absent host can enter. Leave the room on its
-      // existing host until the new acting host actually joins (join_room then
-      // claims the host socket from group.host_user_id).
-      if (!nextHostPlayer) continue;
+      // #159 — appointing a stand-in ('standin') who is NOT seated in this room
+      // must not force them in as its host: that would null hostSocketId and
+      // leave a hostless room nobody present can run. Leave it on its existing
+      // host until the stand-in actually joins (join_room then reconciles).
+      //
+      // A reclaim / hand-back ('reclaimed'), by contrast, returns the seat to
+      // the PERMANENT owner, who is authoritative even while away — apply it
+      // immediately so the old stand-in stops holding controls the instant the
+      // owner takes them back. hostSocketId drops to null until the owner
+      // (re)joins; join_room / host_reconnect reattaches their socket then.
+      if (reason === 'standin' && !nextHostPlayer) continue;
       room.hostUserId = newHostUserId;
-      room.hostSocketId = nextHostPlayer.socketId || null;
+      engine.reconcileHostSocket(room); // hostSocketId follows hostUserId (null if away)
       await saveRoom(room);
       await broadcastRoomState(io, room.code);
       // #183 — room_state already moves the host controls; this dedicated event
       // is what every client toasts so the table knows who now holds them.
+      // emitHostChanged no-ops without a hostName, so an absent reclaiming owner
+      // simply doesn't toast (the room_state push already moved amHost).
       emitHostChanged(io, room.code, {
         hostId: newHostUserId,
-        hostName: nextHostPlayer.username,
+        hostName: nextHostPlayer?.username || null,
         reason,
       });
     }

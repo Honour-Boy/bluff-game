@@ -375,10 +375,10 @@ describe('startGame guarantees ≥1 power card per player (#77)', () => {
   });
 
   it('every Barehand player receives ≥1 power card across 50 trials (named bug)', () => {
-    // <9 alive → assignRoles makes everyone Barehand, so this stresses
-    // exactly the scenario reported in #77.
+    // 12 alive → 6 unique specials + 1 extra Gambler, leaving exactly 5
+    // Barehand fillers per trial — the scenario reported in #77.
     const { barehandWithPower, barehandTotal } = runDealInitialHandsGuarantees(
-      50, { players: 5, copiesPerDeck: 2 },
+      50, { players: 12, copiesPerDeck: 2 },
     );
     expect(barehandTotal).toBeGreaterThanOrEqual(50 * 5);
     expect(barehandWithPower).toBe(barehandTotal);

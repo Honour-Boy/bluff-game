@@ -6,8 +6,9 @@ import { ShapeIcon } from "./shared/ShapeIcon";
 
 // ─── PreGameSelectionModal ────────────────────────────────────
 // Shown during the `pre_game` phase once the server opens selection
-// (#116). Each player gets their own face-down pool (6 power types +
-// 1 random normal card). The player picks ONE blind; on confirm it
+// (#116). Each player gets their own face-down pool (the host-enabled
+// power types + 1 random normal "Additional" card). The player picks
+// ONE blind; on confirm it
 // flips to reveal what they claimed and the modal switches to a live
 // "waiting for N players" state. A countdown reflects the server's
 // 15s auto-resolve deadline — when it lapses the server assigns a

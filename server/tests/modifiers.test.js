@@ -523,9 +523,9 @@ describe('Room modifier — Mirror Match', () => {
     expect(isMirrorMatchEligibleAtStart(room)).toBe(false);
   });
 
-  it('isMirrorMatchEligibleAtStart: false when alive count < 2', () => {
-    const room = makeOnlineRoom(1);
-    expect(isMirrorMatchEligibleAtStart(room)).toBe(false);
+  it('isMirrorMatchEligibleAtStart: false when alive count < 4 (even but too small)', () => {
+    expect(isMirrorMatchEligibleAtStart(makeOnlineRoom(1))).toBe(false);
+    expect(isMirrorMatchEligibleAtStart(makeOnlineRoom(2))).toBe(false);
   });
 
   it('startGame latches mirrorMatchActive flag', () => {

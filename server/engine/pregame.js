@@ -26,20 +26,30 @@ function _nextPoolId(playerId, tag) {
 }
 
 /**
- * Build ONE player's independent, non-finite selection pool: every
- * enabled-or-not power type (all 6) plus a single randomly-generated
- * normal shape card. Pools are generated per-player — duplicate picks
- * across players are expected and fine (nothing is drawn from the
- * shared deck). Returned cards are real, hand-ready card objects with
- * unique ids; the order is shuffled so the client's face-down layout
- * doesn't betray which slot holds which option.
+ * Build ONE player's independent, non-finite selection pool: ONLY the
+ * power types the host enabled for this room (`enabledPowers`) plus a
+ * single randomly-generated normal shape card (the "Additional Card"
+ * — the forgo-a-power option, always present). Pools are generated
+ * per-player — duplicate picks across players are expected and fine
+ * (nothing is drawn from the shared deck). Returned cards are real,
+ * hand-ready card objects with unique ids; the order is shuffled so the
+ * client's face-down layout doesn't betray which slot holds which
+ * option.
+ *
+ * `enabledPowers` defaults to all POWER_TYPES so existing callers/tests
+ * that don't pass a config keep their old behaviour; `beginPreGame`
+ * passes the host-enabled subset so a disabled power never appears as a
+ * pickable pre-game option.
  */
-function generateSelectionPool(playerId) {
-  const pool = POWER_TYPES.map(power => ({
-    id: _nextPoolId(playerId, power),
-    type: 'power',
-    power,
-  }));
+function generateSelectionPool(playerId, enabledPowers = POWER_TYPES) {
+  const powers = Array.isArray(enabledPowers) ? enabledPowers : POWER_TYPES;
+  const pool = powers
+    .filter(power => POWER_TYPES.includes(power))
+    .map(power => ({
+      id: _nextPoolId(playerId, power),
+      type: 'power',
+      power,
+    }));
 
   const nonWhotShapes = SHAPES.filter(s => s !== 'whot');
   const shape = nonWhotShapes[Math.floor(Math.random() * nonWhotShapes.length)];
@@ -78,8 +88,13 @@ function beginPreGame(room) {
   // private review buffer client-side and are kept off the first active turn.
   room.pregameLateSelectors = [];
 
+  // Only the host-enabled power types are pickable. A power the host left
+  // off must never surface as a pre-game option (it isn't in the deck either).
+  const enabledMap = room.config?.powerCards?.enabled || {};
+  const enabledPowers = POWER_TYPES.filter(power => enabledMap[power]);
+
   for (const p of _alivePlayers(room)) {
-    room.pregamePools[p.id] = generateSelectionPool(p.id);
+    room.pregamePools[p.id] = generateSelectionPool(p.id, enabledPowers);
   }
 
   return room;

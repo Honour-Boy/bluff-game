@@ -105,6 +105,7 @@ module.exports = {
   declareRoundWinner: players.declareRoundWinner,
   reconnectPlayer: players.reconnectPlayer,
   pickReplacementHost: players.pickReplacementHost,
+  reconcileHostSocket: players.reconcileHostSocket,
 
   // ─── Roles ───────────────────────────────────────────────
   assignRoles: roles.assignRoles,
