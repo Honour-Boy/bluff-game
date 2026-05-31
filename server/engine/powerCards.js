@@ -237,7 +237,7 @@ function isSwapActivatable(card) {
   return card.swapPendingPlayerIds.length === 0;
 }
 
-function activatePowerCard(room, playerId) {
+function activatePowerCard(room, playerId, cardId = null) {
   if (room.mode !== MODES.ONLINE) return { ok: false, error: 'Online mode only' };
   if (room.phase !== 'playing') return { ok: false, error: 'Wrong phase' };
 
@@ -261,8 +261,11 @@ function activatePowerCard(room, playerId) {
   // Collector could Peek then arm a second power without this ledger guard.
   if (room.powerActivatedThisTurn) return { ok: false, error: 'Already used a power card this turn' };
 
+  // A Collector holds up to 3 power cards (#197). Honour a caller-supplied
+  // `cardId` so any held card can be activated; fall back to slot[0] (FIFO) for
+  // single-card holders and legacy callers, mirroring `armInterceptCard`.
   const slot = room.powerCardSlot?.[playerId] || [];
-  const powerCard = slot[0] ?? null;
+  const powerCard = (cardId ? slot.find(c => c?.id === cardId) : slot[0]) ?? null;
   if (!powerCard) return { ok: false, error: 'No power card in hand' };
 
   if (powerCard.power === 'swap' && !isSwapActivatable(powerCard)) {

@@ -354,7 +354,7 @@ function register(io, socket, deps) {
   });
 
   // ─── PLAYER: Activate a power card (v2 Phase B) ──────────
-  socket.on('activate_power_card', async ({ roomCode } = {}, callback) => {
+  socket.on('activate_power_card', async ({ roomCode, cardId = null } = {}, callback) => {
     try {
       if (!socket.userId) return callback?.({ success: false, error: 'Not authenticated' });
 
@@ -362,7 +362,7 @@ function register(io, socket, deps) {
       const room = await getRoom(code);
       if (!room) return callback?.({ success: false, error: 'Room not found' });
 
-      const result = engine.activatePowerCard(room, socket.userId);
+      const result = engine.activatePowerCard(room, socket.userId, cardId);
       if (!result.ok) return callback?.({ success: false, error: result.error });
       logTurnState(code, socket.userId, 'activate_power', room, { power: result.power });
 

@@ -506,6 +506,48 @@ describe('activatePowerCard', () => {
     expect(card.armed).toBe(true);
   });
 
+  it('Collector: activates the specific held card named by cardId, not slot[0] (#197)', () => {
+    const room = setupActiveRoom();
+    const shield = { id: 'c-shield', type: 'power', power: 'shield' };
+    const mirror = { id: 'c-mirror', type: 'power', power: 'mirror' };
+    const assassin = { id: 'c-assassin', type: 'power', power: 'assassin' };
+    room.powerCardSlot.p0 = [shield, mirror, assassin];
+
+    // Pick the THIRD card, which slot[0]-only activation could never reach.
+    const result = activatePowerCard(room, 'p0', 'c-assassin');
+    expect(result.ok).toBe(true);
+    expect(result.power).toBe('assassin');
+    expect(result.cardId).toBe('c-assassin');
+
+    const player = room.players.find(p => p.id === 'p0');
+    expect(player.armedPowerCard).toEqual(expect.objectContaining({
+      power: 'assassin',
+      cardId: 'c-assassin',
+    }));
+    expect(assassin.armed).toBe(true);
+    // The other held cards are untouched.
+    expect(shield.armed).toBeUndefined();
+    expect(mirror.armed).toBeUndefined();
+  });
+
+  it('falls back to slot[0] when no cardId is supplied (legacy / single-card holders) (#197)', () => {
+    const room = setupActiveRoom();
+    const shield = { id: 'c-shield', type: 'power', power: 'shield' };
+    const mirror = { id: 'c-mirror', type: 'power', power: 'mirror' };
+    room.powerCardSlot.p0 = [shield, mirror];
+
+    const result = activatePowerCard(room, 'p0');
+    expect(result.ok).toBe(true);
+    expect(result.cardId).toBe('c-shield');
+  });
+
+  it('rejects when cardId names a card the player does not hold (#197)', () => {
+    const room = setupActiveRoom({ holding: { id: 'a', type: 'power', power: 'shield' } });
+    const result = activatePowerCard(room, 'p0', 'not-in-slot');
+    expect(result.ok).toBe(false);
+    expect(result.error).toMatch(/no power card/i);
+  });
+
   it('peek is consumed-on-use, returns lastPlayedCard, removes the card from slot', () => {
     const card = { id: 'pk', type: 'power', power: 'peek' };
     const lastPlayed = { id: 'shape-1', type: 'shape', shape: 'circle', number: 4 };

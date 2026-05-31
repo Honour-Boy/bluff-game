@@ -150,3 +150,61 @@ describe('useOnlinePlayerUiController — Last Event spin gating (#185)', () => 
     expect(result.current.displayedLastAction).toEqual(nextCard);
   });
 });
+
+// ─── #197 — Collector can activate any held power card, not just slot[0] ──
+describe('useOnlinePlayerUiController — power card selection (#197)', () => {
+  function makeActiveProps(activatePowerCard) {
+    return {
+      roomState: { lastAction: null, phase: 'playing', powerActivatedThisTurn: false },
+      myPlayer: { id: 'me', status: 'alive', armedPowerCard: null },
+      myHand: [],
+      isMyTurn: true,
+      isPlaying: true,
+      spectatePlayer: vi.fn(),
+      activatePowerCard,
+      swapPick: vi.fn(),
+      medicDecide: vi.fn(),
+      sniperRedirect: vi.fn(),
+      saboteurTransfer: vi.fn(),
+      acknowledgeSpinResult: vi.fn(),
+      spinDismissed: false,
+      powerEventQueue: [],
+    };
+  }
+
+  it('forwards the tapped cardId through to activatePowerCard', async () => {
+    const activatePowerCard = vi.fn().mockResolvedValue({ success: true, power: 'assassin' });
+    const { result } = renderHook(
+      (props) => useOnlinePlayerUiController(props),
+      { initialProps: makeActiveProps(activatePowerCard) },
+    );
+
+    act(() => result.current.handlePowerCardClick('c-assassin'));
+    expect(result.current.powerConfirmOpen).toBe(true);
+    expect(result.current.pendingPowerCardId).toBe('c-assassin');
+
+    await act(async () => {
+      await result.current.handleActivatePower();
+    });
+    expect(activatePowerCard).toHaveBeenCalledWith('c-assassin');
+    // Selection resets after activation.
+    expect(result.current.pendingPowerCardId).toBeNull();
+  });
+
+  it('passes null when activated without an explicit selection (slot[0] fallback)', async () => {
+    const activatePowerCard = vi.fn().mockResolvedValue({ success: true, power: 'shield' });
+    const { result } = renderHook(
+      (props) => useOnlinePlayerUiController(props),
+      { initialProps: makeActiveProps(activatePowerCard) },
+    );
+
+    // No cardId (e.g. a generic activate button).
+    act(() => result.current.handlePowerCardClick());
+    expect(result.current.pendingPowerCardId).toBeNull();
+
+    await act(async () => {
+      await result.current.handleActivatePower();
+    });
+    expect(activatePowerCard).toHaveBeenCalledWith(null);
+  });
+});

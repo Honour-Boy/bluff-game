@@ -49,6 +49,9 @@ export function useOnlinePlayerUiController({
   // NO turn-start auto-prompt: the Activate/Skip modal opens only when the
   // player taps their held power card (this flag), and closes on activate/skip.
   const [powerConfirmOpen, setPowerConfirmOpen] = useState(false);
+  // #197 — which held power card the activation modal is targeting. A Collector
+  // holds up to 3; everyone else holds one. null = fall back to slot[0] server-side.
+  const [pendingPowerCardId, setPendingPowerCardId] = useState(null);
   const [activating, setActivating] = useState(false);
   const [swapping, setSwapping] = useState(false);
   const [roleRevealSeen, setRoleRevealSeen] = useState(false);
@@ -228,13 +231,16 @@ export function useOnlinePlayerUiController({
   // order-independent: a power card may be armed at any point in the holder's
   // own turn — before OR after a card is played, and before OR after a bluff is
   // called. The only block is being already armed (one activation per turn).
-  const handlePowerCardClick = useCallback(() => {
+  const handlePowerCardClick = useCallback((cardId = null) => {
     if (!isMyTurn || !isPlaying) return;
     if (myPlayer?.armedPowerCard) return;
     // §1.1 — one power activation per turn. `armedPowerCard` misses a consumed
     // Peek (it leaves no armed marker), so also honour the server's ledger flag
     // to keep a Collector from Peeking then arming in the same turn.
     if (roomState?.powerActivatedThisTurn) return;
+    // #197 — remember which card was tapped so a Collector can activate any of
+    // its held cards, not just slot[0].
+    setPendingPowerCardId(typeof cardId === 'string' ? cardId : null);
     setPowerConfirmOpen(true);
   }, [isMyTurn, isPlaying, myPlayer?.armedPowerCard, roomState?.powerActivatedThisTurn]);
 
@@ -242,18 +248,20 @@ export function useOnlinePlayerUiController({
     if (!activatePowerCard || activating) return;
     setActivating(true);
     try {
-      const response = await activatePowerCard();
+      const response = await activatePowerCard(pendingPowerCardId);
       setPowerConfirmOpen(false);
+      setPendingPowerCardId(null);
       if (response?.success && response?.power === 'peek') {
         setPeekedCard(response.peekedCard || { _empty: true });
       }
     } finally {
       setActivating(false);
     }
-  }, [activatePowerCard, activating]);
+  }, [activatePowerCard, activating, pendingPowerCardId]);
 
   const handleSkipPower = useCallback(() => {
     setPowerConfirmOpen(false);
+    setPendingPowerCardId(null);
   }, []);
 
   const handleSwapPick = useCallback(async (cardId) => {
@@ -324,6 +332,7 @@ export function useOnlinePlayerUiController({
     setJustEliminated,
     peekedCard,
     powerConfirmOpen,
+    pendingPowerCardId,
     activating,
     swapping,
     roleRevealSeen,
