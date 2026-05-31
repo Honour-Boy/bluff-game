@@ -117,8 +117,8 @@ export function useGameActions({
     });
   }, [roomCode, setError, socket]);
 
-  const activatePowerCard = useCallback(() => {
-    return emitPromiseAction(socket, 'activate_power_card', { roomCode }, failError);
+  const activatePowerCard = useCallback((cardId = null) => {
+    return emitPromiseAction(socket, 'activate_power_card', { roomCode, cardId }, failError);
   }, [failError, roomCode, socket]);
 
   const swapPick = useCallback((cardId) => {

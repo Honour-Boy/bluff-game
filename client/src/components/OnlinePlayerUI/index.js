@@ -202,7 +202,12 @@ export function OnlinePlayerUI({
   const isEliminated = myPlayer.status === 'eliminated';
   const isSpectator = myPlayer.isSpectator;
   const showSpectatorView = isEliminated || isSpectator;
-  const heldPowerCard = myPowerCardSlot[0] || null;
+  // #197 — when the player taps a specific held card (a Collector holds up to
+  // 3), the activation modal targets that card; otherwise default to slot[0].
+  const heldPowerCard =
+    (ui.pendingPowerCardId
+      ? myPowerCardSlot.find((c) => c?.id === ui.pendingPowerCardId)
+      : null) || myPowerCardSlot[0] || null;
   const armedPowerCard = myPlayer?.armedPowerCard || null;
   const isPlaying = phase === 'playing';
   const isSpinPending = phase === 'spin_pending';
