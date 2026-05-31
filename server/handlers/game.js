@@ -56,6 +56,19 @@ function schedulePreGameFinalize(io, code) {
   pregameTimers.set(code, handle);
 }
 
+// #2 — when the pre-game selection is skipped (0–1 powers enabled) there is no
+// picker to open. Still honour the role-reveal display window, then finalize
+// straight into play. Mirrors the timing of schedulePreGameSelectionOpen but
+// without ever opening selection.
+function schedulePreGameSkipFinalize(io, code) {
+  _clearPreGameTimer(code);
+  const handle = setTimeout(async () => {
+    pregameTimers.delete(code);
+    await finalizePreGameAndBroadcast(io, code);
+  }, engine.ROLE_REVEAL_DISPLAY_MS);
+  pregameTimers.set(code, handle);
+}
+
 function schedulePreGameSelectionOpen(io, code) {
   _clearPreGameTimer(code);
   const handle = setTimeout(async () => {
@@ -202,7 +215,13 @@ function register(io, socket, deps) {
       // open selection once the reveal display window elapses.
       if (runsPreGame) {
         await emitRoleReveals(io, room);
-        schedulePreGameSelectionOpen(io, roomCode);
+        // #2 — skip the "Claim your edge" picker when fewer than 2 power types
+        // are enabled; otherwise open it after the role-reveal window.
+        if (room.pregameSelectionSkipped) {
+          schedulePreGameSkipFinalize(io, roomCode);
+        } else {
+          schedulePreGameSelectionOpen(io, roomCode);
+        }
       }
     } catch (err) {
       callback({ success: false, error: err.message });

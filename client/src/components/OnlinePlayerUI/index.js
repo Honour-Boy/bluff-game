@@ -65,7 +65,25 @@ export function OnlinePlayerUI({
   chatUnread = 0,
 }) {
   const wrapperRef = useRef(null);
-  const { triggerShake, triggerAudio, startSpinAudio, stopSpinAudio } = useAtmosphere(wrapperRef);
+  const {
+    triggerShake, triggerAudio, startSpinAudio, stopSpinAudio,
+    startMusic, stopMusic, toggleMusic, musicEnabled,
+  } = useAtmosphere(wrapperRef);
+
+  // Background tavern ambience: start as soon as we're at the table. The
+  // AudioContext may be suspended until a user gesture, so also arm a one-shot
+  // gesture listener; startMusic is idempotent. Fades out + tears down on exit.
+  useEffect(() => {
+    startMusic();
+    const onGesture = () => startMusic();
+    window.addEventListener('pointerdown', onGesture, { once: true });
+    window.addEventListener('keydown', onGesture, { once: true });
+    return () => {
+      window.removeEventListener('pointerdown', onGesture);
+      window.removeEventListener('keydown', onGesture);
+      stopMusic();
+    };
+  }, [startMusic, stopMusic]);
 
   const myHand = roomState?.myHand || [];
   const myPowerCardSlot = roomState?.myPowerCardSlot || [];
@@ -446,8 +464,10 @@ export function OnlinePlayerUI({
         config={roomState?.config}
         voice={voice}
         speechEnabled={ui.speechEnabled}
+        musicEnabled={musicEnabled}
         onCentralize={ui.scrollToCenter}
         onToggleSpeech={ui.toggleSpeech}
+        onToggleMusic={toggleMusic}
         onOpenChat={openChat}
         chatUnread={chatUnread}
       />

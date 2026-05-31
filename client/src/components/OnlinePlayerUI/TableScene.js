@@ -41,13 +41,22 @@ export function TableScene({
       style={{
         flex: 1,
         position: 'relative',
-        /* Felt-green center fading to deep wood at the edges */
+        /* Warm candle-lit felt: a soft gold light pool over a forest-green
+           surface (warmed off the old teal so it sits with the tavern wood +
+           gold), brightening toward the middle then fading to deep wood. */
         background: `
           radial-gradient(
-            ellipse 70% 55% at 50% 50%,
-            #0e2d1a 0%,
-            #0a2014 40%,
-            #060e08 65%,
+            ellipse 50% 38% at 50% 44%,
+            rgba(200,146,46,0.12) 0%,
+            rgba(200,146,46,0.04) 45%,
+            transparent 72%
+          ),
+          radial-gradient(
+            ellipse 72% 58% at 50% 48%,
+            #275437 0%,
+            #1c4029 38%,
+            #122c1c 64%,
+            #0a1a11 82%,
             transparent 100%
           )
         `,

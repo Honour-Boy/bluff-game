@@ -356,6 +356,31 @@ function applyPostElimSystemHooks(io, room) {
 // it server-side when the target never spins. Keeping ONE implementation means
 // an auto-spin produces byte-for-byte the same result as a manual one.
 
+// #6 — Highlight callouts. Updates the per-player survival streak + the once-
+// per-game first-blood flag and returns banner events to surface. Emitted over
+// the same `power_card_triggered` channel as bounty/betting so they queue AFTER
+// the spin overlay resolves. Only a RESOLVED outcome counts — a Medic-pending
+// elimination is deferred (the streak/first-blood is decided when Medic acts).
+function _computeSpinHighlights(room, player, spinResult, medicPaused) {
+  if (medicPaused) return [];
+  const events = [];
+  if (spinResult.eliminated) {
+    player.survivalStreak = 0;
+    if (!room.firstBloodAwarded) {
+      room.firstBloodAwarded = true;
+      events.push({ kind: 'first_blood', eliminatedName: player.username });
+    }
+  } else {
+    player.survivalStreak = (player.survivalStreak || 0) + 1;
+    const s = player.survivalStreak;
+    // Escalating milestones: survive 3, 5, then every odd count from 7 up.
+    if (s === 3 || s === 5 || (s >= 7 && s % 2 === 1)) {
+      events.push({ kind: 'survival_streak', holderName: player.username, streak: s });
+    }
+  }
+  return events;
+}
+
 /**
  * Run a spin for `player` and broadcast the result. Assumes the caller has
  * already validated phase/target. Returns the raw spinResult.
@@ -479,12 +504,17 @@ async function applySpinAndBroadcast(io, code, room, player, leaderboardRepo) {
       : (spinResult.eliminated && !medicPaused ? { newCardType: room.currentCardType } : {})),
   };
 
+  // #6 — highlight callouts (first blood / survival streak). Computed before
+  // save so the streak counter + first-blood flag persist; emitted after.
+  const highlightEvents = _computeSpinHighlights(room, player, spinResult, medicPaused);
+
   await saveRoom(room);
   console.log(`[Room ${code}] ${player.username} spun slot ${spinResult.spinIndex} → ${spinResult.eliminated ? (medicPaused ? 'ELIM (Medic deciding)' : 'ELIMINATED') : 'survived'}`);
   await broadcastRoomState(io, code);
-  // Post-spin banners (bounty + betting streak) AFTER broadcast.
+  // Post-spin banners (bounty + betting streak + highlights) AFTER broadcast.
   for (const ev of bountyEvents) io.to(code).emit('power_card_triggered', ev);
   for (const ev of betEvents) io.to(code).emit('power_card_triggered', ev);
+  for (const ev of highlightEvents) io.to(code).emit('power_card_triggered', ev);
   return spinResult;
 }
 

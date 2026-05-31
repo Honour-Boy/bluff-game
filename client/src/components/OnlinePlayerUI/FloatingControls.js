@@ -10,8 +10,10 @@ export function FloatingControls({
   config,
   voice,
   speechEnabled,
+  musicEnabled,
   onCentralize,
   onToggleSpeech,
+  onToggleMusic,
   onOpenChat,
   chatUnread,
 }) {
@@ -20,8 +22,10 @@ export function FloatingControls({
       config={config}
       voice={voice}
       speechEnabled={speechEnabled}
+      musicEnabled={musicEnabled}
       onCentralize={onCentralize}
       onToggleSpeech={onToggleSpeech}
+      onToggleMusic={onToggleMusic}
       onOpenChat={onOpenChat}
       chatUnread={chatUnread}
       showVoice={isMobile}

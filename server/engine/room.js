@@ -119,6 +119,10 @@ function startGame(room) {
   }
   room.suddenDeathCounter = 0;
   room.mirrorMatchActive = !!room.config?.roomModifiers?.mirrorMatch;
+  // #6 — highlight callouts: one "First Blood" per game; per-player survival
+  // streaks reset at the start of a fresh game.
+  room.firstBloodAwarded = false;
+  for (const p of alivePlayers) p.survivalStreak = 0;
 
   // v2 Phase D — assign roles BEFORE the deal so the per-player
   // power-card hand cap is honoured by `_normalisePowerCardHandCap`.

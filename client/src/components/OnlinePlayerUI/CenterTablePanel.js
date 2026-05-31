@@ -135,8 +135,8 @@ export function CenterTablePanel({
           justifyContent: 'space-around',
           gap: 12,
           background: `
-            radial-gradient(ellipse at center, rgba(14,30,20,0.9) 0%, rgba(10,8,5,0.97) 100%),
-            linear-gradient(160deg, rgba(20,15,10,0.95) 0%, rgba(10,8,5,0.97) 100%)
+            radial-gradient(ellipse at center, rgba(39,84,55,0.88) 0%, rgba(14,26,17,0.96) 100%),
+            linear-gradient(160deg, rgba(26,20,12,0.95) 0%, rgba(12,9,6,0.97) 100%)
           `,
         }}>
           <FaceDownStack count={deckSize} label="Draw" warning={deckSize < 5 && deckSize > 0} />

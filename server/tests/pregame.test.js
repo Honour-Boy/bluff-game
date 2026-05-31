@@ -184,14 +184,61 @@ describe('beginPreGame', () => {
     }
   });
 
-  it('offers only the Additional card when no power cards are enabled', () => {
+  // #2 — the "Claim your edge" picker is only worth showing when there are at
+  // least two power types to choose between. With 0–1 powers enabled it's
+  // skipped: no pools are built and a flag tells the handler to chain straight
+  // to finalize after the role-reveal window.
+  it('skips selection (no pools) when no power cards are enabled', () => {
     const room = makeOnlineRoom(2, defaultRoomConfig()); // all powers off
     startGame(room);
     beginPreGame(room);
+    expect(room.phase).toBe('pre_game'); // role-reveal window still runs
+    expect(room.pregameSelectionSkipped).toBe(true);
+    expect(Object.keys(room.pregamePools)).toHaveLength(0);
+  });
+
+  it('skips selection when only ONE power card is enabled', () => {
+    const cfg = defaultRoomConfig();
+    cfg.powerCards.enabled.shield = true; // exactly one power
+    const room = makeOnlineRoom(2, cfg);
+    startGame(room);
+    beginPreGame(room);
+    expect(room.pregameSelectionSkipped).toBe(true);
+    expect(Object.keys(room.pregamePools)).toHaveLength(0);
+  });
+
+  it('runs selection once TWO or more power cards are enabled', () => {
+    const cfg = defaultRoomConfig();
+    cfg.powerCards.enabled.shield = true;
+    cfg.powerCards.enabled.peek = true; // two powers → real choice
+    const room = makeOnlineRoom(3, cfg);
+    startGame(room);
+    beginPreGame(room);
+    expect(room.pregameSelectionSkipped).toBe(false);
+    expect(Object.keys(room.pregamePools)).toHaveLength(3);
     for (const p of room.players) {
-      const pool = room.pregamePools[p.id];
-      expect(pool).toHaveLength(1);
-      expect(pool[0].type).toBe('shape');
+      // two powers + the Additional card
+      expect(room.pregamePools[p.id]).toHaveLength(3);
+    }
+  });
+});
+
+// ─── finalizePreGame — skipped selection (#2) ────────────────
+
+describe('finalizePreGame — skipped selection', () => {
+  it('resumes play without touching deal-time grants when selection was skipped', () => {
+    const room = makeOnlineRoom(2, defaultRoomConfig()); // all powers off → skip
+    startGame(room);
+    beginPreGame(room);
+    const result = finalizePreGame(room);
+    expect(result.ok).toBe(true);
+    expect(result.skipped).toBe(true);
+    expect(room.phase).toBe('playing');
+    expect(room.pregameSelectionSkipped).toBeUndefined();
+    expect(room.pregamePools).toBeUndefined();
+    // Hands keep their full 6 shape cards; no pool card was forced in.
+    for (const p of room.players) {
+      expect(room.hands.get(p.id)).toHaveLength(6);
     }
   });
 });
