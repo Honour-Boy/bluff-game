@@ -32,6 +32,11 @@ const bluffInterceptTimers = new Map();  // roomCode → setTimeout handle
 const spinPendingTimers = new Map();  // roomCode → setTimeout handle
 const gameOverTimers = new Map();     // roomCode → setTimeout handle
 
+// Redemption Spin safety timer — auto-runs the offered redemption spin if the
+// eliminated player never takes it, so the room can't park in
+// redemption_pending. One handle per room.
+const redemptionTimers = new Map();   // roomCode → setTimeout handle
+
 // Speed Mode — one per-turn countdown handle per room. Stamped when a new
 // player's turn opens (online + roomModifiers.speedMode); on expiry the server
 // auto-ends that player's turn. Re-armed on every turn change, paused whenever
@@ -69,6 +74,10 @@ function _clearSpinPendingTimer(code) {
 function _clearGameOverTimer(code) {
   const t = gameOverTimers.get(code);
   if (t) { clearTimeout(t); gameOverTimers.delete(code); }
+}
+function _clearRedemptionTimer(code) {
+  const t = redemptionTimers.get(code);
+  if (t) { clearTimeout(t); redemptionTimers.delete(code); }
 }
 function _clearSpeedModeTimer(code) {
   const t = speedModeTimers.get(code);
@@ -128,6 +137,7 @@ module.exports = {
   bluffInterceptTimers,
   spinPendingTimers,
   gameOverTimers,
+  redemptionTimers,
   speedModeTimers,
   hostDisconnectTimers,
   playerDisconnectTimers,
@@ -138,6 +148,7 @@ module.exports = {
   _clearBluffInterceptTimer,
   _clearSpinPendingTimer,
   _clearGameOverTimer,
+  _clearRedemptionTimer,
   _clearSpeedModeTimer,
   logRoomDeletion,
   logTurnState,

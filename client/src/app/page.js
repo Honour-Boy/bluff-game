@@ -55,7 +55,7 @@ function HomeContent() {
     playCard, endTurn, playerSpin,
     declareRoundWin, callBluff,
     playCardOnline, spectatePlayer,
-    acknowledgeSpinResult, spinDismissed,
+    acknowledgeSpinResult, redemptionSpin, spinDismissed,
     chatMessages, chatUnread, chatOpen,
     sendChatMessage, openChat, closeChat,
     leaveGame, restartRoom, setError,
@@ -474,6 +474,7 @@ function HomeContent() {
           leaveGame={leaveGame}
           restartRoom={restartRoom}
           acknowledgeSpinResult={acknowledgeSpinResult}
+          redemptionSpin={redemptionSpin}
           spinDismissed={spinDismissed}
           activatePowerCard={activatePowerCard}
           swapPick={swapPick}
@@ -534,6 +535,7 @@ function HomeContent() {
           leaveGame={leaveGame}
           restartRoom={restartRoom}
           acknowledgeSpinResult={acknowledgeSpinResult}
+          redemptionSpin={redemptionSpin}
           spinDismissed={spinDismissed}
           activatePowerCard={activatePowerCard}
           swapPick={swapPick}

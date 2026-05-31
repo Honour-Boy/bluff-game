@@ -15,10 +15,12 @@ export function ActionLog({ lastAction }) {
     bluff_called: ({ callerName, callerId }) => callerName
       ? `⚠️ ${callerName} called bluff! Host: reveal the last card played.`
       : `⚠️ Bluff called! Host: reveal the last card played.`,
-    spin_result: ({ spinTargetName, eliminated, roll, riskLevelBefore }) =>
-      eliminated
-        ? `💀 ${spinTargetName} rolled ${roll} (risk ${riskLevelBefore}/6) — ELIMINATED`
-        : `😮‍💨 ${spinTargetName} rolled ${roll} (risk ${riskLevelBefore}/6) — SURVIVED`,
+    spin_result: ({ spinTargetName, eliminated, roll, riskLevelBefore, redemption }) => {
+      const tag = redemption ? '🎲 REDEMPTION — ' : '';
+      return eliminated
+        ? `${tag}💀 ${spinTargetName} rolled ${roll} (risk ${riskLevelBefore}/6) — ${redemption ? 'STAYS OUT' : 'ELIMINATED'}`
+        : `${tag}😮‍💨 ${spinTargetName} rolled ${roll} (risk ${riskLevelBefore}/6) — ${redemption ? 'REJOINS' : 'SURVIVED'}`;
+    },
     card_played_online: ({ card, playerName }) => {
       const who = playerName ? `${playerName} played` : 'Card played';
       return card

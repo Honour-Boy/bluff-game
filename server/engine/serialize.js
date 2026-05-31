@@ -190,6 +190,18 @@ function serializeRoom(room, requestingPlayerId = null, opts = {}) {
         : undefined,
     suddenDeathCounter: isOnline ? (room.suddenDeathCounter || 0) : undefined,
     mirrorMatchActive: isOnline ? !!room.mirrorMatchActive : undefined,
+    // Redemption Spin (Phase E1) — who is being offered their one redemption
+    // spin and how long is left before the server takes it for them. Drives the
+    // client's redemption_pending overlay (the prompt for the target; a waiting
+    // notice for everyone else).
+    redemption:
+      isOnline && room.phase === 'redemption_pending' && room.redemption
+        ? {
+            playerId: room.redemption.playerId,
+            playerName: room.redemption.playerName || null,
+            msRemaining: Math.max(0, (room.redemption.deadline || 0) - Date.now()),
+          }
+        : undefined,
     // Pre-game selection & role reveal (#116). Authoritative view for
     // the requesting player — reconnect-safe. Only the caller's own
     // pool/selection is exposed; other players' picks stay private,
