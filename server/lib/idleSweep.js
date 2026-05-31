@@ -12,6 +12,7 @@ const {
   _clearPreGameTimer,
   _clearSpinPendingTimer,
   _clearGameOverTimer,
+  _clearSpeedModeTimer,
   logRoomDeletion,
   saveRoom,
 } = require('./state');
@@ -63,6 +64,7 @@ function startInactivitySweep(io) {
       _clearPreGameTimer(code);
       _clearSpinPendingTimer(code);
       _clearGameOverTimer(code);
+      _clearSpeedModeTimer(code);
       const hostTimer = hostDisconnectTimers.get(code);
       if (hostTimer) {
         clearTimeout(hostTimer);
@@ -236,6 +238,7 @@ async function dismissIdleLobby(io, code, reason) {
   _clearPreGameTimer(code);
   _clearSpinPendingTimer(code);
   _clearGameOverTimer(code);
+  _clearSpeedModeTimer(code);
   const hostTimer = hostDisconnectTimers.get(code);
   if (hostTimer) {
     clearTimeout(hostTimer);

@@ -4,6 +4,7 @@
 
 const engine = require('../gameEngine');
 const { getRoom } = require('./state');
+const { armSpeedModeTimer } = require('./speedMode');
 
 /**
  * Fan out the bluff-pipeline's announce events to every socket in
@@ -31,6 +32,13 @@ function emitHostChanged(io, roomCode, { hostId, hostName, reason } = {}) {
 async function broadcastRoomState(io, roomCode) {
   const room = await getRoom(roomCode);
   if (!room) return;
+
+  // Speed Mode (online) — arm / re-arm the per-turn countdown BEFORE serializing
+  // so a turn change's freshly-stamped `room.speedModeDeadline` ships in THIS
+  // push (serialize.js exposes `speedModeMsRemaining`). Torn down when the
+  // modifier isn't in force or the room leaves the playing phase. On expiry the
+  // timer auto-ends the active player's turn (no auto-spin — #79).
+  armSpeedModeTimer(io, room);
 
   // §3.3 — push live pre-room occupancy to anyone watching this group's
   // directory (members are subscribed to `group:<id>` via list_my_groups /
