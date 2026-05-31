@@ -91,9 +91,12 @@ function register(io, socket, deps) {
         }
         room.groupId = group.id;
         room.hostUserId = group.host_user_id;
-        if (group.host_user_id === socket.userId) {
-          room.hostSocketId = socket.id;
-        }
+        // hostSocketId is reconciled from hostUserId AFTER the join below, so it
+        // can never diverge from the host-of-record. (Setting it only for the
+        // joining host left it pointing at the OLD stand-in's socket whenever a
+        // non-host member refreshed after a reclaim/hand-back — server-side host
+        // gates use hostSocketId while the client's amHost uses hostUserId, so a
+        // split between them broke host controls for both players.)
 
         const allowed = await groupsRepo.isGroupMember(group.id, socket.userId);
         if (!allowed) {
@@ -123,6 +126,13 @@ function register(io, socket, deps) {
         room.players.push(player);
         console.log(`[Room ${code}] Joined: ${player.username}`);
       }
+
+      // Reconcile the host socket with the host-of-record now that every
+      // player's socketId is current. For a group room this catches up a
+      // reclaim/hand-back that changed the DB host while the new host was away
+      // (hostSocketId → their live socket, or null until they (re)join), and
+      // guarantees hostUserId and hostSocketId never point at different people.
+      if (room.groupId) engine.reconcileHostSocket(room);
 
       await saveRoom(room);
       socket.join(code);

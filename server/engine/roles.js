@@ -1,9 +1,11 @@
 // ============================================================
 // ENGINE — Secret roles + role-specific abilities (v2 Phase D)
 // ============================================================
-// Roles activate ONLY when alive count >= 9. Each "unique" special
-// role appears at most once per game; Gambler may appear 1-2 times.
-// Remaining players are Barehand.
+// Roles activate ONLY when alive count >= ROLES_AT_MIN_ALIVE (3). Each
+// "unique" special role appears at most once per game; Gambler may appear
+// 1-2 times. Remaining players are Barehand. At small tables (3–6 alive)
+// there are more special slots than players, so only a random subset of
+// the specials is dealt and there are no Barehand fillers.
 
 const { ROLES, ROLES_AT_MIN_ALIVE, MODES, MEDIC_MAX_SAVES, MEDIC_SAVE_HAND_CAP } = require('./constants');
 const { addBulletToChamber } = require('./chamber');

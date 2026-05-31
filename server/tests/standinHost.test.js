@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { createGroupsRepo } from '../groupsRepo.js';
+import { createRoom, createPlayer, reconcileHostSocket, MODES } from '../gameEngine.js';
 
 const GROUP_ID = '00000000-0000-0000-0000-0000000000aa';
 const OWNER = '11111111-1111-1111-1111-111111111111';
@@ -161,5 +162,51 @@ describe('issue #145 — temporary stand-in host', () => {
 
     await expect(repo.removeMember({ groupId: GROUP_ID, hostUserId: STANDIN, userId: OWNER }))
       .rejects.toThrow(/cannot remove the group owner/i);
+  });
+});
+
+// ─── Live-room host-socket reconciliation ─────────────────────────────
+// The DB layer (above) was correct; the reclaim/hand-back bug lived in the
+// LIVE room, where hostUserId (drives the client's amHost) and hostSocketId
+// (gates server-side host actions) could point at different people. After a
+// reclaim/hand-back changed the DB host while the new host was away, the next
+// member to refresh re-stamped hostUserId from the DB but left hostSocketId on
+// the OLD stand-in's socket — a split-brain host. reconcileHostSocket is the
+// invariant that keeps the two in lock-step.
+describe('reconcileHostSocket — keeps hostSocketId aligned with hostUserId', () => {
+  function groupRoom() {
+    const room = createRoom('host-socket', MODES.ONLINE);
+    room.groupId = GROUP_ID;
+    room.players.push(
+      createPlayer(OWNER, 'Owner', 'owner-sock'),
+      createPlayer(STANDIN, 'Standin', 'standin-sock'),
+    );
+    return room;
+  }
+
+  it('points hostSocketId at the seated host-of-record', () => {
+    const room = groupRoom();
+    room.hostUserId = STANDIN;
+    reconcileHostSocket(room);
+    expect(room.hostSocketId).toBe('standin-sock');
+  });
+
+  it('repairs a divergence left by a reclaim while a non-host member refreshed', () => {
+    // Simulate the buggy state: DB reclaim moved host to the OWNER, a refresh
+    // re-stamped hostUserId, but hostSocketId still points at the stand-in.
+    const room = groupRoom();
+    room.hostUserId = OWNER;        // re-stamped from DB on a member refresh
+    room.hostSocketId = 'standin-sock'; // stale — old stand-in still holds it
+    reconcileHostSocket(room);
+    expect(room.hostSocketId).toBe('owner-sock'); // now matches the owner
+  });
+
+  it('nulls hostSocketId when the host-of-record is not seated (away)', () => {
+    const room = groupRoom();
+    room.players = room.players.filter(p => p.id !== OWNER); // owner left
+    room.hostUserId = OWNER; // reclaimed while away
+    room.hostSocketId = 'standin-sock';
+    reconcileHostSocket(room);
+    expect(room.hostSocketId).toBeNull();
   });
 });

@@ -274,6 +274,21 @@ function pickReplacementHost(room, leavingPlayerId) {
   return candidates[Math.floor(Math.random() * candidates.length)];
 }
 
+// Keep `room.hostSocketId` in lock-step with `room.hostUserId`: the host socket
+// is the seated host-of-record's live socket, or null if they aren't seated.
+// This is the single invariant that stops the client's `amHost` (derived from
+// hostUserId) and the server's host-action gate (hostSocketId) from pointing at
+// different people after a stand-in / reclaim / hand-back. Group rooms are
+// always online, so the host is always a seated player. Returns the room.
+function reconcileHostSocket(room) {
+  if (!room) return room;
+  const hostPlayer = room.hostUserId
+    ? room.players.find(p => p.id === room.hostUserId)
+    : null;
+  room.hostSocketId = hostPlayer ? (hostPlayer.socketId || null) : null;
+  return room;
+}
+
 module.exports = {
   createPlayer,
   getCurrentPlayer,
@@ -286,4 +301,5 @@ module.exports = {
   declareRoundWinner,
   reconnectPlayer,
   pickReplacementHost,
+  reconcileHostSocket,
 };

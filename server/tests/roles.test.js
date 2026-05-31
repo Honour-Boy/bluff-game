@@ -2,7 +2,7 @@
 // Tests for v2 Phase D — Secret roles
 //
 // Covers:
-//   - assignRoles distribution (>=9 alive → mixed; <9 → all barehand)
+//   - assignRoles distribution (>=3 alive → specials; <3 → all barehand)
 //   - Gambler frozen risk on survival; spin-elim still works
 //   - Gambler chamber jump to 4 on correct bluff against them
 //   - Sheriff risk drop on correct bluff BY them
@@ -135,12 +135,24 @@ function buildBluffScenario({
 // ─── assignRoles distribution ─────────────────────────────────
 
 describe('assignRoles', () => {
-  it('makes everyone Barehand below the 9-alive threshold', () => {
-    for (const count of [2, 4, 7, 8]) {
+  it('makes everyone Barehand below the role threshold', () => {
+    for (const count of [1, 2]) { // < ROLES_AT_MIN_ALIVE (3)
       const room = makeOnlineRoom(count);
       assignRoles(room);
       const roles = room.players.map(p => p.role);
       expect(roles.every(r => r === ROLES.BAREHAND)).toBe(true);
+    }
+  });
+
+  it('deals only specials (no Barehand) at small tables of 3–6 alive', () => {
+    for (const count of [3, 4, 5, 6]) {
+      const room = makeOnlineRoom(count);
+      assignRoles(room);
+      const roles = room.players.filter(p => p.status === 'alive').map(p => p.role);
+      // Every alive player gets a distinct special; none are Barehand.
+      expect(roles.every(r => r !== ROLES.BAREHAND)).toBe(true);
+      expect(new Set(roles).size).toBe(count); // all distinct
+      for (const r of roles) expect(ROLE_TYPES).toContain(r);
     }
   });
 
@@ -185,9 +197,16 @@ describe('assignRoles', () => {
   });
 
   it('startGame leaves everyone Barehand below threshold', () => {
-    const room = makeOnlineRoom(5);
+    const room = makeOnlineRoom(2); // < ROLES_AT_MIN_ALIVE (3)
     startGame(room);
     expect(room.players.every(p => p.role === ROLES.BAREHAND)).toBe(true);
+  });
+
+  it('startGame assigns specials at the 3-player minimum', () => {
+    const room = makeOnlineRoom(3);
+    startGame(room);
+    const roles = room.players.filter(p => p.status === 'alive').map(p => p.role);
+    expect(roles.every(r => r !== ROLES.BAREHAND)).toBe(true);
   });
 });
 

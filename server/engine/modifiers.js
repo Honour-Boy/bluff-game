@@ -80,9 +80,12 @@ function getMirrorMatchOpposite(room, originalPlayerId) {
   return null;
 }
 
+// Mirror Match spins the seat opposite the current player, so it needs an
+// EVEN table of at least 4 (with 2 the "opposite" is just the other player —
+// degenerate). The lobby UI hides the toggle under the same rule.
 function isMirrorMatchEligibleAtStart(room) {
   const alive = room.players.filter(p => p.status === 'alive').length;
-  return alive >= 2 && alive % 2 === 0;
+  return alive >= 4 && alive % 2 === 0;
 }
 
 // ─── Redemption Spin (Phase E1) ──────────────────────────────

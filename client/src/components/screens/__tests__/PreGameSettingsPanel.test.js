@@ -137,3 +137,51 @@ describe('PreGameSettingsPanel - group settings affordances', () => {
     }));
   });
 });
+
+describe('PreGameSettingsPanel - player-count gating', () => {
+  function expand(playerCount) {
+    const onChange = vi.fn();
+    render(
+      <PreGameSettingsPanel config={DEFAULT_V2_CONFIG} onChange={onChange} playerCount={playerCount} />,
+    );
+    fireEvent.click(screen.getByText(/V2 GAME SETTINGS/i));
+    return { onChange };
+  }
+
+  it('at 2 players: hides Mirror Match + Last Stand and disables Roulette Rotation', () => {
+    expand(2);
+    expect(screen.queryByText('MIRROR MATCH')).toBeNull();
+    expect(screen.queryByText('LAST STAND')).toBeNull();
+    expect(screen.getByText('ROULETTE ROTATION')).toBeInTheDocument();
+    expect(screen.getByText(/Needs 3 or more players/i)).toBeInTheDocument();
+    expect(document.getElementById('room-rouletteRotation')).toBeDisabled();
+  });
+
+  it('at 3 players (odd): Roulette enabled, Mirror Match + Last Stand still hidden', () => {
+    expand(3);
+    expect(document.getElementById('room-rouletteRotation')).not.toBeDisabled();
+    expect(screen.queryByText('MIRROR MATCH')).toBeNull(); // odd
+    expect(screen.queryByText('LAST STAND')).toBeNull();   // < 5
+  });
+
+  it('at 4 players (even): Mirror Match shows, Last Stand still hidden', () => {
+    expand(4);
+    expect(screen.getByText('MIRROR MATCH')).toBeInTheDocument();
+    expect(screen.queryByText('LAST STAND')).toBeNull(); // needs 5+
+  });
+
+  it('at 6 players: every modifier is available', () => {
+    expand(6);
+    expect(document.getElementById('room-rouletteRotation')).not.toBeDisabled();
+    expect(screen.getByText('MIRROR MATCH')).toBeInTheDocument();
+    expect(screen.getByText('LAST STAND')).toBeInTheDocument();
+  });
+
+  it('without a playerCount prop: no gating (every modifier shown)', () => {
+    render(<PreGameSettingsPanel config={DEFAULT_V2_CONFIG} onChange={vi.fn()} />);
+    fireEvent.click(screen.getByText(/V2 GAME SETTINGS/i));
+    expect(screen.getByText('MIRROR MATCH')).toBeInTheDocument();
+    expect(screen.getByText('LAST STAND')).toBeInTheDocument();
+    expect(document.getElementById('room-rouletteRotation')).not.toBeDisabled();
+  });
+});

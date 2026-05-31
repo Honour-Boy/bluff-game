@@ -115,6 +115,19 @@ function register(io, socket, deps) {
         rouletteRotationAutoDisabled = true;
       }
 
+      // Last Stand (the final-two duel) only makes sense with a real field —
+      // disable it at 4 alive or fewer. Matches the lobby UI, which hides the
+      // toggle under the same rule.
+      let lastStandAutoDisabled = false;
+      if (
+        room.mode === engine.MODES.ONLINE
+        && room.config?.systems?.lastStand
+        && room.players.filter(p => p.status === 'alive').length < 5
+      ) {
+        room.config.systems.lastStand = false;
+        lastStandAutoDisabled = true;
+      }
+
       delete room.groupLeaderboardWinnerRecorded;
       engine.startGame(room);
 
@@ -159,7 +172,7 @@ function register(io, socket, deps) {
 
       await saveRoom(room);
       await broadcastRoomState(io, roomCode);
-      callback({ success: true, mirrorMatchAutoDisabled, rouletteRotationAutoDisabled });
+      callback({ success: true, mirrorMatchAutoDisabled, rouletteRotationAutoDisabled, lastStandAutoDisabled });
 
       if (mirrorMatchAutoDisabled) {
         io.to(roomCode).emit('power_card_triggered', {
@@ -174,6 +187,14 @@ function register(io, socket, deps) {
           kind: 'system_notice',
           title: 'Roulette Rotation disabled',
           subtitle: 'requires at least 3 players',
+        });
+      }
+
+      if (lastStandAutoDisabled) {
+        io.to(roomCode).emit('power_card_triggered', {
+          kind: 'system_notice',
+          title: 'Last Stand disabled',
+          subtitle: 'requires at least 5 players',
         });
       }
 

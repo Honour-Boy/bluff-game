@@ -348,7 +348,7 @@ function RolesContent() {
           border: "1px solid var(--border)",
         }}
       >
-        Auto-assigned in any room with 9+ players. Roles are{" "}
+        Auto-assigned in any room with 3+ players. Roles are{" "}
         <strong style={{ color: "var(--text)" }}>private</strong> — only you
         ever see your own. Revealed once, at game start.
       </div>
