@@ -87,11 +87,25 @@ function beginPreGame(room) {
   // §2.1 — ids of players who confirmed at/after the 12s threshold. They get a
   // private review buffer client-side and are kept off the first active turn.
   room.pregameLateSelectors = [];
+  room.pregameSelectionSkipped = false;
 
   // Only the host-enabled power types are pickable. A power the host left
   // off must never surface as a pre-game option (it isn't in the deck either).
   const enabledMap = room.config?.powerCards?.enabled || {};
   const enabledPowers = POWER_TYPES.filter(power => enabledMap[power]);
+
+  // #2 — the "Claim your edge" pick is only worth showing when there are at
+  // least TWO power types to choose between (the Additional card rounds out an
+  // otherwise power-only pool). With 0–1 powers enabled there's no real
+  // decision to make, so skip the selection entirely: the brief pre_game
+  // role-reveal window still plays, then play resumes with the deal-time power
+  // grant intact (room.startGame already guarantees one when a power is
+  // enabled). The handler reads `pregameSelectionSkipped` to chain straight to
+  // finalize instead of opening the picker.
+  if (enabledPowers.length < 2) {
+    room.pregameSelectionSkipped = true;
+    return room;
+  }
 
   for (const p of _alivePlayers(room)) {
     room.pregamePools[p.id] = generateSelectionPool(p.id, enabledPowers);
@@ -170,6 +184,20 @@ function applyPreGameSelection(room, playerId, optionId) {
 function finalizePreGame(room) {
   if (room.phase !== 'pre_game') return { ok: false, error: 'Not in pre-game phase' };
 
+  // #2 — selection was skipped (0–1 powers enabled): there are no pool picks
+  // to apply. Leave the deal-time grants untouched and resume normal play.
+  if (room.pregameSelectionSkipped) {
+    room.phase = 'playing';
+    delete room.pregamePools;
+    delete room.pregameSelections;
+    delete room.pregameSelectionsReady;
+    delete room.pregameSelectionOpen;
+    delete room.pregameSelectionDeadline;
+    delete room.pregameLateSelectors;
+    delete room.pregameSelectionSkipped;
+    return { ok: true, assignments: {}, autoAssigned: [], skipped: true };
+  }
+
   const alive = _alivePlayers(room);
   const autoAssigned = [];
   for (const p of alive) {
@@ -231,6 +259,7 @@ function finalizePreGame(room) {
   delete room.pregameSelectionOpen;
   delete room.pregameSelectionDeadline;
   delete room.pregameLateSelectors;
+  delete room.pregameSelectionSkipped;
 
   return { ok: true, assignments, autoAssigned };
 }

@@ -101,8 +101,10 @@ export function MobileFabMenu({
   config,
   voice,
   speechEnabled,
+  musicEnabled = true,
   onCentralize,
   onToggleSpeech,
+  onToggleMusic,
   onOpenChat,
   chatUnread = 0,
   // On desktop the standalone VoicePanel still lives in the header, so the
@@ -284,6 +286,14 @@ export function MobileFabMenu({
                 label={speechEnabled ? 'Mute announcements' : 'Unmute announcements'}
                 sub="Spoken event narration"
                 onClick={() => { onToggleSpeech(); }}
+              />
+            )}
+            {onToggleMusic && (
+              <ItemButton
+                icon={musicEnabled ? '🎵' : '🔕'}
+                label={musicEnabled ? 'Mute music' : 'Unmute music'}
+                sub="Tavern background ambience"
+                onClick={() => { onToggleMusic(); }}
               />
             )}
           </div>

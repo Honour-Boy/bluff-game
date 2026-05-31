@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useRef } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 
 // ─── useAtmosphere ────────────────────────────────────────────────────────────
 // Phase 3: atmospheric effects hook.
@@ -75,23 +75,51 @@ function playBluffSound(ctx) {
   });
 }
 
-// Survived — soft metallic exhale (used after the spin resolves as empty)
+// Survived — a warm celebratory relief chime (the cylinder came up empty).
+// A quick exhale "phew" of filtered noise, then a bright rising major arpeggio
+// (G–B–D–G) on soft triangles: tavern-warm, uplifting, but lighter than the
+// full game-win fanfare.
 function playSpinSound(ctx) {
   resume(ctx);
   const now = ctx.currentTime;
-  const osc = ctx.createOscillator();
-  const gain = ctx.createGain();
-  osc.connect(gain);
-  gain.connect(ctx.destination);
-  osc.type = 'sawtooth';
-  osc.frequency.setValueAtTime(80, now);
-  osc.frequency.exponentialRampToValueAtTime(320, now + 0.6);
-  osc.frequency.exponentialRampToValueAtTime(110, now + 1.1);
-  gain.gain.setValueAtTime(0.08, now);
-  gain.gain.linearRampToValueAtTime(0.14, now + 0.4);
-  gain.gain.exponentialRampToValueAtTime(0.001, now + 1.2);
-  osc.start(now);
-  osc.stop(now + 1.25);
+
+  // Relief exhale — short noise swell through a sweeping low-pass.
+  const bufLen = Math.ceil(ctx.sampleRate * 0.35);
+  const buf = ctx.createBuffer(1, bufLen, ctx.sampleRate);
+  const data = buf.getChannelData(0);
+  for (let i = 0; i < bufLen; i++) data[i] = (Math.random() * 2 - 1) * (1 - i / bufLen);
+  const noise = ctx.createBufferSource();
+  noise.buffer = buf;
+  const lp = ctx.createBiquadFilter();
+  lp.type = 'lowpass';
+  lp.frequency.setValueAtTime(500, now);
+  lp.frequency.exponentialRampToValueAtTime(1600, now + 0.3);
+  const nGain = ctx.createGain();
+  nGain.gain.setValueAtTime(0.0001, now);
+  nGain.gain.linearRampToValueAtTime(0.05, now + 0.08);
+  nGain.gain.exponentialRampToValueAtTime(0.001, now + 0.34);
+  noise.connect(lp); lp.connect(nGain); nGain.connect(ctx.destination);
+  noise.start(now);
+
+  // Rising major arpeggio — warm bells of relief.
+  const notes = [392.0, 493.88, 587.33, 783.99]; // G4 B4 D5 G5
+  notes.forEach((freq, i) => {
+    const t = now + 0.16 + i * 0.1;
+    const osc = ctx.createOscillator();
+    const harm = ctx.createOscillator();
+    const gain = ctx.createGain();
+    osc.type = 'triangle';
+    harm.type = 'sine';
+    osc.frequency.value = freq;
+    harm.frequency.value = freq * 2;
+    const g = 0.14 - i * 0.012;
+    gain.gain.setValueAtTime(0.0001, t);
+    gain.gain.exponentialRampToValueAtTime(g, t + 0.02);
+    gain.gain.exponentialRampToValueAtTime(0.001, t + 0.5);
+    osc.connect(gain); harm.connect(gain); gain.connect(ctx.destination);
+    osc.start(t); harm.start(t);
+    osc.stop(t + 0.55); harm.stop(t + 0.55);
+  });
 }
 
 // Victory fanfare — three ascending chords
@@ -118,21 +146,49 @@ function playWinSound(ctx) {
   );
 }
 
-// Elimination thud — deep descending boom
+// Elimination — a sombre, mournful end: a deep gut-punch boom layered under a
+// hollow funeral-bell toll and a sighing minor-third fall (a "down" two-note
+// motif). Tavern-dark and sad rather than just a thud.
 function playEliminateSound(ctx) {
   resume(ctx);
   const now = ctx.currentTime;
-  const osc = ctx.createOscillator();
-  const gain = ctx.createGain();
-  osc.connect(gain);
-  gain.connect(ctx.destination);
-  osc.type = 'sine';
-  osc.frequency.setValueAtTime(120, now);
-  osc.frequency.exponentialRampToValueAtTime(28, now + 0.5);
-  gain.gain.setValueAtTime(0.3, now);
-  gain.gain.exponentialRampToValueAtTime(0.001, now + 0.55);
-  osc.start(now);
-  osc.stop(now + 0.6);
+
+  // Deep descending boom — the body of the hit.
+  const boom = ctx.createOscillator();
+  const boomGain = ctx.createGain();
+  boom.type = 'sine';
+  boom.frequency.setValueAtTime(120, now);
+  boom.frequency.exponentialRampToValueAtTime(28, now + 0.5);
+  boomGain.gain.setValueAtTime(0.3, now);
+  boomGain.gain.exponentialRampToValueAtTime(0.001, now + 0.6);
+  boom.connect(boomGain); boomGain.connect(ctx.destination);
+  boom.start(now); boom.stop(now + 0.65);
+
+  // Hollow funeral-bell toll — dull, slightly detuned partials.
+  [146.83, 220.0, 311.13].forEach((freq, i) => {
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+    osc.type = 'sine';
+    osc.frequency.value = freq;
+    const g = 0.12 - i * 0.035;
+    gain.gain.setValueAtTime(0.0001, now + 0.04);
+    gain.gain.exponentialRampToValueAtTime(g, now + 0.09);
+    gain.gain.exponentialRampToValueAtTime(0.001, now + 1.4);
+    osc.connect(gain); gain.connect(ctx.destination);
+    osc.start(now + 0.04); osc.stop(now + 1.45);
+  });
+
+  // Sighing minor-third fall (E4 → C4) — the "sad" gesture.
+  const fall = ctx.createOscillator();
+  const fallGain = ctx.createGain();
+  fall.type = 'triangle';
+  fall.frequency.setValueAtTime(329.63, now + 0.5);
+  fall.frequency.exponentialRampToValueAtTime(261.63, now + 1.1);
+  fallGain.gain.setValueAtTime(0.0001, now + 0.5);
+  fallGain.gain.exponentialRampToValueAtTime(0.1, now + 0.56);
+  fallGain.gain.exponentialRampToValueAtTime(0.001, now + 1.5);
+  fall.connect(fallGain); fallGain.connect(ctx.destination);
+  fall.start(now + 0.5); fall.stop(now + 1.55);
 }
 
 const AUDIO_MAP = {
@@ -224,11 +280,185 @@ function playSpinClunk(ctx) {
   osc.stop(now + 0.28);
 }
 
+// ─── Procedural tavern ambience (background music bed) ──────────────────────────
+// A self-contained, infinitely-generative bed — no asset files, matching the
+// all-synth cue design above. Two warm detuned drones (root + fifth + octave)
+// form an open, never-resolving pad that loops forever without an audible seam;
+// a slow LFO makes it "breathe"; and an occasional soft lute pluck from a
+// pentatonic scale gives it a tavern-minstrel feel. Everything routes through a
+// single `musicGain` so cues can sidechain-duck it (LOUD cue → quiet music →
+// restore). The whole graph lives on `window.__bluffMusic` so it is a true
+// singleton across React remounts and there is only ever one bed playing.
+
+const MUSIC_BASE_GAIN = 0.16;   // subtle bed level
+const MUSIC_DUCK_GAIN = 0.045;  // ducked level while a cue plays
+const MUSIC_FADE = 1.2;         // fade-in / fade-out seconds
+// G-pentatonic across two octaves — warm, folk, always-consonant.
+const PENTATONIC = [196.0, 220.0, 246.94, 293.66, 329.63, 392.0, 440.0];
+
+function _musicMutedFromStorage() {
+  try { return window.localStorage.getItem('bluff_music_muted') === '1'; }
+  catch (_) { return false; }
+}
+
+// One soft plucked lute note into `dest` (the breathing pad bus).
+function _pluck(ctx, dest, freq) {
+  const now = ctx.currentTime;
+  const osc = ctx.createOscillator();
+  const harm = ctx.createOscillator();
+  const gain = ctx.createGain();
+  osc.type = 'triangle';
+  harm.type = 'sine';
+  osc.frequency.value = freq;
+  harm.frequency.value = freq * 2.001; // tiny detune = string shimmer
+  gain.gain.setValueAtTime(0.0001, now);
+  gain.gain.exponentialRampToValueAtTime(0.12, now + 0.015);
+  gain.gain.exponentialRampToValueAtTime(0.001, now + 1.1);
+  osc.connect(gain); harm.connect(gain); gain.connect(dest);
+  osc.start(now); harm.start(now);
+  osc.stop(now + 1.2); harm.stop(now + 1.2);
+}
+
+function _scheduleNextPluck(m) {
+  // 4–9s apart; occasionally a quick two-note answer.
+  const delay = 4000 + Math.random() * 5000;
+  m.pluckTimer = setTimeout(() => {
+    if (!m || !m.started) return;
+    const ctx = m.ctx;
+    const root = PENTATONIC[Math.floor(Math.random() * PENTATONIC.length)];
+    try { _pluck(ctx, m.padBus, root); } catch (_) {}
+    if (Math.random() < 0.4) {
+      const second = PENTATONIC[Math.floor(Math.random() * PENTATONIC.length)];
+      setTimeout(() => { try { _pluck(ctx, m.padBus, second); } catch (_) {} }, 240);
+    }
+    _scheduleNextPluck(m);
+  }, delay);
+}
+
+// Build (once) the ambience graph on the window singleton.
+function _ensureMusicEngine() {
+  if (typeof window === 'undefined') return null;
+  if (window.__bluffMusic) return window.__bluffMusic;
+  const ctx = getCtx();
+  if (!ctx) return null;
+
+  const musicGain = ctx.createGain();
+  musicGain.gain.value = 0; // silent until startMusic fades it up
+
+  // Warm master low-pass — keeps the bed mellow, like music heard through a
+  // tavern door rather than a hi-fi.
+  const warmth = ctx.createBiquadFilter();
+  warmth.type = 'lowpass';
+  warmth.frequency.value = 1500;
+  warmth.Q.value = 0.5;
+  warmth.connect(musicGain);
+  musicGain.connect(ctx.destination);
+
+  // Drone bus (steady) + pad bus (breathing) both feed the warmth filter.
+  const droneBus = ctx.createGain();
+  droneBus.gain.value = 0.6;
+  droneBus.connect(warmth);
+
+  const padBus = ctx.createGain();
+  padBus.gain.value = 0.5;
+  padBus.connect(warmth);
+
+  // Breathing LFO on the pad bus only (so it never fights the duck automation
+  // on musicGain). ~0.07 Hz, ±0.18 around the pad base.
+  const breath = ctx.createOscillator();
+  const breathDepth = ctx.createGain();
+  breath.frequency.value = 0.07;
+  breath.type = 'sine';
+  breathDepth.gain.value = 0.18;
+  breath.connect(breathDepth); breathDepth.connect(padBus.gain);
+  breath.start();
+
+  // Three drones: G2, D3, G3 — an open fifth + octave (no third = neutral mood).
+  const droneFreqs = [98.0, 146.83, 196.0];
+  const droneOscs = [];
+  droneFreqs.forEach((freq, i) => {
+    const osc = ctx.createOscillator();
+    const g = ctx.createGain();
+    osc.type = i === 0 ? 'sine' : 'triangle';
+    osc.frequency.value = freq;
+    osc.detune.value = (i - 1) * 4; // gentle chorus spread
+    g.gain.value = i === 0 ? 0.5 : 0.28 - i * 0.04;
+    osc.connect(g); g.connect(droneBus);
+    osc.start();
+    droneOscs.push(osc);
+  });
+
+  const m = {
+    ctx, musicGain, warmth, droneBus, padBus, breath, droneOscs,
+    started: false, muted: _musicMutedFromStorage(), pluckTimer: null,
+  };
+  window.__bluffMusic = m;
+  return m;
+}
+
+function _musicStart() {
+  const m = _ensureMusicEngine();
+  if (!m) return;
+  resume(m.ctx);
+  const now = m.ctx.currentTime;
+  const target = m.muted ? 0 : MUSIC_BASE_GAIN;
+  m.musicGain.gain.cancelScheduledValues(now);
+  m.musicGain.gain.setValueAtTime(m.musicGain.gain.value, now);
+  m.musicGain.gain.linearRampToValueAtTime(target, now + MUSIC_FADE);
+  if (!m.started) {
+    m.started = true;
+    _scheduleNextPluck(m);
+  }
+}
+
+function _musicStop() {
+  const m = typeof window !== 'undefined' ? window.__bluffMusic : null;
+  if (!m) return;
+  const now = m.ctx.currentTime;
+  m.musicGain.gain.cancelScheduledValues(now);
+  m.musicGain.gain.setValueAtTime(m.musicGain.gain.value, now);
+  m.musicGain.gain.linearRampToValueAtTime(0, now + 0.4);
+  clearTimeout(m.pluckTimer);
+  m.pluckTimer = null;
+  m.started = false;
+}
+
+function _musicSetMuted(muted) {
+  const m = _ensureMusicEngine();
+  if (!m) return;
+  m.muted = muted;
+  try { window.localStorage.setItem('bluff_music_muted', muted ? '1' : '0'); } catch (_) {}
+  const now = m.ctx.currentTime;
+  m.musicGain.gain.cancelScheduledValues(now);
+  m.musicGain.gain.setValueAtTime(m.musicGain.gain.value, now);
+  m.musicGain.gain.linearRampToValueAtTime(muted ? 0 : MUSIC_BASE_GAIN, now + 0.35);
+}
+
+// Sidechain duck: pull the bed down while a cue sounds, then ease it back.
+function _duckMusic(holdMs) {
+  const m = typeof window !== 'undefined' ? window.__bluffMusic : null;
+  if (!m || !m.started || m.muted) return;
+  const g = m.musicGain.gain;
+  const now = m.ctx.currentTime;
+  g.cancelScheduledValues(now);
+  g.setValueAtTime(g.value, now);
+  g.linearRampToValueAtTime(MUSIC_DUCK_GAIN, now + 0.08);
+  const release = now + Math.max(0.1, holdMs / 1000);
+  g.setValueAtTime(MUSIC_DUCK_GAIN, release);
+  g.linearRampToValueAtTime(MUSIC_BASE_GAIN, release + 0.5);
+}
+
+// How long to hold the duck per cue kind (ms), matched to each cue's tail.
+const DUCK_MS = { bluff: 700, card: 200, win: 1700, spin: 1600, eliminate: 1500 };
+
 // ─── Hook ─────────────────────────────────────────────────────────────────────
 export function useAtmosphere(wrapperRef) {
   const shakeTimeout = useRef(null);
   // IDs of all pending click/clunk setTimeout calls for the current spin
   const spinClickIdsRef = useRef([]);
+  const [musicEnabled, setMusicEnabled] = useState(
+    () => (typeof window === 'undefined' ? true : !_musicMutedFromStorage()),
+  );
 
   const triggerShake = useCallback(() => {
     const el = wrapperRef?.current;
@@ -249,6 +479,8 @@ export function useAtmosphere(wrapperRef) {
     if (!ctx) return;
     const fn = AUDIO_MAP[kind];
     if (fn) {
+      // Duck the ambience bed under the cue, then let it swell back.
+      try { _duckMusic(DUCK_MS[kind] ?? 400); } catch (_) {}
       try { fn(ctx); } catch (_) {}
     }
   }, []);
@@ -263,6 +495,10 @@ export function useAtmosphere(wrapperRef) {
 
     const ctx = getCtx();
     if (!ctx) return;
+
+    // Duck the ambience for the whole spin (clicks decelerate over durationMs);
+    // the result cue's own duck takes over right after the cylinder locks.
+    try { _duckMusic(durationMs + 300); } catch (_) {}
 
     const DEGREES_PER_CHAMBER = 60;
     const totalClicks = Math.floor(finalAngle / DEGREES_PER_CHAMBER);
@@ -294,10 +530,27 @@ export function useAtmosphere(wrapperRef) {
     spinClickIdsRef.current = [];
   }, []);
 
+  // ── Background tavern music controls ──
+  // startMusic is safe to call repeatedly (idempotent) and only actually makes
+  // sound once the AudioContext is running, so callers wire it to the first
+  // user gesture to satisfy autoplay policies.
+  const startMusic = useCallback(() => { try { _musicStart(); } catch (_) {} }, []);
+  const stopMusic = useCallback(() => { try { _musicStop(); } catch (_) {} }, []);
+  const toggleMusic = useCallback(() => {
+    setMusicEnabled((prev) => {
+      const next = !prev;
+      try { _musicSetMuted(!next); if (next) _musicStart(); } catch (_) {}
+      return next;
+    });
+  }, []);
+
   useEffect(() => () => {
     clearTimeout(shakeTimeout.current);
     spinClickIdsRef.current.forEach(clearTimeout);
   }, []);
 
-  return { triggerShake, triggerAudio, startSpinAudio, stopSpinAudio };
+  return {
+    triggerShake, triggerAudio, startSpinAudio, stopSpinAudio,
+    startMusic, stopMusic, toggleMusic, musicEnabled,
+  };
 }

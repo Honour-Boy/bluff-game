@@ -175,6 +175,20 @@ const PRESETS = {
     bg: "linear-gradient(90deg, rgba(10,10,11,0.96) 0%, rgba(16,16,20,0.96) 50%, rgba(10,10,11,0.96) 100%)",
     glyph: "shield",
   },
+
+  // ─── #6: Highlight callouts (in-play hype moments) ────────────
+  first_blood: {
+    title: "FIRST BLOOD",
+    accent: "#b8143a", // deep crimson
+    bg: "linear-gradient(90deg, rgba(10,4,6,0.97) 0%, rgba(46,4,12,0.96) 50%, rgba(10,4,6,0.97) 100%)",
+    glyph: "skull",
+  },
+  survival_streak: {
+    title: "NERVES OF STEEL",
+    accent: "var(--accent)", // candlelight gold
+    bg: "linear-gradient(90deg, rgba(12,9,4,0.96) 0%, rgba(34,24,6,0.96) 50%, rgba(12,9,4,0.96) 100%)",
+    glyph: "shield",
+  },
 };
 
 // Inline glyph SVGs — same approach as ShapeIcon / PowerCard
