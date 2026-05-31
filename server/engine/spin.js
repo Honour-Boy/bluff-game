@@ -88,9 +88,16 @@ function resetHandOnSurvival(room, playerId, cardsToDeal = null) {
   // Clear to the retained power cards before redealing.
   room.hands.set(playerId, retainedPowerCards.slice());
 
+  // Retain the armed power card across the re-deal as long as the card itself
+  // still lives in the player's slot. Power cards are extracted out of
+  // `room.hands` into `room.powerCardSlot[playerId]` at game start
+  // (`_extractPowerCardsToSlot`), so the slot — not the (shape-only) hand — is
+  // the source of truth, and the armed marker stores the card under `cardId`
+  // (see powerCards.js). #195: the previous guard read `room.hands` + `.id`,
+  // so it always disarmed.
   if (player.armedPowerCard) {
-    const armedId = player.armedPowerCard.id;
-    if (!retainedPowerCards.some(c => c.id === armedId)) {
+    const slot = room.powerCardSlot?.[playerId] || [];
+    if (!slot.some(c => c?.id === player.armedPowerCard.cardId)) {
       player.armedPowerCard = null;
     }
   }
