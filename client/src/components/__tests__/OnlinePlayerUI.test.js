@@ -181,10 +181,11 @@ describe('CardHand — armed power-card visual state (issue #64)', () => {
     );
     const lock = screen.getByLabelText(/Activated — awaiting trigger/i);
     // The lock badge is a sibling of the dimmed inner. The dimmed
-    // inner is its previousElementSibling — assert opacity ~0.5.
+    // inner is its previousElementSibling — assert it's dimmed to the
+    // shipped 0.48 (CardHand.js sets opacity: isArmed ? 0.48 : 1).
     const inner = lock.previousElementSibling;
     expect(inner).not.toBeNull();
-    expect(inner.style.opacity).toBe('0.5');
+    expect(inner.style.opacity).toBe('0.48');
   });
 
   it('disables pointer events on the armed card so it cannot be re-clicked', () => {
