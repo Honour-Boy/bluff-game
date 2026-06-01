@@ -1,46 +1,47 @@
-# Section-based background music
+# Background music — multi-track playlists w/ crossfade
 
-Each part of the app plays its **own** track. Moving to a new section stops the
-old track and starts the new one. The mapping lives in
-`client/src/hooks/useAtmosphere.js` → `MUSIC_SECTIONS`.
+Each view context plays its **own playlist** with its **own mode**. A dual-deck
+crossfade engine swaps tracks smoothly. The mapping + modes live in
+`client/src/hooks/useAtmosphere.js` → `MUSIC_SECTIONS` / `SECTION_MODE`.
 
-## Sections → file (current mapping)
+## Sections → playlist + mode
 
-| Section    | When it plays                                   | File(s)                                  |
-|------------|-------------------------------------------------|------------------------------------------|
-| `lobby`    | Landing, host setup, and the in-room lobby      | `BLUFF Tavern.mp3`                        |
-| `game`     | Active game at the table                        | `Nordic Hums.mp3` → `Call It Bluff.mp3`  |
-| `groups`   | The whole Groups area                           | `Click_Clack_Spin.mp3`                   |
-| `gameover` | After a game ends (results / recap screen)      | `Gutter-Candle Dread.mp3`                |
+| Section    | When it plays                              | Mode          | File(s) |
+|------------|--------------------------------------------|---------------|---------|
+| `lobby`    | Landing, host setup, in-room lobby         | `shuffle`     | `BLUFF Tavern.mp3`, `Click_Clack_Spin.mp3` |
+| `game`     | Active game at the table                   | `progressive` | `Nordic Hums.mp3` → `Bluff Anthem (instrumental).mp3` → `Call It Bluff.mp3` |
+| `groups`   | The whole Groups (Guild Registry) area     | `loop`        | `Bluff Anthem.mp3` |
+| `gameover` | After a game ends (results / recap screen) | `once`        | `Gutter-Candle Dread.mp3` |
 
-The `game` section has **two** tracks: they play in sequence (Nordic Hums →
-Call It Bluff) and the pair loops. Every other section has one track that loops.
-To change a track, drop a file here and update its path in `MUSIC_SECTIONS`.
+### Modes
+- **`shuffle`** (lobby) — starts on a **random** track in the pool and loops; when
+  a track ends it **crossfades** to the alternative.
+- **`progressive`** (game) — starts at **stage 0** (`Nordic Hums`, quiet tension)
+  and **crossfades up** (3 s) to higher-intensity tracks as the stakes rise. The
+  stage is fed from live game state (player attrition) by `page.js` via
+  `setGameStage()` / `gameMusicStage()`: early game = calm, the field thinning =
+  building, the final two players = peak. Stage only escalates within a game.
+- **`loop`** (groups) — a single track on a clean continuous loop.
+- **`once`** (gameover) — a single atmospheric track, gently faded in over 2 s.
 
-## Looping vs. two tracks per section
-- **One track** in a section → it **loops** (replays if it ends while you're
-  still there).
-- **Two (or more) tracks** in a section → they play **in sequence** and the
-  sequence loops (so a single track never just repeats). Example:
-  ```js
-  lobby: ['/audio/BLUFF Tavern.mp3', '/audio/Nordic Hums.mp3'],
-  ```
+## Volume
+Per the design, **songs play at 8%** of max and **instrumentals at 12%** (the
+instrumentals sit a touch louder so the ambience reads under the table cues).
+Classification + per-track levels live in the `TRACKS` map in `useAtmosphere.js`.
 
-## Resume on return
-Leaving a section remembers its spot (which track + how far in) and **resumes
-there** when you come back — you rejoin the music where you left it, not at the
-top. (Single-track sections that have looped simply continue.)
+## Pre-fetching
+All tracks are **pre-fetched on boot** (detached `<audio preload="auto">`
+elements warm the HTTP cache) so crossfades never stream-stall.
 
 ## Group rooms
 A group room's **lobby** stays on the `groups` track — it does **not** switch to
-the normal `lobby` track. It only moves to `game` once the match actually starts,
-then `gameover` at the end.
+the normal `lobby` track. It only moves to `game` once the match starts, then
+`gameover` at the end.
 
 ## Notes
-- Subtle bed: ~24% volume, and the in-game (`game`) section is quieter still
-  (~11%) so it never competes with the table cues. Auto-ducks when a sound cue
-  fires. Tune `MUSIC_BASE_VOL` / `MUSIC_SECTION_VOL` in `useAtmosphere.js`.
-- Muteable from the settings gear (landing) and the in-game menu.
+- Muteable from the settings gear (landing) and the in-game menu; state is shared
+  so they never drift apart.
 - Starts on the first tap/click (browser autoplay rules); on iOS the hardware
   silent switch still mutes it (OS-level).
-- The revolver spin keeps its synthesized clicks (not an MP3).
+- The revolver spin keeps its synthesized Web Audio clicks (not an MP3); all
+  one-shot cues are unaffected by this music layer.

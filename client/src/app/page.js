@@ -5,7 +5,7 @@ import { useSearchParams } from 'next/navigation';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useAuth } from '../hooks/useAuth';
 import { useGame } from '../hooks/useGame';
-import { useMusic } from '../hooks/useAtmosphere';
+import { useMusic, gameMusicStage } from '../hooks/useAtmosphere';
 import { useVoice } from '../hooks/useVoice';
 import { AuthScreen } from '../components/screens/AuthScreen';
 import { LandingScreen } from '../components/screens/LandingScreen';
@@ -129,7 +129,7 @@ function HomeContent() {
   // current screen + room phase and switched as the player moves around.
   // _setSection arms the mobile autoplay unlock, so no explicit gesture
   // listener is needed here. Muteable from the settings gear.
-  const { musicEnabled, toggleMusic, setSection } = useMusic();
+  const { musicEnabled, toggleMusic, setSection, setGameStage } = useMusic();
   // A group room's lobby belongs to the Groups area — keep it on the GROUPS
   // track instead of switching to the normal online-lobby sound. It only moves
   // to 'game' once the match actually starts (phase leaves lobby), and to
@@ -145,6 +145,14 @@ function HomeContent() {
   useEffect(() => {
     setSection(musicSection);
   }, [setSection, musicSection]);
+
+  // Game-state progressive music: feed the in-game intensity stage (player
+  // attrition) so the 'game' section crossfades from quiet tension up to the
+  // anthems as the field thins. No-op outside the 'game' section.
+  const gameStage = gameMusicStage(roomState);
+  useEffect(() => {
+    setGameStage(gameStage);
+  }, [setGameStage, gameStage]);
 
   // (Module 1) Lock page scrolling while inside the online game shell so the
   // pannable table owns the whole viewport with no native page scroll on any
