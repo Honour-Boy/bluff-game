@@ -1,4 +1,5 @@
 import { useEffect } from 'react';
+import { readRoomSession, clearRoomSession } from '../../lib/sessionStore';
 
 export function useGameSocketEvents({
   socket,
@@ -30,31 +31,55 @@ export function useGameSocketEvents({
       const authed = await authenticateSocket();
       if (!authed) return;
 
-      const saved = sessionStorage.getItem('bluff_session');
-      if (!saved) return;
-      const { roomCode: savedCode, isHost: savedHost, playerId: savedPlayerId } = JSON.parse(saved);
+      // Read the rejoin target from the primary store, falling back to the
+      // short-TTL recovery snapshot (transient drop / refresh that lost it).
+      const session = readRoomSession();
+      if (!session?.roomCode) return;
+      const { roomCode: savedCode, isHost: savedHost, playerId: savedPlayerId } = session;
+      const event = savedHost ? 'host_reconnect' : (savedPlayerId ? 'player_reconnect' : null);
+      if (!event) return;
 
-      if (savedHost) {
-        socket.emit('host_reconnect', { roomCode: savedCode }, (res) => {
+      // §M4 — resilient rejoin. A missing ack (transport hiccup as the instance
+      // wakes) is NOT proof the room is gone, so we retry with backoff instead
+      // of tearing the session down. We only clear — and let the UI fall back to
+      // the landing screen — when a HEALTHY connection explicitly answers that
+      // the room no longer exists. On success we re-pull the authoritative frame
+      // in case the deal/hand packet was dropped during the outage.
+      const MAX_ATTEMPTS = 4;
+      const ACK_TIMEOUT_MS = 8000;
+      const attemptRejoin = (attempt) => {
+        if (!socket.connected) return; // dropped again — the next 'connect' retries
+        let answered = false;
+        const timer = setTimeout(() => {
+          if (answered) return;
+          answered = true;
+          // No ack in time → treat as a transient hiccup, never a gone room.
+          if (attempt < MAX_ATTEMPTS && socket.connected) {
+            attemptRejoin(attempt + 1);
+          }
+        }, ACK_TIMEOUT_MS);
+
+        socket.emit(event, { roomCode: savedCode }, (res) => {
+          if (answered) return;
+          answered = true;
+          clearTimeout(timer);
           if (res?.success) {
             setRoomCode(savedCode);
-            setIsHost(true);
-            setPlayerId(savedPlayerId || null);
+            if (savedHost) {
+              setIsHost(true);
+              setPlayerId(savedPlayerId || null);
+            } else {
+              setIsHost(false);
+              setPlayerId(savedPlayerId);
+            }
+            try { socket.emit('request_room_state', { roomCode: savedCode }, () => {}); } catch (_) { /* next push recovers */ }
           } else {
-            sessionStorage.removeItem('bluff_session');
+            clearRoomSession();
+            clearSession();
           }
         });
-      } else if (savedPlayerId) {
-        socket.emit('player_reconnect', { roomCode: savedCode }, (res) => {
-          if (res?.success) {
-            setRoomCode(savedCode);
-            setIsHost(false);
-            setPlayerId(savedPlayerId);
-          } else {
-            sessionStorage.removeItem('bluff_session');
-          }
-        });
-      }
+      };
+      attemptRejoin(1);
     };
 
     const onDisconnect = () => {
@@ -141,14 +166,14 @@ export function useGameSocketEvents({
       notify(`${newHostName} is now the host.`, 'info');
     };
     const onGameEnded = ({ reason } = {}) => {
-      sessionStorage.removeItem('bluff_session');
+      clearRoomSession();
       clearSession();
       notify(reason || 'The game has ended.', 'error');
     };
     // #156 — host removed us from the group; drop out of any live room and
     // return to the landing screen, mirroring how game_ended is handled.
     const onRemovedFromGroup = ({ reason } = {}) => {
-      sessionStorage.removeItem('bluff_session');
+      clearRoomSession();
       clearSession();
       notify(reason || 'You were removed from the group.', 'error');
     };

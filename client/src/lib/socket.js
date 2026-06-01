@@ -14,8 +14,15 @@ export function getSocket() {
     socket = io(SERVER_URL, {
       autoConnect: true,
       reconnection: true,
-      reconnectionAttempts: 10,
+      // §M4 — never give up reconnecting mid-game. A free-tier host can sleep
+      // for tens of seconds; capping attempts at 10 used to strand players. The
+      // delay backs off to a 5s ceiling with jitter so a fleet of reconnecting
+      // clients doesn't thundering-herd the instance as it wakes.
+      reconnectionAttempts: Infinity,
       reconnectionDelay: 1000,
+      reconnectionDelayMax: 5000,
+      randomizationFactor: 0.5,
+      timeout: 20000,
     });
   }
   return socket;

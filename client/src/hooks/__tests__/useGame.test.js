@@ -18,9 +18,11 @@ import { useGame } from '../useGame';
 
 beforeEach(() => {
   socketHolder.socket = makeMockSocket({ connected: false });
-  // Tests run in JSDOM — sessionStorage is real, but we don't want
-  // state leaking between tests.
+  // Tests run in JSDOM — sessionStorage + localStorage are real, but we don't
+  // want state leaking between tests. localStorage holds the §M4 recovery
+  // snapshot, so clear it too.
   if (typeof sessionStorage !== 'undefined') sessionStorage.clear();
+  if (typeof localStorage !== 'undefined') localStorage.clear();
 });
 
 describe('useGame — initial state', () => {
@@ -429,5 +431,68 @@ describe('useGame — authentication', () => {
       ([e]) => e === 'host_reconnect' || e === 'player_reconnect',
     );
     expect(authCalls).toHaveLength(0);
+  });
+});
+
+describe('useGame — reconnection resilience (#M4)', () => {
+  it('rejoins the saved room and re-pulls authoritative state on reconnect', async () => {
+    socketHolder.socket = makeMockSocket({ connected: true });
+    const getAccessToken = vi.fn().mockResolvedValue('jwt');
+    const { result } = renderHook(() => useGame(getAccessToken));
+
+    // Create a room so a session is persisted (host).
+    socketHolder.socket.emit.mockImplementationOnce((event, payload, cb) => {
+      cb({ success: true, roomCode: 'REJN01', playerId: 'p1' });
+    });
+    act(() => result.current.createRoom('online'));
+    await waitFor(() => expect(result.current.roomCode).toBe('REJN01'));
+
+    // Simulate a reconnect: every subsequent ack succeeds.
+    socketHolder.socket.emit.mockImplementation((event, payload, cb) => {
+      if (typeof cb === 'function') cb({ success: true });
+    });
+    act(() => socketHolder.socket.__emit('connect'));
+
+    await waitFor(() => {
+      const events = socketHolder.socket.emit.mock.calls.map(([e]) => e);
+      expect(events).toContain('host_reconnect');
+      expect(events).toContain('request_room_state');
+    });
+    expect(result.current.roomCode).toBe('REJN01');
+  });
+
+  it('does NOT clear the room on "room not found" while the socket is disconnected (transient drop, no bounce)', async () => {
+    const { result } = renderHook(() => useGame(null));
+    socketHolder.socket.emit.mockImplementationOnce((event, payload, cb) => {
+      cb({ success: true, roomCode: 'KEEP01', playerId: 'p1' });
+    });
+    act(() => result.current.createRoom('online'));
+    await waitFor(() => expect(result.current.roomCode).toBe('KEEP01'));
+
+    // Mid-drop: a queued action acks "Room not found" while the transport is down.
+    socketHolder.socket.connected = false;
+    socketHolder.socket.emit.mockImplementationOnce((event, payload, cb) => {
+      cb({ success: false, error: 'Room not found' });
+    });
+    act(() => result.current.startGame());
+
+    // The resilient rejoin should recover us; we must not be bounced to landing.
+    expect(result.current.roomCode).toBe('KEEP01');
+  });
+
+  it('clears the room on "room not found" when the socket is healthy (room genuinely gone)', async () => {
+    socketHolder.socket = makeMockSocket({ connected: true });
+    const { result } = renderHook(() => useGame(null));
+    socketHolder.socket.emit.mockImplementationOnce((event, payload, cb) => {
+      cb({ success: true, roomCode: 'GONE01', playerId: 'p1' });
+    });
+    act(() => result.current.createRoom('online'));
+    await waitFor(() => expect(result.current.roomCode).toBe('GONE01'));
+
+    socketHolder.socket.emit.mockImplementationOnce((event, payload, cb) => {
+      cb({ success: false, error: 'Room not found' });
+    });
+    act(() => result.current.startGame());
+    await waitFor(() => expect(result.current.roomCode).toBeNull());
   });
 });

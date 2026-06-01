@@ -1,4 +1,5 @@
 import { useCallback } from 'react';
+import { clearRoomSession } from '../../lib/sessionStore';
 
 function emitPromiseAction(socket, eventName, payload, failError) {
   return new Promise((resolve) => {
@@ -208,11 +209,9 @@ export function useGameActions({
     } catch (_) {
       // Never let a transport error block the local exit below.
     }
-    try {
-      sessionStorage.removeItem('bluff_session');
-    } catch (_) {
-      // sessionStorage can throw (SSR / privacy mode) — non-fatal.
-    }
+    // Clears the primary session + recovery snapshot together so an explicit
+    // leave can never be "recovered" into the room on the next reconnect.
+    clearRoomSession();
     clearSession();
   }, [clearSession, playerId, roomCode, socket]);
 

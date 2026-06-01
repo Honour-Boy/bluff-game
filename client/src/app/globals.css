@@ -354,6 +354,13 @@ input::placeholder {
 }
 .fade-in { animation: fadeIn 0.35s ease forwards; }
 
+/* Soft opacity pulse — reusable globally (e.g. the reconnecting indicator).
+   The in-game table redefines an identical `pulse` inside GAME_UI_STYLE. */
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50%      { opacity: 0.4; }
+}
+
 /* Slide in from right (notifications) */
 @keyframes slideIn {
   from { transform: translateX(120%); opacity: 0; }
