@@ -28,6 +28,48 @@ function GearIcon() {
   );
 }
 
+// Prev / next track skip button — sits under the volume slider for the
+// continuous playlist. Icon-only (matches the rest of the gear's SVG controls).
+function TrackSkipButton({ dir, onClick }) {
+  const isPrev = dir === 'prev';
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      aria-label={isPrev ? 'Previous track' : 'Next track'}
+      title={isPrev ? 'Previous track' : 'Next track'}
+      disabled={!onClick}
+      style={{
+        width: 40, height: 30,
+        display: 'flex', alignItems: 'center', justifyContent: 'center',
+        background: 'var(--surface2)',
+        border: '1px solid var(--border-lit)',
+        borderRadius: 'var(--radius)',
+        color: 'var(--text)',
+        cursor: onClick ? 'pointer' : 'not-allowed',
+        opacity: onClick ? 1 : 0.45,
+        WebkitTapHighlightColor: 'transparent',
+      }}
+      onMouseEnter={(e) => { if (onClick) { e.currentTarget.style.borderColor = 'var(--accent)'; e.currentTarget.style.color = 'var(--accent)'; } }}
+      onMouseLeave={(e) => { e.currentTarget.style.borderColor = 'var(--border-lit)'; e.currentTarget.style.color = 'var(--text)'; }}
+    >
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" style={{ width: 16, height: 16, flexShrink: 0 }}>
+        {isPrev ? (
+          <>
+            <path d="M18 7v10l-7-5z" />
+            <path d="M11 7v10l-7-5z" />
+          </>
+        ) : (
+          <>
+            <path d="M6 7v10l7-5z" />
+            <path d="M13 7v10l7-5z" />
+          </>
+        )}
+      </svg>
+    </button>
+  );
+}
+
 function SettingItem({ icon, label, onClick, accent = false, badge = null, disabled = false }) {
   return (
     <button
@@ -74,6 +116,9 @@ export function SettingsGear({
   // (Module 5.3) master music volume (0..1) + setter for the in-menu slider.
   musicVolume = 1,
   onSetMusicVolume,
+  // Continuous-playlist track skip controls (rendered beside the volume slider).
+  onPrevTrack,
+  onNextTrack,
   onSignOut,
   onSignOutGuest,
   onUpdateUsername,
@@ -271,6 +316,16 @@ export function SettingsGear({
                     aria-label="Music volume"
                     style={{ width: '100%', accentColor: 'var(--accent)', cursor: 'pointer' }}
                   />
+                  {(onPrevTrack || onNextTrack) && (
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 10, marginTop: 9 }}>
+                      <TrackSkipButton dir="prev" onClick={onPrevTrack} />
+                      <span style={{
+                        fontFamily: "'Space Mono', monospace", fontSize: 8,
+                        color: 'var(--text-dim)', letterSpacing: '0.16em', textTransform: 'uppercase',
+                      }}>Track</span>
+                      <TrackSkipButton dir="next" onClick={onNextTrack} />
+                    </div>
+                  )}
                 </div>
               )}
 

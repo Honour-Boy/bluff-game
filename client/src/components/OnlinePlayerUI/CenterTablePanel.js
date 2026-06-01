@@ -193,7 +193,13 @@ export function CenterTablePanel({
                 className="primary"
                 onClick={startGame}
                 disabled={alivePlayers.length < 2}
-                style={{ width: '100%', padding: '14px', fontSize: 13 }}
+                style={{
+                  alignSelf: 'center',
+                  width: 'auto',
+                  maxWidth: '100%',
+                  padding: '9px 20px',
+                  fontSize: 12,
+                }}
               >
                 Open the Game ({alivePlayers.length} players)
               </button>
@@ -287,12 +293,14 @@ export function CenterTablePanel({
           {lastAction?.accusedName && !(isMobile && isMySpinTurn) && (
             <div style={{
               fontFamily: "'Cinzel', serif",
-              fontSize: isMobile ? 11 : 19,
-              fontWeight: isMobile ? 600 : 800,
+              fontSize: isMobile ? 13 : 23,
+              fontWeight: isMobile ? 700 : 800,
               letterSpacing: '0.06em',
               color: outcomeColor,
               textTransform: 'uppercase',
-              textShadow: isMobile ? 'none' : '0 2px 10px rgba(0,0,0,0.6)',
+              textAlign: 'center',
+              marginTop: isMobile ? 2 : 6,
+              textShadow: isMobile ? 'none' : '0 2px 12px rgba(0,0,0,0.7)',
             }}>
               {lastAction.bluffCorrect
                 ? `${lastAction.accusedName} bluffed`
