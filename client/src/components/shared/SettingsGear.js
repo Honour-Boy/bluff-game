@@ -2,6 +2,14 @@
 
 import { useState } from 'react';
 import { UserProfile } from '../screens/UserProfile';
+import { VoicePanel } from '../VoicePanel';
+
+// ─── Inline control icons (no emoji / font glyphs) ────────────────────────────
+const _ic = { width: 13, height: 13, viewBox: '0 0 24 24', fill: 'none', 'aria-hidden': true };
+const IconChat = () => (<svg {..._ic}><path d="M4 5h16v11H8l-4 4z" stroke="currentColor" strokeWidth="1.8" strokeLinejoin="round" /></svg>);
+const IconRules = () => (<svg {..._ic}><path d="M5 7h14M5 12h14M5 17h14" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" /></svg>);
+const IconBoard = () => (<svg {..._ic}><path d="M5 20V11M12 20V5M19 20v-6M3 20h18" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" /></svg>);
+const IconLeaveTable = () => (<svg {..._ic}><path d="M14 8V6a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h6a2 2 0 0 0 2-2v-2" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" /><path d="M10 12h10m0 0-3-3m3 3-3 3" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" /></svg>);
 
 // ─── SettingsGear — the global identity / settings menu ───────────────────────
 // A small fixed gear button (top-right) available on EVERY screen once signed
@@ -20,12 +28,13 @@ function GearIcon() {
   );
 }
 
-function SettingItem({ icon, label, onClick, accent = false }) {
+function SettingItem({ icon, label, onClick, accent = false, badge = null, disabled = false }) {
   return (
     <button
       type="button"
       role="menuitem"
       onClick={onClick}
+      disabled={disabled}
       style={{
         display: 'flex', alignItems: 'center', gap: 9, width: '100%',
         padding: '9px 10px',
@@ -36,14 +45,23 @@ function SettingItem({ icon, label, onClick, accent = false }) {
         fontFamily: "'Cinzel', serif",
         fontSize: 11,
         letterSpacing: '0.06em',
-        cursor: 'pointer',
+        cursor: disabled ? 'not-allowed' : 'pointer',
+        opacity: disabled ? 0.45 : 1,
         textAlign: 'left',
       }}
-      onMouseEnter={(e) => { e.currentTarget.style.background = 'var(--surface2)'; }}
+      onMouseEnter={(e) => { if (!disabled) e.currentTarget.style.background = 'var(--surface2)'; }}
       onMouseLeave={(e) => { e.currentTarget.style.background = 'none'; }}
     >
       {icon && <span aria-hidden="true" style={{ width: 16, display: 'flex', justifyContent: 'center', flexShrink: 0 }}>{icon}</span>}
       <span style={{ flex: 1 }}>{label}</span>
+      {badge != null && (
+        <span style={{
+          minWidth: 18, height: 18, padding: '0 5px',
+          borderRadius: 9, background: 'var(--accent2)', color: '#0a0a0b',
+          fontSize: 10, fontWeight: 700, lineHeight: '18px', textAlign: 'center',
+          flexShrink: 0,
+        }}>{badge}</span>
+      )}
     </button>
   );
 }
@@ -56,6 +74,18 @@ export function SettingsGear({
   onSignOut,
   onSignOutGuest,
   onUpdateUsername,
+  // ── In-room game controls (Module 2) ──────────────────────────────────────
+  // Ported here from the old bottom-right FAB. Rendered ONLY when `inRoom` is
+  // true (i.e. the client is in a lobby OR an active game). Outside a room every
+  // one of these is omitted, so the landing / groups gear is unchanged.
+  inRoom = false,
+  chatUnread = 0,
+  onOpenChat,
+  onOpenGameSettings,
+  onOpenLeaderboard,
+  onLeaveTable,
+  leaveDisabled = false,
+  voice,
 }) {
   const [open, setOpen] = useState(false);
   const [showProfile, setShowProfile] = useState(false);
@@ -132,7 +162,8 @@ export function SettingsGear({
               role="menu"
               style={{
                 position: 'absolute', top: 'calc(100% + 8px)', right: 0,
-                minWidth: 214,
+                minWidth: inRoom && voice ? 252 : 214,
+                maxHeight: '78dvh', overflowY: 'auto',
                 background: 'var(--surface)',
                 border: '1px solid var(--border-lit)',
                 borderRadius: 'var(--radius)',
@@ -147,6 +178,62 @@ export function SettingsGear({
                   {isGuest ? 'Guest player' : 'Signed in'}
                 </div>
               </div>
+
+              {/* ── In-room game controls (Module 2) — only inside a room ── */}
+              {inRoom && (
+                <>
+                  <div style={{
+                    padding: '4px 10px 5px', fontFamily: "'Space Mono', monospace",
+                    fontSize: 8, color: 'var(--text-dim)', letterSpacing: '0.18em',
+                    textTransform: 'uppercase',
+                  }}>
+                    Table
+                  </div>
+                  {onOpenChat && (
+                    <SettingItem
+                      icon={<IconChat />}
+                      label="Chat"
+                      badge={chatUnread > 99 ? '99+' : chatUnread > 0 ? String(chatUnread) : null}
+                      onClick={() => { setOpen(false); onOpenChat(); }}
+                    />
+                  )}
+                  {onOpenGameSettings && (
+                    <SettingItem
+                      icon={<IconRules />}
+                      label="Game settings"
+                      onClick={() => { setOpen(false); onOpenGameSettings(); }}
+                    />
+                  )}
+                  {onOpenLeaderboard && (
+                    <SettingItem
+                      icon={<IconBoard />}
+                      label="Leaderboard"
+                      onClick={() => { setOpen(false); onOpenLeaderboard(); }}
+                    />
+                  )}
+                  {onLeaveTable && (
+                    <SettingItem
+                      icon={<IconLeaveTable />}
+                      label={leaveDisabled ? 'Leave (finish turn)' : 'Leave table'}
+                      disabled={leaveDisabled}
+                      onClick={() => { if (leaveDisabled) return; setOpen(false); onLeaveTable(); }}
+                    />
+                  )}
+                  {voice && (
+                    <div style={{ padding: '6px 8px 8px' }}>
+                      <div style={{
+                        fontFamily: "'Space Mono', monospace", fontSize: 8,
+                        color: 'var(--text-dim)', letterSpacing: '0.18em',
+                        textTransform: 'uppercase', marginBottom: 6, paddingLeft: 2,
+                      }}>
+                        Voice
+                      </div>
+                      <VoicePanel {...voice} />
+                    </div>
+                  )}
+                  <div style={{ height: 1, background: 'var(--border)', margin: '3px 4px' }} />
+                </>
+              )}
 
               {!isGuest && onUpdateUsername && (
                 <SettingItem

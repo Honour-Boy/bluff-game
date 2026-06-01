@@ -22,6 +22,11 @@ export function BottomSeat({
   cardPlayedThisTurn,
   bluffBlockedThisTurn,
   actionHint,
+  // (Module 5) unified status ticker text (active → instructions; otherwise →
+  // what the active player is doing). (Module 3) spin-turn morph.
+  tickerText = '',
+  isMySpinTurn = false,
+  playerSpin,
   showSpectatorView,
   alivePlayers,
   spectatingId,
@@ -197,85 +202,53 @@ export function BottomSeat({
         )}
       </div>
 
-      {/* ── Action buttons: Bluff + End Turn ── */}
-      {isMyTurn && isPlaying && !isEliminated && (
-        <div style={{ padding: '0 12px 10px' }}>
-          <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
-            {!isFirstTurn && (
-              <button
-                className="danger"
-                onClick={callBluff}
-                disabled={bluffUsedThisTurn || bluffBlockedThisTurn}
-                title={bluffBlockedThisTurn ? 'No card to challenge — last turn was frozen' : undefined}
-                style={{
-                  flex: 1,
-                  opacity: bluffUsedThisTurn || bluffBlockedThisTurn ? 0.35 : 1,
-                  cursor: bluffUsedThisTurn || bluffBlockedThisTurn ? 'not-allowed' : 'pointer',
-                  padding: '14px',
-                  letterSpacing: '0.16em',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  gap: 8,
-                }}
-              >
-                {/* Bell icon — "ring to challenge" */}
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-                  <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
-                  <path d="M13.73 21a2 2 0 0 1-3.46 0" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
-                </svg>
-                Call Bluff
-              </button>
-            )}
-            {cardPlayedThisTurn && (
-              <button
-                className="primary"
-                onClick={endTurn}
-                style={{
-                  flex: 1,
-                  padding: '14px',
-                  letterSpacing: '0.16em',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  gap: 8,
-                }}
-              >
-                {/* Checkmark stamp */}
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-                  <path d="M20 6L9 17l-5-5" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"/>
-                </svg>
-                End Turn
-              </button>
-            )}
+      {/* ── Status ticker (Module 5) ──
+           One line directly under the nameplate and above the dock. For the
+           active player it carries the explicit instruction; for everyone else
+           it reports what the active player is doing. The End Turn action lives
+           here (right-aligned) so the dock below is purely cards. */}
+      {!isLobby && !isGameOver && !showSpectatorView && (tickerText || (isMyTurn && isPlaying && cardPlayedThisTurn)) && (
+        <div style={{
+          display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+          gap: 10, padding: '0 12px 8px',
+        }}>
+          <div style={{
+            fontFamily: "'Crimson Text', serif",
+            fontSize: 13,
+            color: isMyTurn && isPlaying ? 'var(--text-mid)' : 'var(--text-dim)',
+            fontStyle: 'italic',
+            minWidth: 0, flex: 1,
+          }}>
+            {tickerText}
           </div>
-          {actionHint && (
-            <div style={{
-              fontFamily: "'Crimson Text', serif",
-              fontSize: 13,
-              color: 'var(--text-dim)',
-              marginTop: 8,
-              fontStyle: 'italic',
-              paddingLeft: 2,
-            }}>
-              {actionHint}
-            </div>
+          {isMyTurn && isPlaying && !isEliminated && cardPlayedThisTurn && (
+            <button
+              className="primary"
+              onClick={endTurn}
+              style={{
+                flexShrink: 0, padding: '10px 16px', letterSpacing: '0.14em',
+                display: 'flex', alignItems: 'center', gap: 8,
+              }}
+            >
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                <path d="M20 6L9 17l-5-5" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"/>
+              </svg>
+              End Turn
+            </button>
           )}
         </div>
       )}
 
-      {/* ── Spectator view ── */}
+      {/* ── Card area: spectator notice · pull-trigger morph · the dock ── */}
       {showSpectatorView ? (
         <div
           style={{
-            ...{
-              background: 'linear-gradient(160deg, rgba(22,17,11,0.95) 0%, rgba(13,10,7,0.97) 100%)',
-              border: '1px solid var(--border-lit)',
-              borderRadius: 5,
-              padding: '14px 16px',
-              margin: '0 12px 10px',
-              boxShadow: '0 6px 18px rgba(0,0,0,0.4)',
-            },
+            background: 'linear-gradient(160deg, rgba(22,17,11,0.95) 0%, rgba(13,10,7,0.97) 100%)',
+            border: '1px solid var(--border-lit)',
+            borderRadius: 5,
+            padding: '14px 16px',
+            margin: '0 12px 10px',
+            boxShadow: '0 6px 18px rgba(0,0,0,0.4)',
           }}
         >
           <div style={{
@@ -298,11 +271,44 @@ export function BottomSeat({
             You&apos;ve been eliminated. You may follow the game, but opponents&apos; hands are hidden.
           </div>
         </div>
+      ) : isMySpinTurn && !isEliminated ? (
+        // (Module 3) Pull-trigger morph. When this client is the one who must
+        // spin, the entire card hand is REPLACED by a single high-contrast
+        // action panel — the cards are obscured so a stray tap can't misfire.
+        // The instant the spin resolves server-side, isMySpinTurn flips false
+        // and the dock below restores to its exact prior layout.
+        <div style={{ padding: '4px 12px 12px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8 }}>
+          <div style={{
+            fontFamily: "'Cinzel', serif", fontSize: 9, color: 'var(--accent2)',
+            letterSpacing: '0.22em', textTransform: 'uppercase', opacity: 0.9,
+          }}>
+            Your Fate Awaits
+          </div>
+          <button
+            className="danger"
+            onClick={playerSpin}
+            style={{
+              width: 'min(420px, 100%)', fontSize: 16, padding: '18px',
+              letterSpacing: '0.18em',
+              display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 10,
+            }}
+          >
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+              <circle cx="12" cy="12" r="9" stroke="currentColor" strokeWidth="1.8" />
+              <circle cx="12" cy="12" r="3" fill="currentColor" />
+              <circle cx="12" cy="5" r="1.5" fill="currentColor" />
+              <circle cx="12" cy="19" r="1.5" fill="currentColor" />
+              <circle cx="5" cy="12" r="1.5" fill="currentColor" />
+              <circle cx="19" cy="12" r="1.5" fill="currentColor" />
+            </svg>
+            Pull the Trigger
+          </button>
+        </div>
       ) : (
         !isLobby && !isGameOver && (
-          // Extra right padding keeps the fan + power cards clear of the
-          // bottom-right controls FAB (which floats over this corner).
-          <div style={{ padding: '0 76px 8px 12px' }}>
+          // (Module 2.2) The bottom-right FAB is gone, so the dock spans the full
+          // width. (Module 4) Three columns: BLUFF | played cards | power cards.
+          <div style={{ padding: '0 12px 8px' }}>
             {/* Hand label */}
             <div style={{
               display: 'flex',
@@ -322,16 +328,59 @@ export function BottomSeat({
                 )}
               </span>
             </div>
-            <CardHand
-              hand={myHand}
-              powerCardSlot={myPowerCardSlot}
-              selectedCardId={isMyTurn && isPlaying && !cardPlayedThisTurn ? selectedCardId : null}
-              onCardClick={handleCardClick}
-              onPowerCardClick={handlePowerCardClick}
-              interactive={isMyTurn && isPlaying && !cardPlayedThisTurn}
-              powerInteractive={isMyTurn && isPlaying}
-              justPlayedCardId={justPlayedCardId}
-            />
+
+            <div style={{ display: 'flex', alignItems: 'flex-end', gap: 10 }}>
+              {/* LEFT column — the unified Call Bluff target (Module 4). Same
+                  card-style control on desktop and mobile; no floating overhead
+                  button above the rail. */}
+              {!isFirstTurn && (() => {
+                const bluffDisabled = !isMyTurn || !isPlaying || isEliminated
+                  || bluffUsedThisTurn || bluffBlockedThisTurn;
+                return (
+                  <button
+                    className="danger"
+                    onClick={callBluff}
+                    disabled={bluffDisabled}
+                    title={bluffBlockedThisTurn
+                      ? 'No card to challenge — last turn was frozen'
+                      : 'Call bluff on the previous player'}
+                    style={{
+                      flexShrink: 0,
+                      width: 64, height: 96, padding: 6,
+                      display: 'flex', flexDirection: 'column',
+                      alignItems: 'center', justifyContent: 'center', gap: 6,
+                      borderRadius: 8,
+                      letterSpacing: '0.12em',
+                      opacity: bluffDisabled ? 0.4 : 1,
+                      cursor: bluffDisabled ? 'not-allowed' : 'pointer',
+                    }}
+                  >
+                    {/* Crosshair / target — "take aim and call it" */}
+                    <svg width="26" height="26" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                      <circle cx="12" cy="12" r="7" stroke="currentColor" strokeWidth="1.8" />
+                      <path d="M12 2v4M12 18v4M2 12h4M18 12h4" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
+                      <circle cx="12" cy="12" r="1.6" fill="currentColor" />
+                    </svg>
+                    <span style={{ fontFamily: "'Cinzel', serif", fontSize: 10 }}>BLUFF</span>
+                  </button>
+                );
+              })()}
+
+              {/* CENTER (played cards) + RIGHT (power cards) — CardHand lays out
+                  the shape fan and the power-card bracket side by side. */}
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <CardHand
+                  hand={myHand}
+                  powerCardSlot={myPowerCardSlot}
+                  selectedCardId={isMyTurn && isPlaying && !cardPlayedThisTurn ? selectedCardId : null}
+                  onCardClick={handleCardClick}
+                  onPowerCardClick={handlePowerCardClick}
+                  interactive={isMyTurn && isPlaying && !cardPlayedThisTurn}
+                  powerInteractive={isMyTurn && isPlaying}
+                  justPlayedCardId={justPlayedCardId}
+                />
+              </div>
+            </div>
           </div>
         )
       )}

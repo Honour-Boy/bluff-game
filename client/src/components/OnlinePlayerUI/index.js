@@ -6,7 +6,6 @@ import { ChipPopup } from './ChipPopup';
 import { RoomHeader } from './RoomHeader';
 import { TableScene } from './TableScene';
 import { BottomSeat } from './BottomSeat';
-import { FloatingControls } from './FloatingControls';
 import { CoreGameOverlays } from './CoreGameOverlays';
 import { FlyingCardLayer, useCardFlight } from './FlyingCardLayer';
 import { PowerFlowOverlays } from './PowerFlowOverlays';
@@ -17,10 +16,6 @@ import RedemptionOverlay from './RedemptionOverlay';
 import SpeedModeTimer from './SpeedModeTimer';
 import { PreGameSelectionModal } from '../PreGameSelectionModal';
 import { SmokeLayer } from '../shared/SmokeLayer';
-import { ControlsModal } from '../shared/ControlsModal';
-import { PreGameSettingsPanel } from '../screens/PreGameSettingsPanel';
-import { LobbyConfigSummary } from '../LobbyConfigSummary';
-import { LeaderboardPanel } from '../LeaderboardPanel';
 import {
   arcPlayers,
   distributePlayers,
@@ -79,9 +74,9 @@ export function OnlinePlayerUI({
   // Card-fly: fixed-layer clones that arc from the hand to the discard pile.
   const { flights, launch: launchCardFlight } = useCardFlight();
 
-  // Game settings / leaderboard now open from the Controls menu as modals.
-  const [settingsOpen, setSettingsOpen] = useState(false);
-  const [leaderboardOpen, setLeaderboardOpen] = useState(false);
+  // (Module 2) Game settings + leaderboard dialogs and all in-room controls now
+  // live in the global top-right SettingsGear (rendered at the app root); the
+  // old bottom-right FAB is gone. Nothing for them to track here anymore.
 
   // (Module 1) Pannable canvas. We measure the board against the viewport and
   // derive symmetric drag constraints centred on the middle: when the board
@@ -95,10 +90,6 @@ export function OnlinePlayerUI({
   const [panConstraints, setPanConstraints] = useState({ left: 0, right: 0, top: 0, bottom: 0 });
   const [pannable, setPannable] = useState(false);
   const ready = !!(roomState && myPlayer);
-
-  const recenter = useCallback(() => {
-    panControls.start({ x: 0, y: 0, transition: { type: 'spring', stiffness: 260, damping: 30 } });
-  }, [panControls]);
 
   useEffect(() => {
     const viewport = viewportRef.current;
@@ -323,6 +314,20 @@ export function OnlinePlayerUI({
     }
   }
 
+  // (Module 5) Unified status ticker. The active player gets the explicit
+  // instruction; everyone else gets a subtle line describing what the active
+  // player (or the spin target) is doing.
+  let tickerText = '';
+  if (isMyTurn && isPlaying) {
+    tickerText = actionHint;
+  } else if (isPlaying && currentPlayer) {
+    tickerText = cardPlayedThisTurn
+      ? `${currentPlayer.username} has played a card face-down`
+      : `${currentPlayer.username} is deciding…`;
+  } else if (isSpinPending && spinTargetPlayer && !isMySpinTurn) {
+    tickerText = `${spinTargetPlayer.username} is on the spot…`;
+  }
+
   // #139 — eligibility to show the activation modal at all (turn/state gating).
   // The three turn actions are order-independent: neither `cardPlayedThisTurn`
   // nor `bluffUsedThisTurn` gates power activation — it's allowed before or
@@ -514,48 +519,10 @@ export function OnlinePlayerUI({
       />
 
       <div style={{ flex: '0 0 auto', paddingBottom: 'env(safe-area-inset-bottom, 0px)' }}>
-      {/* (Module 3) The Pull Trigger is pinned above the liable player's profile.
-          On their own screen that profile is the bottom seat, so the standalone
-          high-contrast trigger sits directly above it. Remote viewers instead
-          see the spin-target's avatar popup ("On the spot"). */}
-      {isMySpinTurn && !isEliminated && (
-        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6, padding: '8px 12px 2px' }}>
-          <div style={{
-            fontFamily: "'Cinzel', serif",
-            fontSize: 9,
-            color: 'var(--accent2)',
-            letterSpacing: '0.22em',
-            textTransform: 'uppercase',
-            opacity: 0.9,
-          }}>
-            Your Fate Awaits
-          </div>
-          <button
-            className="danger"
-            onClick={playerSpin}
-            style={{
-              width: 'min(360px, 90%)',
-              fontSize: 15,
-              padding: '15px',
-              letterSpacing: '0.16em',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              gap: 8,
-            }}
-          >
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-              <circle cx="12" cy="12" r="9" stroke="currentColor" strokeWidth="1.8" />
-              <circle cx="12" cy="12" r="3" fill="currentColor" />
-              <circle cx="12" cy="5" r="1.5" fill="currentColor" />
-              <circle cx="12" cy="19" r="1.5" fill="currentColor" />
-              <circle cx="5" cy="12" r="1.5" fill="currentColor" />
-              <circle cx="19" cy="12" r="1.5" fill="currentColor" />
-            </svg>
-            Pull the Trigger
-          </button>
-        </div>
-      )}
+      {/* (Module 3) The Pull-Trigger morph now lives INSIDE BottomSeat: when it's
+          this client's spin, the dock's card hand is replaced by the high-contrast
+          trigger panel (obscuring the cards so they can't be misclicked), and it
+          tears back down to the exact hand layout once the spin resolves. */}
       <BottomSeat
         voice={voice}
         myPlayer={myPlayer}
@@ -572,6 +539,9 @@ export function OnlinePlayerUI({
         cardPlayedThisTurn={cardPlayedThisTurn}
         bluffBlockedThisTurn={bluffBlockedThisTurn}
         actionHint={actionHint}
+        tickerText={tickerText}
+        isMySpinTurn={isMySpinTurn}
+        playerSpin={playerSpin}
         showSpectatorView={showSpectatorView}
         alivePlayers={alivePlayers}
         spectatingId={ui.spectatingId}
@@ -602,59 +572,6 @@ export function OnlinePlayerUI({
         }}>
           View standings from the Controls menu
         </div>
-      )}
-
-      <FloatingControls
-        voice={voice}
-        onCentralize={recenter}
-        onOpenChat={openChat}
-        chatUnread={chatUnread}
-        onOpenSettings={() => setSettingsOpen(true)}
-        onOpenLeaderboard={roomState?.groupId ? () => setLeaderboardOpen(true) : undefined}
-        scrollable={pannable}
-        leaveDisabled={isMyTurn && isPlaying && !isEliminated}
-        onLeaveTable={() => {
-          if (isMyTurn && isPlaying && !isEliminated) return;
-          const isMidGame = !!phase && !['lobby', 'game_over'].includes(phase);
-          if (isMidGame && !window.confirm(
-            'Leave the table? You will forfeit and cannot rejoin this round.',
-          )) return;
-          leaveGame();
-        }}
-      />
-
-      {/* Game settings — host edits in the lobby, everyone else sees a summary */}
-      {settingsOpen && (
-        <ControlsModal title="Game Settings" onClose={() => setSettingsOpen(false)}>
-          {isHost && isLobby && roomState?.config ? (
-            <PreGameSettingsPanel
-              config={roomState.config}
-              onChange={updateRoomConfig}
-              isGroupRoom={!!roomState?.groupId}
-              savedMeta={roomState?.groupSettingsMeta}
-              playerCount={alivePlayers.length}
-            />
-          ) : roomState?.config ? (
-            <LobbyConfigSummary config={roomState.config} />
-          ) : (
-            <div style={{ color: 'var(--text-dim)', fontFamily: "'Crimson Text', serif", fontStyle: 'italic' }}>
-              No house rules configured yet.
-            </div>
-          )}
-        </ControlsModal>
-      )}
-
-      {/* Group leaderboard */}
-      {leaderboardOpen && roomState?.groupId && (
-        <ControlsModal title="Leaderboard" onClose={() => setLeaderboardOpen(false)}>
-          <LeaderboardPanel
-            groupId={roomState.groupId}
-            currentUserId={myPlayer?.id || null}
-            highlightUserId={isGameOver ? (lastAction?.winnerId || null) : null}
-            getGroupLeaderboard={getGroupLeaderboard}
-            leaderboardUpdateNonce={leaderboardUpdateNonce}
-          />
-        </ControlsModal>
       )}
 
       <CoreGameOverlays
