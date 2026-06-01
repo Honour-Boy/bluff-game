@@ -482,10 +482,15 @@ export function OnlinePlayerUI({
         <div style={{ flex: '0 0 auto', textAlign: 'center', padding: '4px 12px 2px' }}>
           <div style={{
             fontFamily: "'Cinzel Decorative', 'Cinzel', serif",
-            fontSize: 26,
+            // Smaller + tighter on mobile so "<Name> Prevails" stays on one line.
+            fontSize: ui.isMobile ? 18 : 26,
+            lineHeight: 1.1,
             color: 'var(--accent)',
             textShadow: '0 0 24px rgba(200,146,46,0.4)',
-            letterSpacing: '0.08em',
+            letterSpacing: ui.isMobile ? '0.03em' : '0.08em',
+            whiteSpace: 'nowrap',
+            overflow: 'hidden',
+            textOverflow: 'ellipsis',
           }}>
             {lastAction?.winnerId === myPlayer.id ? 'Victory' : `${lastAction?.winnerName ?? '?'} Prevails`}
           </div>

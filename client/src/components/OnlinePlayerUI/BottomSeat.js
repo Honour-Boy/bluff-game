@@ -85,9 +85,6 @@ export function BottomSeat({
         `,
         paddingBottom: 'calc(env(safe-area-inset-bottom, 0px) + 8px)',
         boxShadow: '0 -4px 24px rgba(0,0,0,0.5)',
-        // (Module 2.2) On phones the dock is capped to ~30% of the viewport so
-        // the pannable canvas above gets the lion's share of the screen.
-        maxHeight: isMobile ? '32dvh' : undefined,
       }}
     >
       {/* ── Nameplate + chamber indicator (Module 2.3) ──

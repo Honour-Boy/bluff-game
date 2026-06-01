@@ -413,6 +413,10 @@ const TRACKS = {
   '/audio/Gutter-Candle Dread.mp3':         { vol: INSTRUMENTAL_VOL },
   '/audio/Call It Bluff.mp3':               { vol: SONG_VOL },
   '/audio/Bluff Anthem.mp3':                { vol: SONG_VOL },
+  '/audio/In-game(song).mp3':                  { vol: SONG_VOL },
+  '/audio/Gutter-Candle Dread 2.mp3':          { vol: SONG_VOL },
+  '/audio/shoegaze style.mp3':                 { vol: INSTRUMENTAL_VOL },
+  '/audio/Bluff Anthem (instrumental)-v2.mp3': { vol: INSTRUMENTAL_VOL },
 };
 // (Module 5.3) Player-controlled master music volume (0..1) scales every track's
 // base level. Persisted; a shared store keeps the settings slider in sync.
@@ -428,8 +432,11 @@ function _subscribeVol(cb) { _volListeners.add(cb); return () => _volListeners.d
 function _getVolSnapshot() { return _musicVolume; }
 
 function _trackVol(src) {
-  const base = (TRACKS[src] && typeof TRACKS[src].vol === 'number') ? TRACKS[src].vol : SONG_VOL;
-  return base * _musicVolume;
+  // The volume slider maps DIRECTLY to the track's own playback volume, so 100%
+  // means full song volume (1.0) — not 100% of the old ~8% ambient cap. `src` is
+  // kept for call-site compatibility.
+  void src;
+  return Math.max(0, Math.min(1, _musicVolume));
 }
 
 function _setMusicVolume(v) {
@@ -445,8 +452,25 @@ function _setMusicVolume(v) {
 }
 
 const MUSIC_SECTIONS = {
-  lobby:    ['/audio/BLUFF Tavern.mp3', '/audio/Click_Clack_Spin.mp3'],
-  game:     ['/audio/Nordic Hums.mp3', '/audio/Bluff Anthem (instrumental).mp3', '/audio/Call It Bluff.mp3'],
+  // Lobby shuffles all three (the new instrumental v2 included).
+  lobby:    ['/audio/BLUFF Tavern.mp3', '/audio/Click_Clack_Spin.mp3', '/audio/Bluff Anthem (instrumental)-v2.mp3'],
+  // ACTIVE GAME holds the largest pool — every track that isn't a lobby / groups
+  // / gameover cue lives here, so nothing is left unassigned. The progression now
+  // SCALES to this list's length (gameMusicStage), stepping up one track per
+  // elimination so each is reached as the field thins: stage 0 at the full table
+  // → the peak (last) track for the final two. Ordered so the new in-game song
+  // leads (stage 0, the longest phase) and the new dread variant closes the
+  // deadly finale (peak, always reached):
+  //   0 In-game(song) · 1 Nordic Hums · 2 shoegaze style ·
+  //   3 Bluff Anthem (instrumental) · 4 Call It Bluff · 5 Gutter-Candle Dread 2
+  game:     [
+    '/audio/In-game(song).mp3',
+    '/audio/Nordic Hums.mp3',
+    '/audio/shoegaze style.mp3',
+    '/audio/Bluff Anthem (instrumental).mp3',
+    '/audio/Call It Bluff.mp3',
+    '/audio/Gutter-Candle Dread 2.mp3',
+  ],
   groups:   ['/audio/Bluff Anthem.mp3'],
   gameover: ['/audio/Gutter-Candle Dread.mp3'],
 };
@@ -714,20 +738,27 @@ function _duckMusic(holdMs) {
 const DUCK_MS = { bluff: 700, card: 200, win: 1700, spin: 1600, eliminate: 1500, gunshot: 600 };
 
 // ─── Game-state → progressive music stage ────────────────────────────────────
-// Derive the game music intensity from live room state. Escalation tracks player
-// attrition (a proxy for "move-count escalation / high stakes"): early game is
-// calm, the field thinning pushes momentum up, and the final two players hit the
-// peak. Exported pure so it can be unit-tested without audio.
-//   0 = calm (Nordic Hums) · 1 = building (Bluff Anthem instrumental) · 2 = peak (Call It Bluff)
-export function gameMusicStage(roomState) {
+// Derive the game music intensity from live room state. The stage SCALES to the
+// active-game playlist length so every track in it is reached as the field thins:
+// stage 0 at the full table, stepping up monotonically with each elimination, to
+// the peak (last) track for the final two. Exported pure so it can be unit-tested
+// without audio; `stageCount` defaults to the live game playlist length so the
+// app calls it with just the room state.
+export function gameMusicStage(roomState, stageCount = (MUSIC_SECTIONS.game ? MUSIC_SECTIONS.game.length : 1)) {
   if (!roomState || !Array.isArray(roomState.players)) return 0;
   const phase = roomState.phase;
   if (phase === 'lobby' || phase === 'pre_game' || !phase) return 0;
+  const maxStage = Math.max(0, stageCount - 1);
+  if (maxStage === 0) return 0;
   const total = roomState.players.length || 1;
   const alive = roomState.players.filter((p) => p && p.status === 'alive').length;
-  if (alive <= 2) return 2;                       // last two standing — peak stakes
-  if (alive <= Math.ceil(total * 0.6)) return 1;  // the field is thinning — build
-  return 0;                                       // early game — quiet tension
+  if (alive <= 2) return maxStage;                 // final two — the peak track
+  // Fraction of the way from a full field to the final two, mapped across the
+  // available stages. Monotonic; _setGameStage never steps back down.
+  const denom = Math.max(1, total - 2);            // eliminations from full field → final two
+  const elim = Math.max(0, total - alive);
+  const frac = Math.min(1, elim / denom);
+  return Math.min(maxStage, Math.round(frac * maxStage));
 }
 
 // ─── useMusic ───────────────────────────────────────────────────────────────────
