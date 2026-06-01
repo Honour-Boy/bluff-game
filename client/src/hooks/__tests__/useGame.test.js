@@ -434,8 +434,8 @@ describe('useGame — authentication', () => {
   });
 });
 
-describe('useGame — reconnection resilience (#M4)', () => {
-  it('rejoins the saved room and re-pulls authoritative state on reconnect', async () => {
+describe('useGame — disconnect removes you (no reconnection)', () => {
+  it('does NOT auto-rejoin on reconnect — only re-authenticates', async () => {
     socketHolder.socket = makeMockSocket({ connected: true });
     const getAccessToken = vi.fn().mockResolvedValue('jwt');
     const { result } = renderHook(() => useGame(getAccessToken));
@@ -447,18 +447,30 @@ describe('useGame — reconnection resilience (#M4)', () => {
     act(() => result.current.createRoom('online'));
     await waitFor(() => expect(result.current.roomCode).toBe('REJN01'));
 
-    // Simulate a reconnect: every subsequent ack succeeds.
+    // A reconnect must NOT resurrect the room — the server already removed us.
     socketHolder.socket.emit.mockImplementation((event, payload, cb) => {
       if (typeof cb === 'function') cb({ success: true });
     });
     act(() => socketHolder.socket.__emit('connect'));
 
-    await waitFor(() => {
-      const events = socketHolder.socket.emit.mock.calls.map(([e]) => e);
-      expect(events).toContain('host_reconnect');
-      expect(events).toContain('request_room_state');
+    await waitFor(() => expect(getAccessToken).toHaveBeenCalled());
+    const events = socketHolder.socket.emit.mock.calls.map(([e]) => e);
+    expect(events).not.toContain('host_reconnect');
+    expect(events).not.toContain('player_reconnect');
+  });
+
+  it('clears the room and returns to landing when the socket disconnects', async () => {
+    socketHolder.socket = makeMockSocket({ connected: true });
+    const { result } = renderHook(() => useGame(null));
+
+    socketHolder.socket.emit.mockImplementationOnce((event, payload, cb) => {
+      cb({ success: true, roomCode: 'DROP01', playerId: 'p1' });
     });
-    expect(result.current.roomCode).toBe('REJN01');
+    act(() => result.current.createRoom('online'));
+    await waitFor(() => expect(result.current.roomCode).toBe('DROP01'));
+
+    act(() => socketHolder.socket.__emit('disconnect'));
+    await waitFor(() => expect(result.current.roomCode).toBeNull());
   });
 
   it('does NOT clear the room on "room not found" while the socket is disconnected (transient drop, no bounce)', async () => {
