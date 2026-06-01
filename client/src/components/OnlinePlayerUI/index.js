@@ -282,6 +282,10 @@ export function OnlinePlayerUI({
   const isGameOver = phase === 'game_over';
   const isLobby = phase === 'lobby';
   const isMySpinTurn = isSpinPending && spinTargetId === myPlayer.id;
+  // (Module 3) The challenged card is face-up for the whole spin_pending window
+  // and reverse-flips the moment the spin result lands (ui.spinData is set when
+  // the cylinder begins). Drives BluffRevealCard via CenterTablePanel.
+  const revealFlipped = isSpinPending && !ui.spinData;
   const spinTargetPlayer = players?.find((player) => player.id === spinTargetId);
   const isSpinTarget = ui.spinData?.spinTargetId === myPlayer.id;
   const currentPlayer = players?.find((player) => player.id === currentPlayerId);
@@ -490,9 +494,52 @@ export function OnlinePlayerUI({
         leaveGame={leaveGame}
         isMyTurn={isMyTurn}
         currentPlayer={currentPlayer}
+        revealFlipped={revealFlipped}
       />
 
       <div style={{ flex: '0 0 auto', paddingBottom: 'env(safe-area-inset-bottom, 0px)' }}>
+      {/* (Module 3) The Pull Trigger is pinned above the liable player's profile.
+          On their own screen that profile is the bottom seat, so the standalone
+          high-contrast trigger sits directly above it. Remote viewers instead
+          see the spin-target's avatar popup ("On the spot"). */}
+      {isMySpinTurn && !isEliminated && (
+        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6, padding: '8px 12px 2px' }}>
+          <div style={{
+            fontFamily: "'Cinzel', serif",
+            fontSize: 9,
+            color: 'var(--accent2)',
+            letterSpacing: '0.22em',
+            textTransform: 'uppercase',
+            opacity: 0.9,
+          }}>
+            Your Fate Awaits
+          </div>
+          <button
+            className="danger"
+            onClick={playerSpin}
+            style={{
+              width: 'min(360px, 90%)',
+              fontSize: 15,
+              padding: '15px',
+              letterSpacing: '0.16em',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: 8,
+            }}
+          >
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+              <circle cx="12" cy="12" r="9" stroke="currentColor" strokeWidth="1.8" />
+              <circle cx="12" cy="12" r="3" fill="currentColor" />
+              <circle cx="12" cy="5" r="1.5" fill="currentColor" />
+              <circle cx="12" cy="19" r="1.5" fill="currentColor" />
+              <circle cx="5" cy="12" r="1.5" fill="currentColor" />
+              <circle cx="19" cy="12" r="1.5" fill="currentColor" />
+            </svg>
+            Pull the Trigger
+          </button>
+        </div>
+      )}
       <BottomSeat
         voice={voice}
         myPlayer={myPlayer}

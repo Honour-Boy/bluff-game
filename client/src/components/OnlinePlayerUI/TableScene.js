@@ -49,6 +49,7 @@ export function TableScene({
   leaveGame,
   isMyTurn,
   currentPlayer,
+  revealFlipped,
 }) {
   const hasTop = distributed.top.length > 0;
   const hasLeft = distributed.left.length > 0;
@@ -202,6 +203,7 @@ export function TableScene({
                 leaveGame={leaveGame}
                 isMyTurn={isMyTurn}
                 currentPlayer={currentPlayer}
+                revealFlipped={revealFlipped}
               />
             </div>
           </div>

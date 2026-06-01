@@ -1,6 +1,6 @@
 import { CardShape } from '../shared/CardShape';
-import { ShapeIcon } from '../shared/ShapeIcon';
 import { ActionLog } from '../ActionLog';
+import { BluffRevealCard } from './BluffRevealCard';
 // Game settings (host config / read-only summary) and the group leaderboard now
 // live in the Controls menu, not on the felt — keeps the table clean.
 
@@ -109,7 +109,11 @@ export function CenterTablePanel({
   leaveGame,
   isMyTurn,
   currentPlayer,
+  revealFlipped = false,
 }) {
+  // (Module 3) The challenged card border + outcome line read green when the
+  // accused told the truth (card matched) and red when they bluffed (mismatch).
+  const outcomeColor = lastAction?.bluffCorrect ? 'var(--accent2)' : 'var(--alive)';
   return (
     <div
       ref={tableCenterRef}
@@ -119,7 +123,7 @@ export function CenterTablePanel({
            A dealer's tray sunk into the felt — semi-transparent so the cloth
            shows through, with a brass hairline and an inner shadow so it reads
            as recessed rather than a box floating on top. */}
-      {(isPlaying || isSpinPending || isRoundEnd) && (
+      {(isPlaying || isRoundEnd) && (
         <div style={{
           display: 'flex',
           alignItems: 'center',
@@ -229,161 +233,68 @@ export function CenterTablePanel({
         </div>
       )}
 
-      {/* ── Spin pending: bluff resolution + revolver trigger ── */}
+      {/* ── Spin pending: 3D bluff reveal (Module 3) ──
+           The challenged card flips face-up beside the Required template for
+           every client at once; it reverse-flips when the trigger is pulled
+           (driven by `revealFlipped`). The high-contrast Pull Trigger now lives
+           above the liable player's seat (index.js) and per-player status ("On
+           the spot") lives on the avatar popup (ChipPopup) — no felt narration. */}
       {isSpinPending && (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-          {lastAction?.autoResolved && lastAction?.accuserName && (
-            <div
-              className="fade-in"
-              style={{
-                padding: '4px 4px 8px',
-                textShadow: '0 1px 4px rgba(0,0,0,0.85)',
-              }}
-            >
-              <div style={{
-                fontFamily: "'Cinzel', serif",
-                fontSize: 9,
-                color: 'var(--text-dim)',
-                letterSpacing: '0.2em',
-                textTransform: 'uppercase',
-                marginBottom: 10,
-              }}>
-                Bluff Called
+        <div className="fade-in" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 12, padding: '4px 2px', textShadow: '0 1px 4px rgba(0,0,0,0.85)' }}>
+          <div style={{
+            fontFamily: "'Cinzel', serif",
+            fontSize: 9,
+            color: 'var(--text-dim)',
+            letterSpacing: '0.2em',
+            textTransform: 'uppercase',
+          }}>
+            {lastAction?.accuserName ? 'Bluff Reveal' : 'Reveal'}
+          </div>
+
+          {/* Required template  vs  the played card flipping face-up */}
+          <div style={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'center', gap: 14 }}>
+            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6 }}>
+              <div style={{ fontFamily: "'Cinzel', serif", fontSize: 7, color: 'var(--accent)', letterSpacing: '0.16em', textTransform: 'uppercase' }}>
+                Required
               </div>
               <div style={{
-                fontFamily: "'Crimson Text', serif",
-                fontSize: 15,
-                marginBottom: 8,
-                lineHeight: 1.5,
+                padding: '11px 13px',
+                background: 'radial-gradient(ellipse at 50% 35%, rgba(45,34,18,0.95) 0%, rgba(18,13,8,0.95) 100%)',
+                border: '2px solid var(--accent)',
+                borderRadius: 8,
               }}>
-                <strong style={{ color: 'var(--text)' }}>{lastAction.accuserName}</strong>
-                {' '}challenged{' '}
-                <strong style={{ color: 'var(--text)' }}>{lastAction.accusedName}</strong>
-              </div>
-              {lastAction.revealedCard ? (
-                <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 10 }}>
-                  <div style={{
-                    fontFamily: "'Cinzel', serif",
-                    fontSize: 8,
-                    color: 'var(--text-dim)',
-                    letterSpacing: '0.14em',
-                    textTransform: 'uppercase',
-                    flexShrink: 0,
-                  }}>
-                    Revealed:
-                  </div>
-                  <div style={{
-                    display: 'flex', alignItems: 'center', gap: 6,
-                    padding: '7px 12px',
-                    background: 'linear-gradient(160deg, var(--surface3) 0%, var(--surface2) 100%)',
-                    border: '1px solid var(--border-lit)',
-                    borderRadius: 4,
-                    fontFamily: "'Cinzel', serif",
-                    fontSize: 13,
-                    fontWeight: 700,
-                    animation: 'cardFlipIn 0.5s ease-out',
-                    boxShadow: '0 4px 14px rgba(0,0,0,0.5)',
-                  }}>
-                    <ShapeIcon shape={lastAction.revealedCard.shape} size={20} />
-                    <span style={{ color: 'var(--text)', textTransform: 'capitalize' }}>
-                      {lastAction.revealedCard.shape === 'whot' ? 'WHOT' : lastAction.revealedCard.shape}
-                    </span>
-                    <span style={{ color: 'var(--text-dim)', fontSize: 11 }}>{lastAction.revealedCard.number}</span>
-                  </div>
-                </div>
-              ) : (
-                <div style={{
-                  fontFamily: "'Crimson Text', serif",
-                  fontSize: 13,
-                  color: 'var(--text-dim)',
-                  marginBottom: 10,
-                  fontStyle: 'italic',
-                }}>
-                  No card was played.
-                </div>
-              )}
-              <div style={{
-                fontFamily: "'Cinzel', serif",
-                fontSize: 16,
-                letterSpacing: '0.08em',
-                color: lastAction.bluffCorrect ? 'var(--alive)' : 'var(--accent2)',
-                marginBottom: 4,
-                textTransform: 'uppercase',
-              }}>
-                {lastAction.bluffCorrect
-                  ? `Bluff proven — ${lastAction.accusedName} was lying!`
-                  : `Bluff wrong — ${lastAction.accusedName} told the truth!`}
-              </div>
-              <div style={{
-                fontFamily: "'Crimson Text', serif",
-                fontSize: 13,
-                color: 'var(--text-dim)',
-                fontStyle: 'italic',
-              }}>
-                → <strong style={{ fontStyle: 'normal' }}>{lastAction.spinTargetName}</strong> must face the revolver.
+                <CardShape type={currentCardType} size="md" />
               </div>
             </div>
-          )}
 
-          {/* My spin turn — the revolver trigger (button on the felt, no box) */}
-          {isMySpinTurn && !isEliminated && (
-            <div style={{
-              textAlign: 'center',
-              padding: '6px 8px',
-              textShadow: '0 1px 4px rgba(0,0,0,0.85)',
-            }}>
-              <div style={{
-                fontFamily: "'Cinzel', serif",
-                fontSize: 9,
-                color: 'var(--accent2)',
-                letterSpacing: '0.22em',
-                textTransform: 'uppercase',
-                marginBottom: 16,
-                opacity: 0.9,
-              }}>
-                Your Fate Awaits
-              </div>
-              {/* Revolver trigger button */}
-              <button
-                className="danger"
-                onClick={playerSpin}
-
-                style={{
-                  width: '100%',
-                  fontSize: 15,
-                  padding: '16px',
-                  letterSpacing: '0.16em',
-                  position: 'relative',
-                  overflow: 'hidden',
-                }}
-              >
-                {/* Cylinder icon */}
-                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden="true" style={{ marginRight: 8, verticalAlign: 'middle' }}>
-                  <circle cx="12" cy="12" r="9" stroke="currentColor" strokeWidth="1.8"/>
-                  <circle cx="12" cy="12" r="3" fill="currentColor"/>
-                  <circle cx="12" cy="5" r="1.5" fill="currentColor"/>
-                  <circle cx="12" cy="19" r="1.5" fill="currentColor"/>
-                  <circle cx="5" cy="12" r="1.5" fill="currentColor"/>
-                  <circle cx="19" cy="12" r="1.5" fill="currentColor"/>
-                </svg>
-                Pull the Trigger
-              </button>
+            <div style={{ fontFamily: "'Cinzel', serif", fontSize: 11, color: 'var(--text-dim)', letterSpacing: '0.12em', paddingBottom: 30, textTransform: 'uppercase' }}>
+              vs
             </div>
-          )}
 
-          {/* Waiting for other player to spin — felt text */}
-          {!isMySpinTurn && spinTargetPlayer && (
+            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6 }}>
+              <div style={{ fontFamily: "'Cinzel', serif", fontSize: 7, color: 'var(--text-dim)', letterSpacing: '0.16em', textTransform: 'uppercase' }}>
+                Played
+              </div>
+              <BluffRevealCard
+                card={lastAction?.revealedCard || null}
+                revealed={revealFlipped}
+                outcomeColor={outcomeColor}
+              />
+            </div>
+          </div>
+
+          {/* One compact outcome line (no text-heavy narration). */}
+          {lastAction?.accusedName && (
             <div style={{
-              padding: '10px 12px',
-              fontFamily: "'Crimson Text', serif",
-              fontSize: 14,
-              color: '#e07a7a',
-              textAlign: 'center',
-              fontStyle: 'italic',
-              textShadow: '0 1px 4px rgba(0,0,0,0.85)',
-              animation: 'pulse 1.8s ease-in-out infinite',
+              fontFamily: "'Cinzel', serif",
+              fontSize: 12,
+              letterSpacing: '0.06em',
+              color: outcomeColor,
+              textTransform: 'uppercase',
             }}>
-              Waiting for <strong style={{ fontStyle: 'normal' }}>{spinTargetPlayer.username}</strong> to pull the trigger…
+              {lastAction.bluffCorrect
+                ? `${lastAction.accusedName} bluffed`
+                : `${lastAction.accusedName} told the truth`}
             </div>
           )}
         </div>

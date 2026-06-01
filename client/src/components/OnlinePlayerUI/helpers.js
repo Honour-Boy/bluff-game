@@ -116,6 +116,44 @@ export const GAME_UI_STYLE = `
     pointer-events: none;
   }
 
+  /* ── Bluff reveal: 3D card flip (Module 3) ──────────────────────────────────
+     The challenged card flips face-down ↔ face-up beside the Required template.
+     Container default = rotateY(180deg) shows the leather BACK (face-down);
+     .flipped = rotateY(0) shows the FRONT (the played card). */
+  .reveal-card-3d {
+    position: relative;
+    width: 100%;
+    height: 100%;
+    transform-style: preserve-3d;
+    transform: rotateY(180deg);
+    transition: transform 0.55s cubic-bezier(0.4, 0, 0.2, 1);
+  }
+  .reveal-card-3d.flipped { transform: rotateY(0deg); }
+  .reveal-card-face {
+    position: absolute;
+    inset: 0;
+    -webkit-backface-visibility: hidden;
+    backface-visibility: hidden;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 5px;
+    border-radius: 7px;
+  }
+  .reveal-card-front {
+    background: radial-gradient(ellipse at 50% 35%, rgba(45,34,18,0.96) 0%, rgba(18,13,8,0.96) 100%);
+    border: 2px solid var(--accent);
+  }
+  .reveal-card-back {
+    transform: rotateY(180deg);
+    background:
+      linear-gradient(135deg, #1e1410 0%, #120d09 50%, #1a1108 100%),
+      repeating-linear-gradient(45deg, transparent 0px, transparent 3px, rgba(255,255,255,0.02) 3px, rgba(255,255,255,0.02) 4px);
+    border: 1px solid var(--border-lit);
+    box-shadow: 0 4px 12px rgba(0,0,0,0.5);
+  }
+
   @media (max-width: 640px) {
     .topdown-middle { gap: 6px !important; }
     .topdown-chip {
