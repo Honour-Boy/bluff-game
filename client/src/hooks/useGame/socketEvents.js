@@ -27,64 +27,23 @@ export function useGameSocketEvents({
     const onConnect = async () => {
       setConnected(true);
       setError(null);
-
-      const authed = await authenticateSocket();
-      if (!authed) return;
-
-      // Read the rejoin target from the primary store, falling back to the
-      // short-TTL recovery snapshot (transient drop / refresh that lost it).
-      const session = readRoomSession();
-      if (!session?.roomCode) return;
-      const { roomCode: savedCode, isHost: savedHost, playerId: savedPlayerId } = session;
-      const event = savedHost ? 'host_reconnect' : (savedPlayerId ? 'player_reconnect' : null);
-      if (!event) return;
-
-      // §M4 — resilient rejoin. A missing ack (transport hiccup as the instance
-      // wakes) is NOT proof the room is gone, so we retry with backoff instead
-      // of tearing the session down. We only clear — and let the UI fall back to
-      // the landing screen — when a HEALTHY connection explicitly answers that
-      // the room no longer exists. On success we re-pull the authoritative frame
-      // in case the deal/hand packet was dropped during the outage.
-      const MAX_ATTEMPTS = 4;
-      const ACK_TIMEOUT_MS = 8000;
-      const attemptRejoin = (attempt) => {
-        if (!socket.connected) return; // dropped again — the next 'connect' retries
-        let answered = false;
-        const timer = setTimeout(() => {
-          if (answered) return;
-          answered = true;
-          // No ack in time → treat as a transient hiccup, never a gone room.
-          if (attempt < MAX_ATTEMPTS && socket.connected) {
-            attemptRejoin(attempt + 1);
-          }
-        }, ACK_TIMEOUT_MS);
-
-        socket.emit(event, { roomCode: savedCode }, (res) => {
-          if (answered) return;
-          answered = true;
-          clearTimeout(timer);
-          if (res?.success) {
-            setRoomCode(savedCode);
-            if (savedHost) {
-              setIsHost(true);
-              setPlayerId(savedPlayerId || null);
-            } else {
-              setIsHost(false);
-              setPlayerId(savedPlayerId);
-            }
-            try { socket.emit('request_room_state', { roomCode: savedCode }, () => {}); } catch (_) { /* next push recovers */ }
-          } else {
-            clearRoomSession();
-            clearSession();
-          }
-        });
-      };
-      attemptRejoin(1);
+      // Authenticate only. There is NO auto-rejoin: a disconnect (refresh, tab
+      // close, sign-out, or a network drop) removes the participant server-side
+      // immediately, so a reconnected socket starts fresh on the landing screen.
+      await authenticateSocket();
     };
 
     const onDisconnect = () => {
       setConnected(false);
       setAuthenticated(false);
+      // Any disconnect drops us out of the game (matches the server's immediate
+      // removal). If we were in a room, tear the local session down so the UI
+      // returns to the landing screen instead of showing a stale table.
+      if (readRoomSession()?.roomCode) {
+        clearRoomSession();
+        clearSession();
+        notify('You were disconnected from the game.', 'error');
+      }
     };
 
     const onRoomState = (state) => {

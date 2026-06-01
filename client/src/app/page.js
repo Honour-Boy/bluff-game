@@ -417,6 +417,19 @@ function HomeContent() {
     return res;
   }, [invalidateGroupsCache, leaveGroup, refreshGroupsHome, selectedGroup?.id]);
 
+  // Signing out must also drop us out of any live game first — leaveGame emits
+  // leave_room (host-leave/elimination handled server-side) and clears the
+  // local session so we can't linger as a ghost player after sign-out.
+  const handleSignOut = useCallback(async () => {
+    leaveGame();
+    await signOut();
+  }, [leaveGame, signOut]);
+
+  const handleSignOutGuest = useCallback(async () => {
+    leaveGame();
+    await signOutGuest();
+  }, [leaveGame, signOutGuest]);
+
   // Voice — auto-joins muted on room entry (issue #49). Mic stays
   // unpublished until first user-gesture toggle, so first-time visitors
   // don't get a permission prompt before they ask for one. Hook tears
@@ -517,8 +530,8 @@ function HomeContent() {
         onSetMusicVolume={setMusicVolume}
         onPrevTrack={prevTrack}
         onNextTrack={nextTrack}
-        onSignOut={signOut}
-        onSignOutGuest={signOutGuest}
+        onSignOut={handleSignOut}
+        onSignOutGuest={handleSignOutGuest}
         onUpdateUsername={updateUsername}
         // ── In-room controls (Module 2) — only inside an online room ──
         inRoom={inRoomOnline}
@@ -636,8 +649,8 @@ function HomeContent() {
         onCreateRoom={createRoom}
         onJoinRoom={joinRoom}
         onOpenGroups={openGroupsHome}
-        onSignOut={signOut}
-        onSignOutGuest={signOutGuest}
+        onSignOut={handleSignOut}
+        onSignOutGuest={handleSignOutGuest}
         onUpdateUsername={updateUsername}
         initialJoinCode={initialJoinCode}
         error={error}
