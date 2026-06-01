@@ -489,6 +489,29 @@ body.phase-spin-pending::after {
 }
 .focal-breathe { animation: focal-breathe 3.4s ease-in-out infinite; }
 
+/* ─── Dismissal "X" badge (Module 6) ────────────────────────────────────────
+   Every modal/dropdown/popup close control renders a raw literal uppercase "X"
+   (a plain Latin letter — unlike the ✕/× dingbats it always renders in the
+   display fonts). High-contrast white-on-red so it can never blend into a modal
+   surface, with a darker-red hover. */
+.bluff-close-x {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  border-radius: 6px;
+  background: #c0392b;
+  color: #ffffff;
+  font-family: ui-sans-serif, system-ui, -apple-system, sans-serif;
+  font-weight: 800;
+  font-size: 14px;
+  line-height: 1;
+  user-select: none;
+  transition: background 0.15s ease;
+}
+.bluff-close-x:hover { background: #a93226; }
+
 /* ─── Reduced-motion safety ─────────────────────────────────────────────────── */
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after {

@@ -248,7 +248,12 @@ export function CardHand({
     );
   }
 
-  const draggable = n > 2;
+  // #M6.4 — a 2-card hand must stay draggable/selectable. With the old `n > 2`
+  // gate, dropping from 3→2 cards left `dragRef.moved` stuck `true` (onPointerDown
+  // no longer ran to reset it), which permanently blocked the click guard and
+  // froze selection on the final two cards. Allow drag for any multi-card hand,
+  // and only honour the drag-suppression flag while dragging is actually enabled.
+  const draggable = n > 1;
   const onPointerDown = (e) => {
     if (!draggable) return;
     dragRef.current = { down: true, startX: e.clientX, startRot: rotateOffset, moved: false };
@@ -262,9 +267,10 @@ export function CardHand({
   };
   const endPointer = () => { dragRef.current.down = false; };
 
-  // A drag must not also select; the moved flag clears on the next pointerdown.
-  const guardedCardClick = (id) => { if (!dragRef.current.moved) onCardClick && onCardClick(id); };
-  const guardedPowerClick = (id) => { if (!dragRef.current.moved) onPowerCardClick && onPowerCardClick(id); };
+  // A real drag must not also select. Only suppress when dragging is enabled —
+  // otherwise a stale `moved` from an earlier larger hand could block the tap.
+  const guardedCardClick = (id) => { if (draggable && dragRef.current.moved) return; onCardClick && onCardClick(id); };
+  const guardedPowerClick = (id) => { if (draggable && dragRef.current.moved) return; onPowerCardClick && onPowerCardClick(id); };
 
   return (
     <div style={{ display: 'flex', gap: 14, alignItems: 'flex-end', flexWrap: 'wrap' }}>
