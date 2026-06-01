@@ -179,11 +179,10 @@ export function RoomHeader({
         )}
       </div>
 
-      {/* Centre: player status + Rules under it */}
+      {/* Centre: Rules. (Module 2) The alive/eliminated status tag was removed
+          here — it duplicated the bottom-seat nameplate and added to the global
+          status text the contextual chip popups now replace. */}
       <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6, justifySelf: 'center', paddingTop: 2 }}>
-        <span className={`tag ${isEliminated ? 'eliminated' : 'alive'}`}>
-          {isEliminated ? 'Eliminated' : isHost ? 'Host · Alive' : 'Alive'}
-        </span>
         <button
           onClick={onShowHowToPlay}
           style={{

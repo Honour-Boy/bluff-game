@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useAnimationControls } from 'framer-motion';
 import { CardHand } from './CardHand';
 import { PlayerChip } from './PlayerChip';
+import { ChipPopup } from './ChipPopup';
 import { RoomHeader } from './RoomHeader';
 import { TableScene } from './TableScene';
 import { BottomSeat } from './BottomSeat';
@@ -363,18 +364,31 @@ export function OnlinePlayerUI({
     && (roomState?.myHand?.length || 0) > 3;
   const bettingEnabled = !!roomState?.config?.systems?.betting;
 
-  const renderChip = useCallback((player) => (
-    <PlayerChip
-      key={player.id}
-      player={player}
-      isCurrentTurn={player.id === currentPlayerId}
-      isNextTurn={rouletteActive && isPlaying && player.id === nextPlayerId}
-      isSpinTarget={isSpinPending && player.id === spinTargetId}
-      voice={voice}
-      onClick={showSpectatorView ? () => ui.handleSpectatePlayer(player.id) : undefined}
-      bettingEnabled={bettingEnabled}
-    />
-  ), [
+  const renderChip = useCallback((player) => {
+    const isSpin = isSpinPending && player.id === spinTargetId;
+    const isTurn = isPlaying && player.id === currentPlayerId && player.status === 'alive';
+    // (Module 2) Turn / spin status now lives in a contextual bubble anchored to
+    // the avatar instead of a global centre banner. Spin takes priority.
+    const popup = isSpin
+      ? <ChipPopup tone="danger" pulse>On the spot</ChipPopup>
+      : isTurn
+        ? <ChipPopup tone="turn" pulse>Their turn</ChipPopup>
+        : null;
+    return (
+      <div key={player.id} style={{ position: 'relative', display: 'flex', justifyContent: 'center' }}>
+        {popup}
+        <PlayerChip
+          player={player}
+          isCurrentTurn={player.id === currentPlayerId}
+          isNextTurn={rouletteActive && isPlaying && player.id === nextPlayerId}
+          isSpinTarget={isSpinPending && player.id === spinTargetId}
+          voice={voice}
+          onClick={showSpectatorView ? () => ui.handleSpectatePlayer(player.id) : undefined}
+          bettingEnabled={bettingEnabled}
+        />
+      </div>
+    );
+  }, [
     bettingEnabled,
     currentPlayerId,
     rouletteActive,
