@@ -166,8 +166,7 @@ const ANNOUNCEMENT_MAP = {
   ghost_vote_result: { preset: 'ghost_vote_result', title: 'GHOST COUNCIL DECIDES', subtitle: (e) => e.result || e.winningOption || '' },
   last_stand_entered: { preset: 'last_stand_entered', title: 'LAST STAND', subtitle: () => 'two finalists remain' },
   system_notice: { preset: 'system_notice', title: 'NOTICE', subtitle: (e) => e.message || '' },
-  // #6 — highlight callouts
-  first_blood: { preset: 'first_blood', title: 'FIRST BLOOD', subtitle: (e) => (e.eliminatedName ? `${e.eliminatedName} falls first` : 'the first to fall') },
+  // #6 — highlight callouts (first_blood removed per design — survival only)
   survival_streak: { preset: 'survival_streak', title: 'NERVES OF STEEL', subtitle: (e) => `${e.holderName || 'Survivor'} — ${e.streak || 3} spins survived in a row` },
 };
 

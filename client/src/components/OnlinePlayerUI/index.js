@@ -15,13 +15,17 @@ import RedemptionOverlay from './RedemptionOverlay';
 import SpeedModeTimer from './SpeedModeTimer';
 import { PreGameSelectionModal } from '../PreGameSelectionModal';
 import { SmokeLayer } from '../shared/SmokeLayer';
+import { ControlsModal } from '../shared/ControlsModal';
+import { PreGameSettingsPanel } from '../screens/PreGameSettingsPanel';
+import { LobbyConfigSummary } from '../LobbyConfigSummary';
+import { LeaderboardPanel } from '../LeaderboardPanel';
 import {
   distributePlayers,
   GAME_UI_STYLE,
   orderClockwiseFromLocal,
 } from './helpers';
 import { useOnlinePlayerUiController } from '../../hooks/useOnlinePlayerUiController';
-import { useAtmosphere, useMusic } from '../../hooks/useAtmosphere';
+import { useAtmosphere } from '../../hooks/useAtmosphere';
 
 export { CardHand, distributePlayers, orderClockwiseFromLocal };
 
@@ -67,12 +71,31 @@ export function OnlinePlayerUI({
 }) {
   const wrapperRef = useRef(null);
   const { triggerShake, triggerAudio, startSpinAudio, stopSpinAudio } = useAtmosphere(wrapperRef);
-  // The bed itself is started at the app root (so it plays from the landing).
-  // Here we only expose the mute toggle for the in-game menu; it shares the
-  // same store as the landing settings gear, so the two never drift.
-  const { musicEnabled, toggleMusic } = useMusic();
+  // Music mute now lives only in the global settings gear (app root). No music
+  // control is rendered in the in-game menu anymore.
   // Card-fly: fixed-layer clones that arc from the hand to the discard pile.
   const { flights, launch: launchCardFlight } = useCardFlight();
+
+  // Game settings / leaderboard now open from the Controls menu as modals.
+  const [settingsOpen, setSettingsOpen] = useState(false);
+  const [leaderboardOpen, setLeaderboardOpen] = useState(false);
+
+  // Detect whether the table scene is actually scrollable, so Centralize only
+  // shows when there's something to scroll back to (otherwise the fixed-height
+  // shell has nothing to scroll). Observes the scroll container + its content.
+  const sceneScrollRef = useRef(null);
+  const [sceneScrollable, setSceneScrollable] = useState(false);
+  const ready = !!(roomState && myPlayer);
+  useEffect(() => {
+    const el = sceneScrollRef.current;
+    if (!el || typeof ResizeObserver === 'undefined') return undefined;
+    const check = () => setSceneScrollable(el.scrollHeight > el.clientHeight + 2);
+    const ro = new ResizeObserver(check);
+    ro.observe(el);
+    Array.from(el.children).forEach((c) => ro.observe(c));
+    check();
+    return () => ro.disconnect();
+  }, [ready]);
 
   const myHand = roomState?.myHand || [];
   const myPowerCardSlot = roomState?.myPowerCardSlot || [];
@@ -144,13 +167,13 @@ export function OnlinePlayerUI({
   const prevSpinCompleteRef = useRef(false);
   useEffect(() => {
     if (ui.spinComplete && !prevSpinCompleteRef.current) {
+      // Just stop any leftover click timers. The result cues (celebratory
+      // survival chime / elimination toll) were removed per request — the
+      // mechanical clicks during the spin are the only spin audio now.
       stopSpinAudio();
-      if (ui.spinData) {
-        triggerAudio(ui.spinData.eliminated ? 'eliminate' : 'spin');
-      }
     }
     prevSpinCompleteRef.current = ui.spinComplete;
-  }, [ui.spinComplete, ui.spinData, stopSpinAudio, triggerAudio]);
+  }, [ui.spinComplete, stopSpinAudio]);
 
   // Cleanup spin audio timers on unmount
   useEffect(() => () => {
@@ -348,11 +371,15 @@ export function OnlinePlayerUI({
       ref={wrapperRef}
       style={{
         position: 'relative',
-        minHeight: '100vh',
+        // Fill exactly one viewport (dynamic vh handles the mobile URL bar) so
+        // the table is compact with no page scroll. The middle scene flexes and
+        // scrolls internally only when its content (e.g. lobby settings) is tall.
+        height: '100dvh',
+        maxHeight: '100dvh',
         display: 'flex',
         flexDirection: 'column',
+        overflow: 'hidden',
         WebkitOverflowScrolling: 'touch',
-        paddingBottom: 'env(safe-area-inset-bottom, 0px)',
       }}
     >
       {/* Phase 3: ambient smoke drifting across the table during play */}
@@ -361,6 +388,7 @@ export function OnlinePlayerUI({
         intensity={isSpinPendingPhase ? 'high' : 'low'}
       />
 
+      <div style={{ flex: '0 0 auto' }}>
       <RoomHeader
         roomCode={roomCode}
         roundNumber={roundNumber}
@@ -384,9 +412,11 @@ export function OnlinePlayerUI({
             isMe={currentPlayerId === myPlayer?.id}
           />
         )}
+      </div>
 
       <TableScene
         tableCenterRef={ui.tableCenterRef}
+        sceneScrollRef={sceneScrollRef}
         distributed={distributed}
         otherPlayers={otherPlayers}
         renderChip={renderChip}
@@ -418,6 +448,7 @@ export function OnlinePlayerUI({
         currentPlayer={currentPlayer}
       />
 
+      <div style={{ flex: '0 0 auto', paddingBottom: 'env(safe-area-inset-bottom, 0px)' }}>
       <BottomSeat
         voice={voice}
         myPlayer={myPlayer}
@@ -447,18 +478,16 @@ export function OnlinePlayerUI({
         phase={phase}
         leaveGame={leaveGame}
       />
+      </div>
 
       <FloatingControls
-        isMobile={ui.isMobile}
-        config={roomState?.config}
         voice={voice}
-        speechEnabled={ui.speechEnabled}
-        musicEnabled={musicEnabled}
         onCentralize={ui.scrollToCenter}
-        onToggleSpeech={ui.toggleSpeech}
-        onToggleMusic={toggleMusic}
         onOpenChat={openChat}
         chatUnread={chatUnread}
+        onOpenSettings={() => setSettingsOpen(true)}
+        onOpenLeaderboard={roomState?.groupId ? () => setLeaderboardOpen(true) : undefined}
+        scrollable={sceneScrollable}
         leaveDisabled={isMyTurn && isPlaying && !isEliminated}
         onLeaveTable={() => {
           if (isMyTurn && isPlaying && !isEliminated) return;
@@ -469,6 +498,40 @@ export function OnlinePlayerUI({
           leaveGame();
         }}
       />
+
+      {/* Game settings — host edits in the lobby, everyone else sees a summary */}
+      {settingsOpen && (
+        <ControlsModal title="Game Settings" onClose={() => setSettingsOpen(false)}>
+          {isHost && isLobby && roomState?.config ? (
+            <PreGameSettingsPanel
+              config={roomState.config}
+              onChange={updateRoomConfig}
+              isGroupRoom={!!roomState?.groupId}
+              savedMeta={roomState?.groupSettingsMeta}
+              playerCount={alivePlayers.length}
+            />
+          ) : roomState?.config ? (
+            <LobbyConfigSummary config={roomState.config} />
+          ) : (
+            <div style={{ color: 'var(--text-dim)', fontFamily: "'Crimson Text', serif", fontStyle: 'italic' }}>
+              No house rules configured yet.
+            </div>
+          )}
+        </ControlsModal>
+      )}
+
+      {/* Group leaderboard */}
+      {leaderboardOpen && roomState?.groupId && (
+        <ControlsModal title="Leaderboard" onClose={() => setLeaderboardOpen(false)}>
+          <LeaderboardPanel
+            groupId={roomState.groupId}
+            currentUserId={myPlayer?.id || null}
+            highlightUserId={isGameOver ? (lastAction?.winnerId || null) : null}
+            getGroupLeaderboard={getGroupLeaderboard}
+            leaderboardUpdateNonce={leaderboardUpdateNonce}
+          />
+        </ControlsModal>
+      )}
 
       <CoreGameOverlays
         spinData={ui.spinData}

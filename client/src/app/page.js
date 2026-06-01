@@ -15,6 +15,7 @@ import { HostUI } from '../components/HostUI';
 import { PlayerUI } from '../components/PlayerUI';
 import { OnlinePlayerUI } from '../components/OnlinePlayerUI';
 import { Notification } from '../components/shared/Notification';
+import { SettingsGear } from '../components/shared/SettingsGear';
 import { ChatPanel } from '../components/ChatPanel';
 import { useIsMobile } from '../hooks/useIsMobile';
 
@@ -389,10 +390,27 @@ function HomeContent() {
     );
   }
 
+  // The online table runs as a full-bleed, viewport-height shell (no page
+  // scroll) so it stays compact; every other screen keeps normal padded flow.
+  const fullBleed = !!roomCode && gameMode === 'online';
   const wrap = (children) => (
-    <div style={{ minHeight: '100vh', padding: '24px 16px' }}>
+    <div style={fullBleed
+      ? { height: '100dvh', overflow: 'hidden', position: 'relative' }
+      : { minHeight: '100vh', padding: '24px 16px' }}>
       <Notification notification={notification} />
       {children}
+      {/* Global identity / settings gear — present on every signed-in screen
+          (landing, groups, in-game). Holds username, music toggle, profile,
+          and sign-out so the "main settings" are reachable everywhere. */}
+      <SettingsGear
+        username={username}
+        isGuest={isGuest}
+        musicEnabled={musicEnabled}
+        onToggleMusic={toggleMusic}
+        onSignOut={signOut}
+        onSignOutGuest={signOutGuest}
+        onUpdateUsername={updateUsername}
+      />
       {roomCode && (
         <ChatPanel
           messages={chatMessages}

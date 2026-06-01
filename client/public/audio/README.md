@@ -37,8 +37,9 @@ the normal `lobby` track. It only moves to `game` once the match actually starts
 then `gameover` at the end.
 
 ## Notes
-- Plays at ~28% volume and auto-ducks when a sound cue fires. Tune
-  `MUSIC_BASE_VOL` in `useAtmosphere.js`.
+- Subtle bed: ~24% volume, and the in-game (`game`) section is quieter still
+  (~11%) so it never competes with the table cues. Auto-ducks when a sound cue
+  fires. Tune `MUSIC_BASE_VOL` / `MUSIC_SECTION_VOL` in `useAtmosphere.js`.
 - Muteable from the settings gear (landing) and the in-game menu.
 - Starts on the first tap/click (browser autoplay rules); on iOS the hardware
   silent switch still mutes it (OS-level).

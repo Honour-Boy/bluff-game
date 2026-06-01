@@ -356,20 +356,16 @@ function applyPostElimSystemHooks(io, room) {
 // it server-side when the target never spins. Keeping ONE implementation means
 // an auto-spin produces byte-for-byte the same result as a manual one.
 
-// #6 — Highlight callouts. Updates the per-player survival streak + the once-
-// per-game first-blood flag and returns banner events to surface. Emitted over
-// the same `power_card_triggered` channel as bounty/betting so they queue AFTER
-// the spin overlay resolves. Only a RESOLVED outcome counts — a Medic-pending
-// elimination is deferred (the streak/first-blood is decided when Medic acts).
+// #6 — Highlight callouts. Updates the per-player survival streak and returns
+// banner events to surface. Emitted over the same `power_card_triggered` channel
+// as bounty/betting so they queue AFTER the spin overlay resolves. Only a
+// RESOLVED outcome counts — a Medic-pending elimination is deferred (the streak
+// is decided when Medic acts). (First-blood callout removed per design.)
 function _computeSpinHighlights(room, player, spinResult, medicPaused) {
   if (medicPaused) return [];
   const events = [];
   if (spinResult.eliminated) {
     player.survivalStreak = 0;
-    if (!room.firstBloodAwarded) {
-      room.firstBloodAwarded = true;
-      events.push({ kind: 'first_blood', eliminatedName: player.username });
-    }
   } else {
     player.survivalStreak = (player.survivalStreak || 0) + 1;
     const s = player.survivalStreak;

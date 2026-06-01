@@ -1,38 +1,33 @@
 import { MobileFabMenu } from '../MobileFabMenu';
 
-// #146 — both mobile and desktop now use the single consolidated menu so the
-// in-game controls (centralize, active special cards, room chat, speech) are
-// grouped in one compact place instead of being scattered around the screen.
-// On desktop the standalone VoicePanel stays in the header, so the menu hides
-// its own voice section (showVoice={isMobile}).
+// #146 — both mobile and desktop use the single consolidated menu so the
+// in-game controls are grouped in one compact place. Voice join/leave lives in
+// the menu on every screen size. Music lives in the global settings gear (not
+// here); spoken announcements were removed. Centralize only appears when the
+// table area is genuinely scrollable.
 export function FloatingControls({
-  isMobile,
-  config,
   voice,
-  speechEnabled,
-  musicEnabled,
   onCentralize,
-  onToggleSpeech,
-  onToggleMusic,
   onOpenChat,
   chatUnread,
+  onOpenSettings,
+  onOpenLeaderboard,
   onLeaveTable,
   leaveDisabled = false,
+  scrollable = false,
 }) {
   return (
     <MobileFabMenu
-      config={config}
       voice={voice}
-      speechEnabled={speechEnabled}
-      musicEnabled={musicEnabled}
       onCentralize={onCentralize}
-      onToggleSpeech={onToggleSpeech}
-      onToggleMusic={onToggleMusic}
       onOpenChat={onOpenChat}
       chatUnread={chatUnread}
+      onOpenSettings={onOpenSettings}
+      onOpenLeaderboard={onOpenLeaderboard}
       onLeaveTable={onLeaveTable}
       leaveDisabled={leaveDisabled}
-      showVoice={isMobile}
+      scrollable={scrollable}
+      showVoice
     />
   );
 }

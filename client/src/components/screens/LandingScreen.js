@@ -5,7 +5,6 @@ import { useState, useEffect, lazy, Suspense } from 'react';
 const HowToPlayModal = lazy(() =>
   import('./HowToPlayModal').then((m) => ({ default: m.HowToPlayModal })),
 );
-import { UserProfile } from './UserProfile';
 import { ShapeIcon } from '../shared/ShapeIcon';
 
 // ─── Tavern sign icon — carved suit marks ────────────────────────────────────
@@ -48,35 +47,6 @@ function PlaqueButton({ children, onClick, primary, ember, disabled, style = {} 
   );
 }
 
-// ─── Settings-gear menu row ───────────────────────────────────────────────────
-function SettingItem({ icon, label, onClick, accent = false }) {
-  return (
-    <button
-      type="button"
-      role="menuitem"
-      onClick={onClick}
-      style={{
-        display: 'flex', alignItems: 'center', gap: 9, width: '100%',
-        padding: '9px 10px',
-        background: 'none',
-        border: '1px solid transparent',
-        borderRadius: 'var(--radius)',
-        color: accent ? 'var(--accent)' : 'var(--text-mid)',
-        fontFamily: "'Cinzel', serif",
-        fontSize: 11,
-        letterSpacing: '0.06em',
-        cursor: 'pointer',
-        textAlign: 'left',
-      }}
-      onMouseEnter={(e) => { e.currentTarget.style.background = 'var(--surface2)'; }}
-      onMouseLeave={(e) => { e.currentTarget.style.background = 'none'; }}
-    >
-      {icon && <span aria-hidden="true" style={{ width: 16, display: 'flex', justifyContent: 'center', flexShrink: 0 }}>{icon}</span>}
-      <span style={{ flex: 1 }}>{label}</span>
-    </button>
-  );
-}
-
 // ─── LandingScreen — the tavern common room ──────────────────────────────────
 export function LandingScreen({
   username,
@@ -96,8 +66,6 @@ export function LandingScreen({
 }) {
   const [mode, setMode] = useState(null);              // null | 'host' | 'join'
   const [showHowToPlay, setShowHowToPlay] = useState(false);
-  const [showProfile, setShowProfile] = useState(false);
-  const [showSettings, setShowSettings] = useState(false);
   const [roomCode, setRoomCode] = useState('');
   const [selectedGameMode, setSelectedGameMode] = useState(null);
   const [codeLocked, setCodeLocked] = useState(false);
@@ -183,130 +151,6 @@ export function LandingScreen({
           ...s,
         }} />
       ))}
-
-      {/* Settings gear — top right. Folds the identity, music toggle, and
-          sign-out into one menu (#B). */}
-      <div style={{ position: 'fixed', top: 14, right: 14, zIndex: 30 }}>
-        <button
-          onClick={() => setShowSettings((v) => !v)}
-          aria-haspopup="menu"
-          aria-expanded={showSettings}
-          title="Settings"
-          style={{
-            fontFamily: "'Cinzel', serif",
-            fontSize: 10,
-            color: showSettings ? 'var(--accent)' : 'var(--text-dim)',
-            border: `1px solid ${showSettings ? 'var(--accent-dim)' : 'var(--border)'}`,
-            background: 'rgba(20,15,10,0.85)',
-            padding: '6px 11px',
-            borderRadius: 'var(--radius)',
-            cursor: 'pointer',
-            letterSpacing: '0.1em',
-            display: 'flex', alignItems: 'center', gap: 7,
-          }}
-        >
-          {/* Gear icon */}
-          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-            <circle cx="12" cy="12" r="3.2" stroke="currentColor" strokeWidth="1.8" />
-            <path d="M12 2.6v2.3M12 19.1v2.3M21.4 12h-2.3M5 12H2.6M18.6 5.4l-1.6 1.6M7 17l-1.6 1.6M18.6 18.6 17 17M7 7 5.4 5.4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
-          </svg>
-          <span style={{ maxWidth: 120, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{username}</span>
-          {isGuest && (
-            <span style={{
-              fontFamily: "'Cinzel', serif",
-              fontSize: 8,
-              padding: '2px 7px',
-              borderRadius: 2,
-              background: 'rgba(200,146,46,0.1)',
-              border: '1px solid rgba(200,146,46,0.35)',
-              color: 'var(--accent)',
-              letterSpacing: '0.15em',
-            }}>
-              GUEST
-            </span>
-          )}
-        </button>
-
-        {showSettings && (
-          <>
-            {/* Click-away catcher */}
-            <div
-              onClick={() => setShowSettings(false)}
-              aria-hidden="true"
-              style={{ position: 'fixed', inset: 0, zIndex: 25 }}
-            />
-            <div
-              role="menu"
-              style={{
-                position: 'absolute', top: 'calc(100% + 8px)', right: 0, zIndex: 31,
-                minWidth: 214,
-                background: 'var(--surface)',
-                border: '1px solid var(--border-lit)',
-                borderRadius: 'var(--radius)',
-                boxShadow: '0 14px 36px rgba(0,0,0,0.6)',
-                padding: 6,
-                display: 'flex', flexDirection: 'column', gap: 2,
-              }}
-            >
-              <div style={{ padding: '8px 10px 9px', borderBottom: '1px solid var(--border)', marginBottom: 3 }}>
-                <div style={{ fontFamily: "'Cinzel', serif", fontSize: 13, color: 'var(--text)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{username}</div>
-                <div style={{ fontFamily: "'Space Mono', monospace", fontSize: 9, color: 'var(--text-dim)', letterSpacing: '0.14em', textTransform: 'uppercase', marginTop: 2 }}>
-                  {isGuest ? 'Guest player' : 'Signed in'}
-                </div>
-              </div>
-
-              {!isGuest && (
-                <SettingItem
-                  label="Edit profile"
-                  onClick={() => { setShowSettings(false); setShowProfile(true); }}
-                  icon={(
-                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-                      <circle cx="12" cy="8" r="4" stroke="currentColor" strokeWidth="1.8" />
-                      <path d="M4 20c0-4 3.6-7 8-7s8 3 8 7" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
-                    </svg>
-                  )}
-                />
-              )}
-
-              {onToggleMusic && (
-                <SettingItem
-                  label={musicEnabled ? 'Music: On' : 'Music: Off'}
-                  onClick={() => onToggleMusic()}
-                  icon={musicEnabled ? (
-                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-                      <path d="M9 18V6l10-2v12" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
-                      <circle cx="6.5" cy="18" r="2.5" stroke="currentColor" strokeWidth="1.8" />
-                      <circle cx="16.5" cy="16" r="2.5" stroke="currentColor" strokeWidth="1.8" />
-                    </svg>
-                  ) : (
-                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-                      <path d="M9 18V6l10-2v12" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" opacity="0.5" />
-                      <path d="M3 3l18 18" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
-                    </svg>
-                  )}
-                />
-              )}
-
-              <div style={{ height: 1, background: 'var(--border)', margin: '3px 4px' }} />
-
-              {isGuest && onSignOutGuest ? (
-                <SettingItem label="Sign in to save →" accent onClick={() => { setShowSettings(false); onSignOutGuest(); }} />
-              ) : (
-                <SettingItem
-                  label="Leave Tavern"
-                  onClick={() => { setShowSettings(false); onSignOut(); }}
-                  icon={(
-                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-                      <path d="M14 8V6a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h6a2 2 0 0 0 2-2v-2" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
-                      <path d="M10 12h10m0 0-3-3m3 3-3 3" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
-                    </svg>
-                  )}
-                />
-              )}
-            </div>
-          </>
-        )}
-      </div>
 
       {/* ── Main content — tilted notice board ── */}
       <div
@@ -722,14 +566,6 @@ export function LandingScreen({
         <Suspense fallback={null}>
           <HowToPlayModal onClose={() => setShowHowToPlay(false)} />
         </Suspense>
-      )}
-
-      {showProfile && (
-        <UserProfile
-          username={username}
-          onUpdateUsername={onUpdateUsername}
-          onClose={() => setShowProfile(false)}
-        />
       )}
     </div>
   );
