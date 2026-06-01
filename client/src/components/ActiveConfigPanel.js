@@ -18,6 +18,7 @@
 // ============================================================
 
 import { useMemo, useState } from 'react';
+import { CloseIcon } from './shared/CloseIcon';
 
 // Label tables kept ASCII-only here — these are display text only
 // and don't need to share imports with the host settings panel
@@ -150,12 +151,13 @@ export function ActiveConfigPanel({ config }) {
             background: 'transparent',
             border: 'none',
             color: 'var(--text-dim)',
-            fontSize: 16,
-            lineHeight: 1,
             cursor: 'pointer',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
           }}
         >
-          ×
+          <CloseIcon size={15} />
         </button>
       </div>
       <ul style={{ listStyle: 'none', padding: 0, margin: 0, display: 'flex', flexDirection: 'column', gap: 8 }}>

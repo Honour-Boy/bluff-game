@@ -184,7 +184,9 @@ export function useOnlinePlayerUiController({
 
   const scrollToCenter = useCallback(() => {
     if (tableCenterRef.current) {
-      tableCenterRef.current.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      // The table scene pans horizontally now — bring the dealer's cards back
+      // into the centre of the view.
+      tableCenterRef.current.scrollIntoView({ behavior: 'smooth', inline: 'center', block: 'nearest' });
     }
   }, []);
 

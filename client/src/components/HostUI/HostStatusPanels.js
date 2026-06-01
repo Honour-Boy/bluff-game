@@ -1,6 +1,7 @@
 import { CardShape } from '../shared/CardShape';
 import { ShapeIcon } from '../shared/ShapeIcon';
 import { ActionLog } from '../ActionLog';
+import { CloseIcon } from '../shared/CloseIcon';
 
 const phasePanelBase = {
   padding: '12px 16px',
@@ -208,9 +209,10 @@ export function HostGameSummary({
           </span>
           <button
             onClick={onDismissEliminationBanner}
-            style={{ background: 'none', border: 'none', color: 'var(--text-dim)', cursor: 'pointer', fontSize: 16, lineHeight: 1 }}
+            aria-label="Dismiss"
+            style={{ background: 'none', border: 'none', color: 'var(--text-dim)', cursor: 'pointer', display: 'flex', alignItems: 'center' }}
           >
-            ✕
+            <CloseIcon size={15} />
           </button>
         </div>
       )}

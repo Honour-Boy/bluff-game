@@ -1,3 +1,5 @@
+import { CloseIcon } from '../shared/CloseIcon';
+
 const cardStyle = {
   background: 'linear-gradient(160deg, var(--surface2) 0%, var(--surface) 100%)',
   border: '1px solid var(--border-lit)',
@@ -75,9 +77,10 @@ export function HostControlsPanel({
                 <span>Patron eliminated. New required card: <strong>{eliminationBanner}</strong></span>
                 <button
                   onClick={onDismissEliminationBanner}
-                  style={{ background: 'none', border: 'none', color: 'var(--text-dim)', cursor: 'pointer', fontSize: 16, lineHeight: 1 }}
+                  aria-label="Dismiss"
+                  style={{ background: 'none', border: 'none', color: 'var(--text-dim)', cursor: 'pointer', display: 'flex', alignItems: 'center' }}
                 >
-                  ✕
+                  <CloseIcon size={15} />
                 </button>
               </div>
             )}

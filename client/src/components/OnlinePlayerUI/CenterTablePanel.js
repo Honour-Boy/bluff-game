@@ -81,15 +81,6 @@ function FaceDownStack({ count, label, warning = false }) {
   );
 }
 
-// ─── Table panel base style ───────────────────────────────────────────────────
-const tablePanelStyle = {
-  background: 'linear-gradient(160deg, rgba(20,15,10,0.95) 0%, rgba(10,8,5,0.97) 100%)',
-  border: '1px solid var(--border-lit)',
-  borderRadius: 6,
-  padding: '16px 14px',
-  boxShadow: '0 8px 28px rgba(0,0,0,0.6), inset 0 1px 0 rgba(255,255,255,0.03)',
-};
-
 // ─── CenterTablePanel — the felt surface at the heart of the table ────────────
 export function CenterTablePanel({
   tableCenterRef,
@@ -184,9 +175,9 @@ export function CenterTablePanel({
         </div>
       )}
 
-      {/* ── Lobby ── */}
+      {/* ── Lobby — written on the felt, no panel box ── */}
       {isLobby && (
-        <div style={{ ...tablePanelStyle, textAlign: 'center', display: 'flex', flexDirection: 'column', gap: 14 }}>
+        <div style={{ textAlign: 'center', display: 'flex', flexDirection: 'column', gap: 14, padding: '6px 8px', textShadow: '0 1px 4px rgba(0,0,0,0.85)' }}>
           <div style={{
             fontFamily: "'Cinzel', serif",
             fontSize: 9,
@@ -246,11 +237,8 @@ export function CenterTablePanel({
             <div
               className="fade-in"
               style={{
-                ...tablePanelStyle,
-                border: `1px solid ${lastAction.bluffCorrect ? 'var(--alive)' : 'var(--accent2)'}`,
-                background: lastAction.bluffCorrect
-                  ? 'linear-gradient(160deg, rgba(10,30,15,0.97) 0%, rgba(6,16,10,0.97) 100%)'
-                  : 'linear-gradient(160deg, rgba(30,8,8,0.97) 0%, rgba(16,5,5,0.97) 100%)',
+                padding: '4px 4px 8px',
+                textShadow: '0 1px 4px rgba(0,0,0,0.85)',
               }}
             >
               <div style={{
@@ -338,14 +326,12 @@ export function CenterTablePanel({
             </div>
           )}
 
-          {/* My spin turn — the revolver trigger panel */}
+          {/* My spin turn — the revolver trigger (button on the felt, no box) */}
           {isMySpinTurn && !isEliminated && (
             <div style={{
-              ...tablePanelStyle,
-              border: '1px solid var(--accent2)',
               textAlign: 'center',
-              background: 'linear-gradient(160deg, rgba(40,8,8,0.97) 0%, rgba(20,4,4,0.97) 100%)',
-              boxShadow: '0 0 30px rgba(155,28,28,0.2), 0 8px 28px rgba(0,0,0,0.6)',
+              padding: '6px 8px',
+              textShadow: '0 1px 4px rgba(0,0,0,0.85)',
             }}>
               <div style={{
                 fontFamily: "'Cinzel', serif",
@@ -386,18 +372,16 @@ export function CenterTablePanel({
             </div>
           )}
 
-          {/* Waiting for other player to spin */}
+          {/* Waiting for other player to spin — felt text */}
           {!isMySpinTurn && spinTargetPlayer && (
             <div style={{
-              padding: '14px 16px',
-              background: 'rgba(155,28,28,0.07)',
-              border: '1px solid rgba(155,28,28,0.4)',
-              borderRadius: 5,
+              padding: '10px 12px',
               fontFamily: "'Crimson Text', serif",
               fontSize: 14,
-              color: '#c85050',
+              color: '#e07a7a',
               textAlign: 'center',
               fontStyle: 'italic',
+              textShadow: '0 1px 4px rgba(0,0,0,0.85)',
               animation: 'pulse 1.8s ease-in-out infinite',
             }}>
               Waiting for <strong style={{ fontStyle: 'normal' }}>{spinTargetPlayer.username}</strong> to pull the trigger…
@@ -406,13 +390,12 @@ export function CenterTablePanel({
         </div>
       )}
 
-      {/* ── Game over ── */}
+      {/* ── Game over — written on the felt, no panel box ── */}
       {isGameOver && (
         <div style={{
-          ...tablePanelStyle,
           textAlign: 'center',
-          border: '1px solid var(--border-glow)',
-          boxShadow: '0 0 30px rgba(200,146,46,0.1), 0 8px 28px rgba(0,0,0,0.6)',
+          padding: '6px 8px',
+          textShadow: '0 1px 6px rgba(0,0,0,0.9)',
         }}>
           <div style={{
             fontFamily: "'Cinzel Decorative', 'Cinzel', serif",
