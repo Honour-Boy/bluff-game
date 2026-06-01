@@ -17,6 +17,10 @@ import { OnlinePlayerUI } from '../components/OnlinePlayerUI';
 import { Notification } from '../components/shared/Notification';
 import { SettingsGear } from '../components/shared/SettingsGear';
 import { ChatPanel } from '../components/ChatPanel';
+import { ControlsModal } from '../components/shared/ControlsModal';
+import { PreGameSettingsPanel } from '../components/screens/PreGameSettingsPanel';
+import { LobbyConfigSummary } from '../components/LobbyConfigSummary';
+import { LeaderboardPanel } from '../components/LeaderboardPanel';
 import { useIsMobile } from '../hooks/useIsMobile';
 
 // §M4 — non-blocking "reconnecting" pill shown while the socket is down but the
@@ -414,6 +418,33 @@ function HomeContent() {
   // single entry point on small screens.
   const isMobile = useIsMobile();
 
+  // ─── In-room controls hoisted into the global settings gear (Module 2) ──────
+  // The old bottom-right FAB is gone; the online table's controls (chat, game
+  // settings, leaderboard, leave, voice) now live in the top-right SettingsGear.
+  // The "game settings" / "leaderboard" dialogs render here (page level) so the
+  // gear can open them; everything is gated to online rooms so other screens are
+  // untouched.
+  const [gameSettingsOpen, setGameSettingsOpen] = useState(false);
+  const [leaderboardOpen, setLeaderboardOpen] = useState(false);
+  const inRoomOnline = !!roomCode && gameMode === 'online';
+  const phase = roomState?.phase;
+  const isLobby = phase === 'lobby';
+  const isGameOver = phase === 'game_over';
+  const aliveCount = (roomState?.players || []).filter((p) => p?.status === 'alive').length;
+  const leaveDisabled = !!isMyTurn && phase === 'playing' && myPlayer?.status !== 'eliminated';
+  const handleLeaveTable = useCallback(() => {
+    if (!!isMyTurn && roomState?.phase === 'playing' && myPlayer?.status !== 'eliminated') return;
+    const ph = roomState?.phase;
+    const isMidGame = !!ph && !['lobby', 'game_over'].includes(ph);
+    if (isMidGame && typeof window !== 'undefined'
+      && !window.confirm('Leave the table? You will forfeit and cannot rejoin this round.')) return;
+    leaveGame();
+  }, [isMyTurn, roomState?.phase, myPlayer?.status, leaveGame]);
+  // Close the in-room dialogs whenever we leave the room so they can't linger.
+  useEffect(() => {
+    if (!inRoomOnline) { setGameSettingsOpen(false); setLeaderboardOpen(false); }
+  }, [inRoomOnline]);
+
   // ─── Loading splash ────────────────────────────────────────
   if (loading) {
     return (
@@ -475,7 +506,47 @@ function HomeContent() {
         onSignOut={signOut}
         onSignOutGuest={signOutGuest}
         onUpdateUsername={updateUsername}
+        // ── In-room controls (Module 2) — only inside an online room ──
+        inRoom={inRoomOnline}
+        chatUnread={chatUnread}
+        onOpenChat={inRoomOnline ? openChat : undefined}
+        onOpenGameSettings={inRoomOnline ? () => setGameSettingsOpen(true) : undefined}
+        onOpenLeaderboard={inRoomOnline && roomState?.groupId ? () => setLeaderboardOpen(true) : undefined}
+        onLeaveTable={inRoomOnline ? handleLeaveTable : undefined}
+        leaveDisabled={leaveDisabled}
+        voice={inRoomOnline ? voice : undefined}
       />
+      {/* Game settings — host edits in the lobby, everyone else sees a summary */}
+      {inRoomOnline && gameSettingsOpen && (
+        <ControlsModal title="Game Settings" onClose={() => setGameSettingsOpen(false)}>
+          {isHost && isLobby && roomState?.config ? (
+            <PreGameSettingsPanel
+              config={roomState.config}
+              onChange={updateRoomConfig}
+              isGroupRoom={!!roomState?.groupId}
+              savedMeta={roomState?.groupSettingsMeta}
+              playerCount={aliveCount}
+            />
+          ) : roomState?.config ? (
+            <LobbyConfigSummary config={roomState.config} />
+          ) : (
+            <div style={{ color: 'var(--text-dim)', fontFamily: "'Crimson Text', serif", fontStyle: 'italic' }}>
+              No house rules configured yet.
+            </div>
+          )}
+        </ControlsModal>
+      )}
+      {inRoomOnline && leaderboardOpen && roomState?.groupId && (
+        <ControlsModal title="Leaderboard" onClose={() => setLeaderboardOpen(false)}>
+          <LeaderboardPanel
+            groupId={roomState.groupId}
+            currentUserId={myPlayer?.id || null}
+            highlightUserId={isGameOver ? (roomState?.lastAction?.winnerId || null) : null}
+            getGroupLeaderboard={getGroupLeaderboard}
+            leaderboardUpdateNonce={leaderboardUpdateNonce}
+          />
+        </ControlsModal>
+      )}
       {roomCode && (
         <ChatPanel
           messages={chatMessages}
