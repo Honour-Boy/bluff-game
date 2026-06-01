@@ -15,6 +15,18 @@
 import { useEffect, useMemo, useState } from 'react';
 import { VoicePanel } from './VoicePanel';
 
+// ─── Inline SVG icons (no emoji — keeps the tavern look crisp) ────────────────
+const ic = { width: 20, height: 20, viewBox: '0 0 24 24', fill: 'none', 'aria-hidden': true };
+const IconMenu = () => (<svg {...ic}><path d="M4 7h16M4 12h16M4 17h16" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" /></svg>);
+const IconClose = () => (<svg {...ic} width={18} height={18}><path d="M6 6l12 12M18 6 6 18" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" /></svg>);
+const IconCentralize = () => (<svg {...ic}><circle cx="12" cy="12" r="3" stroke="currentColor" strokeWidth="1.8" /><path d="M12 3v3M12 18v3M3 12h3M18 12h3" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" /></svg>);
+const IconChat = () => (<svg {...ic}><path d="M4 5h16v11H8l-4 4z" stroke="currentColor" strokeWidth="1.8" strokeLinejoin="round" /></svg>);
+const IconSpeakerOn = () => (<svg {...ic}><path d="M4 9v6h4l5 4V5L8 9H4z" stroke="currentColor" strokeWidth="1.8" strokeLinejoin="round" /><path d="M17 8a5 5 0 0 1 0 8" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" /></svg>);
+const IconSpeakerOff = () => (<svg {...ic}><path d="M4 9v6h4l5 4V5L8 9H4z" stroke="currentColor" strokeWidth="1.8" strokeLinejoin="round" /><path d="M16 9l5 5M21 9l-5 5" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" /></svg>);
+const IconNote = () => (<svg {...ic}><path d="M9 18V6l10-2v12" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" /><circle cx="6.5" cy="18" r="2.5" stroke="currentColor" strokeWidth="1.8" /><circle cx="16.5" cy="16" r="2.5" stroke="currentColor" strokeWidth="1.8" /></svg>);
+const IconNoteOff = () => (<svg {...ic}><path d="M9 18V6l10-2v12" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" opacity="0.5" /><path d="M3 3l18 18" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" /></svg>);
+const IconLeave = () => (<svg {...ic}><path d="M14 8V6a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h6a2 2 0 0 0 2-2v-2" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" /><path d="M10 12h10m0 0-3-3m3 3-3 3" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" /></svg>);
+
 // Mirror of ActiveConfigPanel's section labels — kept inline so
 // the menu stays self-contained and we don't pull a second
 // fixed-position component into the sheet.
@@ -107,6 +119,8 @@ export function MobileFabMenu({
   onToggleMusic,
   onOpenChat,
   chatUnread = 0,
+  onLeaveTable,
+  leaveDisabled = false,
   // On desktop the standalone VoicePanel still lives in the header, so the
   // menu omits its own voice section to avoid duplicate controls. #146
   showVoice = true,
@@ -169,7 +183,7 @@ export function MobileFabMenu({
             padding: 0,
           }}
         >
-          ☰
+          <IconMenu />
           {unreadLabel && (
             <span
               data-testid="mobile-fab-unread"
@@ -257,7 +271,7 @@ export function MobileFabMenu({
                 WebkitTapHighlightColor: 'transparent',
               }}
             >
-              ✕
+              <IconClose />
             </button>
           </div>
 
@@ -265,7 +279,7 @@ export function MobileFabMenu({
           <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
             {onCentralize && (
               <ItemButton
-                icon="↻"
+                icon={<IconCentralize />}
                 label="Centralize"
                 sub="Centre on the table"
                 onClick={() => { onCentralize(); close(); }}
@@ -273,7 +287,7 @@ export function MobileFabMenu({
             )}
             {onOpenChat && (
               <ItemButton
-                icon="💬"
+                icon={<IconChat />}
                 label="Chat"
                 sub="Open room chat"
                 onClick={() => { onOpenChat(); close(); }}
@@ -282,7 +296,7 @@ export function MobileFabMenu({
             )}
             {onToggleSpeech && (
               <ItemButton
-                icon={speechEnabled ? '🔊' : '🔇'}
+                icon={speechEnabled ? <IconSpeakerOn /> : <IconSpeakerOff />}
                 label={speechEnabled ? 'Mute announcements' : 'Unmute announcements'}
                 sub="Spoken event narration"
                 onClick={() => { onToggleSpeech(); }}
@@ -290,10 +304,18 @@ export function MobileFabMenu({
             )}
             {onToggleMusic && (
               <ItemButton
-                icon={musicEnabled ? '🎵' : '🔕'}
+                icon={musicEnabled ? <IconNote /> : <IconNoteOff />}
                 label={musicEnabled ? 'Mute music' : 'Unmute music'}
                 sub="Tavern background ambience"
                 onClick={() => { onToggleMusic(); }}
+              />
+            )}
+            {onLeaveTable && (
+              <ItemButton
+                icon={<IconLeave />}
+                label="Leave table"
+                sub={leaveDisabled ? 'Finish your turn first' : 'Forfeit and exit'}
+                onClick={() => { if (leaveDisabled) return; close(); onLeaveTable(); }}
               />
             )}
           </div>

@@ -79,7 +79,7 @@ export function PlayerChip({
         padding: compact ? 5 : 7,
         background: chipBg,
         border: `2px solid ${borderColor}`,
-        borderRadius: 6,
+        borderRadius: 8,
         opacity: alive ? 1 : 0.38,
         display: 'flex',
         flexDirection: 'column',

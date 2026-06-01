@@ -456,6 +456,15 @@ export function OnlinePlayerUI({
         onToggleMusic={toggleMusic}
         onOpenChat={openChat}
         chatUnread={chatUnread}
+        leaveDisabled={isMyTurn && isPlaying && !isEliminated}
+        onLeaveTable={() => {
+          if (isMyTurn && isPlaying && !isEliminated) return;
+          const isMidGame = !!phase && !['lobby', 'game_over'].includes(phase);
+          if (isMidGame && !window.confirm(
+            'Leave the table? You will forfeit and cannot rejoin this round.',
+          )) return;
+          leaveGame();
+        }}
       />
 
       <CoreGameOverlays

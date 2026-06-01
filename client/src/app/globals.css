@@ -2,37 +2,43 @@
 
 /* ─── Tavern Design System ──────────────────────────────────────────────────── */
 :root {
-  /* Backgrounds — dark seasoned hardwood */
-  --bg:        #090705;
-  --surface:   #100d09;
-  --surface2:  #1a1510;
-  --surface3:  #241d14;
+  /* ── "Smoke & Amber" tavern palette ──
+     Charcoal-brown shadows lifted off near-black, a punchy amber highlight,
+     and a distinct ember-red focal accent for primary actions. */
+  /* Backgrounds — smoked seasoned hardwood */
+  --bg:        #100f0d;
+  --surface:   #1a1714;
+  --surface2:  #241f19;
+  --surface3:  #2f2820;
 
   /* Borders — wood-grain edges */
-  --border:       #3a2c1c;
-  --border-lit:   #5e4527;
-  --border-glow:  #8a6335;
+  --border:       #463728;
+  --border-lit:   #6a5232;
+  --border-glow:  #8f6f3e;
 
-  /* Accent palette — candlelight, blood, verdigris */
-  --accent:     #c8922e;   /* tarnished gold / candlelight */
-  --accent-dim: #8a5e18;
-  --accent2:    #9b1c1c;   /* deep crimson / danger */
-  --accent3:    #3a7a52;   /* aged verdigris / success */
+  /* Accent palette — amber highlight, ember CTA, blood danger, verdigris */
+  --accent:     #f0b54a;   /* amber candlelight (highlight) */
+  --accent-dim: #b8862f;
+  --accent2:    #a8261d;   /* deep crimson / danger */
+  --accent3:    #3f8f7a;   /* aged verdigris-teal / success */
+  --ember:      #d4513a;   /* ember-red — primary focal CTA */
+  --ember-dim:  #a83a28;
 
   /* Text — aged parchment tones */
-  --text:     #e8d8b8;
-  --text-dim: #7a6848;
-  --text-mid: #a89070;
+  --text:     #ece0c8;
+  --text-dim: #998660;
+  --text-mid: #c4ab82;
 
   /* Game states */
-  --alive:      #3a7a52;
-  --eliminated: #9b1c1c;
-  --warning:    #c8922e;
+  --alive:      #3f8f7a;
+  --eliminated: #a8261d;
+  --warning:    #f0b54a;
 
-  /* Glow / shadow utilities */
-  --glow-gold:    rgba(200, 146, 46, 0.22);
-  --glow-crimson: rgba(155, 28, 28, 0.22);
-  --glow-green:   rgba(58, 122, 82, 0.22);
+  /* Glow / shadow utilities (names kept stable so existing refs update) */
+  --glow-gold:    rgba(240, 181, 74, 0.24);
+  --glow-crimson: rgba(168, 38, 29, 0.24);
+  --glow-green:   rgba(63, 143, 122, 0.22);
+  --glow-ember:   rgba(212, 81, 58, 0.32);
 
   /* Shape */
   --radius: 3px;
@@ -158,26 +164,46 @@ button:disabled {
   transform: none;
 }
 
-/* Primary — gilded gold seal */
+/* Primary — gilded amber seal */
 button.primary {
-  background: linear-gradient(160deg, #a0721e 0%, #c8922e 45%, #a0721e 100%);
-  border-color: #8a5e18;
-  color: #0d0a06;
+  background: linear-gradient(160deg, #b8862f 0%, #f0b54a 45%, #b8862f 100%);
+  border-color: #9a6f24;
+  color: #160d04;
   font-weight: 700;
-  text-shadow: 0 1px 0 rgba(255,220,140,0.3);
-  box-shadow: 0 2px 8px rgba(0,0,0,0.5), inset 0 1px 0 rgba(255,220,100,0.25);
+  text-shadow: 0 1px 0 rgba(255,225,150,0.3);
+  box-shadow: 0 2px 8px rgba(0,0,0,0.5), inset 0 1px 0 rgba(255,228,120,0.25);
 }
 
 button.primary:hover:not(:disabled) {
-  background: linear-gradient(160deg, #b8841e 0%, #e0a83e 45%, #b8841e 100%);
-  border-color: #c8922e;
-  color: #0a0804;
-  box-shadow: 0 4px 16px rgba(200,146,46,0.4), inset 0 1px 0 rgba(255,230,120,0.35);
+  background: linear-gradient(160deg, #c89732 0%, #ffc861 45%, #c89732 100%);
+  border-color: var(--accent);
+  color: #120a03;
+  box-shadow: 0 4px 16px var(--glow-gold), inset 0 1px 0 rgba(255,235,140,0.35);
   transform: translateY(-2px);
 }
 
 button.primary:focus-visible {
-  box-shadow: 0 0 0 2px rgba(200,146,46,0.5), 0 4px 20px rgba(200,146,46,0.5), inset 0 1px 0 rgba(255,230,120,0.35);
+  box-shadow: 0 0 0 2px rgba(240,181,74,0.5), 0 4px 20px var(--glow-gold), inset 0 1px 0 rgba(255,235,140,0.35);
+}
+
+/* Ember — the dominant focal CTA (Host a Table, primary actions) */
+button.ember {
+  background: linear-gradient(160deg, #a83a28 0%, #d4513a 45%, #a83a28 100%);
+  border-color: #8f2f20;
+  color: #fdeede;
+  font-weight: 700;
+  text-shadow: 0 1px 0 rgba(0,0,0,0.4);
+  box-shadow: 0 2px 10px rgba(0,0,0,0.5), inset 0 1px 0 rgba(255,185,155,0.25), 0 0 16px var(--glow-ember);
+}
+button.ember:hover:not(:disabled) {
+  background: linear-gradient(160deg, #c0432e 0%, #e6613f 45%, #c0432e 100%);
+  border-color: var(--ember);
+  color: #fff4ec;
+  box-shadow: 0 4px 22px var(--glow-ember), inset 0 1px 0 rgba(255,195,165,0.35);
+  transform: translateY(-2px);
+}
+button.ember:focus-visible {
+  box-shadow: 0 0 0 2px rgba(212,81,58,0.55), 0 4px 22px var(--glow-ember);
 }
 
 /* Danger — crimson wax */
@@ -410,6 +436,39 @@ body.phase-spin-pending::after {
 .screen-shake {
   animation: screen-shake 0.55s cubic-bezier(0.36, 0.07, 0.19, 0.97) both;
 }
+
+/* ─── Tavern UI refresh ───────────────────────────────────────────────────────── */
+/* Hanging tavern sign — gentle pendulum sway from its chains */
+@keyframes sign-sway {
+  0%, 100% { transform: rotate(-1.1deg); }
+  50%       { transform: rotate(1.1deg); }
+}
+.hanging-sign {
+  transform-origin: top center;
+  animation: sign-sway 6s ease-in-out infinite;
+}
+
+/* Subtle wood-grain / smoke texture overlay — drop inside a position:relative
+   panel as an absolutely-positioned, pointer-events:none child. */
+.wood-grain::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  border-radius: inherit;
+  opacity: 0.5;
+  background:
+    repeating-linear-gradient(96deg, rgba(0,0,0,0.16) 0px, rgba(0,0,0,0) 2px, rgba(255,255,255,0.012) 4px, rgba(0,0,0,0) 7px),
+    radial-gradient(ellipse 120% 80% at 50% -10%, rgba(240,181,74,0.05) 0%, transparent 60%);
+  mix-blend-mode: overlay;
+}
+
+/* Ember/candle focal glow ring — for the required-suit focal element */
+@keyframes focal-breathe {
+  0%, 100% { box-shadow: 0 0 18px rgba(240,181,74,0.25), inset 0 0 14px rgba(240,181,74,0.08); }
+  50%       { box-shadow: 0 0 30px rgba(240,181,74,0.42), inset 0 0 18px rgba(240,181,74,0.12); }
+}
+.focal-breathe { animation: focal-breathe 3.4s ease-in-out infinite; }
 
 /* ─── Reduced-motion safety ─────────────────────────────────────────────────── */
 @media (prefers-reduced-motion: reduce) {

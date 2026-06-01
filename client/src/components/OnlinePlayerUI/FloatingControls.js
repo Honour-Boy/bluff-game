@@ -16,6 +16,8 @@ export function FloatingControls({
   onToggleMusic,
   onOpenChat,
   chatUnread,
+  onLeaveTable,
+  leaveDisabled = false,
 }) {
   return (
     <MobileFabMenu
@@ -28,6 +30,8 @@ export function FloatingControls({
       onToggleMusic={onToggleMusic}
       onOpenChat={onOpenChat}
       chatUnread={chatUnread}
+      onLeaveTable={onLeaveTable}
+      leaveDisabled={leaveDisabled}
       showVoice={isMobile}
     />
   );
