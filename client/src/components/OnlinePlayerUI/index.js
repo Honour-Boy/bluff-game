@@ -180,13 +180,17 @@ export function OnlinePlayerUI({
   const prevSpinCompleteRef = useRef(false);
   useEffect(() => {
     if (ui.spinComplete && !prevSpinCompleteRef.current) {
-      // Just stop any leftover click timers. The result cues (celebratory
-      // survival chime / elimination toll) were removed per request — the
-      // mechanical clicks during the spin are the only spin audio now.
+      // Stop any leftover click timers. (Module 8.2) When the cylinder locks on
+      // a lethal chamber (the server's spin_result reports an elimination), fire
+      // the high-impact gunshot cue right as the result lands.
       stopSpinAudio();
+      const la = roomState?.lastAction;
+      if (la && la.type === 'spin_result' && la.eliminated) {
+        triggerAudio('gunshot');
+      }
     }
     prevSpinCompleteRef.current = ui.spinComplete;
-  }, [ui.spinComplete, stopSpinAudio]);
+  }, [ui.spinComplete, stopSpinAudio, triggerAudio, roomState?.lastAction]);
 
   // Cleanup spin audio timers on unmount
   useEffect(() => () => {

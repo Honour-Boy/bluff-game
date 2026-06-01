@@ -71,6 +71,9 @@ export function SettingsGear({
   isGuest = false,
   musicEnabled = true,
   onToggleMusic,
+  // (Module 5.3) master music volume (0..1) + setter for the in-menu slider.
+  musicVolume = 1,
+  onSetMusicVolume,
   onSignOut,
   onSignOutGuest,
   onUpdateUsername,
@@ -246,6 +249,29 @@ export function SettingsGear({
                     </svg>
                   )}
                 />
+              )}
+
+              {onSetMusicVolume && (
+                <div style={{ padding: '6px 10px 8px' }}>
+                  <div style={{
+                    display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                    fontFamily: "'Space Mono', monospace", fontSize: 9,
+                    color: 'var(--text-dim)', letterSpacing: '0.12em',
+                    textTransform: 'uppercase', marginBottom: 5,
+                  }}>
+                    <span>Music volume</span>
+                    <span>{Math.round((musicVolume ?? 1) * 100)}%</span>
+                  </div>
+                  <input
+                    type="range"
+                    min={0}
+                    max={100}
+                    value={Math.round((musicVolume ?? 1) * 100)}
+                    onChange={(e) => onSetMusicVolume((Number(e.target.value) || 0) / 100)}
+                    aria-label="Music volume"
+                    style={{ width: '100%', accentColor: 'var(--accent)', cursor: 'pointer' }}
+                  />
+                </div>
               )}
 
               {onToggleMusic && (
