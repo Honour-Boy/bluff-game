@@ -127,18 +127,21 @@ export function CenterTablePanel({
       ref={tableCenterRef}
       style={{ display: 'flex', flexDirection: 'column', alignItems: 'stretch', gap: 10 }}
     >
-      {/* ── Active game: deck / required card / played pile ── */}
+      {/* ── Active game: deck / required card / played pile ──
+           A dealer's tray sunk into the felt — semi-transparent so the cloth
+           shows through, with a brass hairline and an inner shadow so it reads
+           as recessed rather than a box floating on top. */}
       {(isPlaying || isSpinPending || isRoundEnd) && (
         <div style={{
-          ...tablePanelStyle,
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'space-around',
           gap: 12,
-          background: `
-            radial-gradient(ellipse at center, rgba(39,84,55,0.88) 0%, rgba(14,26,17,0.96) 100%),
-            linear-gradient(160deg, rgba(26,20,12,0.95) 0%, rgba(12,9,6,0.97) 100%)
-          `,
+          padding: '16px 16px',
+          borderRadius: 20,
+          background: 'radial-gradient(ellipse at center, rgba(9,21,13,0.55) 0%, rgba(7,16,10,0.3) 72%, rgba(7,16,10,0) 100%)',
+          border: '1px solid rgba(200,146,46,0.3)',
+          boxShadow: 'inset 0 3px 22px rgba(0,0,0,0.55), inset 0 0 0 1px rgba(255,255,255,0.02), 0 1px 0 rgba(255,255,255,0.05)',
         }}>
           <FaceDownStack count={deckSize} label="Draw" warning={deckSize < 5 && deckSize > 0} />
 
