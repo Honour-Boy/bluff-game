@@ -79,6 +79,79 @@ function FaceDownStack({ count, label, warning = false }) {
   );
 }
 
+// ─── Lobby ambience — looping "imaginary deal" ───────────────────────────────
+// While the table waits in the lobby, a phantom dealer flicks face-down cards
+// out to five fanned seats and back, forever. Pure CSS (see lobbyDeal in
+// helpers.js); decorative only (aria-hidden, pointer-events:none).
+function LobbyDealCardBack() {
+  return (
+    <div style={{
+      width: '100%', height: '100%',
+      background: 'linear-gradient(135deg, #1e1410 0%, #120d09 50%, #1a1108 100%)',
+      border: '1px solid var(--border-lit)',
+      borderRadius: 6,
+      boxShadow: '0 6px 16px rgba(0,0,0,0.5)',
+      position: 'relative', overflow: 'hidden',
+    }}>
+      <svg width="100%" height="100%" viewBox="0 0 36 52" preserveAspectRatio="none" style={{ position: 'absolute', inset: 0, opacity: 0.28 }} aria-hidden>
+        <rect x="3" y="3" width="30" height="46" rx="3" fill="none" stroke="var(--accent)" strokeWidth="0.8" />
+        <polygon points="18,13 23,20 18,27 13,20" fill="none" stroke="var(--accent)" strokeWidth="0.7" />
+      </svg>
+    </div>
+  );
+}
+
+function LobbyDealAnimation() {
+  // Fanned target offsets (px) + tilt for each dealt card, and a stagger delay
+  // so the flicks cascade. Cards deal UP-and-out from the centre deck.
+  const seats = [
+    { lx: -116, ly: -14, lr: -20, delay: 0 },
+    { lx: -58, ly: -34, lr: -10, delay: 0.34 },
+    { lx: 0, ly: -42, lr: 0, delay: 0.68 },
+    { lx: 58, ly: -34, lr: 10, delay: 1.02 },
+    { lx: 116, ly: -14, lr: 20, delay: 1.36 },
+  ];
+  return (
+    <div
+      aria-hidden="true"
+      style={{
+        position: 'relative',
+        height: 96,
+        width: '100%',
+        maxWidth: 300,
+        margin: '0 auto',
+        pointerEvents: 'none',
+      }}
+    >
+      {/* The phantom deck at centre-bottom */}
+      <div style={{ position: 'absolute', left: '50%', bottom: 4, width: 36, height: 52, transform: 'translateX(-50%)' }}>
+        <LobbyDealCardBack />
+      </div>
+      {/* Cards flicking out to the fanned seats, looping */}
+      {seats.map((s, i) => (
+        <div
+          key={i}
+          className="lobby-deal-card"
+          style={{
+            position: 'absolute',
+            left: '50%',
+            bottom: 4,
+            width: 36,
+            height: 52,
+            marginLeft: -18,
+            animationDelay: `${s.delay}s`,
+            '--lx': `${s.lx}px`,
+            '--ly': `${s.ly}px`,
+            '--lr': `${s.lr}deg`,
+          }}
+        >
+          <LobbyDealCardBack />
+        </div>
+      ))}
+    </div>
+  );
+}
+
 // ─── CenterTablePanel — the felt surface at the heart of the table ────────────
 export function CenterTablePanel({
   tableCenterRef,
@@ -133,7 +206,9 @@ export function CenterTablePanel({
           gap: 10,
           padding: '6px 4px',
         }}>
-          <FaceDownStack count={deckSize} label="Draw" warning={deckSize < 5 && deckSize > 0} />
+          <div data-deck-anchor>
+            <FaceDownStack count={deckSize} label="Draw" warning={deckSize < 5 && deckSize > 0} />
+          </div>
 
           {/* Required suit — the table's bright focal point (dealer's tray) */}
           <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8 }}>
@@ -187,6 +262,10 @@ export function CenterTablePanel({
           }}>
             Waiting Room · {alivePlayers.length} patron{alivePlayers.length !== 1 ? 's' : ''} seated
           </div>
+
+          {/* Ambient looping deal while patrons wait for the game to begin. */}
+          <LobbyDealAnimation />
+
           {isHost ? (
             <>
               <button

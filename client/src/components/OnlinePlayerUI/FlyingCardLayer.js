@@ -17,14 +17,38 @@ let _flightKey = 0;
 
 export function useCardFlight() {
   const [flights, setFlights] = useState([]);
-  const launch = useCallback((card, from, to) => {
-    if (!card || !from || !to) return;
+  // opts: { mode: 'out'|'in', back: boolean }. 'out' (default) arcs to the
+  // target and fades (card → pile/deck); 'in' sails from the source and LANDS
+  // face-down (deck → hand, used by the global-reshuffle deal-back).
+  const launch = useCallback((card, from, to, opts = {}) => {
+    if (!from || !to) return;
     const key = ++_flightKey;
-    setFlights((list) => [...list, { key, card, from, to }]);
-    // Remove once the CSS animation (0.62s) has finished.
+    const mode = opts.mode === 'in' ? 'in' : 'out';
+    const back = !!opts.back;
+    setFlights((list) => [...list, { key, card, from, to, mode, back }]);
+    // Remove once the CSS animation (~0.62s) has finished.
     setTimeout(() => setFlights((list) => list.filter((f) => f.key !== key)), 700);
   }, []);
   return { flights, launch };
+}
+
+// Leather card back — used while a card is travelling to/from the deck face-down.
+function FlyingCardBack() {
+  return (
+    <div style={{
+      width: '100%', height: '100%',
+      background: 'linear-gradient(135deg, #1e1410 0%, #120d09 50%, #1a1108 100%)',
+      border: '1px solid var(--border-lit)',
+      borderRadius: 7,
+      boxShadow: '0 10px 26px rgba(0,0,0,0.6)',
+      position: 'relative', overflow: 'hidden',
+    }}>
+      <svg width="100%" height="100%" viewBox="0 0 44 64" preserveAspectRatio="none" style={{ position: 'absolute', inset: 0, opacity: 0.3 }} aria-hidden>
+        <rect x="4" y="4" width="36" height="56" rx="3" fill="none" stroke="var(--accent)" strokeWidth="0.8" />
+        <polygon points="22,16 28,24 22,32 16,24" fill="none" stroke="var(--accent)" strokeWidth="0.7" />
+      </svg>
+    </div>
+  );
 }
 
 function FlyingCardFace({ card }) {
@@ -69,14 +93,14 @@ export function FlyingCardLayer({ flights }) {
   if (!flights || flights.length === 0) return null;
   return (
     <div style={{ position: 'fixed', inset: 0, pointerEvents: 'none', zIndex: 9700 }} aria-hidden="true">
-      {flights.map(({ key, card, from, to }) => {
+      {flights.map(({ key, card, from, to, mode, back }) => {
         const dx = (to.left + to.width / 2) - (from.left + from.width / 2);
         const dy = (to.top + to.height / 2) - (from.top + from.height / 2);
         const rot = (key % 2 === 0 ? 1 : -1) * (6 + (key % 7));
         return (
           <div
             key={key}
-            className="card-fly"
+            className={mode === 'in' ? 'card-fly-in' : 'card-fly'}
             style={{
               position: 'fixed',
               left: from.left,
@@ -88,7 +112,7 @@ export function FlyingCardLayer({ flights }) {
               '--fly-rot': `${rot}deg`,
             }}
           >
-            <FlyingCardFace card={card} />
+            {back ? <FlyingCardBack /> : <FlyingCardFace card={card} />}
           </div>
         );
       })}

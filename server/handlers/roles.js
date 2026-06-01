@@ -7,7 +7,7 @@ const engine = require('../gameEngine');
 const { getRoom, saveRoom } = require('../lib/state');
 const { broadcastRoomState } = require('../lib/broadcast');
 const { maybeRecordGroupWinner } = require('../lib/roomBuilders');
-const { applyBluffOutcome, _maybeOpenBetting, _scheduleSpinPendingTimeout } = require('../lib/orchestration');
+const { applyBluffOutcome, _maybeOpenBetting, _scheduleSpinPendingTimeout, applySpinAndBroadcast } = require('../lib/orchestration');
 
 function register(io, socket, deps) {
   const { leaderboardRepo } = deps;
@@ -173,6 +173,16 @@ function register(io, socket, deps) {
 
       room.pendingSniperRedirect = null;
       applyBluffOutcome(room, outcome);
+
+      // Russian Roulette — the (re-targeted) failed bluff fires an immediate
+      // spin: no manual pull / betting pause.
+      if (engine.shouldImmediateSpin(room)) {
+        const target = room.players.find(p => p.id === room.spinTargetId);
+        await saveRoom(room);
+        if (banner) io.to(code).emit('power_card_triggered', banner);
+        await applySpinAndBroadcast(io, code, room, target, leaderboardRepo);
+        return callback?.({ success: true, redirected: !!newTargetId });
+      }
 
       if (room.phase === 'spin_pending') {
         _maybeOpenBetting(io, room);

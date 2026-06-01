@@ -44,6 +44,9 @@ export function BottomSeat({
   handlePowerCardClick,
   phase,
   leaveGame,
+  // (Global redeal) while true the hand fan is emptied (faded out) so the
+  // fly-out → deal-back card flight reads as the dock being re-dealt.
+  reshuffling = false,
 }) {
   const shapeCardCount = myHand.filter((card) => card?.type !== 'power').length;
   const powerCardCount = (myPowerCardSlot?.length || 0)
@@ -398,7 +401,14 @@ export function BottomSeat({
                   drawing a line across the card count. The fan sits in its own
                   flow now, clear of the label.
                   (Module 2.2) A shorter fan on mobile keeps the dock compact. */}
-              <div style={{ flex: 1, minWidth: 0 }}>
+              <div style={{
+                flex: 1,
+                minWidth: 0,
+                // (Global redeal) empty the fan during the fly-out/deal-back so
+                // the flying card backs are the only cards visible mid-swap.
+                opacity: reshuffling ? 0 : 1,
+                transition: 'opacity .3s',
+              }}>
                 <CardHand
                   hand={myHand}
                   powerCardSlot={myPowerCardSlot}

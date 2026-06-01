@@ -434,6 +434,33 @@ describe('Medic — save flow', () => {
     expect(p0.medicSavesUsed).toBe(1);
   });
 
+  it('the Medic can save THEMSELVES after being eliminated by their own spin', () => {
+    // Regression: spinGun flips the spun player to 'eliminated' before the save
+    // prompt opens, so the Medic (p0) is 'eliminated' at decision time. A plain
+    // alive-only medic lookup denied every self-save ("couldn't save myself").
+    const { room, p0 } = setupMedicRoom();
+    p0.status = 'eliminated';
+    p0.isSpectator = true;
+
+    // findAvailableMedic must surface the just-eliminated Medic for a self-save.
+    expect(findAvailableMedic(room, 'p0')).toBe(p0);
+
+    const res = applyMedicSave(room, 'p0', 'spin');
+    expect(res.ok).toBe(true);
+    expect(res.revivedPlayerId).toBe('p0');
+    expect(p0.status).toBe('alive');
+    expect(p0.isSpectator).toBe(false);
+    expect(p0.medicSavesUsed).toBe(1);
+  });
+
+  it('a Medic eliminated EARLIER (not by this spin) still cannot save', () => {
+    // includeEliminatedId only whitelists the player the prompt is FOR; a Medic
+    // who died on a previous turn stays dead and unavailable.
+    const { room, p0 } = setupMedicRoom();
+    p0.status = 'eliminated';
+    expect(findAvailableMedic(room, 'p1')).toBeNull();
+  });
+
   it('save bumps chamber by 1 on spin source', () => {
     const { room, p1 } = setupMedicRoom();
     p1.status = 'eliminated';

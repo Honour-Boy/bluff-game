@@ -29,6 +29,9 @@ export function RolePromptOverlays({
   roomState,
   players,
   spectatedHand,
+  // (Role timing) hold the spin-triggered decision prompts (Medic / Sniper)
+  // until the cylinder animation has resolved.
+  holdForSpin = false,
 }) {
   return (
     <>
@@ -127,7 +130,7 @@ export function RolePromptOverlays({
         </div>
       )}
 
-      {amTargetMedic && medicPending && (
+      {amTargetMedic && medicPending && !holdForSpin && (
         <div
           style={{
             position: 'fixed',
@@ -201,7 +204,7 @@ export function RolePromptOverlays({
         </div>
       )}
 
-      {amTargetSniper && sniperPending && (
+      {amTargetSniper && sniperPending && !holdForSpin && (
         <div
           style={{
             position: 'fixed',

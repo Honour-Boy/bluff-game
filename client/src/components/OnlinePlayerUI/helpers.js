@@ -27,6 +27,14 @@ export const GAME_UI_STYLE = `
     100% { transform: translate(var(--fly-dx), var(--fly-dy)) rotate(var(--fly-rot, 8deg)) scale(0.46); opacity: 0; }
   }
   .card-fly { animation: cardFly 0.62s cubic-bezier(0.45, 0, 0.2, 1) forwards; will-change: transform, opacity; }
+  /* Card-fly IN: a face-down card sails from the deck and LANDS in the hand
+     (the global-reshuffle "deal back" half). Unlike cardFly it ends visible. */
+  @keyframes cardFlyIn {
+    0%   { transform: translate(0,0) rotate(var(--fly-rot, -6deg)) scale(0.5); opacity: 0; }
+    25%  { opacity: 1; }
+    100% { transform: translate(var(--fly-dx), var(--fly-dy)) rotate(0deg) scale(1); opacity: 1; }
+  }
+  .card-fly-in { animation: cardFlyIn 0.6s cubic-bezier(0.2, 0.7, 0.3, 1) forwards; will-change: transform, opacity; }
   /* Active-turn chip: warm amber candlelight pulse */
   @keyframes chipTurnPulse {
     0%, 100% { box-shadow: 0 0 8px rgba(200,146,46,0.3), 0 2px 8px rgba(0,0,0,0.6); }
@@ -52,6 +60,21 @@ export const GAME_UI_STYLE = `
     0%, 100% { opacity: 1; }
     30%       { opacity: 0.3; }
     60%       { opacity: 1; }
+  }
+  /* Lobby ambience — an imaginary dealer flicks face-down cards out to the
+     empty seats while patrons wait. Each card flies from the centre deck to its
+     fanned spot (--lx/--ly/--lr), holds, then fades so the loop re-deals. Per-
+     card animation-delay staggers the flick into a continuous cascade. */
+  @keyframes lobbyDeal {
+    0%   { transform: translate(0,0) rotate(0deg) scale(0.62); opacity: 0; }
+    8%   { opacity: 1; }
+    34%  { transform: translate(var(--lx,0), var(--ly,0)) rotate(var(--lr,0deg)) scale(1); opacity: 1; }
+    82%  { transform: translate(var(--lx,0), var(--ly,0)) rotate(var(--lr,0deg)) scale(1); opacity: 1; }
+    100% { transform: translate(var(--lx,0), var(--ly,0)) rotate(var(--lr,0deg)) scale(0.96); opacity: 0; }
+  }
+  .lobby-deal-card { animation: lobbyDeal 3.4s ease-in-out infinite; will-change: transform, opacity; }
+  @media (prefers-reduced-motion: reduce) {
+    .lobby-deal-card { animation: none; opacity: 0.35; }
   }
 
   .topdown-table-scene {

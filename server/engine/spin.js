@@ -17,8 +17,9 @@ const { shuffleDeck } = require('./deck');
  */
 function getSpinModifiers(room) {
   const r = room?.config?.riskModifiers || {};
+  // Double Barrel is a start-of-game chamber load (initChamber(2)), not a
+  // pull-time modifier — only Hot Potato changes pullTrigger behaviour.
   return {
-    doubleBarrel: !!r.doubleBarrel,
     hotPotato: !!r.hotPotato,
   };
 }
@@ -29,8 +30,8 @@ function getSpinModifiers(room) {
  * SURVIVAL we revert the chamber back to its pre-spin state. External
  * modifiers like Sudden Death still bump Gambler's risk — spec.
  *
- * v2 Phase E1 — Risk modifiers (Double Barrel, Hot Potato) are
- * forwarded to pullTrigger via `modifiers`.
+ * v2 Phase E1 — the Hot Potato risk modifier is forwarded to
+ * pullTrigger via `modifiers`.
  */
 function spinGun(player, modifiers = {}) {
   const isGambler = player.role === 'gambler';

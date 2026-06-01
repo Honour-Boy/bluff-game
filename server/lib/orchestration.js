@@ -78,7 +78,9 @@ function maybeStartSniperPause(io, room, outcome) {
 }
 
 function maybeStartMedicPause(io, room, eliminatedPlayerId, source, finaliseFn) {
-  const medic = engine.findAvailableMedic(room);
+  // Pass the just-eliminated id so a Medic eliminated by THIS spin can still be
+  // found to save themselves (spinGun already flipped them to 'eliminated').
+  const medic = engine.findAvailableMedic(room, eliminatedPlayerId);
   if (!medic) return false;
 
   const eliminated = room.players.find(p => p.id === eliminatedPlayerId);

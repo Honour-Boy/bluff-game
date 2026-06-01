@@ -143,6 +143,7 @@ module.exports = {
   // ─── Risk/Room modifiers + Ghost vote + Last Stand ───────
   tickSuddenDeath: modifiers.tickSuddenDeath,
   resetSuddenDeath: modifiers.resetSuddenDeath,
+  shouldImmediateSpin: modifiers.shouldImmediateSpin,
   getMirrorMatchOpposite: modifiers.getMirrorMatchOpposite,
   isMirrorMatchEligibleAtStart: modifiers.isMirrorMatchEligibleAtStart,
   pickRedemptionCandidates: modifiers.pickRedemptionCandidates,

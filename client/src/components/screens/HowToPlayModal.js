@@ -42,11 +42,11 @@ const ROLE_ORDER = [
 const RISK_MODS = [
   {
     label: "Double Barrel",
-    desc: "Every spin rolls twice and takes the higher index. Lethal.",
+    desc: "Every chamber starts with two bullets loaded. The opening turns are already a coin flip.",
   },
   {
     label: "Russian Roulette",
-    desc: "Every chamber starts with three bullets loaded. The opening turns are already a coin flip.",
+    desc: "A failed bluff fires immediately — no pause to pull the trigger yourself.",
   },
   {
     label: "Hot Potato",
