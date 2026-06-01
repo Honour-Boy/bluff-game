@@ -6,6 +6,7 @@ import { TableScene } from './TableScene';
 import { BottomSeat } from './BottomSeat';
 import { FloatingControls } from './FloatingControls';
 import { CoreGameOverlays } from './CoreGameOverlays';
+import { FlyingCardLayer, useCardFlight } from './FlyingCardLayer';
 import { PowerFlowOverlays } from './PowerFlowOverlays';
 import { RolePromptOverlays } from './RolePromptOverlays';
 import { SystemsLayer } from './SystemsLayer';
@@ -70,6 +71,8 @@ export function OnlinePlayerUI({
   // Here we only expose the mute toggle for the in-game menu; it shares the
   // same store as the landing settings gear, so the two never drift.
   const { musicEnabled, toggleMusic } = useMusic();
+  // Card-fly: fixed-layer clones that arc from the hand to the discard pile.
+  const { flights, launch: launchCardFlight } = useCardFlight();
 
   const myHand = roomState?.myHand || [];
   const myPowerCardSlot = roomState?.myPowerCardSlot || [];
@@ -480,6 +483,7 @@ export function OnlinePlayerUI({
         setWhotPickerCard={ui.setWhotPickerCard}
         setSelectedCardId={ui.setSelectedCardId}
         playCardOnline={playCardOnline}
+        launchCardFlight={launchCardFlight}
         justEliminated={ui.justEliminated}
         setJustEliminated={ui.setJustEliminated}
         showHowToPlay={ui.showHowToPlay}
@@ -585,6 +589,8 @@ export function OnlinePlayerUI({
         setLastStandSpinBusy={ui.setLastStandSpinBusy}
         lastStandSpin={lastStandSpin}
       />
+
+      <FlyingCardLayer flights={flights} />
 
       <style>{GAME_UI_STYLE}</style>
     </div>

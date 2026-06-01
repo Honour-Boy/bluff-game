@@ -85,9 +85,10 @@ function installAudioUnlock() {
   const events = ['touchstart', 'touchend', 'pointerdown', 'mousedown', 'keydown', 'click'];
   const handler = () => {
     _unlockAudio();
+    // Resume the current section's track within the gesture (mobile autoplay).
+    try { _musicResume(); } catch (_) {}
     const ctx = getCtx();
     if (ctx && ctx.state === 'running') {
-      try { _musicStart(); } catch (_) {}
       events.forEach((e) => document.removeEventListener(e, handler, true));
     }
   };
@@ -344,21 +345,21 @@ function playSpinClunk(ctx) {
   osc.stop(now + 0.28);
 }
 
-// ─── Procedural tavern ambience (background music bed) ──────────────────────────
-// A self-contained, infinitely-generative bed — no asset files, matching the
-// all-synth cue design above. Two warm detuned drones (root + fifth + octave)
-// form an open, never-resolving pad that loops forever without an audible seam;
-// a slow LFO makes it "breathe"; and an occasional soft lute pluck from a
-// pentatonic scale gives it a tavern-minstrel feel. Everything routes through a
-// single `musicGain` so cues can sidechain-duck it (LOUD cue → quiet music →
-// restore). The whole graph lives on `window.__bluffMusic` so it is a true
-// singleton across React remounts and there is only ever one bed playing.
-
-const MUSIC_BASE_GAIN = 0.16;   // subtle bed level
-const MUSIC_DUCK_GAIN = 0.045;  // ducked level while a cue plays
-const MUSIC_FADE = 1.2;         // fade-in / fade-out seconds
-// G-pentatonic across two octaves — warm, folk, always-consonant.
-const PENTATONIC = [196.0, 220.0, 246.94, 293.66, 329.63, 392.0, 440.0];
+// ─── Background music — SECTION-BASED, the player's OWN tracks (HTMLAudio) ───────
+// Each app SECTION has its own track(s). Moving to a new section stops the old
+// track and starts the new one. A section with ONE track loops; a section with
+// TWO+ plays them in sequence and loops the sequence (assign two if you don't
+// want a single track to simply repeat). Subtle volume, auto-ducks under cues,
+// muteable, mobile-unlocked. Drop files in client/public/audio/ (see README);
+// a missing file for a section just leaves it silent — cues still play.
+const MUSIC_SECTIONS = {
+  lobby:    ['/audio/BLUFF Tavern.mp3'],          // landing + game setup + in-room lobby
+  game:     ['/audio/Gutter-Candle Dread.mp3'],   // active game at the table
+  groups:   ['/audio/Nordic Hums.mp3'],           // the whole Groups area
+  gameover: ['/audio/BLUFF Tavern (1).mp3'],      // after a game ends (results)
+};
+const MUSIC_BASE_VOL = 0.28;  // subtle bed level (0–1)
+const MUSIC_DUCK_VOL = 0.08;  // ducked level while a cue plays
 
 function _musicMutedFromStorage() {
   try { return window.localStorage.getItem('bluff_music_muted') === '1'; }
@@ -373,160 +374,125 @@ function _subscribeMuted(cb) { _mutedListeners.add(cb); return () => _mutedListe
 function _notifyMuted() { _mutedListeners.forEach((cb) => { try { cb(); } catch (_) {} }); }
 function _getMutedSnapshot() {
   if (typeof window === 'undefined') return false;
-  const m = window.__bluffMusic;
-  return m ? !!m.muted : _musicMutedFromStorage();
+  const t = window.__bluffTrack;
+  return t ? !!t.muted : _musicMutedFromStorage();
 }
 
-// One soft plucked lute note into `dest` (the breathing pad bus).
-function _pluck(ctx, dest, freq) {
-  const now = ctx.currentTime;
-  const osc = ctx.createOscillator();
-  const harm = ctx.createOscillator();
-  const gain = ctx.createGain();
-  osc.type = 'triangle';
-  harm.type = 'sine';
-  osc.frequency.value = freq;
-  harm.frequency.value = freq * 2.001; // tiny detune = string shimmer
-  gain.gain.setValueAtTime(0.0001, now);
-  gain.gain.exponentialRampToValueAtTime(0.12, now + 0.015);
-  gain.gain.exponentialRampToValueAtTime(0.001, now + 1.1);
-  osc.connect(gain); harm.connect(gain); gain.connect(dest);
-  osc.start(now); harm.start(now);
-  osc.stop(now + 1.2); harm.stop(now + 1.2);
-}
-
-function _scheduleNextPluck(m) {
-  // 4–9s apart; occasionally a quick two-note answer.
-  const delay = 4000 + Math.random() * 5000;
-  m.pluckTimer = setTimeout(() => {
-    if (!m || !m.started) return;
-    const ctx = m.ctx;
-    const root = PENTATONIC[Math.floor(Math.random() * PENTATONIC.length)];
-    try { _pluck(ctx, m.padBus, root); } catch (_) {}
-    if (Math.random() < 0.4) {
-      const second = PENTATONIC[Math.floor(Math.random() * PENTATONIC.length)];
-      setTimeout(() => { try { _pluck(ctx, m.padBus, second); } catch (_) {} }, 240);
-    }
-    _scheduleNextPluck(m);
-  }, delay);
-}
-
-// Build (once) the ambience graph on the window singleton.
-function _ensureMusicEngine() {
-  if (typeof window === 'undefined') return null;
-  if (window.__bluffMusic) return window.__bluffMusic;
-  const ctx = getCtx();
-  if (!ctx) return null;
-
-  const musicGain = ctx.createGain();
-  musicGain.gain.value = 0; // silent until startMusic fades it up
-
-  // Warm master low-pass — keeps the bed mellow, like music heard through a
-  // tavern door rather than a hi-fi.
-  const warmth = ctx.createBiquadFilter();
-  warmth.type = 'lowpass';
-  warmth.frequency.value = 1500;
-  warmth.Q.value = 0.5;
-  warmth.connect(musicGain);
-  musicGain.connect(masterOut(ctx));
-
-  // Drone bus (steady) + pad bus (breathing) both feed the warmth filter.
-  const droneBus = ctx.createGain();
-  droneBus.gain.value = 0.6;
-  droneBus.connect(warmth);
-
-  const padBus = ctx.createGain();
-  padBus.gain.value = 0.5;
-  padBus.connect(warmth);
-
-  // Breathing LFO on the pad bus only (so it never fights the duck automation
-  // on musicGain). ~0.07 Hz, ±0.18 around the pad base.
-  const breath = ctx.createOscillator();
-  const breathDepth = ctx.createGain();
-  breath.frequency.value = 0.07;
-  breath.type = 'sine';
-  breathDepth.gain.value = 0.18;
-  breath.connect(breathDepth); breathDepth.connect(padBus.gain);
-  breath.start();
-
-  // Three drones: G2, D3, G3 — an open fifth + octave (no third = neutral mood).
-  const droneFreqs = [98.0, 146.83, 196.0];
-  const droneOscs = [];
-  droneFreqs.forEach((freq, i) => {
-    const osc = ctx.createOscillator();
-    const g = ctx.createGain();
-    osc.type = i === 0 ? 'sine' : 'triangle';
-    osc.frequency.value = freq;
-    osc.detune.value = (i - 1) * 4; // gentle chorus spread
-    g.gain.value = i === 0 ? 0.5 : 0.28 - i * 0.04;
-    osc.connect(g); g.connect(droneBus);
-    osc.start();
-    droneOscs.push(osc);
-  });
-
-  const m = {
-    ctx, musicGain, warmth, droneBus, padBus, breath, droneOscs,
-    started: false, muted: _musicMutedFromStorage(), pluckTimer: null,
+// Smoothly tween the HTMLAudio element volume (it has no AudioParam ramp).
+function _tweenVol(t, to, ms) {
+  if (!t || !t.audio) return;
+  if (t.raf) cancelAnimationFrame(t.raf);
+  const from = t.audio.volume;
+  const start = (typeof performance !== 'undefined' ? performance.now() : Date.now());
+  const step = (now) => {
+    const k = ms <= 0 ? 1 : Math.min(1, (now - start) / ms);
+    try { t.audio.volume = Math.max(0, Math.min(1, from + (to - from) * k)); } catch (_) {}
+    if (k < 1) t.raf = requestAnimationFrame(step);
+    else t.raf = 0;
   };
-  window.__bluffMusic = m;
-  return m;
+  t.raf = requestAnimationFrame(step);
 }
 
-function _musicStart() {
-  // Arm the mobile/iOS unlock so the first real gesture resumes + unlocks audio
-  // for BOTH the bed and the game cues (they share one context).
+// Build (once) the single reusable <audio> element on the window singleton.
+function _ensureTrack() {
+  if (typeof window === 'undefined') return null;
+  if (window.__bluffTrack) return window.__bluffTrack;
+  if (typeof Audio === 'undefined') return null;
+
+  const audio = new Audio();
+  audio.preload = 'auto';
+  audio.volume = 0;
+  const t = {
+    audio,
+    section: null,
+    queue: [],
+    idx: 0,
+    muted: _musicMutedFromStorage(),
+    raf: 0,
+    duckTimer: null,
+    switchTimer: null,
+  };
+  // For a multi-track section, advance to the next track when one finishes
+  // (single-track sections use native looping and never fire 'ended').
+  audio.addEventListener('ended', () => {
+    if (t.queue.length > 1 && !t.muted) {
+      t.idx = (t.idx + 1) % t.queue.length;
+      _playCurrent(t);
+    }
+  });
+  window.__bluffTrack = t;
+  return t;
+}
+
+function _playCurrent(t) {
+  const src = t.queue[t.idx];
+  if (!src) return;
+  try { t.audio.src = encodeURI(src); } catch (_) { return; }
+  t.audio.loop = t.queue.length === 1; // one track loops; many cycle via 'ended'
+  const p = t.audio.play();            // must run in a gesture on mobile
+  if (p && p.catch) p.catch(() => {});
+  _tweenVol(t, t.muted ? 0 : MUSIC_BASE_VOL, 700);
+}
+
+// Switch the active section: stop the old track, start the new. No-op (but
+// ensures playback) if the section is unchanged.
+function _setSection(name) {
   installAudioUnlock();
-  const m = _ensureMusicEngine();
-  if (!m) return;
-  resume(m.ctx);
-  const now = m.ctx.currentTime;
-  const target = m.muted ? 0 : MUSIC_BASE_GAIN;
-  m.musicGain.gain.cancelScheduledValues(now);
-  m.musicGain.gain.setValueAtTime(m.musicGain.gain.value, now);
-  m.musicGain.gain.linearRampToValueAtTime(target, now + MUSIC_FADE);
-  if (!m.started) {
-    m.started = true;
-    _scheduleNextPluck(m);
+  const t = _ensureTrack();
+  if (!t) return;
+  if (t.section === name) {
+    if (!t.muted && t.audio.paused && t.queue.length) _playCurrent(t);
+    return;
   }
+  t.section = name;
+  t.queue = MUSIC_SECTIONS[name] || [];
+  t.idx = 0;
+  clearTimeout(t.switchTimer);
+  if (t.queue.length === 0) {
+    _tweenVol(t, 0, 250);
+    t.switchTimer = setTimeout(() => { try { t.audio.pause(); } catch (_) {} }, 280);
+    return;
+  }
+  if (t.muted) { t.audio.loop = t.queue.length === 1; return; }
+  // Quick fade-out of the old track, then swap to the new section's first track.
+  _tweenVol(t, 0, 220);
+  t.switchTimer = setTimeout(() => _playCurrent(t), 230);
 }
 
-function _musicStop() {
-  const m = typeof window !== 'undefined' ? window.__bluffMusic : null;
-  if (!m) return;
-  const now = m.ctx.currentTime;
-  m.musicGain.gain.cancelScheduledValues(now);
-  m.musicGain.gain.setValueAtTime(m.musicGain.gain.value, now);
-  m.musicGain.gain.linearRampToValueAtTime(0, now + 0.4);
-  clearTimeout(m.pluckTimer);
-  m.pluckTimer = null;
-  m.started = false;
+// Resume the current section's track (first user gesture / unmute).
+function _musicResume() {
+  const t = (typeof window !== 'undefined') ? window.__bluffTrack : null;
+  if (!t || t.muted || !t.queue.length) return;
+  if (t.audio.paused) _playCurrent(t);
+  else _tweenVol(t, MUSIC_BASE_VOL, 400);
 }
 
 function _musicSetMuted(muted) {
-  const m = _ensureMusicEngine();
+  const t = _ensureTrack();
   try { window.localStorage.setItem('bluff_music_muted', muted ? '1' : '0'); } catch (_) {}
-  if (m) {
-    m.muted = muted;
-    const now = m.ctx.currentTime;
-    m.musicGain.gain.cancelScheduledValues(now);
-    m.musicGain.gain.setValueAtTime(m.musicGain.gain.value, now);
-    m.musicGain.gain.linearRampToValueAtTime(muted ? 0 : MUSIC_BASE_GAIN, now + 0.35);
+  if (t) {
+    t.muted = muted;
+    if (muted) {
+      _tweenVol(t, 0, 250);
+      clearTimeout(t.switchTimer);
+      t.switchTimer = setTimeout(() => { try { t.audio.pause(); } catch (_) {} }, 280);
+    } else {
+      clearTimeout(t.switchTimer);
+      _musicResume();
+    }
   }
   _notifyMuted();
 }
 
-// Sidechain duck: pull the bed down while a cue sounds, then ease it back.
+// Sidechain duck: dip the track under a cue, then ease it back up.
 function _duckMusic(holdMs) {
-  const m = typeof window !== 'undefined' ? window.__bluffMusic : null;
-  if (!m || !m.started || m.muted) return;
-  const g = m.musicGain.gain;
-  const now = m.ctx.currentTime;
-  g.cancelScheduledValues(now);
-  g.setValueAtTime(g.value, now);
-  g.linearRampToValueAtTime(MUSIC_DUCK_GAIN, now + 0.08);
-  const release = now + Math.max(0.1, holdMs / 1000);
-  g.setValueAtTime(MUSIC_DUCK_GAIN, release);
-  g.linearRampToValueAtTime(MUSIC_BASE_GAIN, release + 0.5);
+  const t = (typeof window !== 'undefined') ? window.__bluffTrack : null;
+  if (!t || t.muted || !t.queue.length || t.audio.paused) return;
+  clearTimeout(t.duckTimer);
+  _tweenVol(t, MUSIC_DUCK_VOL, 90);
+  t.duckTimer = setTimeout(() => {
+    if (!t.muted) _tweenVol(t, MUSIC_BASE_VOL, 450);
+  }, Math.max(100, holdMs));
 }
 
 // How long to hold the duck per cue kind (ms), matched to each cue's tail.
@@ -537,20 +503,22 @@ const DUCK_MS = { bluff: 700, card: 200, win: 1700, spin: 1600, eliminate: 1500 
 // per-screen atmosphere hook. Used at the app root (start on first gesture) and
 // by any settings UI (mute toggle). Mute state is shared via the module store
 // so the landing gear and the in-game menu never drift apart.
-//   startMusic() — idempotent; fades the bed in once the AudioContext runs.
-//   toggleMusic() — flip mute (persisted); unmuting (re)starts the bed.
+//   setSection(name) — switch the active section's track ('lobby'|'game'|
+//                      'groups'|'gameover'); the app root drives this.
+//   startMusic() — arm the mobile unlock + resume the current section.
+//   toggleMusic() — flip mute (persisted); unmuting resumes the section.
 //   musicEnabled — boolean, reactive.
 export function useMusic() {
   const muted = useSyncExternalStore(_subscribeMuted, _getMutedSnapshot, () => false);
-  const startMusic = useCallback(() => { try { _musicStart(); } catch (_) {} }, []);
+  const setSection = useCallback((name) => { try { _setSection(name); } catch (_) {} }, []);
+  const startMusic = useCallback(() => {
+    try { installAudioUnlock(); _musicResume(); } catch (_) {}
+  }, []);
   const toggleMusic = useCallback(() => {
     const willMute = !_getMutedSnapshot();
-    try {
-      _musicSetMuted(willMute);
-      if (!willMute) _musicStart();
-    } catch (_) {}
+    try { _musicSetMuted(willMute); } catch (_) {}
   }, []);
-  return { musicEnabled: !muted, startMusic, toggleMusic };
+  return { musicEnabled: !muted, setSection, startMusic, toggleMusic };
 }
 
 // ─── Hook ─────────────────────────────────────────────────────────────────────

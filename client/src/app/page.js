@@ -80,23 +80,20 @@ function HomeContent() {
     lastStandEndTurn,
   } = game;
 
-  // ─── Background tavern music (#A) ──────────────────────────
-  // Start the ambience bed as soon as the app loads (from the landing on),
-  // not just in-game. Browsers gate audio until a user gesture, so arm a
-  // one-shot pointer/key listener; startMusic is idempotent. The bed then
-  // plays across every screen (landing → lobby → table) and is muteable from
-  // the settings gear. We never tear it down on screen changes.
-  const { musicEnabled, startMusic, toggleMusic } = useMusic();
+  // ─── Section-based background music (#A) ──────────────────────────
+  // Each area of the app has its own track; the section is derived from the
+  // current screen + room phase and switched as the player moves around.
+  // _setSection arms the mobile autoplay unlock, so no explicit gesture
+  // listener is needed here. Muteable from the settings gear.
+  const { musicEnabled, toggleMusic, setSection } = useMusic();
+  const musicSection = roomCode
+    ? (roomState?.phase === 'game_over'
+        ? 'gameover'
+        : (roomState?.phase && roomState.phase !== 'lobby') ? 'game' : 'lobby')
+    : (homeView === 'groups' || homeView === 'group') ? 'groups' : 'lobby';
   useEffect(() => {
-    startMusic();
-    const onGesture = () => startMusic();
-    window.addEventListener('pointerdown', onGesture, { once: true });
-    window.addEventListener('keydown', onGesture, { once: true });
-    return () => {
-      window.removeEventListener('pointerdown', onGesture);
-      window.removeEventListener('keydown', onGesture);
-    };
-  }, [startMusic]);
+    setSection(musicSection);
+  }, [setSection, musicSection]);
 
   // ─── Groups cache (issue #106) ─────────────────────────────
   // In-memory only (sessionStorage is overkill for socket payloads

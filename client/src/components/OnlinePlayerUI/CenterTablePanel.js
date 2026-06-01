@@ -176,7 +176,9 @@ export function CenterTablePanel({
             </div>
           </div>
 
-          <FaceDownStack count={playedPileSize} label="Played" />
+          <div data-flight-target>
+            <FaceDownStack count={playedPileSize} label="Played" />
+          </div>
         </div>
       )}
 
