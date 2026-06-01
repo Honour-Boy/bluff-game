@@ -12,6 +12,7 @@
 // surface tokens; radius pinned to the design-system 4px.
 
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { CloseIcon } from './shared/CloseIcon';
 
 const TEXT_MAX = 500;
 const GROUP_WINDOW_MS = 60_000;
@@ -211,7 +212,7 @@ export function ChatPanel({
                 marginRight: -8,
                 WebkitTapHighlightColor: 'transparent',
               }}
-            >✕</button>
+            ><CloseIcon size={18} /></button>
           </div>
 
           {/* Messages */}

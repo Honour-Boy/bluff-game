@@ -300,7 +300,9 @@ export function BottomSeat({
         </div>
       ) : (
         !isLobby && !isGameOver && (
-          <div style={{ padding: '0 12px 8px' }}>
+          // Extra right padding keeps the fan + power cards clear of the
+          // bottom-right controls FAB (which floats over this corner).
+          <div style={{ padding: '0 76px 8px 12px' }}>
             {/* Hand label */}
             <div style={{
               display: 'flex',

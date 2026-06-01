@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { PowerCard, POWER_META } from "../shared/PowerCard";
 import { ROLE_META } from "../RoleRevealOverlay";
+import { CloseIcon } from "../shared/CloseIcon";
 
 // ─── HowToPlayModal ───────────────────────────────────────────
 // Reference for the full v2 ruleset. Collapsible accordion so the
@@ -595,9 +596,12 @@ export function HowToPlayModal({ onClose, initialTab = "physical" }) {
               border: "none",
               cursor: "pointer",
               lineHeight: 1,
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
             }}
           >
-            ✕
+            <CloseIcon size={18} />
           </button>
         </div>
 

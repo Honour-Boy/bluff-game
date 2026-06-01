@@ -89,7 +89,18 @@ export function OnlinePlayerUI({
   useEffect(() => {
     const el = sceneScrollRef.current;
     if (!el || typeof ResizeObserver === 'undefined') return undefined;
-    const check = () => setSceneScrollable(el.scrollHeight > el.clientHeight + 2);
+    const check = () => {
+      const scrollable = el.scrollWidth > el.clientWidth + 2;
+      setSceneScrollable(scrollable);
+      // Centre the board the first time it overflows so the dealer's cards are
+      // visible by default; players are then scrollable to either side.
+      if (scrollable && el.dataset.centered !== '1') {
+        el.scrollLeft = (el.scrollWidth - el.clientWidth) / 2;
+        el.dataset.centered = '1';
+      } else if (!scrollable) {
+        el.dataset.centered = '';
+      }
+    };
     const ro = new ResizeObserver(check);
     ro.observe(el);
     Array.from(el.children).forEach((c) => ro.observe(c));

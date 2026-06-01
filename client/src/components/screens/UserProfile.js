@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import { CloseIcon } from '../shared/CloseIcon';
 
 export function UserProfile({ username, onUpdateUsername, onClose }) {
   const [newUsername, setNewUsername] = useState(username || '');
@@ -45,12 +46,12 @@ export function UserProfile({ username, onUpdateUsername, onClose }) {
           style={{
             position: 'absolute', top: 12, right: 14,
             background: 'none', border: 'none',
-            color: 'var(--text-dim)', fontSize: 18, cursor: 'pointer',
-            fontFamily: 'sans-serif',
+            color: 'var(--text-dim)', cursor: 'pointer',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
           }}
           aria-label="Close"
         >
-          ✕
+          <CloseIcon size={18} />
         </button>
 
         <div style={{
