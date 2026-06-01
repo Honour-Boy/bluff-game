@@ -72,28 +72,33 @@ export function VoicePanel({ status, error, muted, isConnected, connect, disconn
     );
   }
 
-  // connected
+  // connected — (Module 5.2) the mute toggle reads a flat "Muted" / "Mic on",
+  // and the toggle + Leave Voice sit on a single horizontal row (no wrap).
   return (
-    <div data-testid="voice-panel-slot" style={SLOT_STYLE}>
+    <div data-testid="voice-panel-slot" style={{ ...SLOT_STYLE, flexWrap: 'nowrap' }}>
       <button
         type="button"
         onClick={toggleMute}
         style={{
           ...baseStyle,
+          padding: '6px 10px',
           cursor: 'pointer',
           color: muted ? 'var(--text-dim)' : 'var(--alive)',
           borderColor: muted ? 'var(--border)' : 'var(--alive)',
+          whiteSpace: 'nowrap',
         }}
       >
-        {muted ? '🔇 Muted — click to talk' : '🎙 Mic ON — click to mute'}
+        {muted ? '🔇 Muted' : '🎙 Mic ON'}
       </button>
       <button
         type="button"
         onClick={disconnect}
         style={{
           ...baseStyle,
+          padding: '6px 10px',
           background: 'none',
           cursor: 'pointer',
+          whiteSpace: 'nowrap',
         }}
       >
         Leave Voice

@@ -256,12 +256,46 @@ function playEliminateSound(ctx) {
   fall.start(now + 0.5); fall.stop(now + 1.55);
 }
 
+// Gunshot — (Module 8.2) a high-impact crack + low boom, fired when a spin lands
+// on a live round (lethal bullet hit). Sharp filtered-noise crack over a fast
+// descending boom body, then a short tail.
+function playGunshot(ctx) {
+  resume(ctx);
+  const now = ctx.currentTime;
+  // Crack — short highpassed noise burst with a fast decay.
+  const crackLen = Math.ceil(ctx.sampleRate * 0.07);
+  const buf = ctx.createBuffer(1, crackLen, ctx.sampleRate);
+  const d = buf.getChannelData(0);
+  for (let i = 0; i < crackLen; i++) d[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / crackLen, 2);
+  const noise = ctx.createBufferSource();
+  noise.buffer = buf;
+  const hp = ctx.createBiquadFilter();
+  hp.type = 'highpass';
+  hp.frequency.value = 850;
+  const ng = ctx.createGain();
+  ng.gain.setValueAtTime(0.95, now);
+  ng.gain.exponentialRampToValueAtTime(0.001, now + 0.09);
+  noise.connect(hp); hp.connect(ng); ng.connect(masterOut(ctx));
+  noise.start(now);
+  // Boom — the body of the shot.
+  const boom = ctx.createOscillator();
+  const bg = ctx.createGain();
+  boom.type = 'sine';
+  boom.frequency.setValueAtTime(150, now);
+  boom.frequency.exponentialRampToValueAtTime(38, now + 0.2);
+  bg.gain.setValueAtTime(0.6, now);
+  bg.gain.exponentialRampToValueAtTime(0.001, now + 0.34);
+  boom.connect(bg); bg.connect(masterOut(ctx));
+  boom.start(now); boom.stop(now + 0.38);
+}
+
 const AUDIO_MAP = {
   card: playCardSound,
   bluff: playBluffSound,
   spin: playSpinSound,
   win: playWinSound,
   eliminate: playEliminateSound,
+  gunshot: playGunshot,
 };
 
 // ─── Dynamic spin-audio engine ────────────────────────────────────────────────
@@ -380,8 +414,34 @@ const TRACKS = {
   '/audio/Call It Bluff.mp3':               { vol: SONG_VOL },
   '/audio/Bluff Anthem.mp3':                { vol: SONG_VOL },
 };
+// (Module 5.3) Player-controlled master music volume (0..1) scales every track's
+// base level. Persisted; a shared store keeps the settings slider in sync.
+function _musicVolumeFromStorage() {
+  try {
+    const v = parseFloat(window.localStorage.getItem('bluff_music_volume'));
+    return Number.isFinite(v) ? Math.max(0, Math.min(1, v)) : 1;
+  } catch (_) { return 1; }
+}
+let _musicVolume = (typeof window !== 'undefined') ? _musicVolumeFromStorage() : 1;
+const _volListeners = new Set();
+function _subscribeVol(cb) { _volListeners.add(cb); return () => _volListeners.delete(cb); }
+function _getVolSnapshot() { return _musicVolume; }
+
 function _trackVol(src) {
-  return (TRACKS[src] && typeof TRACKS[src].vol === 'number') ? TRACKS[src].vol : SONG_VOL;
+  const base = (TRACKS[src] && typeof TRACKS[src].vol === 'number') ? TRACKS[src].vol : SONG_VOL;
+  return base * _musicVolume;
+}
+
+function _setMusicVolume(v) {
+  _musicVolume = Math.max(0, Math.min(1, Number(v) || 0));
+  try { window.localStorage.setItem('bluff_music_volume', String(_musicVolume)); } catch (_) {}
+  // Live-apply to the audible deck (skip while muted; unmute will pick it up).
+  const eng = (typeof window !== 'undefined') ? window.__bluffMusic : null;
+  if (eng && !eng.muted && eng.currentSrc) {
+    const deck = eng.decks[eng.active];
+    if (deck && !deck.paused) { try { deck.volume = _trackVol(eng.currentSrc); } catch (_) {} }
+  }
+  _volListeners.forEach((cb) => { try { cb(); } catch (_) {} });
 }
 
 const MUSIC_SECTIONS = {
@@ -455,6 +515,7 @@ function _engine() {
     pendingSrc: null,   // deferred start while muted
     muted: _musicMutedFromStorage(),
     duckTimer: null,
+    positions: {},      // (Module 8.1) src → last playhead (s), for smooth resume
   };
   // SHUFFLE sections crossfade to the alternative when a track ends; LOOP/ONCE/
   // PROGRESSIVE tracks set loop=true so 'ended' never fires.
@@ -485,6 +546,19 @@ function _fadeDeck(eng, deckIdx, to, ms, curve = 'linear', onDone) {
   eng.rafs[deckIdx] = requestAnimationFrame(step);
 }
 
+// (Module 8.1) Seek a deck to `time`, deferring until metadata is ready so the
+// seek isn't dropped on a freshly-assigned src. A 0/empty time is a no-op (the
+// deck already starts at 0).
+function _seekDeck(deck, time) {
+  if (!time || time <= 0) return;
+  const apply = () => { try { deck.currentTime = time; } catch (_) {} };
+  if (deck.readyState >= 1) apply();
+  else {
+    const h = () => { deck.removeEventListener('loadedmetadata', h); apply(); };
+    deck.addEventListener('loadedmetadata', h);
+  }
+}
+
 // Crossfade the foreground deck out while bringing `src` up on the other deck.
 // Used for section switches, lobby track-ends, and game stage escalations.
 function _crossfadeTo(eng, src, ms, loop) {
@@ -492,12 +566,19 @@ function _crossfadeTo(eng, src, ms, loop) {
   const nxtIdx = 1 - eng.active;
   const cur = eng.decks[curIdx];
   const nxt = eng.decks[nxtIdx];
+  // (Module 8.1) Persist the outgoing track's playhead so re-entering its view
+  // resumes mid-track instead of restarting at 0:00. A track that ended (shuffle)
+  // is stored at 0 so it doesn't immediately re-end on resume.
+  if (eng.currentSrc) {
+    try { eng.positions[eng.currentSrc] = cur.ended ? 0 : (cur.currentTime || 0); } catch (_) {}
+  }
   try {
     nxt.src = encodeURI(src);
     nxt.loop = !!loop;
     nxt.currentTime = 0;
     nxt.volume = 0;
   } catch (_) { return; }
+  _seekDeck(nxt, eng.positions[src] || 0);
   const target = eng.muted ? 0 : _trackVol(src);
   const p = nxt.play(); if (p && p.catch) p.catch(() => {}); // must run in a gesture on mobile
   _fadeDeck(eng, nxtIdx, target, ms, 'in');
@@ -583,9 +664,11 @@ function _musicResume() {
     try {
       deck.src = encodeURI(src);
       deck.loop = loop;
-      if (eng.pendingSrc) deck.currentTime = 0;
+      deck.currentTime = 0;
       deck.volume = 0;
     } catch (_) {}
+    // (Module 8.1) resume from the retained playhead rather than 0:00.
+    _seekDeck(deck, eng.positions[src] || 0);
     const p = deck.play(); if (p && p.catch) p.catch(() => {});
     _fadeDeck(eng, idx, _trackVol(src), 600, 'in');
     eng.currentSrc = src;
@@ -601,6 +684,10 @@ function _musicSetMuted(muted) {
   if (eng) {
     eng.muted = muted;
     if (muted) {
+      // (Module 8.1) snapshot the playhead so unmuting resumes in place.
+      if (eng.currentSrc) {
+        try { eng.positions[eng.currentSrc] = eng.decks[eng.active].currentTime || 0; } catch (_) {}
+      }
       [0, 1].forEach((i) => _fadeDeck(eng, i, 0, 250, 'out', () => { try { eng.decks[i].pause(); } catch (_) {} }));
     } else {
       _musicResume();
@@ -624,7 +711,7 @@ function _duckMusic(holdMs) {
 }
 
 // How long to hold the duck per cue kind (ms), matched to each cue's tail.
-const DUCK_MS = { bluff: 700, card: 200, win: 1700, spin: 1600, eliminate: 1500 };
+const DUCK_MS = { bluff: 700, card: 200, win: 1700, spin: 1600, eliminate: 1500, gunshot: 600 };
 
 // ─── Game-state → progressive music stage ────────────────────────────────────
 // Derive the game music intensity from live room state. Escalation tracks player
@@ -656,6 +743,8 @@ export function gameMusicStage(roomState) {
 //   musicEnabled       — boolean, reactive.
 export function useMusic() {
   const muted = useSyncExternalStore(_subscribeMuted, _getMutedSnapshot, () => false);
+  // (Module 5.3) reactive master music volume (0..1), shared across consumers.
+  const volume = useSyncExternalStore(_subscribeVol, _getVolSnapshot, () => 1);
   // Pre-fetch + build the engine on boot so the playlists are warm before the
   // first section switch.
   useEffect(() => { try { _engine(); } catch (_) {} }, []);
@@ -668,7 +757,8 @@ export function useMusic() {
     const willMute = !_getMutedSnapshot();
     try { _musicSetMuted(willMute); } catch (_) {}
   }, []);
-  return { musicEnabled: !muted, setSection, setGameStage, startMusic, toggleMusic };
+  const setMusicVolume = useCallback((v) => { try { _setMusicVolume(v); } catch (_) {} }, []);
+  return { musicEnabled: !muted, musicVolume: volume, setSection, setGameStage, startMusic, toggleMusic, setMusicVolume };
 }
 
 // ─── Hook ─────────────────────────────────────────────────────────────────────
