@@ -10,6 +10,8 @@ const IconChat = () => (<svg {..._ic}><path d="M4 5h16v11H8l-4 4z" stroke="curre
 const IconRules = () => (<svg {..._ic}><path d="M5 7h14M5 12h14M5 17h14" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" /></svg>);
 const IconBoard = () => (<svg {..._ic}><path d="M5 20V11M12 20V5M19 20v-6M3 20h18" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" /></svg>);
 const IconLeaveTable = () => (<svg {..._ic}><path d="M14 8V6a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h6a2 2 0 0 0 2-2v-2" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" /><path d="M10 12h10m0 0-3-3m3 3-3 3" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" /></svg>);
+// #244 — host "Kick player": a person with a cross.
+const IconKick = () => (<svg {..._ic}><circle cx="9" cy="8" r="3.2" stroke="currentColor" strokeWidth="1.8" /><path d="M3.5 20c0-3.3 2.7-6 6-6 1.2 0 2.3.35 3.2.95" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" /><path d="M16 9l5 5m0-5-5 5" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" /></svg>);
 
 // ─── SettingsGear — the global identity / settings menu ───────────────────────
 // A small fixed gear button (top-right) available on EVERY screen once signed
@@ -131,6 +133,9 @@ export function SettingsGear({
   onOpenChat,
   onOpenGameSettings,
   onOpenLeaderboard,
+  // #244 — host-only Kick Player. Set only for the host, so its presence gates
+  // the menu item (non-hosts never see it).
+  onOpenKickPlayer,
   onLeaveTable,
   leaveDisabled = false,
   voice,
@@ -257,6 +262,13 @@ export function SettingsGear({
                       icon={<IconBoard />}
                       label="Leaderboard"
                       onClick={() => { setOpen(false); onOpenLeaderboard(); }}
+                    />
+                  )}
+                  {onOpenKickPlayer && (
+                    <SettingItem
+                      icon={<IconKick />}
+                      label="Kick player"
+                      onClick={() => { setOpen(false); onOpenKickPlayer(); }}
                     />
                   )}
                   {onLeaveTable && (

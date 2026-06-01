@@ -66,12 +66,19 @@ export function useOnlinePlayerUiController({
     if (lastSpinKeyRef.current === actionKey) return undefined;
     lastSpinKeyRef.current = actionKey;
 
-    const { spinIndex, eliminated, spinTargetName, spinTargetId: targetId, chamber } = action;
+    const { spinIndex, eliminated, spinTargetName, spinTargetId: targetId, chamber, chamberAfter } = action;
     const landingChamberIndex = spinIndex ?? 0;
     const finalAngle = 10 * 360 - landingChamberIndex * 60;
-    const bulletChambers = new Set(
-      (chamber || []).map((value, index) => (value === 'bullet' ? index : -1)).filter((index) => index !== -1),
+    const toBulletSet = (slots) => new Set(
+      (slots || []).map((value, index) => (value === 'bullet' ? index : -1)).filter((index) => index !== -1),
     );
+    // Pre-spin chamber drives the cylinder DURING the spin (you watch the bullet
+    // pass). The post-spin chamber (`chamberAfter`) is what survivors actually
+    // carry afterwards — it folds in any bullets a survival adds (always +1, or
+    // +2 under Hot Potato). Surfacing it lets the cylinder reveal the new bullets
+    // the instant the spin lands instead of looking like nothing changed (#238).
+    const bulletChambers = toBulletSet(chamber);
+    const bulletChambersAfter = toBulletSet(chamberAfter || chamber);
 
     setCylinderAnimating(false);
     setCylinderRotation(0);
@@ -82,6 +89,8 @@ export function useOnlinePlayerUiController({
       spinTargetName,
       spinTargetId: targetId,
       bulletChambers,
+      bulletChambersAfter,
+      bulletCountAfter: bulletChambersAfter.size,
       landingChamberIndex,
       finalAngle,
     });

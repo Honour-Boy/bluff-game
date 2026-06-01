@@ -46,6 +46,9 @@ import {
   enterLastStand,
   lastStandSpin,
   lastStandEndTurn,
+  startGame,
+  eliminateFromTurnOrder,
+  checkGameOver,
 } from '../gameEngine.js';
 import { resolveBluff } from '../bluffPipeline.js';
 
@@ -510,7 +513,8 @@ describe('Last Stand — entry consumes armed cards + clears hands', () => {
     expect(room.hands.get('p0')).toEqual([]);
     expect(room.hands.get('p1')).toEqual([]);
 
-    // Chambers reset to exactly 1 bullet each.
+    // ONE shared gun, loaded with a single bullet, mirrored onto both seats.
+    expect(room.lastStand.chamber.filter(s => s === 'bullet').length).toBe(1);
     expect(room.players[0].chamber.filter(s => s === 'bullet').length).toBe(1);
     expect(room.players[1].chamber.filter(s => s === 'bullet').length).toBe(1);
     expect(room.players[0].riskLevel).toBe(1);
@@ -557,23 +561,29 @@ describe('Last Stand — spin + winner declaration', () => {
     expect(room.lastStand.activeFinalistId).toBe(other);
   });
 
-  it('survival mutates chamber, no game over', () => {
+  it('survival mutates the SHARED chamber, no game over', () => {
     const room = setupLastStand();
     const active = room.lastStand.activeFinalistId;
-    // Force a chamber with no bullets so the spin always survives.
-    const player = room.players.find(p => p.id === active);
-    player.chamber = [null, null, null, null, null, null];
+    // Empty the SHARED gun so the spin always survives.
+    room.lastStand.chamber = [null, null, null, null, null, null];
     const res = lastStandSpin(room, active);
     expect(res.ok).toBe(true);
     expect(res.eliminated).toBe(false);
+    // Survival loads a bullet into the shared gun (normal curve), and both
+    // finalists' display chambers mirror it.
+    expect(room.lastStand.chamber.filter(s => s === 'bullet').length).toBe(1);
+    for (const id of room.lastStand.finalistIds) {
+      const f = room.players.find(p => p.id === id);
+      expect(f.chamber.filter(s => s === 'bullet').length).toBe(1);
+    }
   });
 
   it('elimination ends Last Stand and game_over is winnable', () => {
     const room = setupLastStand();
     const active = room.lastStand.activeFinalistId;
     const player = room.players.find(p => p.id === active);
-    // Force a chamber that will definitely hit a bullet.
-    player.chamber = ['bullet', 'bullet', 'bullet', 'bullet', 'bullet', 'bullet'];
+    // Fully load the SHARED gun so the active spinner definitely dies.
+    room.lastStand.chamber = ['bullet', 'bullet', 'bullet', 'bullet', 'bullet', 'bullet'];
     const res = lastStandSpin(room, active);
     expect(res.ok).toBe(true);
     expect(res.eliminated).toBe(true);
@@ -584,6 +594,108 @@ describe('Last Stand — spin + winner declaration', () => {
     const room = makeRoom(2);
     const res = lastStandSpin(room, 'p0');
     expect(res.ok).toBe(false);
+  });
+});
+
+// ─── #243 — shared-gun alternating duel ──────────────────────
+
+describe('Last Stand — #243 shared-gun alternating duel', () => {
+  function setup4PlayerFinalists() {
+    const room = makeRoom(4);
+    room.players[2].status = 'eliminated';
+    room.players[3].status = 'eliminated';
+    enterLastStand(room);
+    return room;
+  }
+
+  it('only enters for a game that STARTED with more than 3 players', () => {
+    // A 3-player game narrowing to 2 is NOT a Last Stand.
+    const small = makeRoom(3);
+    small.players[0].status = 'eliminated';
+    expect(small.players.filter(p => p.status === 'alive').length).toBe(2);
+    expect(shouldEnterLastStand(small)).toBe(false);
+
+    // A 4-player game narrowing to 2 IS.
+    const big = makeRoom(4);
+    big.players[0].status = 'eliminated';
+    big.players[1].status = 'eliminated';
+    expect(shouldEnterLastStand(big)).toBe(true);
+  });
+
+  it('honours an explicit startingAliveCount over the roster size', () => {
+    const room = makeRoom(4);
+    room.players[0].status = 'eliminated';
+    room.players[1].status = 'eliminated';
+    room.startingAliveCount = 3; // began small despite 4 ghosts on the roster
+    expect(shouldEnterLastStand(room)).toBe(false);
+    room.startingAliveCount = 4;
+    expect(shouldEnterLastStand(room)).toBe(true);
+  });
+
+  it('startGame stamps the starting alive count', () => {
+    const room = makeRoom(5);
+    startGame(room);
+    expect(room.startingAliveCount).toBe(5);
+  });
+
+  it('uses ONE shared gun that escalates as the finalists pass it back and forth', () => {
+    const room = setup4PlayerFinalists();
+    expect(room.lastStand.chamber).toBeTruthy();
+    const a = room.lastStand.activeFinalistId;
+    const b = room.lastStand.finalistIds.find(id => id !== a);
+
+    // Empty the SHARED gun → A survives → a bullet loads into the shared gun.
+    room.lastStand.chamber = [null, null, null, null, null, null];
+    let res = lastStandSpin(room, a);
+    expect(res.eliminated).toBe(false);
+    expect(room.lastStand.chamber.filter(s => s === 'bullet').length).toBe(1);
+
+    // The handler passes the gun on survival.
+    lastStandEndTurn(room, a);
+    expect(room.lastStand.activeFinalistId).toBe(b);
+    // B inherits the SAME escalated gun (1 bullet), not a fresh chamber.
+    expect(room.players.find(p => p.id === b).chamber.filter(s => s === 'bullet').length).toBe(1);
+
+    // B survives again → the shared gun rises to 2 bullets (carried over, shared).
+    room.lastStand.chamber = ['bullet', null, null, null, null, null];
+    res = lastStandSpin(room, b);
+    if (!res.eliminated) {
+      expect(room.lastStand.chamber.filter(s => s === 'bullet').length).toBe(2);
+    } else {
+      expect(room.players.find(p => p.id === b).status).toBe('eliminated');
+    }
+  });
+
+  it('alternates strictly — a survivor never spins twice in a row', () => {
+    const room = setup4PlayerFinalists();
+    const order = [];
+    for (let i = 0; i < 6; i++) {
+      const active = room.lastStand.activeFinalistId;
+      order.push(active);
+      room.lastStand.chamber = [null, null, null, null, null, null]; // force survival
+      const res = lastStandSpin(room, active);
+      expect(res.eliminated).toBe(false);
+      lastStandEndTurn(room, active); // handler passes the gun on survive
+    }
+    for (let i = 1; i < order.length; i++) {
+      expect(order[i]).not.toBe(order[i - 1]);
+    }
+  });
+
+  it('terminates when a spin kills the active finalist — the other wins', () => {
+    const room = setup4PlayerFinalists();
+    const active = room.lastStand.activeFinalistId;
+    const other = room.lastStand.finalistIds.find(id => id !== active);
+
+    room.lastStand.chamber = ['bullet', 'bullet', 'bullet', 'bullet', 'bullet', 'bullet'];
+    const res = lastStandSpin(room, active);
+    expect(res.eliminated).toBe(true);
+
+    // Mirrors the handler: drop the dead finalist, then the survivor is the winner.
+    eliminateFromTurnOrder(room, active);
+    const winner = checkGameOver(room);
+    expect(winner).toBeTruthy();
+    expect(winner.id).toBe(other);
   });
 });
 

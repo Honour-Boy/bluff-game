@@ -186,9 +186,32 @@ function _allPendingPhasesClear(room) {
 function shouldEnterLastStand(room) {
   if (!room?.config?.systems?.lastStand) return false;
   if (room.phase === 'last_stand') return false;
+  // #243 — only a game that STARTED with more than 3 players narrows into a Last
+  // Stand. `startingAliveCount` is stamped by startGame; fall back to the roster
+  // size (eliminated players remain as ghosts mid-game, so it equals the starting
+  // count) for callers/tests that build a room without going through startGame.
+  const startedCount = room.startingAliveCount ?? room.players.length;
+  if (startedCount <= 3) return false;
   const alive = room.players.filter(p => p.status === 'alive');
   if (alive.length !== 2) return false;
   return _allPendingPhasesClear(room);
+}
+
+// #243 — current bullet count of the one shared Last Stand gun.
+function _lastStandBulletCount(room) {
+  const ch = room?.lastStand?.chamber || [];
+  return ch.filter(s => s === 'bullet').length;
+}
+
+// #243 — keep both finalists' display chambers in lock-step with the single
+// shared gun so each seat / cinematic card renders the same escalating cylinder.
+function _syncLastStandChamberToFinalists(room) {
+  const chamber = room.lastStand?.chamber || [];
+  const count = chamber.filter(s => s === 'bullet').length;
+  for (const id of room.lastStand?.finalistIds || []) {
+    const f = room.players.find(p => p.id === id);
+    if (f) { f.chamber = [...chamber]; f.riskLevel = count; }
+  }
 }
 
 function enterLastStand(room) {
@@ -197,6 +220,7 @@ function enterLastStand(room) {
 
   if (!room.discardPile) room.discardPile = [];
 
+  // No cards, no bluffs in the duel — surrender hands and disarm everyone.
   for (const p of alive) {
     if (room.hands && room.hands.has(p.id)) {
       const hand = room.hands.get(p.id) || [];
@@ -204,8 +228,6 @@ function enterLastStand(room) {
       room.hands.set(p.id, []);
     }
     p.armedPowerCard = null;
-    p.chamber = initChamber();
-    p.riskLevel = p.chamber.filter(s => s === 'bullet').length;
   }
 
   room.phase = 'last_stand';
@@ -214,22 +236,27 @@ function enterLastStand(room) {
   room.cardPlayedThisTurn = false;
   room.bluffUsedThisTurn = false;
   room.powerActivatedThisTurn = false;
-  const orderedFinalists = room.turnOrder.filter(id =>
-    alive.some(p => p.id === id)
-  );
+  const orderedFinalists = room.turnOrder.filter(id => alive.some(p => p.id === id));
+  const finalistIds = orderedFinalists.length === 2 ? orderedFinalists : alive.map(p => p.id);
+
+  // #243 — ONE shared gun. It starts with a single bullet and escalates on the
+  // normal survival curve (pullTrigger adds a bullet every time SOMEONE survives),
+  // so the alternating duel is guaranteed to terminate. The two finalists pass
+  // this same chamber back and forth; their per-seat chambers mirror it.
   room.lastStand = {
-    finalistIds: orderedFinalists.length === 2 ? orderedFinalists : alive.map(p => p.id),
-    activeFinalistId: (orderedFinalists[0] || alive[0].id),
+    finalistIds,
+    activeFinalistId: finalistIds[0],
+    chamber: initChamber(1),
+    bulletCount: 1,
     startedAt: Date.now(),
   };
-  room.turnOrder = [...room.lastStand.finalistIds];
+  _syncLastStandChamberToFinalists(room);
+
+  room.turnOrder = [...finalistIds];
   room.currentTurnIndex = 0;
-  if (room.turnOrder[0] !== room.lastStand.activeFinalistId) {
-    room.currentTurnIndex = room.turnOrder.indexOf(room.lastStand.activeFinalistId);
-  }
   room.lastAction = {
     type: 'last_stand_started',
-    finalistIds: room.lastStand.finalistIds,
+    finalistIds,
   };
   return room.lastStand;
 }
@@ -243,10 +270,16 @@ function lastStandSpin(room, playerId) {
   const player = room.players.find(p => p.id === playerId);
   if (!player) return { ok: false, error: 'Player not found' };
 
-  const chamberBefore = [...player.chamber];
-  const { spinIndex, eliminated, chamber, bulletCount } = pullTrigger(player.chamber);
-  player.chamber = chamber;
-  player.riskLevel = bulletCount;
+  // Spin the ONE shared gun — NOT the player's own chamber. On survival the
+  // pull adds a bullet to the shared chamber (normal curve), which the next
+  // finalist then inherits. The turn pass is handled by lastStandEndTurn (the
+  // handler calls it on survive), so this stays pass-free.
+  const chamberBefore = [...room.lastStand.chamber];
+  const { spinIndex, eliminated, chamber, bulletCount } = pullTrigger(room.lastStand.chamber);
+  room.lastStand.chamber = chamber;
+  room.lastStand.bulletCount = bulletCount;
+  _syncLastStandChamberToFinalists(room);
+
   if (eliminated) {
     player.status = 'eliminated';
     player.isSpectator = true;
@@ -256,7 +289,7 @@ function lastStandSpin(room, playerId) {
     spinIndex,
     eliminated,
     chamberBefore,
-    chamberAfter: player.chamber,
+    chamberAfter: chamber,
     riskLevel: bulletCount,
   };
 }

@@ -18,6 +18,7 @@ import { Notification } from '../components/shared/Notification';
 import { SettingsGear } from '../components/shared/SettingsGear';
 import { ChatPanel } from '../components/ChatPanel';
 import { ControlsModal } from '../components/shared/ControlsModal';
+import { KickPlayerPanel } from '../components/shared/KickPlayerPanel';
 import { PreGameSettingsPanel } from '../components/screens/PreGameSettingsPanel';
 import { LobbyConfigSummary } from '../components/LobbyConfigSummary';
 import { LeaderboardPanel } from '../components/LeaderboardPanel';
@@ -107,7 +108,7 @@ function HomeContent() {
     acknowledgeSpinResult, redemptionSpin, spinDismissed,
     chatMessages, chatUnread, chatOpen,
     sendChatMessage, openChat, closeChat,
-    leaveGame, restartRoom, resetRoom, setError,
+    leaveGame, restartRoom, resetRoom, kickPlayer, setError,
     activatePowerCard,
     swapPick,
     preGameSelect,
@@ -449,6 +450,7 @@ function HomeContent() {
   // untouched.
   const [gameSettingsOpen, setGameSettingsOpen] = useState(false);
   const [leaderboardOpen, setLeaderboardOpen] = useState(false);
+  const [kickOpen, setKickOpen] = useState(false); // #244 — host Kick Player modal
   const inRoomOnline = !!roomCode && gameMode === 'online';
   const phase = roomState?.phase;
   const isLobby = phase === 'lobby';
@@ -539,6 +541,9 @@ function HomeContent() {
         onOpenChat={inRoomOnline ? openChat : undefined}
         onOpenGameSettings={inRoomOnline ? () => setGameSettingsOpen(true) : undefined}
         onOpenLeaderboard={inRoomOnline && roomState?.groupId ? () => setLeaderboardOpen(true) : undefined}
+        // #244 — host-only: opens the Kick Player roster (presence of the
+        // callback is what gates the menu item, like the other in-room controls).
+        onOpenKickPlayer={inRoomOnline && isHost ? () => setKickOpen(true) : undefined}
         onLeaveTable={inRoomOnline ? handleLeaveTable : undefined}
         leaveDisabled={leaveDisabled}
         voice={inRoomOnline ? voice : undefined}
@@ -571,6 +576,16 @@ function HomeContent() {
             highlightUserId={isGameOver ? (roomState?.lastAction?.winnerId || null) : null}
             getGroupLeaderboard={getGroupLeaderboard}
             leaderboardUpdateNonce={leaderboardUpdateNonce}
+          />
+        </ControlsModal>
+      )}
+      {/* #244 — host-only Kick Player roster */}
+      {inRoomOnline && isHost && kickOpen && (
+        <ControlsModal title="Kick Player" onClose={() => setKickOpen(false)}>
+          <KickPlayerPanel
+            players={roomState?.players || []}
+            hostId={roomState?.hostUserId || null}
+            onKick={kickPlayer}
           />
         </ControlsModal>
       )}

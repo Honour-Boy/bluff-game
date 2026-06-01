@@ -21,7 +21,16 @@ function _shuffle(arr) {
   return a;
 }
 
-function _roleAssignmentFor(aliveCount) {
+// #235 — Collector's only purpose is holding/activating power cards (up to
+// COLLECTOR_POWER_CARD_CAP). With every power card disabled the role is dead
+// weight, so it's dropped from the eligible pool unless ≥1 power card is on.
+function _anyPowerCardEnabled(room) {
+  const enabled = room?.config?.powerCards?.enabled;
+  if (!enabled || typeof enabled !== 'object') return false;
+  return Object.values(enabled).some(Boolean);
+}
+
+function _roleAssignmentFor(aliveCount, { collectorEligible = true } = {}) {
   if (aliveCount < ROLES_AT_MIN_ALIVE) {
     return Array.from({ length: aliveCount }).map(() => ROLES.BAREHAND);
   }
@@ -30,7 +39,7 @@ function _roleAssignmentFor(aliveCount) {
     ROLES.MEDIC,
     ROLES.SABOTEUR,
     ROLES.SNIPER,
-    ROLES.COLLECTOR,
+    ...(collectorEligible ? [ROLES.COLLECTOR] : []),
     ROLES.GAMBLER,
   ];
   let extraGambler = aliveCount >= 11 ? 1 : 0;
@@ -41,7 +50,9 @@ function _roleAssignmentFor(aliveCount) {
 
 function assignRoles(room) {
   const alivePlayers = room.players.filter(p => p.status === 'alive');
-  const assignment = _roleAssignmentFor(alivePlayers.length);
+  const assignment = _roleAssignmentFor(alivePlayers.length, {
+    collectorEligible: _anyPowerCardEnabled(room),
+  });
   const shuffledPlayers = _shuffle(alivePlayers);
   for (let i = 0; i < shuffledPlayers.length; i++) {
     shuffledPlayers[i].role = assignment[i] || ROLES.BAREHAND;

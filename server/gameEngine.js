@@ -60,6 +60,7 @@ module.exports = {
   PENDING_GAME_OVER_TIMEOUT_MS: constants.PENDING_GAME_OVER_TIMEOUT_MS,
   REDEMPTION_PENDING_TIMEOUT_MS: constants.REDEMPTION_PENDING_TIMEOUT_MS,
   SPEED_MODE_TURN_MS: constants.SPEED_MODE_TURN_MS,
+  IDLE_TURN_TIMEOUT_MS: constants.IDLE_TURN_TIMEOUT_MS,
   defaultRoomConfig: constants.defaultRoomConfig,
   normalizeRoomConfig: constants.normalizeRoomConfig,
 
@@ -83,6 +84,7 @@ module.exports = {
   randomShape: cards.randomShape,
   newCardType: cards.newCardType,
   validateAndPlayCard: cards.validateAndPlayCard,
+  pickAutoPlayCard: cards.pickAutoPlayCard,
   ensureDrawPile: cards.ensureDrawPile,
   drawCardForPlayer: cards.drawCardForPlayer,
 

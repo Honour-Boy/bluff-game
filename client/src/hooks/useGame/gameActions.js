@@ -222,6 +222,13 @@ export function useGameActions({
     });
   }, [failError, roomCode, socket]);
 
+  // #244 — host kicks a player. Resolves with the ack so the caller can surface
+  // success/failure inline in the settings roster.
+  const kickPlayer = useCallback((targetPlayerId) => {
+    if (!roomCode || !targetPlayerId) return Promise.resolve({ success: false, error: 'No player' });
+    return emitPromiseAction(socket, 'kick_player', { roomCode, playerId: targetPlayerId }, failError);
+  }, [failError, roomCode, socket]);
+
   // Group host: reset a (possibly remote) room by its cipher — boots everyone
   // and tears the live room down so the next join rebuilds a fresh lobby with
   // the same code. Called from the group detail screen, so it takes an explicit
@@ -277,6 +284,7 @@ export function useGameActions({
     leaveGame,
     restartRoom,
     resetRoom,
+    kickPlayer,
     refreshRoomState,
   };
 }

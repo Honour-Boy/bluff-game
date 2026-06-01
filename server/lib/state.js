@@ -43,6 +43,13 @@ const redemptionTimers = new Map();   // roomCode → setTimeout handle
 // the room leaves the `playing` phase (spins / resolution), cleared on teardown.
 const speedModeTimers = new Map();    // roomCode → setTimeout handle
 
+// #239 — Idle-turn safety net. One per-turn handle per room while a turn is open
+// and Speed Mode is OFF. On expiry the server auto-resolves the AFK player's turn
+// (auto-play a sensible card + end the turn) so an idle player can't stall the
+// table. Re-armed on every turn change, paused outside the `playing` phase, and
+// cleared on teardown — exactly the Speed Mode lifecycle, just a separate handle.
+const idleTurnTimers = new Map();     // roomCode → setTimeout handle
+
 // Host / player disconnect grace timers.
 const hostDisconnectTimers = new Map();
 // Player disconnect timers must be visible across socket connections —
@@ -82,6 +89,10 @@ function _clearRedemptionTimer(code) {
 function _clearSpeedModeTimer(code) {
   const t = speedModeTimers.get(code);
   if (t) { clearTimeout(t); speedModeTimers.delete(code); }
+}
+function _clearIdleTurnTimer(code) {
+  const t = idleTurnTimers.get(code);
+  if (t) { clearTimeout(t); idleTurnTimers.delete(code); }
 }
 
 // §2.1 — verbose, single-line structured logging for every room teardown so
@@ -139,6 +150,7 @@ module.exports = {
   gameOverTimers,
   redemptionTimers,
   speedModeTimers,
+  idleTurnTimers,
   hostDisconnectTimers,
   playerDisconnectTimers,
   dcKey,
@@ -150,6 +162,7 @@ module.exports = {
   _clearGameOverTimer,
   _clearRedemptionTimer,
   _clearSpeedModeTimer,
+  _clearIdleTurnTimer,
   logRoomDeletion,
   logTurnState,
   getRoom,

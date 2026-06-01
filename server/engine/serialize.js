@@ -182,6 +182,10 @@ function serializeRoom(room, requestingPlayerId = null, opts = {}) {
       ? {
           finalistIds: room.lastStand.finalistIds,
           activeFinalistId: room.lastStand.activeFinalistId,
+          // #243 — the single shared gun both finalists pass back and forth.
+          chamber: room.lastStand.chamber || null,
+          bulletCount: room.lastStand.bulletCount
+            ?? (room.lastStand.chamber || []).filter(s => s === 'bullet').length,
         }
       : null,
     speedModeMsRemaining:
