@@ -164,8 +164,11 @@ export function TableScene({
               className="poker-table-oval"
               aria-hidden="true"
               style={{
-                width: 'clamp(260px, 46vmin, 520px)',
-                height: 'clamp(172px, 32vmin, 340px)',
+                // (Module 1) Grown so the dealer's tray / reveal cards sit
+                // comfortably WITHIN the felt interior. The content panel below
+                // is deliberately narrower than this so nothing kisses the rail.
+                width: 'clamp(300px, 52vmin, 560px)',
+                height: 'clamp(200px, 36vmin, 360px)',
               }}
             >
               <div className="poker-table-studs" />
@@ -174,7 +177,9 @@ export function TableScene({
               </div>
             </div>
 
-            <div style={{ position: 'relative', zIndex: 1, width: 'min(360px, 78vw)' }}>
+            {/* (Module 1) Kept narrower than the oval so the deck / required /
+                played slots have spatial breathing room inside the felt. */}
+            <div style={{ position: 'relative', zIndex: 1, width: 'min(288px, 64vw)' }}>
               <CenterTablePanel
                 tableCenterRef={tableCenterRef}
                 isPlaying={isPlaying}
