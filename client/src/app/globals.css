@@ -62,6 +62,18 @@ html, body {
   line-height: 1.65;
   min-height: 100vh;
   overflow-x: hidden;
+  /* (Module 1) Kill the native rubber-band / pull-to-refresh so it can't fight
+     the pannable table canvas or bounce padded screens. Vertical content on the
+     landing/groups screens still scrolls normally. */
+  overscroll-behavior: none;
+}
+
+/* (Module 1) Hard scroll-lock while inside the online game shell. Toggled on
+   <body> by page.js (fullBleed) so the table owns the whole viewport with no
+   page-level scrolling on any device; removed everywhere else. */
+body.game-noscroll {
+  overflow: hidden;
+  height: 100dvh;
 }
 
 /* ─── Global tavern atmosphere — wood grain + vignette ─────────────────────── */

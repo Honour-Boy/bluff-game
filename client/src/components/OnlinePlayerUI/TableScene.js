@@ -1,18 +1,28 @@
+import { motion } from 'framer-motion';
 import { CenterTablePanel } from './CenterTablePanel';
 
-// ─── TableScene — a real oval card table, top-down ───────────────────────────
-// The whole board (oval felt + the dealer's cards + the seated players) is ONE
-// unit inside a horizontally-scrollable layer. The oval lives in the same layer
-// as the cards, so the cards are fixed ON the table and the table moves with
-// them when you pan. When more players than fit are seated, the board grows
-// wider than the screen and you scroll LEFT/RIGHT to see everyone; it never
-// scrolls vertically (it's sized to the available height).
+// ─── TableScene — a medium, fixed-size card table on a pannable canvas ────────
+// (Module 1) The whole board — the fixed oval felt, the dealer's tray, and the
+// seated players — is ONE unit inside a Framer Motion <motion.div drag> plane.
+// The plane is flex-centred in the viewport, so when the board fits it sits
+// dead-centre and can't drift; when more players are seated than fit, the board
+// grows past the viewport and you drag it in ANY direction to bring far seats
+// into view (elastic + dampened so it can't be flung off-screen). The oval
+// itself stays a fixed "medium" size — only the ring of seats around it grows.
+//
+// Seat placement is responsive (chosen in index.js): desktop spreads seats
+// top / left / right around the table (distributePlayers); mobile fans them all
+// into the top band above the table (arcPlayers).
 export function TableScene({
+  viewportRef,
+  boardRef,
+  panControls,
+  panConstraints,
   tableCenterRef,
-  sceneScrollRef,
   distributed,
   otherPlayers,
   renderChip,
+  isMobile,
   isPlaying,
   isSpinPending,
   isRoundEnd,
@@ -40,108 +50,128 @@ export function TableScene({
   isMyTurn,
   currentPlayer,
 }) {
+  const hasTop = distributed.top.length > 0;
+  const hasLeft = distributed.left.length > 0;
+  const hasRight = distributed.right.length > 0;
+
   return (
     <div
+      ref={viewportRef}
       className="topdown-table-scene tavern-floor"
       style={{
         flex: '1 1 0',
         minHeight: 0,
         position: 'relative',
         overflow: 'hidden',
+        // Flex-centre the draggable plane so the board sits centred by default
+        // and is held there whenever it fits the viewport.
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        touchAction: 'none', // let the drag handler own touch gestures (no native scroll fight)
       }}
     >
-      {/* Horizontal pan layer — the board scrolls left/right within it. */}
-      <div
-        ref={sceneScrollRef}
+      {/* The pannable plane. dragConstraints are recomputed (index.js) from the
+          board-vs-viewport overflow so the table can never be thrown fully off
+          screen; dragElastic gives a little dampened overscroll. */}
+      <motion.div
+        ref={boardRef}
+        drag
+        dragConstraints={panConstraints}
+        dragElastic={0.15}
+        dragMomentum
+        animate={panControls}
         style={{
-          position: 'absolute',
-          inset: 0,
-          overflowX: 'auto',
-          overflowY: 'hidden',
+          width: 'max-content',
           display: 'flex',
-          alignItems: 'stretch',
-          WebkitOverflowScrolling: 'touch',
+          flexDirection: 'column',
+          alignItems: 'center',
+          gap: 10,
+          cursor: 'grab',
+          padding: '8px 12px',
         }}
+        whileTap={{ cursor: 'grabbing' }}
       >
-        {/* The board: oval felt + cards + seats, all move together. Fills the
-            layer when it fits; grows wider (→ scroll) when more seats are in. */}
+        {/* Top band of seats — a single centred row above the table. On mobile
+            this is the whole "horseshoe"; on desktop it's the far-rail row. */}
         <div
-          className="poker-board"
+          className="topdown-top"
           style={{
-            position: 'relative',
-            flex: '1 0 auto',
-            minWidth: '100%',
             display: 'flex',
-            flexDirection: 'column',
-            padding: '0 6px',
+            alignItems: 'center',
+            justifyContent: 'center',
+            gap: 8,
+            minHeight: hasTop ? undefined : 0,
           }}
         >
-          {/* The table itself (decorative): rail → studs → felt → stitching */}
-          <div className="poker-table-oval" aria-hidden="true">
-            <div className="poker-table-studs" />
-            <div className="poker-table-felt">
-              <div className="poker-table-stitch" />
-            </div>
-          </div>
-
-          {/* Seats + play area on the felt */}
-          <div style={{ position: 'relative', zIndex: 1, flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column' }}>
-            {/* Top row of player chips — seated along the far rail */}
-            <div
-              className="topdown-top"
-              style={{
-                flex: '0 0 auto',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                flexWrap: 'wrap',
-                gap: 8,
-                padding: '12px 4px 6px',
-              }}
-            >
-              {distributed.top.length > 0 ? (
-                distributed.top.map(renderChip)
-              ) : (
-                <div style={{
-                  fontFamily: "'Cinzel', serif",
-                  fontSize: 9,
-                  color: 'var(--text-dim)',
-                  letterSpacing: '0.16em',
-                  textTransform: 'uppercase',
-                  opacity: 0.5,
-                }}>
-                  {otherPlayers.length === 0 ? 'Awaiting players…' : ''}
-                </div>
-              )}
-            </div>
-
-            {/* Middle: left chips | centre tray | right chips */}
-            <div
-              className="topdown-middle"
-              style={{
-                flex: '1 1 auto',
-                minHeight: 0,
-                display: 'grid',
-                gridTemplateColumns: 'auto 1fr auto',
-                gap: 10,
-                alignItems: 'center',
-                padding: '4px 0',
-              }}
-            >
-              <div
-                className="topdown-side"
-                style={{
-                  display: 'flex',
-                  flexDirection: 'column',
-                  flexWrap: 'wrap',
-                  gap: 8,
-                  maxHeight: '42vh',
-                  alignContent: 'flex-start',
-                }}
-              >
-                {distributed.left.map(renderChip)}
+          {hasTop ? (
+            distributed.top.map(renderChip)
+          ) : (
+            otherPlayers.length === 0 && (
+              <div style={{
+                fontFamily: "'Cinzel', serif",
+                fontSize: 9,
+                color: 'var(--text-dim)',
+                letterSpacing: '0.16em',
+                textTransform: 'uppercase',
+                opacity: 0.5,
+              }}>
+                Awaiting players…
               </div>
+            )
+          )}
+        </div>
 
+        {/* Middle band: left seats | the fixed table | right seats */}
+        <div
+          className="topdown-middle"
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            gap: isMobile ? 8 : 14,
+          }}
+        >
+          {!isMobile && (
+            <div
+              className="topdown-side"
+              style={{
+                display: 'flex',
+                flexDirection: 'column',
+                gap: 8,
+                visibility: hasLeft ? 'visible' : 'hidden',
+              }}
+            >
+              {distributed.left.map(renderChip)}
+            </div>
+          )}
+
+          {/* The fixed-size oval table with the dealer's tray on the felt. */}
+          <div
+            className="table-felt-anchor"
+            style={{
+              position: 'relative',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              padding: '20px 16px',
+            }}
+          >
+            <div
+              className="poker-table-oval"
+              aria-hidden="true"
+              style={{
+                width: 'clamp(260px, 46vmin, 520px)',
+                height: 'clamp(172px, 32vmin, 340px)',
+              }}
+            >
+              <div className="poker-table-studs" />
+              <div className="poker-table-felt">
+                <div className="poker-table-stitch" />
+              </div>
+            </div>
+
+            <div style={{ position: 'relative', zIndex: 1, width: 'min(360px, 78vw)' }}>
               <CenterTablePanel
                 tableCenterRef={tableCenterRef}
                 isPlaying={isPlaying}
@@ -171,24 +201,24 @@ export function TableScene({
                 isMyTurn={isMyTurn}
                 currentPlayer={currentPlayer}
               />
-
-              <div
-                className="topdown-side"
-                style={{
-                  display: 'flex',
-                  flexDirection: 'column',
-                  flexWrap: 'wrap',
-                  gap: 8,
-                  maxHeight: '42vh',
-                  alignContent: 'flex-start',
-                }}
-              >
-                {distributed.right.map(renderChip)}
-              </div>
             </div>
           </div>
+
+          {!isMobile && (
+            <div
+              className="topdown-side"
+              style={{
+                display: 'flex',
+                flexDirection: 'column',
+                gap: 8,
+                visibility: hasRight ? 'visible' : 'hidden',
+              }}
+            >
+              {distributed.right.map(renderChip)}
+            </div>
+          )}
         </div>
-      </div>
+      </motion.div>
     </div>
   );
 }

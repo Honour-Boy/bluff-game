@@ -146,6 +146,16 @@ function HomeContent() {
     setSection(musicSection);
   }, [setSection, musicSection]);
 
+  // (Module 1) Lock page scrolling while inside the online game shell so the
+  // pannable table owns the whole viewport with no native page scroll on any
+  // device. Mirrors the `fullBleed` condition below; cleaned up on exit.
+  const inOnlineGame = !!roomCode && gameMode === 'online';
+  useEffect(() => {
+    if (typeof document === 'undefined') return undefined;
+    document.body.classList.toggle('game-noscroll', inOnlineGame);
+    return () => document.body.classList.remove('game-noscroll');
+  }, [inOnlineGame]);
+
   // ─── Groups cache (issue #106) ─────────────────────────────
   // In-memory only (sessionStorage is overkill for socket payloads
   // and they shouldn't survive tab close). Two scopes:
@@ -435,7 +445,7 @@ function HomeContent() {
 
   // The online table runs as a full-bleed, viewport-height shell (no page
   // scroll) so it stays compact; every other screen keeps normal padded flow.
-  const fullBleed = !!roomCode && gameMode === 'online';
+  const fullBleed = inOnlineGame;
   const wrap = (children) => (
     <div style={fullBleed
       ? { height: '100dvh', overflow: 'hidden', position: 'relative' }
