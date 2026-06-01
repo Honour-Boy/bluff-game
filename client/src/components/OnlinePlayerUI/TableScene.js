@@ -170,8 +170,8 @@ export function TableScene({
               // seats then sit clearly OUTSIDE the rail on desktop — no longer
               // tucked under the table (lobby + in-game, all large screens).
               boxSizing: 'border-box',
-              minWidth: 'clamp(300px, 44vmin, 440px)',
-              minHeight: 'clamp(196px, 32vmin, 300px)',
+              minWidth: 'clamp(360px, 70vmin, 600px)',
+              minHeight: 'clamp(280px, 52vmin, 460px)',
             }}
           >
             <div
@@ -183,8 +183,11 @@ export function TableScene({
                 // that the felt overflows its anchor and swallows the seated
                 // players on the sides/top. The seats are also lifted above the
                 // felt via z-index (below) as a guarantee on big screens.
-                width: 'clamp(300px, 44vmin, 440px)',
-                height: 'clamp(196px, 32vmin, 300px)',
+                // Generous size (the canvas is pannable) so the dealer's tray,
+                // reveal cards, the bluff-outcome line, and lobby copy all sit
+                // comfortably WITHIN the felt instead of spilling over its rim.
+                width: 'clamp(360px, 70vmin, 600px)',
+                height: 'clamp(280px, 52vmin, 460px)',
               }}
             >
               <div className="poker-table-studs" />
@@ -194,8 +197,10 @@ export function TableScene({
             </div>
 
             {/* (Module 1) Kept narrower than the oval so the deck / required /
-                played slots have spatial breathing room inside the felt. */}
-            <div style={{ position: 'relative', zIndex: 1, width: 'min(288px, 64vw)' }}>
+                played slots have spatial breathing room inside the felt. Widened
+                to match the larger felt so lobby copy / the start button fit on
+                one line without clipping. */}
+            <div style={{ position: 'relative', zIndex: 1, width: 'min(340px, 82vw)' }}>
               <CenterTablePanel
                 tableCenterRef={tableCenterRef}
                 isPlaying={isPlaying}

@@ -133,7 +133,7 @@ function HomeContent() {
   // current screen + room phase and switched as the player moves around.
   // _setSection arms the mobile autoplay unlock, so no explicit gesture
   // listener is needed here. Muteable from the settings gear.
-  const { musicEnabled, musicVolume, toggleMusic, setMusicVolume, setSection, setGameStage } = useMusic();
+  const { musicEnabled, musicVolume, toggleMusic, setMusicVolume, setSection, setGameStage, nextTrack, prevTrack } = useMusic();
   // A group room's lobby belongs to the Groups area — keep it on the GROUPS
   // track instead of switching to the normal online-lobby sound. It only moves
   // to 'game' once the match actually starts (phase leaves lobby), and to
@@ -505,6 +505,8 @@ function HomeContent() {
         onToggleMusic={toggleMusic}
         musicVolume={musicVolume}
         onSetMusicVolume={setMusicVolume}
+        onPrevTrack={prevTrack}
+        onNextTrack={nextTrack}
         onSignOut={signOut}
         onSignOutGuest={signOutGuest}
         onUpdateUsername={updateUsername}

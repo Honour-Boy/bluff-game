@@ -393,10 +393,12 @@ export function BottomSeat({
 
               {/* CENTER (played cards) + RIGHT (power cards) — CardHand lays out
                   the shape fan and the power-card bracket side by side.
-                  (Module 1.4) On desktop the fan is nudged up the Y-axis so the
-                  card tops are fully visible and never tuck under the table edge.
+                  No Y-lift: the old desktop translateY(-12px) dragged the card-
+                  holder's top border up into the "Your Hand / N cards" label row,
+                  drawing a line across the card count. The fan sits in its own
+                  flow now, clear of the label.
                   (Module 2.2) A shorter fan on mobile keeps the dock compact. */}
-              <div style={{ flex: 1, minWidth: 0, transform: isMobile ? 'none' : 'translateY(-12px)' }}>
+              <div style={{ flex: 1, minWidth: 0 }}>
                 <CardHand
                   hand={myHand}
                   powerCardSlot={myPowerCardSlot}

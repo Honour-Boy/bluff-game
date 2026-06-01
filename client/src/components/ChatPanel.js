@@ -139,7 +139,10 @@ export function ChatPanel({
             position: 'fixed',
             inset: 0,
             background: 'rgba(0,0,0,0.45)',
-            zIndex: 9099,
+            // Above the SettingsGear (9200) so the panel's own close button isn't
+            // swallowed by the gear on mobile (both sit top-right); still below the
+            // controls modal (9300) so that hierarchy is preserved.
+            zIndex: 9210,
           }}
         />
       )}
@@ -155,7 +158,9 @@ export function ChatPanel({
             right: 0,
             top: 0,
             bottom: 0,
-            zIndex: 9100,
+            // Above the SettingsGear (9200) so the close button is reachable on
+            // mobile; below the controls modal (9300).
+            zIndex: 9220,
             width: '100%',
             maxWidth: 380,
             background: 'var(--surface)',

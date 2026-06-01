@@ -262,31 +262,75 @@ function playEliminateSound(ctx) {
 function playGunshot(ctx) {
   resume(ctx);
   const now = ctx.currentTime;
-  // Crack — short highpassed noise burst with a fast decay.
-  const crackLen = Math.ceil(ctx.sampleRate * 0.07);
-  const buf = ctx.createBuffer(1, crackLen, ctx.sampleRate);
-  const d = buf.getChannelData(0);
-  for (let i = 0; i < crackLen; i++) d[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / crackLen, 2);
-  const noise = ctx.createBufferSource();
-  noise.buffer = buf;
-  const hp = ctx.createBiquadFilter();
-  hp.type = 'highpass';
-  hp.frequency.value = 850;
-  const ng = ctx.createGain();
-  ng.gain.setValueAtTime(0.95, now);
-  ng.gain.exponentialRampToValueAtTime(0.001, now + 0.09);
-  noise.connect(hp); hp.connect(ng); ng.connect(masterOut(ctx));
-  noise.start(now);
-  // Boom — the body of the shot.
-  const boom = ctx.createOscillator();
+  const out = masterOut(ctx);
+
+  // tanh saturator — the nonlinear grit that makes this read as a real shot
+  // rather than the soft "blank" a clean sine gives. One per noise layer.
+  const mkShaper = () => {
+    const sh = ctx.createWaveShaper();
+    const c = new Float32Array(1024);
+    for (let i = 0; i < 1024; i++) { const x = (i / 1023) * 2 - 1; c[i] = Math.tanh(x * 3.4); }
+    sh.curve = c; sh.oversample = '4x';
+    return sh;
+  };
+
+  // 1) CRACK — the muzzle snap. Full-spectrum white noise, instant attack, very
+  //    fast decay, through a wide bandpass + saturation. This sharp transient is
+  //    what the ear actually hears as "gunshot".
+  const crackLen = Math.ceil(ctx.sampleRate * 0.05);
+  const cbuf = ctx.createBuffer(1, crackLen, ctx.sampleRate);
+  const cd = cbuf.getChannelData(0);
+  for (let i = 0; i < crackLen; i++) cd[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / crackLen, 1.3);
+  const crack = ctx.createBufferSource(); crack.buffer = cbuf;
+  const cbp = ctx.createBiquadFilter(); cbp.type = 'bandpass'; cbp.frequency.value = 2400; cbp.Q.value = 0.5;
+  const csh = mkShaper();
+  const cg = ctx.createGain();
+  cg.gain.setValueAtTime(1.0, now);
+  cg.gain.exponentialRampToValueAtTime(0.001, now + 0.06);
+  crack.connect(cbp); cbp.connect(csh); csh.connect(cg); cg.connect(out);
+  crack.start(now);
+
+  // 2) BODY — the explosive punch. A burst of low-passed noise (an explosion is
+  //    noise, not a tone) sweeping down, saturated, decaying fast.
+  const bodyLen = Math.ceil(ctx.sampleRate * 0.24);
+  const bbuf = ctx.createBuffer(1, bodyLen, ctx.sampleRate);
+  const bd = bbuf.getChannelData(0);
+  for (let i = 0; i < bodyLen; i++) bd[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / bodyLen, 2);
+  const body = ctx.createBufferSource(); body.buffer = bbuf;
+  const blp = ctx.createBiquadFilter(); blp.type = 'lowpass';
+  blp.frequency.setValueAtTime(1900, now);
+  blp.frequency.exponentialRampToValueAtTime(170, now + 0.22);
+  const bsh = mkShaper();
   const bg = ctx.createGain();
-  boom.type = 'sine';
-  boom.frequency.setValueAtTime(150, now);
-  boom.frequency.exponentialRampToValueAtTime(38, now + 0.2);
-  bg.gain.setValueAtTime(0.6, now);
-  bg.gain.exponentialRampToValueAtTime(0.001, now + 0.34);
-  boom.connect(bg); bg.connect(masterOut(ctx));
-  boom.start(now); boom.stop(now + 0.38);
+  bg.gain.setValueAtTime(0.95, now);
+  bg.gain.exponentialRampToValueAtTime(0.001, now + 0.27);
+  body.connect(blp); blp.connect(bsh); bsh.connect(bg); bg.connect(out);
+  body.start(now);
+
+  // 3) SUB — the chest-thump low end under the body.
+  const sub = ctx.createOscillator();
+  const sg = ctx.createGain();
+  sub.type = 'sine';
+  sub.frequency.setValueAtTime(140, now);
+  sub.frequency.exponentialRampToValueAtTime(33, now + 0.18);
+  sg.gain.setValueAtTime(0.9, now);
+  sg.gain.exponentialRampToValueAtTime(0.001, now + 0.3);
+  sub.connect(sg); sg.connect(out);
+  sub.start(now); sub.stop(now + 0.34);
+
+  // 4) TAIL — a short low-passed noise decay so the shot rings out into the room
+  //    instead of cutting off abruptly.
+  const tailLen = Math.ceil(ctx.sampleRate * 0.4);
+  const tbuf = ctx.createBuffer(1, tailLen, ctx.sampleRate);
+  const tdat = tbuf.getChannelData(0);
+  for (let i = 0; i < tailLen; i++) tdat[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / tailLen, 3);
+  const tail = ctx.createBufferSource(); tail.buffer = tbuf;
+  const tlp = ctx.createBiquadFilter(); tlp.type = 'lowpass'; tlp.frequency.value = 1000;
+  const tg = ctx.createGain();
+  tg.gain.setValueAtTime(0.2, now + 0.02);
+  tg.gain.exponentialRampToValueAtTime(0.001, now + 0.42);
+  tail.connect(tlp); tlp.connect(tg); tg.connect(out);
+  tail.start(now);
 }
 
 const AUDIO_MAP = {
@@ -481,11 +525,22 @@ const SECTION_MODE = {
   gameover: 'once',
 };
 
-const SECTION_FADE_MS = 900;      // crossfade when switching view contexts
-const CROSSFADE_MS = 3000;        // game progressive stage crossfade (3 s)
-const LOBBY_CROSSFADE_MS = 2500;  // lobby track-end → alternative
-const GAMEOVER_FADEIN_MS = 2000;  // gameover gentle fade-in
+const SECTION_FADE_MS = 900;      // fade used when the playlist first starts
+const TRACK_CROSSFADE_MS = 2500;  // crossfade between consecutive / skipped tracks
 const MUSIC_DUCK_VOL = 0.04;      // ducked level while a one-shot cue plays
+
+// ── One continuous, app-wide playlist ────────────────────────────────────────
+// The music is now a SINGLE uninterrupted stream: moving between sections never
+// stops or restarts it. We derive the order from the section pools (deduped) so
+// every assigned track still plays and nothing is orphaned — the section grouping
+// just defines the running order. Tracks advance automatically when one ends, and
+// the player can step through them with the prev/next controls in settings.
+const PLAYLIST = Array.from(new Set([
+  ...MUSIC_SECTIONS.lobby,
+  ...MUSIC_SECTIONS.game,
+  ...MUSIC_SECTIONS.groups,
+  ...MUSIC_SECTIONS.gameover,
+]));
 
 function _musicMutedFromStorage() {
   try { return window.localStorage.getItem('bluff_music_muted') === '1'; }
@@ -611,83 +666,82 @@ function _crossfadeTo(eng, src, ms, loop) {
   eng.currentSrc = src;
 }
 
-// Lobby SHUFFLE: when the foreground deck's (non-looping) track ends, crossfade
-// to a different track in the pool.
+// Continuous playlist: when the foreground track ends, crossfade straight into
+// the next one (wrapping at the end) so the stream never stops.
 function _onDeckEnded(eng, deckIdx) {
-  if (eng.muted || deckIdx !== eng.active || eng.mode !== 'shuffle') return;
-  if (!eng.queue.length) return;
-  let next = eng.idx;
-  if (eng.queue.length > 1) {
-    do { next = Math.floor(Math.random() * eng.queue.length); } while (next === eng.idx);
-  }
-  eng.idx = next;
-  _crossfadeTo(eng, eng.queue[next], LOBBY_CROSSFADE_MS, false);
+  if (eng.muted || deckIdx !== eng.active) return;
+  if (!eng.queue || !eng.queue.length) eng.queue = PLAYLIST;
+  eng.idx = (eng.idx + 1) % eng.queue.length;
+  _crossfadeTo(eng, eng.queue[eng.idx], TRACK_CROSSFADE_MS, false);
 }
 
-// Switch the active view context. Picks the starting track per the section's
-// MODE and crossfades to it. No-op (but ensures playback) if unchanged.
+// Section switch. Playback is ONE continuous playlist, so this never changes the
+// track or restarts the music when navigating — it only kicks the stream off the
+// first time (and nudges a paused deck back to life, e.g. after a tab return).
 function _setSection(name) {
   installAudioUnlock();
   const eng = _engine();
   if (!eng) return;
-  if (eng.section === name) {
-    if (!eng.muted && eng.currentSrc) {
+  eng.section = name;            // retained for reference only
+  eng.queue = PLAYLIST;
+  // Already playing or queued (while muted)? Leave it running — continuity.
+  if (eng.currentSrc || eng.pendingSrc) {
+    if (!eng.muted) {
       const d = eng.decks[eng.active];
-      if (d.paused) {
+      if (d && d.paused && eng.currentSrc) {
         const p = d.play(); if (p && p.catch) p.catch(() => {});
         _fadeDeck(eng, eng.active, _trackVol(eng.currentSrc), 400, 'in');
       }
     }
     return;
   }
-  eng.section = name;
-  eng.mode = SECTION_MODE[name] || 'loop';
-  eng.queue = MUSIC_SECTIONS[name] || [];
-  eng.stage = 0;
-  if (!eng.queue.length) {
-    _fadeDeck(eng, eng.active, 0, SECTION_FADE_MS, 'out', () => { try { eng.decks[eng.active].pause(); } catch (_) {} });
-    eng.currentSrc = null;
-    return;
-  }
-  // Pick the opening track: random for shuffle, top for everything else.
-  if (eng.mode === 'shuffle') eng.idx = Math.floor(Math.random() * eng.queue.length);
-  else eng.idx = 0;
+  // First start — open the playlist on a random track for session variety.
+  eng.idx = Math.floor(Math.random() * eng.queue.length);
   const src = eng.queue[eng.idx];
-  // Shuffle tracks must NOT loop (so 'ended' fires → crossfade to the other);
-  // every other mode loops its current track.
-  const loop = eng.mode !== 'shuffle';
-  const fadeMs = eng.mode === 'once' ? GAMEOVER_FADEIN_MS : SECTION_FADE_MS;
   if (eng.muted) { eng.currentSrc = src; eng.pendingSrc = src; return; }
-  _crossfadeTo(eng, src, fadeMs, loop);
+  _crossfadeTo(eng, src, SECTION_FADE_MS, false);
 }
 
-// Game PROGRESSIVE: escalate to a higher-intensity track. Monotonic within a
-// game (never steps back down); a fresh game resets stage via _setSection.
-function _setGameStage(stage) {
-  const eng = (typeof window !== 'undefined') ? window.__bluffMusic : null;
-  if (!eng || eng.section !== 'game' || eng.mode !== 'progressive' || !eng.queue.length) return;
-  const clamped = Math.max(0, Math.min(stage | 0, eng.queue.length - 1));
-  if (clamped <= eng.stage) return;
-  eng.stage = clamped;
-  eng.idx = clamped;
-  const src = eng.queue[clamped];
-  if (eng.muted) { eng.currentSrc = src; eng.pendingSrc = src; return; }
-  _crossfadeTo(eng, src, CROSSFADE_MS, true); // 3 s logarithmic-feel crossfade, looped
-}
+// Progressive in-game escalation is retired in favour of the single continuous
+// playlist (escalating would restart tracks). Kept as a no-op so existing callers
+// (page.js still feeds it gameMusicStage) need no change.
+function _setGameStage() { /* no-op — continuous playlist mode */ }
 
-// Resume the current section (first user gesture / unmute).
+// Step to the next (dir=1) or previous (dir=-1) track in the playlist.
+function _musicSkip(dir) {
+  installAudioUnlock();
+  const eng = _engine();
+  if (!eng) return;
+  if (!eng.queue || !eng.queue.length) eng.queue = PLAYLIST;
+  const len = eng.queue.length;
+  if (!len) return;
+  eng.idx = ((eng.idx + dir) % len + len) % len;
+  const src = eng.queue[eng.idx];
+  // A manual skip starts the chosen track fresh, not from a retained playhead.
+  try { delete eng.positions[src]; } catch (_) {}
+  if (eng.muted) { eng.currentSrc = src; eng.pendingSrc = src; return; }
+  _crossfadeTo(eng, src, 600, false);
+}
+function _musicNext() { _musicSkip(1); }
+function _musicPrev() { _musicSkip(-1); }
+
+// Start / resume the continuous playlist (first user gesture / unmute).
 function _musicResume() {
   const eng = (typeof window !== 'undefined') ? window.__bluffMusic : null;
-  if (!eng || eng.muted || !eng.queue.length) return;
-  const src = eng.pendingSrc || eng.currentSrc;
-  if (!src) return;
+  if (!eng || eng.muted) return;
+  if (!eng.queue || !eng.queue.length) eng.queue = PLAYLIST;
+  let src = eng.pendingSrc || eng.currentSrc;
+  if (!src) {
+    // Nothing started yet (gesture arrived before any section switch).
+    eng.idx = Math.floor(Math.random() * eng.queue.length);
+    src = eng.queue[eng.idx];
+  }
   const idx = eng.active;
   const deck = eng.decks[idx];
-  if (deck.paused || eng.pendingSrc) {
-    const loop = eng.mode !== 'shuffle';
+  if (deck.paused || eng.pendingSrc || !deck.src) {
     try {
       deck.src = encodeURI(src);
-      deck.loop = loop;
+      deck.loop = false;
       deck.currentTime = 0;
       deck.volume = 0;
     } catch (_) {}
@@ -766,11 +820,12 @@ export function gameMusicStage(roomState, stageCount = (MUSIC_SECTIONS.game ? MU
 // per-screen atmosphere hook. Used at the app root (start on first gesture) and
 // by any settings UI (mute toggle). Mute state is shared via the module store
 // so the landing gear and the in-game menu never drift apart.
-//   setSection(name)   — switch the active view context ('lobby'|'game'|
-//                        'groups'|'gameover'); the app root drives this.
-//   setGameStage(n)    — escalate the in-game progressive playlist (0..2).
-//   startMusic()       — arm the mobile unlock + resume the current section.
-//   toggleMusic()      — flip mute (persisted); unmuting resumes the section.
+//   setSection(name)   — note the active view context; the music is ONE
+//                        continuous playlist, so this never restarts it.
+//   setGameStage(n)    — retained no-op (continuous playlist mode).
+//   nextTrack()/prevTrack() — step through the playlist (settings skip buttons).
+//   startMusic()       — arm the mobile unlock + start/resume the playlist.
+//   toggleMusic()      — flip mute (persisted); unmuting resumes playback.
 //   musicEnabled       — boolean, reactive.
 export function useMusic() {
   const muted = useSyncExternalStore(_subscribeMuted, _getMutedSnapshot, () => false);
@@ -789,7 +844,9 @@ export function useMusic() {
     try { _musicSetMuted(willMute); } catch (_) {}
   }, []);
   const setMusicVolume = useCallback((v) => { try { _setMusicVolume(v); } catch (_) {} }, []);
-  return { musicEnabled: !muted, musicVolume: volume, setSection, setGameStage, startMusic, toggleMusic, setMusicVolume };
+  const nextTrack = useCallback(() => { try { _musicNext(); } catch (_) {} }, []);
+  const prevTrack = useCallback(() => { try { _musicPrev(); } catch (_) {} }, []);
+  return { musicEnabled: !muted, musicVolume: volume, setSection, setGameStage, startMusic, toggleMusic, setMusicVolume, nextTrack, prevTrack };
 }
 
 // ─── Hook ─────────────────────────────────────────────────────────────────────
