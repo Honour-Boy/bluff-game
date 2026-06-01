@@ -133,7 +133,9 @@ export function CenterTablePanel({
           gap: 10,
           padding: '6px 4px',
         }}>
-          <FaceDownStack count={deckSize} label="Draw" warning={deckSize < 5 && deckSize > 0} />
+          <div data-deck-anchor>
+            <FaceDownStack count={deckSize} label="Draw" warning={deckSize < 5 && deckSize > 0} />
+          </div>
 
           {/* Required suit — the table's bright focal point (dealer's tray) */}
           <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8 }}>

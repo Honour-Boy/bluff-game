@@ -27,6 +27,14 @@ export const GAME_UI_STYLE = `
     100% { transform: translate(var(--fly-dx), var(--fly-dy)) rotate(var(--fly-rot, 8deg)) scale(0.46); opacity: 0; }
   }
   .card-fly { animation: cardFly 0.62s cubic-bezier(0.45, 0, 0.2, 1) forwards; will-change: transform, opacity; }
+  /* Card-fly IN: a face-down card sails from the deck and LANDS in the hand
+     (the global-reshuffle "deal back" half). Unlike cardFly it ends visible. */
+  @keyframes cardFlyIn {
+    0%   { transform: translate(0,0) rotate(var(--fly-rot, -6deg)) scale(0.5); opacity: 0; }
+    25%  { opacity: 1; }
+    100% { transform: translate(var(--fly-dx), var(--fly-dy)) rotate(0deg) scale(1); opacity: 1; }
+  }
+  .card-fly-in { animation: cardFlyIn 0.6s cubic-bezier(0.2, 0.7, 0.3, 1) forwards; will-change: transform, opacity; }
   /* Active-turn chip: warm amber candlelight pulse */
   @keyframes chipTurnPulse {
     0%, 100% { box-shadow: 0 0 8px rgba(200,146,46,0.3), 0 2px 8px rgba(0,0,0,0.6); }
