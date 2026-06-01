@@ -105,6 +105,10 @@ export function TableScene({
             justifyContent: 'center',
             gap: 8,
             minHeight: hasTop ? undefined : 0,
+            // Keep seated players painted ABOVE the absolutely-positioned felt so
+            // they are never hidden behind the table (lobby + in-game, all sizes).
+            position: 'relative',
+            zIndex: 5,
           }}
         >
           {hasTop ? (
@@ -143,6 +147,8 @@ export function TableScene({
                 flexDirection: 'column',
                 gap: 8,
                 visibility: hasLeft ? 'visible' : 'hidden',
+                position: 'relative',
+                zIndex: 5,
               }}
             >
               {distributed.left.map(renderChip)}
@@ -158,19 +164,27 @@ export function TableScene({
               alignItems: 'center',
               justifyContent: 'center',
               padding: '20px 16px',
+              // Reserve a box at least as large as the absolutely-positioned felt
+              // (same clamp as the oval below) so the felt is fully CONTAINED and
+              // never bleeds sideways/up into the seat columns or top band. The
+              // seats then sit clearly OUTSIDE the rail on desktop — no longer
+              // tucked under the table (lobby + in-game, all large screens).
+              boxSizing: 'border-box',
+              minWidth: 'clamp(300px, 44vmin, 440px)',
+              minHeight: 'clamp(196px, 32vmin, 300px)',
             }}
           >
             <div
               className="poker-table-oval"
               aria-hidden="true"
               style={{
-                // (Module 1) Grown so the dealer's tray / reveal cards sit
-                // comfortably WITHIN the felt interior. The content panel below
-                // is deliberately narrower than this so nothing kisses the rail.
-                // The raised mobile minimum gives compact phones extra breathing
-                // room around the cards.
-                width: 'clamp(330px, 56vmin, 580px)',
-                height: 'clamp(216px, 40vmin, 380px)',
+                // Sized to comfortably hold the dealer's tray / reveal cards
+                // (the content panel below is narrower) WITHOUT growing so large
+                // that the felt overflows its anchor and swallows the seated
+                // players on the sides/top. The seats are also lifted above the
+                // felt via z-index (below) as a guarantee on big screens.
+                width: 'clamp(300px, 44vmin, 440px)',
+                height: 'clamp(196px, 32vmin, 300px)',
               }}
             >
               <div className="poker-table-studs" />
@@ -224,6 +238,8 @@ export function TableScene({
                 flexDirection: 'column',
                 gap: 8,
                 visibility: hasRight ? 'visible' : 'hidden',
+                position: 'relative',
+                zIndex: 5,
               }}
             >
               {distributed.right.map(renderChip)}
