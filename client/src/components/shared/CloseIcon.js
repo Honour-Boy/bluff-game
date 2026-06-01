@@ -1,12 +1,13 @@
-// ─── CloseIcon — an SVG "X" for dismiss buttons ──────────────────────────────
-// Replaces the old `✕` / `×` text glyphs, which silently fail to render in the
-// serif/display fonts the app uses (the dingbat is missing from many fonts, so
-// the close button showed up blank). An SVG stroke always renders. Inherits the
-// button's text colour via currentColor.
-export function CloseIcon({ size = 16, strokeWidth = 2 }) {
+// ─── CloseIcon — a raw literal "X" for dismiss buttons (Module 6) ─────────────
+// Per the design brief, every dismissal control renders a raw, literal uppercase
+// "X" text character — NOT an SVG path or a font-icon glyph. A plain Latin "X"
+// (U+0058) always renders in the app's display fonts (unlike the ✕/× dingbats,
+// which silently fail). It sits in a high-contrast white-on-red badge
+// (`.bluff-close-x` in globals.css) so it can never blend into a modal surface.
+// The `size`/`strokeWidth` props are accepted for backwards compatibility with
+// existing call sites but the badge is a fixed, legible size.
+export function CloseIcon() {
   return (
-    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" aria-hidden="true" focusable="false">
-      <path d="M6 6l12 12M18 6 6 18" stroke="currentColor" strokeWidth={strokeWidth} strokeLinecap="round" />
-    </svg>
+    <span className="bluff-close-x" aria-hidden="true">X</span>
   );
 }
