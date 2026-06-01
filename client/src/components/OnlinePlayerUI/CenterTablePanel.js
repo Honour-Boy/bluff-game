@@ -1,7 +1,6 @@
 import { CardShape } from '../shared/CardShape';
 import { ShapeIcon } from '../shared/ShapeIcon';
 import { ActionLog } from '../ActionLog';
-import { WaitingForPlayerBanner } from '../TurnStartNotice';
 // Game settings (host config / read-only summary) and the group leaderboard now
 // live in the Controls menu, not on the felt — keeps the table clean.
 
@@ -447,11 +446,11 @@ export function CenterTablePanel({
         </div>
       )}
 
-      {/* #185 — Last Event panel uses displayedLastAction to gate spin reveals */}
+      {/* #185 — Last Event panel uses displayedLastAction to gate spin reveals.
+          (Module 2) The "waiting for X" banner moved to a contextual popup above
+          the active player's avatar (see ChipPopup in index.js); ActionLog stays
+          as the trimmed detailed log surface. */}
       {displayedLastAction && <ActionLog lastAction={displayedLastAction} />}
-      {!isMyTurn && isPlaying && currentPlayer && !isEliminated && (
-        <WaitingForPlayerBanner playerName={currentPlayer.username} />
-      )}
     </div>
   );
 }

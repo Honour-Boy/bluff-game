@@ -19,7 +19,10 @@ export function Notification({ notification }) {
         position: "fixed",
         top: 20,
         right: 20,
-        zIndex: 9000,
+        // (Module 2.4) Sit above every overlay/menu (current ceiling is
+        // SmokeLayer at 9996) so system toasts/warnings are never occluded by
+        // the lobby panels, settings gear, or spin/role overlays.
+        zIndex: 10000,
         background: "var(--surface)",
         border: `1px solid ${color}`,
         borderLeft: `4px solid ${color}`,

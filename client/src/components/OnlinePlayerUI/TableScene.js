@@ -88,7 +88,9 @@ export function TableScene({
           alignItems: 'center',
           gap: 10,
           cursor: 'grab',
-          padding: '8px 12px',
+          // Extra top room so a top-row chip's contextual popup (Module 2) has
+          // headroom and isn't clipped by the viewport's overflow:hidden.
+          padding: '34px 16px 16px',
         }}
         whileTap={{ cursor: 'grabbing' }}
       >
