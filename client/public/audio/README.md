@@ -6,15 +6,16 @@ old track and starts the new one. The mapping lives in
 
 ## Sections → file (current mapping)
 
-| Section    | When it plays                                   | File                        |
-|------------|-------------------------------------------------|-----------------------------|
-| `lobby`    | Landing, host setup, and the in-room lobby      | `BLUFF Tavern.mp3`          |
-| `game`     | Active game at the table                        | `Gutter-Candle Dread.mp3`   |
-| `groups`   | The whole Groups area                           | `Nordic Hums.mp3`           |
-| `gameover` | After a game ends (results / recap screen)      | `BLUFF Tavern (1).mp3`      |
+| Section    | When it plays                                   | File(s)                                  |
+|------------|-------------------------------------------------|------------------------------------------|
+| `lobby`    | Landing, host setup, and the in-room lobby      | `BLUFF Tavern.mp3`                        |
+| `game`     | Active game at the table                        | `Nordic Hums.mp3` → `Call It Bluff.mp3`  |
+| `groups`   | The whole Groups area                           | `Click_Clack_Spin.mp3`                   |
+| `gameover` | After a game ends (results / recap screen)      | `Gutter-Candle Dread.mp3`                |
 
-So: **4 sections, 1 track each.** To change a track, just drop a new file in
-this folder and update its path in `MUSIC_SECTIONS`.
+The `game` section has **two** tracks: they play in sequence (Nordic Hums →
+Call It Bluff) and the pair loops. Every other section has one track that loops.
+To change a track, drop a file here and update its path in `MUSIC_SECTIONS`.
 
 ## Looping vs. two tracks per section
 - **One track** in a section → it **loops** (replays if it ends while you're
@@ -31,5 +32,4 @@ this folder and update its path in `MUSIC_SECTIONS`.
 - Muteable from the settings gear (landing) and the in-game menu.
 - Starts on the first tap/click (browser autoplay rules); on iOS the hardware
   silent switch still mutes it (OS-level).
-- `Click_Clack_Spin.mp3` is currently **unused** (you chose to keep the
-  synthesized spin clicks).
+- The revolver spin keeps its synthesized clicks (not an MP3).
