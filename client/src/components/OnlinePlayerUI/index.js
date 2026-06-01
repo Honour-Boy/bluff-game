@@ -458,6 +458,22 @@ export function OnlinePlayerUI({
         )}
       </div>
 
+      {/* (Module 7) Victory declaration floats cleanly ABOVE the table wrapper,
+          separate from the felt (which keeps the closing line + host controls). */}
+      {isGameOver && (
+        <div style={{ flex: '0 0 auto', textAlign: 'center', padding: '4px 12px 2px' }}>
+          <div style={{
+            fontFamily: "'Cinzel Decorative', 'Cinzel', serif",
+            fontSize: 26,
+            color: 'var(--accent)',
+            textShadow: '0 0 24px rgba(200,146,46,0.4)',
+            letterSpacing: '0.08em',
+          }}>
+            {lastAction?.winnerId === myPlayer.id ? 'Victory' : `${lastAction?.winnerName ?? '?'} Prevails`}
+          </div>
+        </div>
+      )}
+
       <TableScene
         tableCenterRef={ui.tableCenterRef}
         viewportRef={viewportRef}
@@ -570,6 +586,23 @@ export function OnlinePlayerUI({
         leaveGame={leaveGame}
       />
       </div>
+
+      {/* (Module 7) Detached standings hint — a standalone strip at the absolute
+          bottom of the layout, OUTSIDE the table, shown only at game over. */}
+      {isGameOver && roomState?.groupId && (
+        <div style={{
+          flex: '0 0 auto',
+          textAlign: 'center',
+          padding: '6px 12px calc(env(safe-area-inset-bottom, 0px) + 8px)',
+          fontFamily: "'Cinzel', serif",
+          fontSize: 9,
+          color: 'var(--text-dim)',
+          letterSpacing: '0.12em',
+          textTransform: 'uppercase',
+        }}>
+          View standings from the Controls menu
+        </div>
+      )}
 
       <FloatingControls
         voice={voice}

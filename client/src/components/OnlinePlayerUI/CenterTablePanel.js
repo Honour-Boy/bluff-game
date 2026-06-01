@@ -1,5 +1,4 @@
 import { CardShape } from '../shared/CardShape';
-import { ActionLog } from '../ActionLog';
 import { BluffRevealCard } from './BluffRevealCard';
 // Game settings (host config / read-only summary) and the group leaderboard now
 // live in the Controls menu, not on the felt — keeps the table clean.
@@ -120,21 +119,18 @@ export function CenterTablePanel({
       style={{ display: 'flex', flexDirection: 'column', alignItems: 'stretch', gap: 10 }}
     >
       {/* ── Active game: deck / required card / played pile ──
-           A dealer's tray sunk into the felt — semi-transparent so the cloth
-           shows through, with a brass hairline and an inner shadow so it reads
-           as recessed rather than a box floating on top. */}
+           (Module 1) The deck, required suit, and played pile now sit DIRECTLY
+           on the felt — the old semi-transparent "dealer's tray" panel (its
+           background / brass hairline / inner shadow) is removed so there is no
+           opacity box layered behind the table content. */}
       {(isPlaying || isRoundEnd) && (
         <div style={{
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'space-around',
           flexWrap: 'wrap',
-          gap: 12,
-          padding: '16px 16px',
-          borderRadius: 20,
-          background: 'radial-gradient(ellipse at center, rgba(9,21,13,0.55) 0%, rgba(7,16,10,0.3) 72%, rgba(7,16,10,0) 100%)',
-          border: '1px solid rgba(200,146,46,0.3)',
-          boxShadow: 'inset 0 3px 22px rgba(0,0,0,0.55), inset 0 0 0 1px rgba(255,255,255,0.02), 0 1px 0 rgba(255,255,255,0.05)',
+          gap: 10,
+          padding: '6px 4px',
         }}>
           <FaceDownStack count={deckSize} label="Draw" warning={deckSize < 5 && deckSize > 0} />
 
@@ -251,8 +247,9 @@ export function CenterTablePanel({
             {lastAction?.accuserName ? 'Bluff Reveal' : 'Reveal'}
           </div>
 
-          {/* Required template  vs  the played card flipping face-up */}
-          <div style={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'center', gap: 14 }}>
+          {/* Required template  vs  the played card flipping face-up.
+              (Module 1.4) Centred and snug so the flip stays inside the felt. */}
+          <div style={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'center', gap: 10, maxWidth: '100%' }}>
             <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6 }}>
               <div style={{ fontFamily: "'Cinzel', serif", fontSize: 7, color: 'var(--accent)', letterSpacing: '0.16em', textTransform: 'uppercase' }}>
                 Required
@@ -300,23 +297,18 @@ export function CenterTablePanel({
         </div>
       )}
 
-      {/* ── Game over — written on the felt, no panel box ── */}
+      {/* ── Game over — written on the felt, no panel box ──
+           (Module 7) The victory declaration now floats ABOVE the table
+           (rendered in OnlinePlayerUI) and the "view standings" hint is a
+           detached strip at the very bottom of the layout. The felt keeps only
+           the closing line + the host's Deal Again / Leave Table controls so
+           those actions render INSIDE the table wrapper. */}
       {isGameOver && (
         <div style={{
           textAlign: 'center',
           padding: '6px 8px',
           textShadow: '0 1px 6px rgba(0,0,0,0.9)',
         }}>
-          <div style={{
-            fontFamily: "'Cinzel Decorative', 'Cinzel', serif",
-            fontSize: 28,
-            color: 'var(--accent)',
-            marginBottom: 8,
-            textShadow: '0 0 24px rgba(200,146,46,0.4)',
-            letterSpacing: '0.08em',
-          }}>
-            {lastAction?.winnerId === myPlayer.id ? 'Victory' : `${lastAction?.winnerName ?? '?'} Prevails`}
-          </div>
           <div style={{
             fontFamily: "'Crimson Text', serif",
             fontSize: 14,
@@ -342,26 +334,13 @@ export function CenterTablePanel({
               Awaiting the proprietor to reshuffle…
             </div>
           )}
-          {roomState?.groupId && (
-            <div style={{
-              marginTop: 14,
-              fontFamily: "'Cinzel', serif",
-              fontSize: 9,
-              color: 'var(--text-dim)',
-              letterSpacing: '0.12em',
-              textTransform: 'uppercase',
-            }}>
-              View standings from the Controls menu
-            </div>
-          )}
         </div>
       )}
 
-      {/* #185 — Last Event panel uses displayedLastAction to gate spin reveals.
-          (Module 2) The "waiting for X" banner moved to a contextual popup above
-          the active player's avatar (see ChipPopup in index.js); ActionLog stays
-          as the trimmed detailed log surface. */}
-      {displayedLastAction && <ActionLog lastAction={displayedLastAction} />}
+      {/* (Module 1.3) The floating "Last Event" label has been removed from the
+          canvas entirely — per-player turn / spin status now lives in the
+          contextual avatar popups (ChipPopup, see OnlinePlayerUI), keeping the
+          felt clean. */}
     </div>
   );
 }
