@@ -179,10 +179,27 @@ export function RoomHeader({
         )}
       </div>
 
-      {/* Centre: Rules. (Module 2) The alive/eliminated status tag was removed
-          here — it duplicated the bottom-seat nameplate and added to the global
-          status text the contextual chip popups now replace. */}
+      {/* Centre: the player lifecycle indicator (Module 4.3) sits prominently in
+          the top-middle, directly ABOVE the Rules control. It is the single
+          home for Alive/Eliminated status (removed from the profile/nameplate). */}
       <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6, justifySelf: 'center', paddingTop: 2 }}>
+        {myPlayer && !isLobby && (
+          <div style={{
+            fontFamily: "'Cinzel', serif",
+            fontSize: 10,
+            fontWeight: 700,
+            letterSpacing: '0.18em',
+            textTransform: 'uppercase',
+            padding: '3px 12px',
+            borderRadius: 3,
+            color: isEliminated ? 'var(--accent2)' : 'var(--alive)',
+            border: `1px solid ${isEliminated ? 'var(--accent2)' : 'var(--alive)'}`,
+            background: isEliminated ? 'rgba(155,28,28,0.12)' : 'rgba(74,155,74,0.12)',
+            boxShadow: isEliminated ? '0 0 10px rgba(155,28,28,0.25)' : '0 0 10px rgba(74,155,74,0.25)',
+          }}>
+            {isEliminated ? 'Eliminated' : 'Alive'}
+          </div>
+        )}
         <button
           onClick={onShowHowToPlay}
           style={{

@@ -27,6 +27,11 @@ export function BottomSeat({
   tickerText = '',
   isMySpinTurn = false,
   playerSpin,
+  // (Module 2/3) responsive sizing + the bluff-outcome line that, on mobile,
+  // rides above the morphed Pull Trigger.
+  isMobile = false,
+  bluffOutcomeText = '',
+  bluffOutcomeColor = 'var(--accent2)',
   showSpectatorView,
   alivePlayers,
   spectatingId,
@@ -80,21 +85,26 @@ export function BottomSeat({
         `,
         paddingBottom: 'calc(env(safe-area-inset-bottom, 0px) + 8px)',
         boxShadow: '0 -4px 24px rgba(0,0,0,0.5)',
+        // (Module 2.2) On phones the dock is capped to ~30% of the viewport so
+        // the pannable canvas above gets the lion's share of the screen.
+        maxHeight: isMobile ? '32dvh' : undefined,
       }}
     >
-      {/* ── Nameplate + chamber indicator ── */}
+      {/* ── Nameplate + chamber indicator (Module 2.3) ──
+           Username + chamber on a single, no-wrap horizontal row; compacted on
+           mobile so the text never wraps on narrow phones. */}
       <div style={{
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'space-between',
-        gap: 12,
-        padding: '10px 12px 6px',
-        flexWrap: 'wrap',
+        gap: isMobile ? 8 : 12,
+        padding: isMobile ? '7px 10px 4px' : '10px 12px 6px',
+        flexWrap: 'nowrap',
       }}>
         {/* Player name + turn tag */}
         <div style={{
           fontFamily: "'Cinzel', serif",
-          fontSize: 16,
+          fontSize: isMobile ? 13 : 16,
           color: isEliminated
             ? 'var(--accent2)'
             : isMyTurn && isPlaying
@@ -103,7 +113,11 @@ export function BottomSeat({
           letterSpacing: '0.06em',
           display: 'flex',
           alignItems: 'center',
-          gap: 8,
+          gap: isMobile ? 6 : 8,
+          minWidth: 0,
+          overflow: 'hidden',
+          textOverflow: 'ellipsis',
+          whiteSpace: 'nowrap',
           textShadow: isMyTurn && isPlaying && !isEliminated
             ? '0 0 14px rgba(200,146,46,0.4)'
             : 'none',
@@ -153,8 +167,9 @@ export function BottomSeat({
           <div style={{
             display: 'flex',
             alignItems: 'center',
-            gap: 8,
-            padding: '6px 12px',
+            gap: isMobile ? 6 : 8,
+            padding: isMobile ? '4px 8px' : '6px 12px',
+            flexShrink: 0,
             background: 'linear-gradient(160deg, var(--surface3) 0%, var(--surface2) 100%)',
             border: '1px solid var(--border-lit)',
             borderRadius: 4,
@@ -167,18 +182,20 @@ export function BottomSeat({
               letterSpacing: '0.18em',
               textTransform: 'uppercase',
               flexShrink: 0,
+              display: isMobile ? 'none' : 'block',
             }}>
               Chamber
             </div>
-            <div style={{ display: 'flex', gap: 3 }}>
+            <div style={{ display: 'flex', gap: isMobile ? 2 : 3 }}>
               {Array.from({ length: 6 }).map((_, index) => {
                 const isBullet = myPlayer.chamber?.[index] === 'bullet';
+                const dot = isMobile ? 9 : 12;
                 return (
                   <div
                     key={index}
                     style={{
-                      width: 12,
-                      height: 12,
+                      width: dot,
+                      height: dot,
                       borderRadius: '50%',
                       background: isBullet
                         ? 'radial-gradient(circle at 35% 35%, #ff5555, var(--accent2))'
@@ -278,6 +295,17 @@ export function BottomSeat({
         // The instant the spin resolves server-side, isMySpinTurn flips false
         // and the dock below restores to its exact prior layout.
         <div style={{ padding: '4px 12px 12px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8 }}>
+          {/* (Module 3.3) On mobile the bluff outcome rides right above the
+              trigger (the felt copy is desktop-only). */}
+          {isMobile && bluffOutcomeText && (
+            <div style={{
+              fontFamily: "'Cinzel', serif", fontSize: 12, fontWeight: 700,
+              letterSpacing: '0.04em', color: bluffOutcomeColor,
+              textTransform: 'uppercase', textAlign: 'center',
+            }}>
+              {bluffOutcomeText}
+            </div>
+          )}
           <div style={{
             fontFamily: "'Cinzel', serif", fontSize: 9, color: 'var(--accent2)',
             letterSpacing: '0.22em', textTransform: 'uppercase', opacity: 0.9,
@@ -367,8 +395,11 @@ export function BottomSeat({
               })()}
 
               {/* CENTER (played cards) + RIGHT (power cards) — CardHand lays out
-                  the shape fan and the power-card bracket side by side. */}
-              <div style={{ flex: 1, minWidth: 0 }}>
+                  the shape fan and the power-card bracket side by side.
+                  (Module 1.4) On desktop the fan is nudged up the Y-axis so the
+                  card tops are fully visible and never tuck under the table edge.
+                  (Module 2.2) A shorter fan on mobile keeps the dock compact. */}
+              <div style={{ flex: 1, minWidth: 0, transform: isMobile ? 'none' : 'translateY(-12px)' }}>
                 <CardHand
                   hand={myHand}
                   powerCardSlot={myPowerCardSlot}
@@ -378,6 +409,7 @@ export function BottomSeat({
                   interactive={isMyTurn && isPlaying && !cardPlayedThisTurn}
                   powerInteractive={isMyTurn && isPlaying}
                   justPlayedCardId={justPlayedCardId}
+                  fanHeight={isMobile ? 104 : 128}
                 />
               </div>
             </div>

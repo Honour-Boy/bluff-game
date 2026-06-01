@@ -216,6 +216,8 @@ export function CardHand({
   interactive = true,
   powerInteractive = undefined,
   justPlayedCardId = null,
+  // (Module 2.2) shorter fan area on compact/mobile docks.
+  fanHeight = 128,
 }) {
   const shapeCards = hand.filter((c) => c?.type !== 'power');
   const n = shapeCards.length;
@@ -293,7 +295,7 @@ export function CardHand({
             onPointerCancel={endPointer}
             style={{
               position: 'relative',
-              height: 128,
+              height: fanHeight,
               touchAction: 'pan-y',
               cursor: draggable ? 'grab' : 'default',
             }}
