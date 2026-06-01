@@ -61,7 +61,7 @@ const RISK_MODS = [
 const ROOM_MODS = [
   {
     label: "Speed Mode",
-    desc: "15-second turn timer, visible to everyone. Run the clock out and your turn is automatically ended (you forfeit the rest of it) — no spin.",
+    desc: "25-second turn timer, visible to everyone. Run the clock out and your turn is automatically ended (you forfeit the rest of it) — no spin.",
   },
   {
     label: "Sudden Death",

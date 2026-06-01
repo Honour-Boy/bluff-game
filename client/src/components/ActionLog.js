@@ -46,6 +46,12 @@ export function ActionLog({ lastAction }) {
       playerName
         ? `⏱ ${playerName} ran out of time — turn auto-ended.`
         : `⏱ Turn timed out — auto-ended.`,
+    idle_timeout: ({ playerName, autoPlayed }) => {
+      const who = playerName || 'A player';
+      return autoPlayed
+        ? `💤 ${who} was idle — a card was auto-played and their turn ended.`
+        : `💤 ${who} was idle — their turn was auto-ended.`;
+    },
   };
 
   const fn = messages[lastAction.type];
@@ -68,6 +74,7 @@ export function ActionLog({ lastAction }) {
     assassin_strike: 'var(--accent2)',
     swap_pending: 'var(--warning)',
     speed_timeout: 'var(--warning)',
+    idle_timeout: 'var(--warning)',
   };
 
   const color = colors[lastAction.type] || 'var(--text-dim)';

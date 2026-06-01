@@ -5,6 +5,7 @@
 const engine = require('../gameEngine');
 const { getRoom } = require('./state');
 const { armSpeedModeTimer } = require('./speedMode');
+const { armIdleTurnTimer } = require('./idleTurn');
 
 /**
  * Fan out the bluff-pipeline's announce events to every socket in
@@ -39,6 +40,9 @@ async function broadcastRoomState(io, roomCode) {
   // modifier isn't in force or the room leaves the playing phase. On expiry the
   // timer auto-ends the active player's turn (no auto-spin — #79).
   armSpeedModeTimer(io, room);
+  // #239 — and the idle-turn safety net (mutually exclusive with Speed Mode:
+  // _idleTurnActive requires speedMode OFF, so only one ever arms per turn).
+  armIdleTurnTimer(io, room);
 
   // §3.3 — push live pre-room occupancy to anyone watching this group's
   // directory (members are subscribed to `group:<id>` via list_my_groups /

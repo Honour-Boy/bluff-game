@@ -97,6 +97,11 @@ function startGame(room) {
   const alivePlayers = room.players.filter(p => p.status === 'alive');
   if (alivePlayers.length < 2) throw new Error('Need at least 2 players');
 
+  // #243 — remember how many players the game STARTED with. Last Stand only
+  // triggers for a game that began with more than 3 players (a >3-player table
+  // narrowing to the final two), so this count gates the duel later.
+  room.startingAliveCount = alivePlayers.length;
+
   const shuffled = [...alivePlayers].sort(() => Math.random() - 0.5);
   room.turnOrder = shuffled.map(p => p.id);
   room.currentTurnIndex = 0;

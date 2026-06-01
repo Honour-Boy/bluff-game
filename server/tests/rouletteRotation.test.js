@@ -118,6 +118,64 @@ describe('Roulette Rotation — eliminations', () => {
   });
 });
 
+// #242 — direct regression for "a player must never take two turns in a row",
+// stressed with eliminations interleaved (the realistic online path, where the
+// just-acted or just-eliminated player must never be re-seated at the front of
+// the next reshuffled cycle).
+describe('Roulette Rotation — #242 no consecutive turns under eliminations', () => {
+  it('never seats the same player twice in a row across many cycles + random eliminations', () => {
+    const room = makeRouletteRoom(['a', 'b', 'c', 'd', 'e', 'f']);
+    // Deterministic-ish: a fixed pseudo-random elimination schedule so the test
+    // is reproducible while still exercising mid-cycle removals.
+    let rng = 1;
+    const nextRand = () => {
+      rng = (rng * 1103515245 + 12345) & 0x7fffffff;
+      return rng / 0x7fffffff;
+    };
+
+    const seq = [];
+    for (let i = 0; i < 600; i++) {
+      const actingId = room.turnOrder[room.currentTurnIndex];
+      seq.push(actingId);
+
+      // Occasionally eliminate a still-alive, non-acting player — but keep at
+      // least two players standing so the duel/last-one cases stay out of scope.
+      const alive = aliveIds(room);
+      if (alive.length > 2 && nextRand() < 0.06) {
+        const victim = alive.find(id => id !== actingId);
+        if (victim) {
+          room.players.find(p => p.id === victim).status = 'eliminated';
+          eliminateFromTurnOrder(room, victim);
+        }
+      }
+      advanceTurn(room);
+    }
+
+    // The core invariant: no player ever acts on two consecutive turns.
+    for (let i = 1; i < seq.length; i++) {
+      expect(seq[i]).not.toBe(seq[i - 1]);
+    }
+    // And eliminated players never reappear after removal.
+    const eliminated = room.players.filter(p => p.status === 'eliminated').map(p => p.id);
+    for (const deadId of eliminated) {
+      const lastActed = seq.lastIndexOf(deadId);
+      // They may have acted before dying, but never on the final turn snapshot.
+      expect(room.turnOrder).not.toContain(deadId);
+      expect(lastActed).toBeLessThan(seq.length);
+    }
+  });
+
+  it('each living player acts exactly once per full cycle (no-elimination steady state)', () => {
+    const ids = ['a', 'b', 'c', 'd', 'e'];
+    const room = makeRouletteRoom(ids);
+    const seq = takeTurns(room, ids.length * 60);
+    for (let start = 0; start + ids.length <= seq.length; start += ids.length) {
+      const cycle = seq.slice(start, start + ids.length);
+      expect(new Set(cycle).size).toBe(ids.length); // exactly once each, no repeats
+    }
+  });
+});
+
 describe('Roulette Rotation — bluff target after a reshuffle', () => {
   it('the bluff accuses the previous turn-taker across a cycle boundary, not turnOrder[index-1]', () => {
     const room = makeRouletteRoom(['a', 'b', 'c', 'd']);

@@ -4,14 +4,22 @@ const CY = 100;
 const ORBIT = 58;
 const CHAM_R = 20;
 
-function CylinderSVG({ bulletChambers, landingChamberIndex, rotation, animating, spinComplete }) {
+function CylinderSVG({ bulletChambers, bulletChambersAfter, eliminated, landingChamberIndex, rotation, animating, spinComplete }) {
+  // While the cylinder is spinning we show the PRE-spin bullets (you watch the
+  // round come up). Once it stops, swap to the POST-spin chamber so any bullets
+  // a survival just added (always +1, +2 under Hot Potato) visibly pop in (#238).
+  const activeBullets = spinComplete && bulletChambersAfter ? bulletChambersAfter : bulletChambers;
   const chambers = [0, 1, 2, 3, 4, 5].map((index) => {
     const angleRad = ((index * 60 - 90) * Math.PI) / 180;
+    // The landing slot always reflects the actual outcome: empty on a survival,
+    // bullet on an elimination — never contradicted by a freshly-added bullet.
+    const isLanding = spinComplete && index === landingChamberIndex;
+    const isBullet = isLanding ? !!eliminated : activeBullets.has(index);
     return {
       x: CX + ORBIT * Math.cos(angleRad),
       y: CY + ORBIT * Math.sin(angleRad),
-      isBullet: bulletChambers.has(index),
-      isLanding: spinComplete && index === landingChamberIndex,
+      isBullet,
+      isLanding,
     };
   });
 
@@ -113,6 +121,8 @@ export function SpinOverlay({
 
       <CylinderSVG
         bulletChambers={spinData.bulletChambers}
+        bulletChambersAfter={spinData.bulletChambersAfter}
+        eliminated={spinData.eliminated}
         landingChamberIndex={spinData.landingChamberIndex}
         rotation={cylinderRotation}
         animating={cylinderAnimating}
@@ -138,6 +148,9 @@ export function SpinOverlay({
           </div>
           <div style={{ fontSize: 12, color: 'var(--text-dim)', marginBottom: 28 }}>
             Chamber {spinData.landingChamberIndex + 1} · {spinData.eliminated ? 'bullet found' : 'empty'}
+            {!spinData.eliminated && spinData.bulletCountAfter != null && (
+              <> · now {spinData.bulletCountAfter}/6 loaded</>
+            )}
           </div>
           {isSpinTarget ? (
             <button className="primary" onClick={acknowledgeSpinResult} style={{ padding: '10px 32px', fontSize: 14 }}>

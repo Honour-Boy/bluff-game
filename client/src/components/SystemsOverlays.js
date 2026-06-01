@@ -268,6 +268,12 @@ export function LastStandCinematic({
   const active = finalists.find(p => p.id === lastStand?.activeFinalistId);
   const me = finalists.find(p => p.id === myPlayerId);
   const amActive = active?.id === myPlayerId;
+  // #243 — the ONE shared gun both finalists pass back and forth. Prefer the
+  // authoritative shared chamber from serialize; fall back to the active
+  // finalist's (server-mirrored) chamber for older payloads.
+  const sharedChamber = lastStand?.chamber || active?.chamber || [];
+  const sharedBullets = lastStand?.bulletCount
+    ?? sharedChamber.filter(s => s === 'bullet').length;
 
   return (
     <div style={{
@@ -286,13 +292,52 @@ export function LastStandCinematic({
         LAST STAND
       </div>
       <div style={{ color: 'var(--text-dim)', letterSpacing: '0.2em', fontSize: 11, textTransform: 'uppercase' }}>
-        Two finalists. No cards. No bluffs. Pure spin.
+        Two finalists. One gun. Spin and pass — until it goes off.
+      </div>
+
+      {/* #243 — the single SHARED gun, centred so it's unmistakably ONE chamber
+          both finalists take turns spinning. It escalates every survival. */}
+      <div style={{
+        display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 12,
+        marginTop: 8, padding: '20px 30px',
+        background: 'rgba(255,53,82,0.08)',
+        border: '2px solid #ff3552',
+        borderRadius: 'var(--radius)',
+        boxShadow: '0 0 30px rgba(255,53,82,0.4)',
+      }}>
+        <div style={{
+          fontFamily: "'Space Mono', monospace", fontSize: 9,
+          color: 'var(--text-dim)', letterSpacing: '0.24em', textTransform: 'uppercase',
+        }}>
+          The Shared Gun
+        </div>
+        <div style={{ display: 'flex', justifyContent: 'center', gap: 7 }}>
+          {sharedChamber.map((s, i) => (
+            <div key={i} style={{
+              width: 20, height: 20, borderRadius: '50%',
+              background: s === 'bullet' ? '#ff3552' : 'transparent',
+              border: '2px solid #ff3552',
+              boxShadow: s === 'bullet' ? '0 0 10px rgba(255,53,82,0.8)' : 'none',
+            }} />
+          ))}
+        </div>
+        <div style={{
+          fontFamily: "'Bebas Neue', sans-serif", fontSize: 16,
+          color: '#ff3552', letterSpacing: '0.16em',
+        }}>
+          {sharedBullets}/{sharedChamber.length || 6} LOADED
+        </div>
+        <div style={{ fontSize: 12, color: 'var(--text)', letterSpacing: '0.12em' }}>
+          {amActive
+            ? 'The gun is in YOUR hands'
+            : `${active?.username || 'Opponent'} holds the gun`}
+        </div>
       </div>
 
       <div style={{
         display: 'flex',
-        gap: 36,
-        marginTop: 16,
+        gap: 20,
+        marginTop: 4,
         flexWrap: 'wrap',
         justifyContent: 'center',
       }}>
@@ -301,8 +346,8 @@ export function LastStandCinematic({
           const isMe = p.id === myPlayerId;
           return (
             <div key={p.id} style={{
-              padding: '20px 28px',
-              minWidth: 220,
+              padding: '12px 22px',
+              minWidth: 150,
               background: isActive ? 'rgba(255,53,82,0.12)' : 'rgba(20,20,28,0.6)',
               border: `2px solid ${isActive ? '#ff3552' : 'var(--border)'}`,
               borderRadius: 'var(--radius)',
@@ -311,41 +356,19 @@ export function LastStandCinematic({
             }}>
               <div style={{
                 fontFamily: "'Bebas Neue', sans-serif",
-                fontSize: 22,
+                fontSize: 20,
                 letterSpacing: '0.14em',
                 color: isActive ? '#ff3552' : 'var(--text)',
               }}>
                 {p.username}{isMe ? ' (you)' : ''}
               </div>
-              <div style={{ marginTop: 8, fontSize: 12, color: 'var(--text-dim)', letterSpacing: '0.16em' }}>
-                {p.chamber.filter(s => s === 'bullet').length}/{p.chamber.length} BULLETS
-              </div>
               <div style={{
-                marginTop: 12,
-                display: 'flex',
-                justifyContent: 'center',
-                gap: 4,
+                marginTop: 6, fontSize: 10,
+                color: isActive ? '#ff3552' : 'var(--text-dim)',
+                letterSpacing: '0.18em',
               }}>
-                {p.chamber.map((s, i) => (
-                  <div key={i} style={{
-                    width: 14,
-                    height: 14,
-                    borderRadius: '50%',
-                    background: s === 'bullet' ? '#ff3552' : 'transparent',
-                    border: '1px solid #ff3552',
-                  }} />
-                ))}
+                {isActive ? '// ON THE TRIGGER' : '// WAITING'}
               </div>
-              {isActive && (
-                <div style={{
-                  marginTop: 12,
-                  fontSize: 10,
-                  color: '#ff3552',
-                  letterSpacing: '0.18em',
-                }}>
-                  // ON THE TRIGGER
-                </div>
-              )}
             </div>
           );
         })}

@@ -136,6 +136,13 @@ export function useGameSocketEvents({
       clearSession();
       notify(reason || 'You were removed from the group.', 'error');
     };
+    // #244 — the host kicked us from the room; drop out and return to landing,
+    // mirroring game_ended / removed_from_group.
+    const onKicked = ({ reason } = {}) => {
+      clearRoomSession();
+      clearSession();
+      notify(reason || 'The host removed you from the room.', 'error');
+    };
     const onLobbyIdleWarning = ({ secondsUntilAction, willAutoStart } = {}) => {
       const secs = secondsUntilAction ?? 60;
       notify(
@@ -164,6 +171,7 @@ export function useGameSocketEvents({
     socket.on('host_migrated', onHostMigrated);
     socket.on('game_ended', onGameEnded);
     socket.on('removed_from_group', onRemovedFromGroup);
+    socket.on('kicked', onKicked);
     socket.on('power_card_triggered', onPowerCardTriggered);
     socket.on('group_leaderboard_updated', onGroupLeaderboardUpdated);
     socket.on('lobby_idle_warning', onLobbyIdleWarning);
@@ -183,6 +191,7 @@ export function useGameSocketEvents({
       socket.off('host_migrated', onHostMigrated);
       socket.off('game_ended', onGameEnded);
       socket.off('removed_from_group', onRemovedFromGroup);
+      socket.off('kicked', onKicked);
       socket.off('power_card_triggered', onPowerCardTriggered);
       socket.off('group_leaderboard_updated', onGroupLeaderboardUpdated);
       socket.off('lobby_idle_warning', onLobbyIdleWarning);

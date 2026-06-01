@@ -106,11 +106,26 @@ function drawCardForPlayer(room, playerId) {
   return null;
 }
 
+// #239 — pick a sensible card for the idle-turn auto-resolver to play on an AFK
+// player's behalf. Prefers an HONEST play (shape matches the required
+// `currentCardType`) so the auto-played card can't be successfully bluff-called
+// and spin the absent player; otherwise falls back to any plain shape card. Whot
+// (needs a nominated shape) and power cards are skipped to keep the auto-play
+// trivial and side-effect-free. Returns a cardId, or null if nothing suitable.
+function pickAutoPlayCard(room, playerId) {
+  const hand = room.hands?.get(playerId) || [];
+  const plain = hand.filter(c => c?.type === 'shape' && c.shape !== 'whot');
+  if (plain.length === 0) return null;
+  const honest = plain.find(c => c.shape === room.currentCardType);
+  return (honest || plain[0]).id;
+}
+
 module.exports = {
   randomCardType,
   randomShape,
   newCardType,
   validateAndPlayCard,
+  pickAutoPlayCard,
   ensureDrawPile,
   drawCardForPlayer,
 };

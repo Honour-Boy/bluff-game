@@ -146,7 +146,9 @@ describe('assignRoles', () => {
 
   it('deals only specials (no Barehand) at small tables of 3–6 alive', () => {
     for (const count of [3, 4, 5, 6]) {
-      const room = makeOnlineRoom(count);
+      // A power card is enabled so Collector stays in the pool (#235); with the
+      // full 6-special pool a 6-player table fills entirely with distinct specials.
+      const room = makeOnlineRoom(count, configWith({ shield: true }));
       assignRoles(room);
       const roles = room.players.filter(p => p.status === 'alive').map(p => p.role);
       // Every alive player gets a distinct special; none are Barehand.
@@ -157,7 +159,7 @@ describe('assignRoles', () => {
   });
 
   it('assigns a mixed cohort with all five unique specials at 9 alive', () => {
-    const room = makeOnlineRoom(9);
+    const room = makeOnlineRoom(9, configWith({ shield: true })); // Collector eligible (#235)
     assignRoles(room);
     const roles = room.players.map(p => p.role);
     // All 5 unique roles present at most once.
@@ -176,7 +178,7 @@ describe('assignRoles', () => {
   });
 
   it('caps unique specials to one each even at the largest table', () => {
-    const room = makeOnlineRoom(15);
+    const room = makeOnlineRoom(15, configWith({ shield: true })); // Collector eligible (#235)
     assignRoles(room);
     const roles = room.players.map(p => p.role);
     for (const r of [ROLES.SHERIFF, ROLES.MEDIC, ROLES.SABOTEUR, ROLES.SNIPER, ROLES.COLLECTOR]) {
@@ -203,10 +205,54 @@ describe('assignRoles', () => {
   });
 
   it('startGame assigns specials at the 3-player minimum', () => {
-    const room = makeOnlineRoom(3);
+    // Collector eligible so a 3-player table can still draw it (#235).
+    const room = makeOnlineRoom(3, configWith({ shield: true }));
     startGame(room);
     const roles = room.players.filter(p => p.status === 'alive').map(p => p.role);
     expect(roles.every(r => r !== ROLES.BAREHAND)).toBe(true);
+  });
+});
+
+// ─── #235 — Collector gated on power cards being enabled ─────
+
+describe('assignRoles — Collector requires power cards', () => {
+  it('never assigns Collector when ALL power cards are disabled', () => {
+    // Default config has every power card off. Across many assignments the
+    // Collector must never appear — the role is dead weight without power cards.
+    for (let run = 0; run < 200; run++) {
+      const room = makeOnlineRoom(9); // default config → no power cards
+      assignRoles(room);
+      expect(room.players.some(p => p.role === ROLES.COLLECTOR)).toBe(false);
+    }
+  });
+
+  it('never assigns Collector via startGame with power cards disabled', () => {
+    for (let run = 0; run < 50; run++) {
+      const room = makeOnlineRoom(9);
+      startGame(room);
+      expect(room.players.some(p => p.role === ROLES.COLLECTOR)).toBe(false);
+    }
+  });
+
+  it('keeps Collector eligible when at least one power card is enabled', () => {
+    // With ≥1 power card on, a 9-player table fills with all six specials, so
+    // the Collector is present on every run.
+    for (let run = 0; run < 50; run++) {
+      const room = makeOnlineRoom(9, configWith({ freeze: true }));
+      assignRoles(room);
+      expect(room.players.some(p => p.role === ROLES.COLLECTOR)).toBe(true);
+    }
+  });
+
+  it('does not disturb the other special roles when Collector is dropped', () => {
+    const room = makeOnlineRoom(9); // no power cards
+    assignRoles(room);
+    const roles = room.players.map(p => p.role);
+    // The remaining four uniques and Gambler are still dealt exactly once.
+    for (const r of [ROLES.SHERIFF, ROLES.MEDIC, ROLES.SABOTEUR, ROLES.SNIPER]) {
+      expect(roles.filter(x => x === r).length).toBe(1);
+    }
+    expect(roles.filter(r => r === ROLES.GAMBLER).length).toBeGreaterThanOrEqual(1);
   });
 });
 

@@ -383,6 +383,35 @@ function _computeSpinHighlights(room, player, spinResult, medicPaused) {
  * Run a spin for `player` and broadcast the result. Assumes the caller has
  * already validated phase/target. Returns the raw spinResult.
  */
+// #237 — Russian Roulette auto-end-of-turn. Under Russian Roulette a failed bluff
+// fires an IMMEDIATE spin (no manual "Pull the Trigger" step), so the on-turn
+// player's turn must also end on its own once the spin lands — otherwise play
+// hangs forever waiting for an End Turn the modifier deliberately removed. Mirrors
+// the end_turn handler (freeze consume → advanceTurn → sudden-death tick) and is
+// gated tightly so it only fires for the genuine RR auto-spin in online play.
+//
+// `onTurnIdBefore` is whoever's turn it was when the spin began:
+//   • survived, or the spin eliminated someone EARLIER in the order → they are
+//     still the current turn-taker, so we advance off them.
+//   • THEY were the one eliminated → eliminateFromTurnOrder already moved the
+//     pointer to the next player, so advancing again would skip a turn. Skip it.
+function _maybeAutoEndTurnAfterImmediateSpin(room, onTurnIdBefore) {
+  if (room.mode !== engine.MODES.ONLINE) return null;
+  if (!room.config?.riskModifiers?.russianRoulette) return null;
+  if (room.phase !== 'playing') return null;       // last_stand / ghost_vote / swap own the flow
+  if (room.pendingGameOver) return null;           // decided match — let the game-over reveal run
+  if (room.pendingMirrorMatchSpin) return null;    // a mirror spin is still queued
+  if (room.pendingRedemption) return null;         // a redemption spin is still queued
+  const onTurnPlayer = room.players.find(p => p.id === onTurnIdBefore);
+  if (!onTurnPlayer || onTurnPlayer.status !== 'alive') return null; // was eliminated → pointer already moved
+  if (!room.turnOrder.includes(onTurnIdBefore)) return null;
+
+  const freezeTrigger = engine.consumeFreezeOnTurnEnd(room, onTurnIdBefore);
+  engine.advanceTurn(room); // NOTE: this nulls room.lastAction — the caller re-stamps spin_result after.
+  const suddenDeathBanner = engine.tickSuddenDeath(room);
+  return { freezeTrigger, suddenDeathBanner };
+}
+
 async function applySpinAndBroadcast(io, code, room, player, leaderboardRepo) {
   // Auto-spin path: a betting window may still be open (the 10s window is
   // shorter than the spin timeout, but close it defensively so the spin can
@@ -391,6 +420,11 @@ async function applySpinAndBroadcast(io, code, room, player, leaderboardRepo) {
     engine.closeBettingWindow(room);
     _clearBettingTimer(code);
   }
+
+  // #237 — Russian Roulette auto-ends the turn after the immediate spin. Capture
+  // who was on-turn BEFORE the spin can shuffle the order (eliminateFromTurnOrder
+  // below moves the pointer when the spinner is themselves eliminated).
+  const onTurnIdBefore = room.turnOrder[room.currentTurnIndex] || null;
 
   const riskLevelBefore = player.riskLevel;
   const chamberBefore = [...player.chamber];
@@ -484,6 +518,11 @@ async function applySpinAndBroadcast(io, code, room, player, leaderboardRepo) {
     redemptionPending = true;
   }
 
+  // #237 — Russian Roulette: end the turn automatically now the auto-spin landed.
+  // Done BEFORE stamping lastAction because advanceTurn nulls lastAction; we then
+  // re-stamp spin_result so every client still animates the cylinder.
+  const autoEnd = _maybeAutoEndTurnAfterImmediateSpin(room, onTurnIdBefore);
+
   room.lastAction = {
     type: 'spin_result',
     spinTargetId: player.id,
@@ -513,6 +552,10 @@ async function applySpinAndBroadcast(io, code, room, player, leaderboardRepo) {
   for (const ev of bountyEvents) io.to(code).emit('power_card_triggered', ev);
   for (const ev of betEvents) io.to(code).emit('power_card_triggered', ev);
   for (const ev of highlightEvents) io.to(code).emit('power_card_triggered', ev);
+  // #237 — turn-end side effects from the Russian Roulette auto-advance (freeze
+  // skip / sudden-death tick), emitted on the same channel as the other banners.
+  if (autoEnd?.freezeTrigger) io.to(code).emit('power_card_triggered', autoEnd.freezeTrigger);
+  if (autoEnd?.suddenDeathBanner) io.to(code).emit('power_card_triggered', autoEnd.suddenDeathBanner);
   return spinResult;
 }
 

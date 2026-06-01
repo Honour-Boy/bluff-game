@@ -151,8 +151,15 @@ const REDEMPTION_PENDING_TIMEOUT_MS = 30_000;
 
 // Speed Mode (roomModifiers.speedMode) — each player's turn is capped at this
 // many ms. When the deadline passes the server auto-ENDS the turn (no auto-spin
-// — #79 bans auto-spin in every mode). The lobby advertises a 15s turn timer.
-const SPEED_MODE_TURN_MS = 15_000;
+// — #79 bans auto-spin in every mode). The lobby advertises a 25s turn timer.
+const SPEED_MODE_TURN_MS = 25_000;
+
+// #239 — Idle-turn safety net. OUTSIDE Speed Mode an AFK current player would
+// otherwise block the table forever. After this long with no action the server
+// auto-resolves their turn (auto-plays a sensible legal card if they haven't,
+// then ends the turn). Speed Mode's shorter advertised cap takes precedence when
+// it's enabled, so the two never both fire on the same turn.
+const IDLE_TURN_TIMEOUT_MS = 40_000;
 
 // ─── v2 config defaults ───────────────────────────────────────
 function defaultRoomConfig() {
@@ -259,6 +266,7 @@ module.exports = {
   PENDING_GAME_OVER_TIMEOUT_MS,
   REDEMPTION_PENDING_TIMEOUT_MS,
   SPEED_MODE_TURN_MS,
+  IDLE_TURN_TIMEOUT_MS,
   defaultRoomConfig,
   normalizeRoomConfig,
 };

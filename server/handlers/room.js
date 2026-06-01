@@ -17,6 +17,7 @@ const {
   _clearGameOverTimer,
   _clearRedemptionTimer,
   _clearSpeedModeTimer,
+  _clearIdleTurnTimer,
   logRoomDeletion,
 } = require('../lib/state');
 const { socketRateLimit } = require('../lib/rateLimiter');
@@ -367,6 +368,7 @@ function register(io, socket, deps) {
         _clearGameOverTimer(code);
         _clearRedemptionTimer(code);
         _clearSpeedModeTimer(code);
+        _clearIdleTurnTimer(code);
         discardLobbyIdleState(code);
         logRoomDeletion(code, 'last_participant_left', {
           phase: room.phase,
@@ -394,6 +396,82 @@ function register(io, socket, deps) {
       callback?.({ success: true });
     } catch (err) {
       console.error('[leave_room]', err.message);
+      callback?.({ success: false, error: err.message });
+    }
+  });
+
+  // ─── HOST: Kick a player (#244) ──────────────────────────
+  // Host-only mid-session removal of a disruptive player. Mirrors the
+  // leave/disconnect removal path (mid-game → eliminate out of the turn order;
+  // lobby / game_over → splice), boots the kicked socket back to landing with a
+  // dedicated `kicked` event, then re-broadcasts the updated roster to everyone.
+  socket.on('kick_player', async ({ roomCode, playerId } = {}, callback) => {
+    if (!socket.userId) return callback?.({ success: false, error: 'Not authenticated' });
+    try {
+      const code = roomCode?.toUpperCase();
+      const room = await getRoom(code);
+      if (!room) return callback?.({ success: false, error: 'Room not found' });
+      // Host-only: the acting host-of-record is the only one who may kick.
+      if (room.hostUserId !== socket.userId) {
+        return callback?.({ success: false, error: 'Only the host can kick players' });
+      }
+      if (!playerId) return callback?.({ success: false, error: 'No player specified' });
+      if (playerId === room.hostUserId) {
+        return callback?.({ success: false, error: 'The host cannot kick themselves' });
+      }
+
+      const idx = room.players.findIndex(p => p.id === playerId);
+      if (idx === -1) return callback?.({ success: false, error: 'Player not in room' });
+      const target = room.players[idx];
+      const targetSocketId = target.socketId;
+
+      // Cancel any pending disconnect-grace timer for the kicked player.
+      const key = dcKey(code, playerId);
+      if (playerDisconnectTimers.has(key)) {
+        clearTimeout(playerDisconnectTimers.get(key));
+        playerDisconnectTimers.delete(key);
+      }
+
+      const isMidGame = !['lobby', 'game_over'].includes(room.phase);
+      if (isMidGame) {
+        // Resolve any pause the kicked player was gating so the table can't deadlock.
+        resolveLeaverPendingPauses(io, code, room, playerId);
+        if (target.status !== 'eliminated') {
+          target.status = 'eliminated';
+          target.isSpectator = true;
+          engine.eliminateFromTurnOrder(room, playerId);
+        }
+      } else {
+        // Lobby or game_over: clean removal from the roster.
+        room.players.splice(idx, 1);
+        engine.eliminateFromTurnOrder(room, playerId);
+      }
+
+      room.lastAction = { type: 'kicked', playerId, playerName: target.username };
+      console.log(`[Room ${code}] host ${socket.username} kicked ${target.username}`);
+
+      // Boot the kicked socket back to landing, then detach it from the room so
+      // its later events can't touch this room.
+      if (targetSocketId) {
+        io.to(targetSocketId).emit('kicked', { reason: 'The host removed you from the room.' });
+        try { io.in(targetSocketId).socketsLeave(code); } catch (_) { /* mock io / already gone */ }
+      }
+
+      // Mid-game a removal can leave a single survivor → game over.
+      if (isMidGame) {
+        const gameOverWinner = engine.checkGameOver(room);
+        if (gameOverWinner) {
+          room.phase = 'game_over';
+          room.lastAction = { type: 'game_over', winnerId: gameOverWinner.id, winnerName: gameOverWinner.username };
+          await maybeRecordGroupWinner(io, room, leaderboardRepo);
+        }
+      }
+
+      await saveRoom(room);
+      await broadcastRoomState(io, code);
+      callback?.({ success: true });
+    } catch (err) {
+      console.error('[kick_player]', err.message);
       callback?.({ success: false, error: err.message });
     }
   });
@@ -456,6 +534,7 @@ function register(io, socket, deps) {
       _clearGameOverTimer(code);
       _clearRedemptionTimer(code);
       _clearSpeedModeTimer(code);
+      _clearIdleTurnTimer(code);
       discardLobbyIdleState(code);
 
       // Boot everyone in the live room back to landing (mirrors game_ended).

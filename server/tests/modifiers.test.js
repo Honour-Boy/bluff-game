@@ -227,6 +227,10 @@ describe('Risk modifier — Hot Potato', () => {
     const room = makeOnlineRoom(4, cfg);
     startGame(room);
     const player = room.players.find((p) => p.status === 'alive');
+    // Pin Barehand so a randomly-assigned role (notably Gambler, whose risk is
+    // frozen on survival) can't suppress the Hot Potato bullet adds — this test
+    // is about the +2 mechanic, not role interactions.
+    player.role = ROLES.BAREHAND;
     player.chamber = [null, null, null, null, null, 'bullet'];
     player.riskLevel = 1;
 

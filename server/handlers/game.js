@@ -504,8 +504,16 @@ function register(io, socket, deps) {
     if (room?.pendingMirrorMatchSpin) {
       const pending = room.pendingMirrorMatchSpin;
       delete room.pendingMirrorMatchSpin;
-      await runMirrorMatchSpin(io, room, pending, leaderboardRepo);
+      // #241 — emit the dismiss for the PRIMARY spin's overlay BEFORE broadcasting
+      // the mirror spin. Socket.IO preserves per-connection order, so clients see
+      // spin_acknowledged (clears the just-finished overlay) and then the mirror
+      // spin_result (which resets spinDismissed=false and starts a FRESH overlay).
+      // The previous order broadcast the mirror result first, so the trailing
+      // spin_acknowledged left spinDismissed=true and the mirror overlay was torn
+      // down the instant its cylinder stopped — the spin appeared to play for only
+      // the first player. Now BOTH the liable player and their mirror visibly spin.
       io.to(code).emit('spin_acknowledged');
+      await runMirrorMatchSpin(io, room, pending, leaderboardRepo);
       return;
     }
 
