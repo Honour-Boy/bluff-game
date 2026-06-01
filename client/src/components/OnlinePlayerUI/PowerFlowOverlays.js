@@ -20,6 +20,8 @@ export function PowerFlowOverlays({
   isSwapPending,
   players,
   swapHolderId,
+  // (Role timing) hold announcements while the spin cylinder is still turning.
+  holdForSpin = false,
 }) {
   const event = Array.isArray(powerEventQueue) && powerEventQueue.length > 0 ? powerEventQueue[0] : null;
   const bannerModel = buildAnnouncementBannerProps(event);
@@ -28,11 +30,13 @@ export function PowerFlowOverlays({
   // renders nothing by design — but it must still be consumed or it
   // would stall every banner queued behind it. Drop it so the queue
   // keeps moving. `consumePowerEvent` is a stable useCallback.
+  // While a spin is animating we hold the WHOLE queue (don't even drop
+  // unknown kinds) so order + timing are preserved until the spin resolves.
   const headId = event?.id || null;
   const renderable = !!bannerModel;
   useEffect(() => {
-    if (headId && !renderable) consumePowerEvent?.();
-  }, [headId, renderable, consumePowerEvent]);
+    if (!holdForSpin && headId && !renderable) consumePowerEvent?.();
+  }, [holdForSpin, headId, renderable, consumePowerEvent]);
 
   return (
     <>
@@ -168,7 +172,7 @@ export function PowerFlowOverlays({
         </div>
       )}
 
-      {bannerModel && event && (
+      {bannerModel && event && !holdForSpin && (
         <AnnouncementBanner
           key={event.id}
           kind={bannerModel.kind}

@@ -42,7 +42,9 @@ const MEDIC_SAVE_HAND_CAP = 8;
 // How long the private role-reveal card lingers before the server
 // opens the selection window. Selection then auto-resolves after
 // PRE_GAME_SELECTION_TIMEOUT_MS for any player who hasn't picked.
-const ROLE_REVEAL_DISPLAY_MS = 2000;
+// 10s so players can actually read their role + its description (2s was
+// too quick to read — playtest feedback).
+const ROLE_REVEAL_DISPLAY_MS = 10000;
 const PRE_GAME_SELECTION_TIMEOUT_MS = 15000;
 // Playtest §2.1 — the 15s window always runs to completion (no quick-skip when
 // the last player confirms). A pick made at/after the 12s mark is "late": the

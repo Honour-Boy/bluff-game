@@ -516,6 +516,12 @@ export function OnlinePlayerUI({
   void medicPrompt;
   void lastStandEndTurn;
 
+  // (Role timing) While the spin cylinder is still turning, hold BOTH the
+  // event/achievement announcements AND any role decision prompt (Medic save,
+  // Sniper redirect) until the animation resolves — so nothing pops over a
+  // live spin. They surface the instant the cylinder locks (spinComplete).
+  const holdForSpin = !!ui.spinData && !ui.spinComplete;
+
   const isSpinPendingPhase = roomState?.phase === 'spin_pending';
 
   return (
@@ -730,6 +736,7 @@ export function OnlinePlayerUI({
         isSwapPending={isSwapPending}
         players={players}
         swapHolderId={roomState?.swapHolderId}
+        holdForSpin={holdForSpin}
       />
 
       {phase === 'redemption_pending' && roomState?.redemption && (
@@ -782,6 +789,7 @@ export function OnlinePlayerUI({
         roomState={roomState}
         players={players}
         spectatedHand={ui.spectatedHand}
+        holdForSpin={holdForSpin}
       />
 
       {/* §1.1 — bluff interception window (accused arms a defence in response). */}

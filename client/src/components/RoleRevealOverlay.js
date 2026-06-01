@@ -131,7 +131,10 @@ const ROLE_ICONS = {
   ),
 };
 
-export function RoleRevealOverlay({ role, onComplete, durationMs = 7500, barehandVisible = true }) {
+// durationMs default 9000: with the 450ms enter + 400ms exit that lands the
+// fade-out just under the server's 10s ROLE_REVEAL_DISPLAY_MS window, so the
+// card stays readable for the full reveal instead of vanishing early.
+export function RoleRevealOverlay({ role, onComplete, durationMs = 9000, barehandVisible = true }) {
   // Barehand players below the role threshold see the neutral
   // "Standard" card instead of "Barehand" (#116). Special roles are
   // always shown as themselves; only the Barehand label is masked.

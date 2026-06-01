@@ -282,11 +282,11 @@ export function AnnouncementBanner({
   const headline = title || preset.title;
   const draw = GLYPHS[preset.glyph] || GLYPHS.shield;
 
-  // Translate based on phase
+  // Toast drops in from the top and retracts upward on exit.
   const translate =
-    phase === "enter" ? "translateX(-100%)" :
-    phase === "exit"  ? "translateX(100%)"  :
-                        "translateX(0)";
+    phase === "enter" ? "translateY(-140%)" :
+    phase === "exit"  ? "translateY(-140%)" :
+                        "translateY(0)";
   const opacity = phase === "enter" ? 0 : 1;
 
   return (
@@ -296,29 +296,32 @@ export function AnnouncementBanner({
         position: "fixed",
         left: 0,
         right: 0,
-        top: "38vh",
+        top: "max(16px, env(safe-area-inset-top, 0px))",
         zIndex: 9500,
+        display: "flex",
+        justifyContent: "center",
+        padding: "0 16px",
         pointerEvents: "none",
       }}
     >
+      {/* Compact top-centre toast (was a full-width across-screen sweep). */}
       <div
         style={{
           position: "relative",
-          width: "100%",
-          minHeight: 96,
+          width: "auto",
+          maxWidth: "min(440px, 100%)",
           background: preset.bg,
-          borderTop: `1px solid ${accent}`,
-          borderBottom: `1px solid ${accent}`,
-          boxShadow: `0 0 48px ${accent}55, inset 0 0 64px ${accent}22`,
+          border: `1px solid ${accent}`,
+          borderRadius: 12,
+          boxShadow: `0 12px 40px rgba(0,0,0,0.55), 0 0 24px ${accent}44, inset 0 0 28px ${accent}1a`,
           transform: translate,
           opacity,
           transition:
-            "transform 350ms cubic-bezier(0.2, 0.7, 0.2, 1), opacity 200ms linear",
+            "transform 320ms cubic-bezier(0.2, 0.8, 0.25, 1), opacity 180ms linear",
           display: "flex",
           alignItems: "center",
-          justifyContent: "center",
-          gap: 18,
-          padding: "18px 24px",
+          gap: 13,
+          padding: "12px 18px",
           overflow: "hidden",
         }}
       >
@@ -331,9 +334,9 @@ export function AnnouncementBanner({
             backgroundImage: `repeating-linear-gradient(
               115deg,
               transparent 0,
-              transparent 20px,
-              ${accent}08 20px,
-              ${accent}08 22px
+              transparent 18px,
+              ${accent}08 18px,
+              ${accent}08 20px
             )`,
             pointerEvents: "none",
           }}
@@ -343,16 +346,16 @@ export function AnnouncementBanner({
         <div
           style={{
             position: "relative",
-            width: 64,
-            height: 64,
+            width: 38,
+            height: 38,
             display: "flex",
             alignItems: "center",
             justifyContent: "center",
             flexShrink: 0,
-            filter: `drop-shadow(0 0 12px ${accent}cc)`,
+            filter: `drop-shadow(0 0 8px ${accent}cc)`,
           }}
         >
-          <svg viewBox="0 0 100 100" width={64} height={64} aria-hidden>
+          <svg viewBox="0 0 100 100" width={38} height={38} aria-hidden>
             {draw(accent)}
           </svg>
         </div>
@@ -364,19 +367,23 @@ export function AnnouncementBanner({
             display: "flex",
             flexDirection: "column",
             alignItems: "flex-start",
-            gap: 4,
+            gap: 2,
             minWidth: 0,
           }}
         >
           <div
             style={{
               fontFamily: "'Bebas Neue', sans-serif",
-              fontSize: 44,
-              letterSpacing: "0.16em",
+              fontSize: 24,
+              letterSpacing: "0.12em",
               color: accent,
               textTransform: "uppercase",
-              lineHeight: 1,
-              textShadow: `0 0 16px ${accent}aa, 0 2px 0 rgba(0,0,0,0.6)`,
+              lineHeight: 1.05,
+              textShadow: `0 0 12px ${accent}aa, 0 1px 0 rgba(0,0,0,0.6)`,
+              whiteSpace: "nowrap",
+              overflow: "hidden",
+              textOverflow: "ellipsis",
+              maxWidth: "100%",
             }}
           >
             {headline}
@@ -385,11 +392,15 @@ export function AnnouncementBanner({
             <div
               style={{
                 fontFamily: "'Space Mono', monospace",
-                fontSize: 12,
-                letterSpacing: "0.18em",
+                fontSize: 11,
+                letterSpacing: "0.14em",
                 color: "var(--text)",
                 textTransform: "uppercase",
                 opacity: 0.85,
+                whiteSpace: "nowrap",
+                overflow: "hidden",
+                textOverflow: "ellipsis",
+                maxWidth: "100%",
               }}
             >
               {playerName ? `// ${playerName} ` : ""}
