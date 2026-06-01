@@ -79,6 +79,17 @@ async function _resolveOnlineBluff(io, code, room, accuserId, leaderboardRepo) {
     await maybeRecordGroupWinner(io, room, leaderboardRepo);
   }
 
+  // Russian Roulette — a failed bluff fires an IMMEDIATE spin: no manual
+  // "pull the trigger" pause, no betting window. Emit the bluff power events
+  // first, then run the spin pipeline (which saves + broadcasts itself).
+  if (engine.shouldImmediateSpin(room)) {
+    const target = room.players.find(p => p.id === room.spinTargetId);
+    await saveRoom(room);
+    emitPowerCardEvents(io, code, events);
+    await applySpinAndBroadcast(io, code, room, target, leaderboardRepo);
+    return;
+  }
+
   if (room.phase === 'spin_pending') {
     _maybeOpenBetting(io, room);
     // Issue 1 — guard against a spin that never gets performed.
@@ -148,6 +159,14 @@ function register(io, socket, deps) {
         spinTargetName: spinTarget.username,
         bluffCorrect: bluffIsCorrect,
       };
+
+      // Russian Roulette — failed bluff fires an immediate spin (no host/player
+      // "pull the trigger" step).
+      if (engine.shouldImmediateSpin(room)) {
+        await applySpinAndBroadcast(io, room.code, room, spinTarget, leaderboardRepo);
+        return callback({ success: true });
+      }
+
       // Issue 1 — guard against a spin that never gets performed.
       _scheduleSpinPendingTimeout(io, room.code, leaderboardRepo);
 

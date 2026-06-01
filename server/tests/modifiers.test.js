@@ -4,10 +4,11 @@
 // Covers, per the locked roadmap (sections 3 + 4):
 //
 //   Risk:
-//     - Double Barrel: two trigger pulls against the curve; eliminated
-//       if EITHER pull lands a kill (issue #67 — was max-of-two-indices)
-//     - Russian Roulette: every chamber starts with 2 bullets at
-//       startGame (issue #67 — was 3, ≈24% first-spin on the new curve)
+//     - Double Barrel: every chamber starts with 2 bullets at startGame
+//       (≈24% first-spin on the issue #67 curve). NOT a pull-time modifier.
+//     - Russian Roulette: a failed bluff fires an IMMEDIATE spin (no manual
+//       pull / betting pause) — see shouldImmediateSpin + the bluff handlers.
+//       Does NOT change the chamber load (stays at 1 bullet).
 //     - Hot Potato: +2 bullets on survival; clamps at 6
 //     - Redemption Spin: K-by-table selection, fresh 3-card hand on
 //       success, chamber resets to 1 bullet on success, stays dead on
@@ -15,7 +16,6 @@
 //
 //   Issue #67 — Math.random() draw order assumed in tests below:
 //     [0]   outcome roll (vs DEATH_CURVE[bulletCount])
-//     [1]   second outcome roll — ONLY when doubleBarrel is set
 //     [n]   spinIndex slot pick within the consistent slot subset
 //     [n+]  addBulletToChamber slot pick(s) on survival (1, or 2 w/ HP)
 //
@@ -48,6 +48,8 @@ import {
   pickRedemptionCandidates,
   runRedemptionSpin,
   resetRedemptionFlags,
+  shouldImmediateSpin,
+  applyGlobalBluffReshuffle,
   resetRoundOnline,
   eliminateFromTurnOrder,
   CHAMBER_SIZE,
@@ -94,70 +96,12 @@ afterEach(() => {
 // ============================================================
 
 describe('Risk modifier — Double Barrel', () => {
-  // Issue #67: Double Barrel is now "two trigger pulls" — eliminated
-  // if EITHER curve roll lands a kill (effective p = 1-(1-p)^2).
-  // Math.random draw order: [0] roll1, [1] roll2 (doubleBarrel only),
-  // [n] spinIndex slot pick, [n+] addBullet pick(s) on survival.
+  // Double Barrel loads TWO bullets into every chamber at game start
+  // (≈24% first-spin death on the issue #67 curve). It is NOT a pull-time
+  // modifier — pullTrigger ignores a `doubleBarrel` flag.
 
-  it('survives only when BOTH pulls miss the curve', () => {
-    // 1 bullet → p=0.15. roll1=0.9 miss, roll2=0.9 miss → survive.
-    pinRandom([0.9, 0.9, 0, 0]);
-    const chamber = ['bullet', null, null, null, null, null];
-    const r = pullTrigger(chamber, { doubleBarrel: true });
-    expect(r.eliminated).toBe(false);
-    expect(chamber[r.spinIndex]).toBeNull(); // spinIndex agrees with verdict
-  });
-
-  it('eliminates when the FIRST pull kills even if the second would miss', () => {
-    // roll1=0.05 < 0.15 → die (|| short-circuits, roll2 irrelevant).
-    pinRandom([0.05, 0.9, 0]);
-    const chamber = ['bullet', null, null, null, null, null];
-    const r = pullTrigger(chamber, { doubleBarrel: true });
-    expect(r.eliminated).toBe(true);
-    expect(chamber[r.spinIndex]).toBe('bullet');
-  });
-
-  it('eliminates when only the SECOND pull kills', () => {
-    // roll1=0.9 miss, roll2=0.05 < 0.15 → die.
-    pinRandom([0.9, 0.05, 0]);
-    const chamber = ['bullet', null, null, null, null, null];
-    const r = pullTrigger(chamber, { doubleBarrel: true });
-    expect(r.eliminated).toBe(true);
-    expect(chamber[r.spinIndex]).toBe('bullet');
-  });
-
-  it('without doubleBarrel only one roll is consumed (the second value is not an outcome roll)', () => {
-    // [0]=outcome 0.9 → survive. 0.05 is NOT a second outcome roll;
-    // it is consumed by the spinIndex slot pick instead.
-    pinRandom([0.9, 0.05, 0]);
-    const chamber = ['bullet', null, null, null, null, null];
-    const r = pullTrigger(chamber, { doubleBarrel: false });
-    expect(r.eliminated).toBe(false);
-    expect(chamber[r.spinIndex]).toBeNull();
-  });
-
-  it('over many runs Double Barrel is strictly DEADLIER than a single pull', () => {
-    // Two pulls vs one → P(die) = 1-(1-p)^2 > p. So fewer survivals.
-    let vanillaSurvived = 0;
-    let dbSurvived = 0;
-    const ITER = 5000;
-    const chamber = ['bullet', null, 'bullet', null, null, null]; // 2 bullets → p=0.24
-    vi.restoreAllMocks();
-    for (let i = 0; i < ITER; i++) {
-      if (!pullTrigger([...chamber]).eliminated) vanillaSurvived++;
-      if (!pullTrigger([...chamber], { doubleBarrel: true }).eliminated) dbSurvived++;
-    }
-    expect(dbSurvived).toBeLessThan(vanillaSurvived);
-  });
-});
-
-// ============================================================
-// Risk: Russian Roulette
-// ============================================================
-
-describe('Risk modifier — Russian Roulette', () => {
-  it('startGame leaves chambers at 2 bullets when enabled (issue #67)', () => {
-    const cfg = configWith({ risk: { russianRoulette: true } });
+  it('startGame loads every chamber with 2 bullets when enabled', () => {
+    const cfg = configWith({ risk: { doubleBarrel: true } });
     const room = makeOnlineRoom(4, cfg);
     startGame(room);
     for (const p of room.players) {
@@ -175,6 +119,69 @@ describe('Risk modifier — Russian Roulette', () => {
       expect(countBullets(p.chamber)).toBe(1);
       expect(p.riskLevel).toBe(1);
     }
+  });
+
+  it('pullTrigger ignores a doubleBarrel flag — only ONE outcome roll', () => {
+    // [0]=0.9 → survive on the 1-bullet curve (p=0.15). The next value (0.05)
+    // is NOT consumed as a second outcome roll; it falls to the spinIndex pick.
+    pinRandom([0.9, 0.05, 0]);
+    const chamber = ['bullet', null, null, null, null, null];
+    const r = pullTrigger(chamber, { doubleBarrel: true });
+    expect(r.eliminated).toBe(false);
+    expect(chamber[r.spinIndex]).toBeNull();
+  });
+});
+
+// ============================================================
+// Risk: Russian Roulette
+// ============================================================
+
+describe('Risk modifier — Russian Roulette', () => {
+  // Russian Roulette no longer loads extra bullets — it makes a FAILED bluff
+  // fire an immediate spin (handled in the bluff handlers via
+  // shouldImmediateSpin). Chambers still start at the vanilla 1 bullet.
+  it('startGame leaves chambers at 1 bullet when enabled (no extra load)', () => {
+    const cfg = configWith({ risk: { russianRoulette: true } });
+    const room = makeOnlineRoom(4, cfg);
+    startGame(room);
+    for (const p of room.players) {
+      if (p.status !== 'alive') continue;
+      expect(countBullets(p.chamber)).toBe(1);
+      expect(p.riskLevel).toBe(1);
+    }
+  });
+
+  it('shouldImmediateSpin: true in spin_pending with the modifier + a live target', () => {
+    const cfg = configWith({ risk: { russianRoulette: true } });
+    const room = makeOnlineRoom(2, cfg);
+    room.phase = 'spin_pending';
+    room.spinTargetId = room.players[0].id;
+    room.players[0].status = 'alive';
+    expect(shouldImmediateSpin(room)).toBe(true);
+  });
+
+  it('shouldImmediateSpin: false when the modifier is off', () => {
+    const room = makeOnlineRoom(2);
+    room.phase = 'spin_pending';
+    room.spinTargetId = room.players[0].id;
+    expect(shouldImmediateSpin(room)).toBe(false);
+  });
+
+  it('shouldImmediateSpin: false outside spin_pending', () => {
+    const cfg = configWith({ risk: { russianRoulette: true } });
+    const room = makeOnlineRoom(2, cfg);
+    room.phase = 'playing';
+    room.spinTargetId = room.players[0].id;
+    expect(shouldImmediateSpin(room)).toBe(false);
+  });
+
+  it('shouldImmediateSpin: false when the spin target is not alive', () => {
+    const cfg = configWith({ risk: { russianRoulette: true } });
+    const room = makeOnlineRoom(2, cfg);
+    room.phase = 'spin_pending';
+    room.spinTargetId = room.players[0].id;
+    room.players[0].status = 'eliminated';
+    expect(shouldImmediateSpin(room)).toBe(false);
   });
 
   it('initChamber(3) places 3 distinct bullets', () => {
@@ -209,6 +216,29 @@ describe('Risk modifier — Hot Potato', () => {
     expect(r.eliminated).toBe(false);
     // Started with 1 bullet → +2 → 3.
     expect(countBullets(r.chamber)).toBe(3);
+  });
+
+  it('survival + the following global reshuffle KEEP the +2 bullets (real-game path)', () => {
+    // Mirrors what applySpinAndBroadcast does: spinGun(player, getSpinModifiers
+    // (room)) on survival, then applyGlobalBluffReshuffle. The reshuffle re-deals
+    // HANDS only — it must not reset chambers, or Hot Potato would appear to
+    // "add no bullets" once the dust settled.
+    const cfg = configWith({ risk: { hotPotato: true } });
+    const room = makeOnlineRoom(4, cfg);
+    startGame(room);
+    const player = room.players.find((p) => p.status === 'alive');
+    player.chamber = [null, null, null, null, null, 'bullet'];
+    player.riskLevel = 1;
+
+    pinRandom([0.9, 0, 0, 0]); // survive (p=0.15), then slot picks
+    const result = spinGun(player, getSpinModifiers(room));
+    expect(result.eliminated).toBe(false);
+    expect(countBullets(player.chamber)).toBe(3); // 1 + 2 from Hot Potato
+    vi.restoreAllMocks();
+
+    applyGlobalBluffReshuffle(room);
+    expect(countBullets(player.chamber)).toBe(3); // chamber untouched by reshuffle
+    expect(player.riskLevel).toBe(3);
   });
 
   it('adds 1 bullet without hotPotato (vanilla survival rule preserved)', () => {
@@ -605,24 +635,24 @@ describe('Room modifier — Mirror Match', () => {
 // ============================================================
 
 describe('getSpinModifiers', () => {
-  it('returns false flags when no modifiers set', () => {
+  // Only Hot Potato is a pull-time modifier now (Double Barrel is a start-of-
+  // game chamber load; Russian Roulette is handled outside pullTrigger).
+  it('returns a false hotPotato flag when no modifiers set', () => {
     const room = makeOnlineRoom(2);
     const m = getSpinModifiers(room);
-    expect(m.doubleBarrel).toBe(false);
     expect(m.hotPotato).toBe(false);
   });
 
-  it('reads doubleBarrel + hotPotato from config', () => {
-    const cfg = configWith({ risk: { doubleBarrel: true, hotPotato: true } });
+  it('reads hotPotato from config', () => {
+    const cfg = configWith({ risk: { hotPotato: true } });
     const room = makeOnlineRoom(2, cfg);
     const m = getSpinModifiers(room);
-    expect(m.doubleBarrel).toBe(true);
     expect(m.hotPotato).toBe(true);
   });
 
   it('safe on a room with no config', () => {
     const m = getSpinModifiers({});
-    expect(m).toEqual({ doubleBarrel: false, hotPotato: false });
+    expect(m).toEqual({ hotPotato: false });
   });
 });
 
@@ -661,43 +691,5 @@ describe('spinGun forwards modifiers', () => {
     const r = spinGun(player, { hotPotato: true });
     expect(r.eliminated).toBe(false);
     expect(player.riskLevel).toBe(1); // Gambler revert wins over Hot Potato
-  });
-
-  it('Double Barrel: a kill on EITHER pull eliminates (issue #67)', () => {
-    // 1 bullet → p=0.15. roll1=0.9 (miss), roll2=0.05 (kill) → die.
-    // spinIndex MUST point at the bullet slot for visual consistency.
-    pinRandom([0.9, 0.05, 0]);
-    const preSpinChamber = ['bullet', null, null, null, null, null];
-    const player = {
-      id: 'p1',
-      status: 'alive',
-      isSpectator: false,
-      chamber: [...preSpinChamber],
-      riskLevel: 1,
-      role: 'barehand',
-    };
-    const r = spinGun(player, { doubleBarrel: true });
-    expect(r.eliminated).toBe(true);
-    // Verify against the PRE-spin chamber — survival path mutates
-    // player.chamber by adding a bullet, which can land on spinIndex.
-    expect(preSpinChamber[r.spinIndex]).toBe('bullet');
-  });
-
-  it('Double Barrel: BOTH pulls must miss to survive', () => {
-    // 1 bullet → p=0.15. roll1=0.9 miss, roll2=0.9 miss → survive.
-    pinRandom([0.9, 0.9, 0, 0]);
-    const preSpinChamber = ['bullet', null, null, null, null, null];
-    const player = {
-      id: 'p1',
-      status: 'alive',
-      isSpectator: false,
-      chamber: [...preSpinChamber],
-      riskLevel: 1,
-      role: 'barehand',
-    };
-    const r = spinGun(player, { doubleBarrel: true });
-    expect(r.eliminated).toBe(false);
-    // Pre-spin slot at spinIndex must be empty (chamber realism).
-    expect(preSpinChamber[r.spinIndex]).toBeNull();
   });
 });

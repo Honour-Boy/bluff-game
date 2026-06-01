@@ -77,10 +77,15 @@ function isBarehandVisible(playerCount) {
  * revive up to MEDIC_MAX_SAVES times per game (#120). The hand-room cap is
  * sized so a Medic can always save from a fresh 6-shape starting hand (#142).
  */
-function findAvailableMedic(room) {
+// `includeEliminatedId` lets a Medic who was JUST eliminated by the spin now
+// being resolved still count as available — so the Medic can save THEMSELVES.
+// (spinGun flips status to 'eliminated' before the save prompt opens, so a
+// plain alive-only check would silently deny every self-save — issue: "couldn't
+// save myself".)
+function findAvailableMedic(room, includeEliminatedId = null) {
   const medic = room.players.find(p =>
     p.role === ROLES.MEDIC
-    && p.status === 'alive'
+    && (p.status === 'alive' || p.id === includeEliminatedId)
     && (p.medicSavesUsed || 0) < MEDIC_MAX_SAVES
   );
   if (!medic) return null;
@@ -112,14 +117,15 @@ function findAvailableSniper(room) {
  */
 function applyMedicSave(room, eliminatedPlayerId, source = 'spin') {
   if (room.mode !== MODES.ONLINE) return { ok: false, error: 'Online mode only' };
-  const medic = findAvailableMedic(room);
+  // Treat the just-eliminated player as an eligible Medic so a self-save works.
+  const medic = findAvailableMedic(room, eliminatedPlayerId);
   if (!medic) {
     // findAvailableMedic also rejects a Medic who has spent all their
     // saves — surface that as a distinct error so the caller (and the
     // 4th-attempt acceptance test) can tell it apart from "no Medic".
     const capped = room.players.find(p =>
       p.role === ROLES.MEDIC
-      && p.status === 'alive'
+      && (p.status === 'alive' || p.id === eliminatedPlayerId)
       && (p.medicSavesUsed || 0) >= MEDIC_MAX_SAVES
     );
     return { ok: false, error: capped ? 'Save limit reached' : 'No Medic available' };

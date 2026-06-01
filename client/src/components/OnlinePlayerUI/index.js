@@ -188,6 +188,13 @@ export function OnlinePlayerUI({
       if (la && la.type === 'spin_result' && la.eliminated) {
         triggerAudio('gunshot');
       }
+      // (Global redeal) a resolved bluff that triggered a reshuffle rides the
+      // SAME spin_result lastAction. Don't play the card flight now — the spin
+      // overlay is still up. Stash it and let the overlay-close effect play it
+      // once the cylinder has been dismissed.
+      if (la && la.type === 'spin_result' && la.globalReshuffle && playedReshuffleRef.current !== la) {
+        pendingReshuffleRef.current = la;
+      }
     }
     prevSpinCompleteRef.current = ui.spinComplete;
   }, [ui.spinComplete, stopSpinAudio, triggerAudio, roomState?.lastAction]);
@@ -197,6 +204,89 @@ export function OnlinePlayerUI({
     clearTimeout(spinAudioDelayRef.current);
     stopSpinAudio();
   }, [stopSpinAudio]);
+
+  // ── Global-redeal flight animation ──────────────────────────────────────────
+  // On a resolved bluff the server silently re-deals every alive player's shape
+  // hand (powers kept, same count) and flags it on lastAction as
+  // `globalReshuffle: true`. To make the swap legible, this client's shape cards
+  // visibly fly OUT to the draw pile, then fresh backs deal back IN — played
+  // only AFTER the trigger/spin animation has finished so the two don't overlap.
+  const [reshuffling, setReshuffling] = useState(false);
+  // Spin path: the reshuffle rides the spin_result lastAction, so we stash it at
+  // spinComplete and play it when the overlay closes. Dedup ref guards both
+  // paths so a given lastAction animates exactly once.
+  const pendingReshuffleRef = useRef(null);
+  const playedReshuffleRef = useRef(null);
+  const prevSpinDataRef = useRef(null);
+  const reshuffleDelayRef = useRef(null);
+
+  const playReshuffleAnimation = useCallback(() => {
+    if (typeof document === 'undefined' || !launchCardFlight) return;
+    // No draw pile rendered (eliminated / spectating) → nothing to fly to.
+    const deckEl = document.querySelector('[data-deck-anchor]');
+    if (!deckEl) return;
+    const shapeCards = (roomState?.myHand || []).filter((card) => card?.type !== 'power');
+    if (shapeCards.length === 0) return;
+    const deckRect = deckEl.getBoundingClientRect();
+    // Snapshot each shape card's current rect (opacity:0 keeps layout, so these
+    // stay valid as the deal-back landing spots even after the fan is hidden).
+    const rects = shapeCards
+      .map((card) => {
+        const el = document.querySelector(`[data-card-id="${card.id}"]`);
+        return el ? el.getBoundingClientRect() : null;
+      })
+      .filter(Boolean);
+    if (rects.length === 0) return;
+    const n = rects.length;
+    setReshuffling(true);
+    // Phase 1 — cards fly OUT to the draw pile, staggered.
+    rects.forEach((rect, i) => {
+      setTimeout(
+        () => launchCardFlight({ back: true }, rect, deckRect, { mode: 'out', back: true }),
+        i * 55,
+      );
+    });
+    // Phase 2 — fresh backs deal back IN from the draw pile to each spot.
+    const phase2 = n * 55 + 240;
+    rects.forEach((rect, i) => {
+      setTimeout(
+        () => launchCardFlight({ back: true }, deckRect, rect, { mode: 'in', back: true }),
+        phase2 + i * 55,
+      );
+    });
+    // Restore the fan once the deal-back has landed.
+    setTimeout(() => setReshuffling(false), phase2 + n * 55 + 320);
+  }, [launchCardFlight, roomState?.myHand]);
+
+  // Overlay-close watcher (spin path). When the spin overlay goes non-null →
+  // null and a reshuffle is queued, play it after a short settle.
+  useEffect(() => {
+    const prev = prevSpinDataRef.current;
+    prevSpinDataRef.current = ui.spinData;
+    if (prev && !ui.spinData && pendingReshuffleRef.current) {
+      const la = pendingReshuffleRef.current;
+      pendingReshuffleRef.current = null;
+      playedReshuffleRef.current = la;
+      clearTimeout(reshuffleDelayRef.current);
+      reshuffleDelayRef.current = setTimeout(() => playReshuffleAnimation(), 250);
+    }
+  }, [ui.spinData, playReshuffleAnimation]);
+
+  // No-spin path (shield block / assassin backfire): the reshuffle arrives on a
+  // non-spin lastAction with no overlay, so play it on arrival. Guarded by the
+  // dedup ref so it fires once per lastAction.
+  useEffect(() => {
+    const la = roomState?.lastAction;
+    if (!la || !la.globalReshuffle) return;
+    if (la.type === 'spin_result') return;   // spin path handles this one
+    if (ui.spinData) return;                  // wait for any overlay to clear
+    if (playedReshuffleRef.current === la) return;
+    playedReshuffleRef.current = la;
+    playReshuffleAnimation();
+  }, [roomState?.lastAction, ui.spinData, playReshuffleAnimation]);
+
+  // Clear the pending-reshuffle delay timer on unmount.
+  useEffect(() => () => clearTimeout(reshuffleDelayRef.current), []);
 
   // §2.1 — private late-pick review buffer. When the server flags a pick as
   // late (≥12s into the 15s window) it returns a reviewMs grace period. We
@@ -575,6 +665,7 @@ export function OnlinePlayerUI({
         handlePowerCardClick={ui.handlePowerCardClick}
         phase={phase}
         leaveGame={leaveGame}
+        reshuffling={reshuffling}
       />
       </div>
 

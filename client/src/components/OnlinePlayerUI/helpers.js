@@ -61,6 +61,21 @@ export const GAME_UI_STYLE = `
     30%       { opacity: 0.3; }
     60%       { opacity: 1; }
   }
+  /* Lobby ambience — an imaginary dealer flicks face-down cards out to the
+     empty seats while patrons wait. Each card flies from the centre deck to its
+     fanned spot (--lx/--ly/--lr), holds, then fades so the loop re-deals. Per-
+     card animation-delay staggers the flick into a continuous cascade. */
+  @keyframes lobbyDeal {
+    0%   { transform: translate(0,0) rotate(0deg) scale(0.62); opacity: 0; }
+    8%   { opacity: 1; }
+    34%  { transform: translate(var(--lx,0), var(--ly,0)) rotate(var(--lr,0deg)) scale(1); opacity: 1; }
+    82%  { transform: translate(var(--lx,0), var(--ly,0)) rotate(var(--lr,0deg)) scale(1); opacity: 1; }
+    100% { transform: translate(var(--lx,0), var(--ly,0)) rotate(var(--lr,0deg)) scale(0.96); opacity: 0; }
+  }
+  .lobby-deal-card { animation: lobbyDeal 3.4s ease-in-out infinite; will-change: transform, opacity; }
+  @media (prefers-reduced-motion: reduce) {
+    .lobby-deal-card { animation: none; opacity: 0.35; }
+  }
 
   .topdown-table-scene {
     animation: tableEntrance 0.5s ease-out forwards;

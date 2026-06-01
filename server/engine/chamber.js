@@ -90,10 +90,11 @@ function addBulletToChamber(chamber) {
  *      invariant even if a caller passes an impossible state.
  *
  * v2 Phase E1 — Risk modifiers:
- *   - doubleBarrel: two trigger pulls — eliminated if EITHER roll
- *     lands a kill against the curve.
  *   - hotPotato: on SURVIVAL, add 2 bullets instead of 1. Clamps at
  *     full chamber.
+ *
+ * (Double Barrel is NOT a pull-time modifier — it loads two bullets into
+ * every chamber at game start; see initChamber(2) in engine/room.js.)
  *
  * Returns { spinIndex, eliminated, chamber, bulletCount }.
  */
@@ -104,10 +105,6 @@ function pullTrigger(chamber, modifiers = {}) {
 
   const p = deathProbability(bulletSlots.length);
   let eliminated = Math.random() < p;
-  if (modifiers.doubleBarrel) {
-    const second = Math.random() < p;
-    eliminated = eliminated || second;
-  }
 
   // Chamber realism / defensive consistency.
   if (eliminated && bulletSlots.length === 0) eliminated = false;

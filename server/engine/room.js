@@ -110,8 +110,11 @@ function startGame(room) {
   room.prevTurnPlayerId = null;
   room.discardPile = room.discardPile || [];
 
-  // v2 Phase E1 — Russian Roulette: re-init chambers with 2 bullets.
-  if (room.config?.riskModifiers?.russianRoulette) {
+  // v2 Phase E1 — Double Barrel: load 2 bullets into every chamber at start
+  // (≈24% first-spin death on the issue #67 curve). Russian Roulette is a
+  // separate modifier (failed bluff = immediate spin) and does NOT touch the
+  // chamber load — see shouldImmediateSpin / the bluff handlers.
+  if (room.config?.riskModifiers?.doubleBarrel) {
     for (const p of alivePlayers) {
       p.chamber = initChamber(2);
       p.riskLevel = 2;

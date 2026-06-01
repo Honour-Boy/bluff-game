@@ -383,9 +383,24 @@ function resolveGhostVote(room) {
   return banner;
 }
 
+// ─── Russian Roulette (Phase E1) ─────────────────────────────
+//
+// Russian Roulette: a FAILED bluff forces an IMMEDIATE spin — no manual
+// "pull the trigger" pause and no betting window. Returns true only when the
+// room has just entered `spin_pending` off a resolved bluff, the modifier is
+// enabled, and the spin target is still alive. The bluff handlers consult this
+// to run the spin pipeline straight away instead of parking on spin_pending.
+function shouldImmediateSpin(room) {
+  if (!room || room.phase !== 'spin_pending') return false;
+  if (!room.config?.riskModifiers?.russianRoulette) return false;
+  const target = room.players?.find(p => p.id === room.spinTargetId);
+  return !!(target && target.status === 'alive');
+}
+
 module.exports = {
   tickSuddenDeath,
   resetSuddenDeath,
+  shouldImmediateSpin,
   getMirrorMatchOpposite,
   isMirrorMatchEligibleAtStart,
   pickRedemptionCandidates,
