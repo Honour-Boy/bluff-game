@@ -1,18 +1,18 @@
 'use client';
 
-// ─── MobileFabMenu — single FAB + popup sheet (mobile only) ───
-// Issue #102 — replaces the scattered floating controls
-// (Centralize, speech-mute, chat, settings, voice-join) with one
-// non-obstructive button + a slide-up sheet exposing each. Sits
-// at bottom-right above the safe-area inset; the sheet docks at
-// the bottom of the viewport so it never overlaps the top-right
-// info HUD.
-//
-// Controlled-by-parent: parent decides whether to render this at
-// all (only when on the mobile breakpoint). Internal state is
-// just the open/closed sheet.
+// ─── MobileFabMenu — single FAB + popup sheet (mobile + desktop) ───
+// Issue #102 / #146 — one non-obstructive button + a slide-up sheet that
+// consolidates the in-game controls. Contents now:
+//   • Centralize  — only when the table area is actually scrollable
+//   • Chat
+//   • Game settings — opens the host's config (editable) / read-only summary
+//   • Leaderboard   — group standings (groups only)
+//   • Leave table
+//   • Voice (join/leave) — on every screen size
+// Music is handled by the global settings gear (not here); spoken
+// announcements were removed entirely.
 
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { VoicePanel } from './VoicePanel';
 
 // ─── Inline SVG icons (no emoji — keeps the tavern look crisp) ────────────────
@@ -21,46 +21,9 @@ const IconMenu = () => (<svg {...ic}><path d="M4 7h16M4 12h16M4 17h16" stroke="c
 const IconClose = () => (<svg {...ic} width={18} height={18}><path d="M6 6l12 12M18 6 6 18" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" /></svg>);
 const IconCentralize = () => (<svg {...ic}><circle cx="12" cy="12" r="3" stroke="currentColor" strokeWidth="1.8" /><path d="M12 3v3M12 18v3M3 12h3M18 12h3" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" /></svg>);
 const IconChat = () => (<svg {...ic}><path d="M4 5h16v11H8l-4 4z" stroke="currentColor" strokeWidth="1.8" strokeLinejoin="round" /></svg>);
-const IconSpeakerOn = () => (<svg {...ic}><path d="M4 9v6h4l5 4V5L8 9H4z" stroke="currentColor" strokeWidth="1.8" strokeLinejoin="round" /><path d="M17 8a5 5 0 0 1 0 8" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" /></svg>);
-const IconSpeakerOff = () => (<svg {...ic}><path d="M4 9v6h4l5 4V5L8 9H4z" stroke="currentColor" strokeWidth="1.8" strokeLinejoin="round" /><path d="M16 9l5 5M21 9l-5 5" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" /></svg>);
-const IconNote = () => (<svg {...ic}><path d="M9 18V6l10-2v12" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" /><circle cx="6.5" cy="18" r="2.5" stroke="currentColor" strokeWidth="1.8" /><circle cx="16.5" cy="16" r="2.5" stroke="currentColor" strokeWidth="1.8" /></svg>);
-const IconNoteOff = () => (<svg {...ic}><path d="M9 18V6l10-2v12" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" opacity="0.5" /><path d="M3 3l18 18" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" /></svg>);
+const IconSettings = () => (<svg {...ic}><path d="M5 7h14M5 12h14M5 17h14" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" /><circle cx="9" cy="7" r="2.2" fill="var(--surface)" stroke="currentColor" strokeWidth="1.8" /><circle cx="15" cy="12" r="2.2" fill="var(--surface)" stroke="currentColor" strokeWidth="1.8" /><circle cx="8" cy="17" r="2.2" fill="var(--surface)" stroke="currentColor" strokeWidth="1.8" /></svg>);
+const IconBoard = () => (<svg {...ic}><path d="M5 20V11M12 20V5M19 20v-6" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" /><path d="M3 20h18" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" /></svg>);
 const IconLeave = () => (<svg {...ic}><path d="M14 8V6a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h6a2 2 0 0 0 2-2v-2" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" /><path d="M10 12h10m0 0-3-3m3 3-3 3" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" /></svg>);
-
-// Mirror of ActiveConfigPanel's section labels — kept inline so
-// the menu stays self-contained and we don't pull a second
-// fixed-position component into the sheet.
-const POWER_CARDS = [
-  { key: 'shield',   label: 'Shield' },
-  { key: 'mirror',   label: 'Mirror' },
-  { key: 'swap',     label: 'Swap' },
-  { key: 'peek',     label: 'Peek' },
-  { key: 'freeze',   label: 'Freeze' },
-  { key: 'assassin', label: 'Assassin' },
-];
-const RISK_MODS = [
-  { key: 'doubleBarrel',    label: 'Double Barrel' },
-  { key: 'russianRoulette', label: 'Russian Roulette' },
-  { key: 'hotPotato',       label: 'Hot Potato' },
-  { key: 'redemptionSpin',  label: 'Redemption Spin' },
-];
-const ROOM_MODS = [
-  { key: 'speedMode',        label: 'Speed Mode' },
-  { key: 'suddenDeath',      label: 'Sudden Death' },
-  { key: 'mirrorMatch',      label: 'Mirror Match' },
-  { key: 'rouletteRotation', label: 'Roulette Rotation' },
-];
-const SYSTEMS = [
-  { key: 'bounty',       label: 'Bounty' },
-  { key: 'betting',      label: 'Betting' },
-  { key: 'deadMansHand', label: "Dead Man's Hand" },
-  { key: 'lastStand',    label: 'Last Stand' },
-];
-
-function pickEnabled(items, source) {
-  if (!source) return [];
-  return items.filter(({ key }) => !!source[key]);
-}
 
 function ItemButton({ icon, label, sub, onClick, badge }) {
   return (
@@ -110,20 +73,20 @@ function ItemButton({ icon, label, sub, onClick, badge }) {
 }
 
 export function MobileFabMenu({
-  config,
   voice,
-  speechEnabled,
-  musicEnabled = true,
   onCentralize,
-  onToggleSpeech,
-  onToggleMusic,
   onOpenChat,
   chatUnread = 0,
+  onOpenSettings,
+  onOpenLeaderboard,
   onLeaveTable,
   leaveDisabled = false,
-  // On desktop the standalone VoicePanel still lives in the header, so the
-  // menu omits its own voice section to avoid duplicate controls. #146
+  // On desktop the standalone VoicePanel used to live in the header; voice now
+  // lives in this menu on every screen size, so this defaults on. #146
   showVoice = true,
+  // Centralize only appears when the table area is genuinely scrollable — with
+  // the fixed-height shell there is normally nothing to scroll. #compact
+  scrollable = false,
 }) {
   const [open, setOpen] = useState(false);
 
@@ -138,17 +101,6 @@ export function MobileFabMenu({
   }, [open]);
 
   const close = () => setOpen(false);
-
-  const sections = useMemo(() => {
-    if (!config) return [];
-    return [
-      { title: 'Power Cards', items: pickEnabled(POWER_CARDS, config?.powerCards?.enabled) },
-      { title: 'Risk',        items: pickEnabled(RISK_MODS,   config?.riskModifiers) },
-      { title: 'Room',        items: pickEnabled(ROOM_MODS,   config?.roomModifiers) },
-      { title: 'Systems',     items: pickEnabled(SYSTEMS,     config?.systems) },
-    ].filter((section) => section.items.length > 0);
-  }, [config]);
-  const totalEnabled = sections.reduce((sum, s) => sum + s.items.length, 0);
 
   const unreadLabel = chatUnread > 99 ? '99+' : chatUnread > 0 ? String(chatUnread) : null;
 
@@ -262,12 +214,13 @@ export function MobileFabMenu({
               onClick={close}
               aria-label="Close menu"
               style={{
-                background: 'none', border: 'none',
-                color: 'var(--text-dim)', fontSize: 18,
+                background: 'var(--surface2)',
+                border: '1px solid var(--border-lit)',
+                borderRadius: 'var(--radius)',
+                color: 'var(--text)',
                 cursor: 'pointer',
-                width: 44, height: 44,
+                width: 40, height: 40,
                 display: 'flex', alignItems: 'center', justifyContent: 'center',
-                marginRight: -8,
                 WebkitTapHighlightColor: 'transparent',
               }}
             >
@@ -277,11 +230,11 @@ export function MobileFabMenu({
 
           {/* Action items */}
           <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-            {onCentralize && (
+            {scrollable && onCentralize && (
               <ItemButton
                 icon={<IconCentralize />}
                 label="Centralize"
-                sub="Centre on the table"
+                sub="Scroll back to the table"
                 onClick={() => { onCentralize(); close(); }}
               />
             )}
@@ -294,20 +247,20 @@ export function MobileFabMenu({
                 badge={unreadLabel}
               />
             )}
-            {onToggleSpeech && (
+            {onOpenSettings && (
               <ItemButton
-                icon={speechEnabled ? <IconSpeakerOn /> : <IconSpeakerOff />}
-                label={speechEnabled ? 'Mute announcements' : 'Unmute announcements'}
-                sub="Spoken event narration"
-                onClick={() => { onToggleSpeech(); }}
+                icon={<IconSettings />}
+                label="Game settings"
+                sub="Powers & house rules"
+                onClick={() => { onOpenSettings(); close(); }}
               />
             )}
-            {onToggleMusic && (
+            {onOpenLeaderboard && (
               <ItemButton
-                icon={musicEnabled ? <IconNote /> : <IconNoteOff />}
-                label={musicEnabled ? 'Mute music' : 'Unmute music'}
-                sub="Tavern background ambience"
-                onClick={() => { onToggleMusic(); }}
+                icon={<IconBoard />}
+                label="Leaderboard"
+                sub="Standings for this group"
+                onClick={() => { onOpenLeaderboard(); close(); }}
               />
             )}
             {onLeaveTable && (
@@ -333,50 +286,6 @@ export function MobileFabMenu({
                 Voice
               </div>
               <VoicePanel {...voice} />
-            </div>
-          )}
-
-          {/* Settings — surface the same data ActiveConfigPanel shows
-              on desktop. Hidden when nothing is enabled. */}
-          {totalEnabled > 0 && (
-            <div style={{ marginTop: 16 }}>
-              <div style={{
-                fontSize: 10, color: 'var(--text-dim)',
-                letterSpacing: '0.12em', textTransform: 'uppercase',
-                marginBottom: 8,
-              }}>
-                Settings · {totalEnabled} active
-              </div>
-              <ul style={{ listStyle: 'none', padding: 0, margin: 0, display: 'flex', flexDirection: 'column', gap: 8 }}>
-                {sections.map((section) => (
-                  <li key={section.title}>
-                    <div style={{
-                      fontSize: 10, color: 'var(--text-dim)',
-                      letterSpacing: '0.1em', textTransform: 'uppercase',
-                      marginBottom: 4,
-                    }}>
-                      {section.title}
-                    </div>
-                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4 }}>
-                      {section.items.map((item) => (
-                        <span
-                          key={item.key}
-                          style={{
-                            padding: '2px 8px',
-                            background: 'var(--surface2)',
-                            border: '1px solid var(--border)',
-                            borderRadius: 999,
-                            color: 'var(--text)',
-                            fontSize: 11,
-                          }}
-                        >
-                          {item.label}
-                        </span>
-                      ))}
-                    </div>
-                  </li>
-                ))}
-              </ul>
             </div>
           )}
         </div>

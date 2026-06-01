@@ -1,0 +1,213 @@
+'use client';
+
+import { useState } from 'react';
+import { UserProfile } from '../screens/UserProfile';
+
+// ─── SettingsGear — the global identity / settings menu ───────────────────────
+// A small fixed gear button (top-right) available on EVERY screen once signed
+// in: landing, groups, and in-game. Folds the player's identity, the music
+// toggle, profile editing, and sign-out into one menu so the "main settings"
+// are reachable everywhere. Icon-only trigger keeps the footprint tiny; the
+// username shows inside the open menu. The in-game RoomHeader reserves top-right
+// padding so this never overlaps the status tag / Rules.
+
+function GearIcon() {
+  return (
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+      <circle cx="12" cy="12" r="3.2" stroke="currentColor" strokeWidth="1.8" />
+      <path d="M12 2.6v2.3M12 19.1v2.3M21.4 12h-2.3M5 12H2.6M18.6 5.4l-1.6 1.6M7 17l-1.6 1.6M18.6 18.6 17 17M7 7 5.4 5.4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+    </svg>
+  );
+}
+
+function SettingItem({ icon, label, onClick, accent = false }) {
+  return (
+    <button
+      type="button"
+      role="menuitem"
+      onClick={onClick}
+      style={{
+        display: 'flex', alignItems: 'center', gap: 9, width: '100%',
+        padding: '9px 10px',
+        background: 'none',
+        border: '1px solid transparent',
+        borderRadius: 'var(--radius)',
+        color: accent ? 'var(--accent)' : 'var(--text-mid)',
+        fontFamily: "'Cinzel', serif",
+        fontSize: 11,
+        letterSpacing: '0.06em',
+        cursor: 'pointer',
+        textAlign: 'left',
+      }}
+      onMouseEnter={(e) => { e.currentTarget.style.background = 'var(--surface2)'; }}
+      onMouseLeave={(e) => { e.currentTarget.style.background = 'none'; }}
+    >
+      {icon && <span aria-hidden="true" style={{ width: 16, display: 'flex', justifyContent: 'center', flexShrink: 0 }}>{icon}</span>}
+      <span style={{ flex: 1 }}>{label}</span>
+    </button>
+  );
+}
+
+export function SettingsGear({
+  username,
+  isGuest = false,
+  musicEnabled = true,
+  onToggleMusic,
+  onSignOut,
+  onSignOutGuest,
+  onUpdateUsername,
+}) {
+  const [open, setOpen] = useState(false);
+  const [showProfile, setShowProfile] = useState(false);
+
+  // Nothing to manage if we have no identity at all.
+  if (!username && !onSignOut && !onSignOutGuest) return null;
+
+  return (
+    <>
+      {/* Hide the inline name on small screens so it never crowds the centred
+          header status; the name still shows inside the opened menu. */}
+      <style>{`@media (max-width: 520px){.settings-gear-name{display:none !important;}}`}</style>
+      <div style={{
+        position: 'fixed',
+        top: 'max(12px, env(safe-area-inset-top, 0px))',
+        right: 'max(12px, env(safe-area-inset-right, 0px))',
+        // Above the table/header but below the controls modal (9300) so an open
+        // modal cleanly covers it (avoids two top-right close targets on mobile).
+        zIndex: 9200,
+      }}>
+        <button
+          type="button"
+          onClick={() => setOpen((v) => !v)}
+          aria-haspopup="menu"
+          aria-expanded={open}
+          aria-label="Settings"
+          title="Settings"
+          style={{
+            height: 40,
+            display: 'flex', alignItems: 'center', gap: 7,
+            padding: '0 11px',
+            color: open ? 'var(--accent)' : 'var(--text-mid)',
+            border: `1px solid ${open ? 'var(--accent-dim)' : 'var(--border-lit)'}`,
+            background: 'rgba(20,15,10,0.9)',
+            borderRadius: 'var(--radius)',
+            cursor: 'pointer',
+            boxShadow: '0 4px 14px rgba(0,0,0,0.45)',
+            fontFamily: "'Cinzel', serif",
+            fontSize: 10,
+            letterSpacing: '0.08em',
+            WebkitTapHighlightColor: 'transparent',
+          }}
+        >
+          <GearIcon />
+          {username && (
+            <span className="settings-gear-name" style={{ maxWidth: 130, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+              {username}
+            </span>
+          )}
+          {isGuest && (
+            <span style={{
+              fontSize: 8,
+              padding: '2px 6px',
+              borderRadius: 2,
+              background: 'rgba(200,146,46,0.1)',
+              border: '1px solid rgba(200,146,46,0.35)',
+              color: 'var(--accent)',
+              letterSpacing: '0.14em',
+            }}>
+              GUEST
+            </span>
+          )}
+        </button>
+
+        {open && (
+          <>
+            {/* Click-away catcher */}
+            <div
+              onClick={() => setOpen(false)}
+              aria-hidden="true"
+              style={{ position: 'fixed', inset: 0 }}
+            />
+            <div
+              role="menu"
+              style={{
+                position: 'absolute', top: 'calc(100% + 8px)', right: 0,
+                minWidth: 214,
+                background: 'var(--surface)',
+                border: '1px solid var(--border-lit)',
+                borderRadius: 'var(--radius)',
+                boxShadow: '0 14px 36px rgba(0,0,0,0.6)',
+                padding: 6,
+                display: 'flex', flexDirection: 'column', gap: 2,
+              }}
+            >
+              <div style={{ padding: '8px 10px 9px', borderBottom: '1px solid var(--border)', marginBottom: 3 }}>
+                <div style={{ fontFamily: "'Cinzel', serif", fontSize: 13, color: 'var(--text)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{username}</div>
+                <div style={{ fontFamily: "'Space Mono', monospace", fontSize: 9, color: 'var(--text-dim)', letterSpacing: '0.14em', textTransform: 'uppercase', marginTop: 2 }}>
+                  {isGuest ? 'Guest player' : 'Signed in'}
+                </div>
+              </div>
+
+              {!isGuest && onUpdateUsername && (
+                <SettingItem
+                  label="Edit profile"
+                  onClick={() => { setOpen(false); setShowProfile(true); }}
+                  icon={(
+                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                      <circle cx="12" cy="8" r="4" stroke="currentColor" strokeWidth="1.8" />
+                      <path d="M4 20c0-4 3.6-7 8-7s8 3 8 7" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
+                    </svg>
+                  )}
+                />
+              )}
+
+              {onToggleMusic && (
+                <SettingItem
+                  label={musicEnabled ? 'Music: On' : 'Music: Off'}
+                  onClick={() => onToggleMusic()}
+                  icon={musicEnabled ? (
+                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                      <path d="M9 18V6l10-2v12" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+                      <circle cx="6.5" cy="18" r="2.5" stroke="currentColor" strokeWidth="1.8" />
+                      <circle cx="16.5" cy="16" r="2.5" stroke="currentColor" strokeWidth="1.8" />
+                    </svg>
+                  ) : (
+                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                      <path d="M9 18V6l10-2v12" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" opacity="0.5" />
+                      <path d="M3 3l18 18" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
+                    </svg>
+                  )}
+                />
+              )}
+
+              <div style={{ height: 1, background: 'var(--border)', margin: '3px 4px' }} />
+
+              {isGuest && onSignOutGuest ? (
+                <SettingItem label="Sign in to save →" accent onClick={() => { setOpen(false); onSignOutGuest(); }} />
+              ) : onSignOut ? (
+                <SettingItem
+                  label="Leave Tavern"
+                  onClick={() => { setOpen(false); onSignOut(); }}
+                  icon={(
+                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                      <path d="M14 8V6a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h6a2 2 0 0 0 2-2v-2" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+                      <path d="M10 12h10m0 0-3-3m3 3-3 3" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+                    </svg>
+                  )}
+                />
+              ) : null}
+            </div>
+          </>
+        )}
+      </div>
+
+      {showProfile && (
+        <UserProfile
+          username={username}
+          onUpdateUsername={onUpdateUsername}
+          onClose={() => setShowProfile(false)}
+        />
+      )}
+    </>
+  );
+}

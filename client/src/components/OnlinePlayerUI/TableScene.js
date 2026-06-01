@@ -9,6 +9,7 @@ import { CenterTablePanel } from './CenterTablePanel';
 // middle of the cloth.
 export function TableScene({
   tableCenterRef,
+  sceneScrollRef,
   distributed,
   otherPlayers,
   renderChip,
@@ -43,14 +44,18 @@ export function TableScene({
     <div
       className="topdown-table-scene tavern-floor"
       style={{
-        flex: 1,
+        // Grow to fill the leftover viewport between header + bottom seat, but
+        // be allowed to shrink (minHeight:0) so the shell never overflows the
+        // screen. Content scrolls INSIDE here, not the page.
+        flex: '1 1 0',
+        minHeight: 0,
         position: 'relative',
         overflow: 'hidden',
-        minHeight: '64vh',
         padding: '0 6px',
       }}
     >
-      {/* ── The table itself (decorative): rail → studs → felt → stitching ── */}
+      {/* ── The table itself (decorative): rail → studs → felt → stitching.
+           Fixed behind the scrollable content so it stays put. ── */}
       <div className="poker-table-oval" aria-hidden="true">
         <div className="poker-table-studs" />
         <div className="poker-table-felt">
@@ -58,19 +63,32 @@ export function TableScene({
         </div>
       </div>
 
-      {/* ── Seats + play area, layered on top of the felt ── */}
-      <div style={{ position: 'relative', zIndex: 1, display: 'flex', flexDirection: 'column' }}>
+      {/* ── Seats + play area, layered on the felt. This layer scrolls on its
+           own when its content is taller than the scene, so the page itself
+           never needs to scroll. ── */}
+      <div
+        ref={sceneScrollRef}
+        style={{
+          position: 'absolute',
+          inset: 0,
+          zIndex: 1,
+          overflowY: 'auto',
+          WebkitOverflowScrolling: 'touch',
+          display: 'flex',
+          flexDirection: 'column',
+        }}
+      >
         {/* Top row of player chips — seated along the far rail */}
         <div
           className="topdown-top"
           style={{
-            minHeight: '22vh',
+            flex: '0 0 auto',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
             flexWrap: 'wrap',
             gap: 8,
-            padding: '14px 4px 4px',
+            padding: '12px 4px 6px',
           }}
         >
           {distributed.top.length > 0 ? (
@@ -93,11 +111,12 @@ export function TableScene({
         <div
           className="topdown-middle"
           style={{
+            flex: '1 1 auto',
+            minHeight: 0,
             display: 'grid',
             gridTemplateColumns: 'auto 1fr auto',
             gap: 10,
             alignItems: 'center',
-            minHeight: '42vh',
             padding: '4px 0',
           }}
         >

@@ -360,8 +360,17 @@ const MUSIC_SECTIONS = {
   groups:   ['/audio/Click_Clack_Spin.mp3'],                         // the whole Groups area
   gameover: ['/audio/Gutter-Candle Dread.mp3'],                      // after a game ends (results)
 };
-const MUSIC_BASE_VOL = 0.28;  // subtle bed level (0–1)
-const MUSIC_DUCK_VOL = 0.08;  // ducked level while a cue plays
+const MUSIC_BASE_VOL = 0.24;  // subtle bed level (0–1)
+const MUSIC_DUCK_VOL = 0.06;  // ducked level while a cue plays
+// Per-section overrides of the base level. The in-game bed is the quietest so
+// it never competes with the table's cues/spin (kept well below the others).
+const MUSIC_SECTION_VOL = {
+  game: 0.11,
+};
+function _sectionVol(t) {
+  const v = MUSIC_SECTION_VOL[t?.section];
+  return typeof v === 'number' ? v : MUSIC_BASE_VOL;
+}
 
 function _musicMutedFromStorage() {
   try { return window.localStorage.getItem('bluff_music_muted') === '1'; }
@@ -459,7 +468,7 @@ function _playCurrent(t, resumeTime = 0) {
   t.audio.loop = t.queue.length === 1; // one track loops; many cycle via 'ended'
   const p = t.audio.play();            // must run in a gesture on mobile
   if (p && p.catch) p.catch(() => {});
-  _tweenVol(t, t.muted ? 0 : MUSIC_BASE_VOL, 700);
+  _tweenVol(t, t.muted ? 0 : _sectionVol(t), 700);
 }
 
 // Switch the active section: stop the old track, start the new. No-op (but
@@ -504,7 +513,7 @@ function _musicResume() {
   const resume = t.pendingResume || 0;
   t.pendingResume = 0;
   if (t.audio.paused) _playCurrent(t, resume);
-  else _tweenVol(t, MUSIC_BASE_VOL, 400);
+  else _tweenVol(t, _sectionVol(t), 400);
 }
 
 function _musicSetMuted(muted) {
@@ -529,9 +538,9 @@ function _duckMusic(holdMs) {
   const t = (typeof window !== 'undefined') ? window.__bluffTrack : null;
   if (!t || t.muted || !t.queue.length || t.audio.paused) return;
   clearTimeout(t.duckTimer);
-  _tweenVol(t, MUSIC_DUCK_VOL, 90);
+  _tweenVol(t, Math.min(MUSIC_DUCK_VOL, _sectionVol(t)), 90);
   t.duckTimer = setTimeout(() => {
-    if (!t.muted) _tweenVol(t, MUSIC_BASE_VOL, 450);
+    if (!t.muted) _tweenVol(t, _sectionVol(t), 450);
   }, Math.max(100, holdMs));
 }
 

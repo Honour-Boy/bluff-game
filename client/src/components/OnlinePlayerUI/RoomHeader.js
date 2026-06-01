@@ -1,5 +1,4 @@
 import { useState } from 'react';
-import { VoicePanel } from '../VoicePanel';
 
 // ─── Share dropdown — tavern-styled ──────────────────────────────────────────
 function ShareButton({ roomCode, senderName }) {
@@ -114,18 +113,19 @@ export function RoomHeader({
 }) {
   return (
     <div style={{
-      display: 'flex',
-      alignItems: 'flex-start',
-      justifyContent: 'space-between',
-      gap: 12,
-      flexWrap: 'wrap',
-      padding: '6px 8px 10px',
+      display: 'grid',
+      // Three zones: BLUFF + code (left), status + Rules (centre), and a
+      // spacer (right) that the fixed global settings gear floats over.
+      gridTemplateColumns: '1fr auto 1fr',
+      alignItems: 'start',
+      gap: 8,
+      padding: '8px 10px 10px',
       borderBottom: '1px solid var(--border)',
       background: 'linear-gradient(180deg, rgba(16,12,8,0.96) 0%, rgba(10,8,5,0.8) 100%)',
       boxShadow: '0 2px 12px rgba(0,0,0,0.5)',
     }}>
       {/* Left: title + room code wax seal */}
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 5, minWidth: 0 }}>
         <h1 style={{
           fontFamily: "'Cinzel Decorative', 'Cinzel', serif",
           fontSize: 20,
@@ -177,11 +177,10 @@ export function RoomHeader({
         {isLobby && myPlayer && (
           <ShareButton roomCode={roomCode} senderName={myPlayer.username} />
         )}
-        {voice && !isMobile && <VoicePanel {...voice} />}
       </div>
 
-      {/* Right: status + how-to */}
-      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 6 }}>
+      {/* Centre: player status + Rules under it */}
+      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6, justifySelf: 'center', paddingTop: 2 }}>
         <span className={`tag ${isEliminated ? 'eliminated' : 'alive'}`}>
           {isEliminated ? 'Eliminated' : isHost ? 'Host · Alive' : 'Alive'}
         </span>
@@ -202,6 +201,9 @@ export function RoomHeader({
           Rules
         </button>
       </div>
+
+      {/* Right: spacer reserved for the fixed global settings gear (name + menu) */}
+      <div aria-hidden="true" />
     </div>
   );
 }

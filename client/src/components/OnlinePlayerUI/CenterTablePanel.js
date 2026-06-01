@@ -2,10 +2,8 @@ import { CardShape } from '../shared/CardShape';
 import { ShapeIcon } from '../shared/ShapeIcon';
 import { ActionLog } from '../ActionLog';
 import { WaitingForPlayerBanner } from '../TurnStartNotice';
-import { LeaderboardPanel } from '../LeaderboardPanel';
-import { PreGameSettingsPanel } from '../screens/PreGameSettingsPanel';
-import { LobbyConfigSummary } from '../LobbyConfigSummary';
-import { ShareRecap } from './ShareRecap';
+// Game settings (host config / read-only summary) and the group leaderboard now
+// live in the Controls menu, not on the felt — keeps the table clean.
 
 // ─── Face-down card stack — leather-back texture ──────────────────────────────
 function FaceDownStack({ count, label, warning = false }) {
@@ -136,6 +134,7 @@ export function CenterTablePanel({
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'space-around',
+          flexWrap: 'wrap',
           gap: 12,
           padding: '16px 16px',
           borderRadius: 20,
@@ -199,15 +198,6 @@ export function CenterTablePanel({
           </div>
           {isHost ? (
             <>
-              {roomState?.config && (
-                <PreGameSettingsPanel
-                  config={roomState.config}
-                  onChange={updateRoomConfig}
-                  isGroupRoom={!!roomState?.groupId}
-                  savedMeta={roomState?.groupSettingsMeta}
-                  playerCount={alivePlayers.length}
-                />
-              )}
               <button
                 className="primary"
                 onClick={startGame}
@@ -226,27 +216,25 @@ export function CenterTablePanel({
                   At least 2 patrons needed to begin.
                 </div>
               )}
-            </>
-          ) : (
-            <>
-              {roomState?.config && <LobbyConfigSummary config={roomState.config} />}
               <div style={{
-                fontFamily: "'Crimson Text', serif",
-                fontSize: 14,
+                fontFamily: "'Cinzel', serif",
+                fontSize: 9,
                 color: 'var(--text-dim)',
-                fontStyle: 'italic',
+                letterSpacing: '0.12em',
+                textTransform: 'uppercase',
               }}>
-                Waiting for the proprietor to deal…
+                Set powers &amp; house rules from the Controls menu
               </div>
             </>
-          )}
-          {roomState?.groupId && (
-            <LeaderboardPanel
-              groupId={roomState.groupId}
-              currentUserId={myPlayer?.id || null}
-              getGroupLeaderboard={getGroupLeaderboard}
-              leaderboardUpdateNonce={leaderboardUpdateNonce}
-            />
+          ) : (
+            <div style={{
+              fontFamily: "'Crimson Text', serif",
+              fontSize: 14,
+              color: 'var(--text-dim)',
+              fontStyle: 'italic',
+            }}>
+              Waiting for the proprietor to deal…
+            </div>
           )}
         </div>
       )}
@@ -446,14 +434,6 @@ export function CenterTablePanel({
             The game concludes.
           </div>
 
-          {/* #207 — shareable end-of-game recap (lean v1) */}
-          <ShareRecap
-            didWin={lastAction?.winnerId === myPlayer?.id}
-            winnerName={lastAction?.winnerName}
-            totalPlayers={roomState?.players?.length || alivePlayers?.length || 1}
-            username={myPlayer?.username}
-          />
-
           {isHost ? (
             <div style={{ display: 'flex', gap: 10, justifyContent: 'center', flexWrap: 'wrap' }}>
               <button className="primary" onClick={restartRoom}>Deal Again</button>
@@ -470,14 +450,15 @@ export function CenterTablePanel({
             </div>
           )}
           {roomState?.groupId && (
-            <div style={{ marginTop: 18, textAlign: 'left' }}>
-              <LeaderboardPanel
-                groupId={roomState.groupId}
-                currentUserId={myPlayer?.id || null}
-                highlightUserId={lastAction?.winnerId || null}
-                getGroupLeaderboard={getGroupLeaderboard}
-                leaderboardUpdateNonce={leaderboardUpdateNonce}
-              />
+            <div style={{
+              marginTop: 14,
+              fontFamily: "'Cinzel', serif",
+              fontSize: 9,
+              color: 'var(--text-dim)',
+              letterSpacing: '0.12em',
+              textTransform: 'uppercase',
+            }}>
+              View standings from the Controls menu
             </div>
           )}
         </div>

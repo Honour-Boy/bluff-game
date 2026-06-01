@@ -1,10 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useIsMobile } from './useIsMobile';
-import {
-  useAnnouncementSpeech,
-  loadSpeechEnabled,
-  saveSpeechEnabled,
-} from './useAnnouncementSpeech';
 
 export function useOnlinePlayerUiController({
   roomState,
@@ -62,17 +57,6 @@ export function useOnlinePlayerUiController({
   const [bettingBusy, setBettingBusy] = useState(false);
   const [ghostVotingBusy, setGhostVotingBusy] = useState(false);
   const [lastStandSpinBusy, setLastStandSpinBusy] = useState(false);
-  const [speechEnabled, setSpeechEnabled] = useState(true);
-
-  const announcementHead = Array.isArray(powerEventQueue) && powerEventQueue.length > 0
-    ? powerEventQueue[0]
-    : null;
-
-  useEffect(() => {
-    setSpeechEnabled(loadSpeechEnabled());
-  }, []);
-
-  useAnnouncementSpeech(announcementHead, { enabled: speechEnabled });
 
   useEffect(() => {
     const action = roomState?.lastAction;
@@ -202,14 +186,6 @@ export function useOnlinePlayerUiController({
     if (tableCenterRef.current) {
       tableCenterRef.current.scrollIntoView({ behavior: 'smooth', block: 'center' });
     }
-  }, []);
-
-  const toggleSpeech = useCallback(() => {
-    setSpeechEnabled((current) => {
-      const next = !current;
-      saveSpeechEnabled(next);
-      return next;
-    });
   }, []);
 
   const handleCardClick = useCallback((cardId) => {
@@ -348,8 +324,6 @@ export function useOnlinePlayerUiController({
     setGhostVotingBusy,
     lastStandSpinBusy,
     setLastStandSpinBusy,
-    speechEnabled,
-    toggleSpeech,
     handleCardClick,
     handlePowerCardClick,
     handleSpectatePlayer,
