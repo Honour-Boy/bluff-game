@@ -73,8 +73,12 @@ export const GAME_UI_STYLE = `
       repeating-linear-gradient(91deg, #16110c 0px, #16110c 46px, #110c08 46px, #110c08 48px);
   }
   .poker-table-oval {
+    /* A medium, FIXED-size felt (sized inline in TableScene), centred behind
+       the dealer's tray. The ring of seats grows around it; the oval doesn't. */
     position: absolute;
-    inset: 4.5% 3% 3% 3%;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
     border-radius: 50%;
     background:
       radial-gradient(ellipse at 50% -8%, rgba(214,158,70,0.18) 0%, transparent 55%),
@@ -114,13 +118,11 @@ export const GAME_UI_STYLE = `
 
   @media (max-width: 640px) {
     .topdown-middle { gap: 6px !important; }
-    .topdown-side { max-height: 48vh !important; }
     .topdown-chip {
       width: 64px !important;
       height: 88px !important;
       padding: 5px !important;
     }
-    .poker-table-oval { inset: 2.5% 1% 1.5% 1%; }
     .poker-table-felt { inset: 14px; }
   }
 `;
@@ -246,4 +248,13 @@ export function distributePlayers(others) {
     top: topSlice.slice().reverse(),
     left: leftSlice,
   };
+}
+
+// Mobile (Module 1): the "top-arc / horseshoe" placement. All opponents fan into
+// a single band above the table (no side columns), matching the same
+// { top, left, right } shape TableScene consumes for desktop. When the band is
+// wider than the screen the pannable canvas scrolls it horizontally.
+export function arcPlayers(others) {
+  const list = Array.isArray(others) ? others : [];
+  return { top: list, left: [], right: [] };
 }

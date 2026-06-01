@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useAnimationControls } from 'framer-motion';
 import { CardHand } from './CardHand';
 import { PlayerChip } from './PlayerChip';
 import { RoomHeader } from './RoomHeader';
@@ -20,6 +21,7 @@ import { PreGameSettingsPanel } from '../screens/PreGameSettingsPanel';
 import { LobbyConfigSummary } from '../LobbyConfigSummary';
 import { LeaderboardPanel } from '../LeaderboardPanel';
 import {
+  arcPlayers,
   distributePlayers,
   GAME_UI_STYLE,
   orderClockwiseFromLocal,
@@ -80,33 +82,41 @@ export function OnlinePlayerUI({
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [leaderboardOpen, setLeaderboardOpen] = useState(false);
 
-  // Detect whether the table scene is actually scrollable, so Centralize only
-  // shows when there's something to scroll back to (otherwise the fixed-height
-  // shell has nothing to scroll). Observes the scroll container + its content.
-  const sceneScrollRef = useRef(null);
-  const [sceneScrollable, setSceneScrollable] = useState(false);
+  // (Module 1) Pannable canvas. We measure the board against the viewport and
+  // derive symmetric drag constraints centred on the middle: when the board
+  // fits, constraints collapse to {0,0,0,0} (locked, centred); when it overflows,
+  // you can pan ±half-the-overflow in each axis. `pannable` gates the Re-center
+  // control, and we snap back to centre whenever the board no longer overflows
+  // (e.g. a player left and everyone fits again).
+  const viewportRef = useRef(null);
+  const boardRef = useRef(null);
+  const panControls = useAnimationControls();
+  const [panConstraints, setPanConstraints] = useState({ left: 0, right: 0, top: 0, bottom: 0 });
+  const [pannable, setPannable] = useState(false);
   const ready = !!(roomState && myPlayer);
+
+  const recenter = useCallback(() => {
+    panControls.start({ x: 0, y: 0, transition: { type: 'spring', stiffness: 260, damping: 30 } });
+  }, [panControls]);
+
   useEffect(() => {
-    const el = sceneScrollRef.current;
-    if (!el || typeof ResizeObserver === 'undefined') return undefined;
-    const check = () => {
-      const scrollable = el.scrollWidth > el.clientWidth + 2;
-      setSceneScrollable(scrollable);
-      // Centre the board the first time it overflows so the dealer's cards are
-      // visible by default; players are then scrollable to either side.
-      if (scrollable && el.dataset.centered !== '1') {
-        el.scrollLeft = (el.scrollWidth - el.clientWidth) / 2;
-        el.dataset.centered = '1';
-      } else if (!scrollable) {
-        el.dataset.centered = '';
-      }
+    const viewport = viewportRef.current;
+    const board = boardRef.current;
+    if (!viewport || !board || typeof ResizeObserver === 'undefined') return undefined;
+    const measure = () => {
+      const ox = Math.max(0, (board.offsetWidth - viewport.clientWidth) / 2);
+      const oy = Math.max(0, (board.offsetHeight - viewport.clientHeight) / 2);
+      setPanConstraints({ left: -ox, right: ox, top: -oy, bottom: oy });
+      const overflows = ox > 1 || oy > 1;
+      setPannable(overflows);
+      if (!overflows) panControls.start({ x: 0, y: 0, transition: { duration: 0.2 } });
     };
-    const ro = new ResizeObserver(check);
-    ro.observe(el);
-    Array.from(el.children).forEach((c) => ro.observe(c));
-    check();
+    const ro = new ResizeObserver(measure);
+    ro.observe(viewport);
+    ro.observe(board);
+    measure();
     return () => ro.disconnect();
-  }, [ready]);
+  }, [ready, panControls]);
 
   const myHand = roomState?.myHand || [];
   const myPowerCardSlot = roomState?.myPowerCardSlot || [];
@@ -284,7 +294,12 @@ export function OnlinePlayerUI({
     const seatOrder = rouletteActive ? (players?.map((p) => p.id) || []) : turnOrder;
     return orderClockwiseFromLocal(others, seatOrder, myPlayer.id);
   }, [myPlayer.id, players, turnOrder, rouletteActive]);
-  const distributed = useMemo(() => distributePlayers(otherPlayers), [otherPlayers]);
+  // Responsive seating (Module 1): desktop spreads seats top/left/right around
+  // the table; mobile fans them all into the top band (top-arc / horseshoe).
+  const distributed = useMemo(
+    () => (ui.isMobile ? arcPlayers(otherPlayers) : distributePlayers(otherPlayers)),
+    [otherPlayers, ui.isMobile],
+  );
 
   let actionHint = '';
   if (isMyTurn && isPlaying) {
@@ -427,7 +442,11 @@ export function OnlinePlayerUI({
 
       <TableScene
         tableCenterRef={ui.tableCenterRef}
-        sceneScrollRef={sceneScrollRef}
+        viewportRef={viewportRef}
+        boardRef={boardRef}
+        panControls={panControls}
+        panConstraints={panConstraints}
+        isMobile={ui.isMobile}
         distributed={distributed}
         otherPlayers={otherPlayers}
         renderChip={renderChip}
@@ -493,12 +512,12 @@ export function OnlinePlayerUI({
 
       <FloatingControls
         voice={voice}
-        onCentralize={ui.scrollToCenter}
+        onCentralize={recenter}
         onOpenChat={openChat}
         chatUnread={chatUnread}
         onOpenSettings={() => setSettingsOpen(true)}
         onOpenLeaderboard={roomState?.groupId ? () => setLeaderboardOpen(true) : undefined}
-        scrollable={sceneScrollable}
+        scrollable={pannable}
         leaveDisabled={isMyTurn && isPlaying && !isEliminated}
         onLeaveTable={() => {
           if (isMyTurn && isPlaying && !isEliminated) return;
