@@ -36,6 +36,70 @@ function resume(ctx) {
   if (ctx && ctx.state === 'suspended') ctx.resume().catch(() => {});
 }
 
+// ─── Master output bus (volume + peak limiter) ──────────────────────────────────
+// Everything routes through one master gain → soft limiter → speakers. The gain
+// makes the whole mix noticeably louder; the DynamicsCompressor catches peaks so
+// stacked cues (clunk + boom + bed) don't clip/distort. Created once per context.
+// NOTE: uses ctx['destination'] (bracket form) so the blanket replace of
+// `ctx.destination` → masterOut(ctx) elsewhere never rewrites this line.
+const MASTER_GAIN = 2.1;
+function masterOut(ctx) {
+  if (!ctx.__bluffMaster) {
+    const comp = ctx.createDynamicsCompressor();
+    comp.threshold.value = -9;
+    comp.knee.value = 14;
+    comp.ratio.value = 8;
+    comp.attack.value = 0.003;
+    comp.release.value = 0.25;
+    const g = ctx.createGain();
+    g.gain.value = MASTER_GAIN;
+    g.connect(comp);
+    comp.connect(ctx['destination']);
+    ctx.__bluffMaster = g;
+  }
+  return ctx.__bluffMaster;
+}
+
+// ─── Mobile/iOS audio unlock ────────────────────────────────────────────────────
+// Mobile browsers keep the AudioContext suspended until it is resumed *inside* a
+// user gesture, and iOS additionally needs a silent buffer played once to unlock
+// Web Audio. We install capture-phase listeners on the first real gesture that
+// resume + play a 1-sample silent buffer, then self-remove once running. Also
+// re-resume when the tab returns to the foreground (iOS suspends on background).
+let _unlockInstalled = false;
+function _unlockAudio() {
+  const ctx = getCtx();
+  if (!ctx) return;
+  resume(ctx);
+  try {
+    const buf = ctx.createBuffer(1, 1, 22050);
+    const src = ctx.createBufferSource();
+    src.buffer = buf;
+    src.connect(ctx['destination']);
+    src.start(0);
+  } catch (_) {}
+}
+function installAudioUnlock() {
+  if (typeof window === 'undefined' || typeof document === 'undefined' || _unlockInstalled) return;
+  _unlockInstalled = true;
+  const events = ['touchstart', 'touchend', 'pointerdown', 'mousedown', 'keydown', 'click'];
+  const handler = () => {
+    _unlockAudio();
+    const ctx = getCtx();
+    if (ctx && ctx.state === 'running') {
+      try { _musicStart(); } catch (_) {}
+      events.forEach((e) => document.removeEventListener(e, handler, true));
+    }
+  };
+  events.forEach((e) => document.addEventListener(e, handler, true));
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'visible') {
+      const ctx = getCtx();
+      if (ctx) resume(ctx);
+    }
+  });
+}
+
 // ─── One-shot sound primitives ────────────────────────────────────────────────
 
 // Wood knock — card play
@@ -45,7 +109,7 @@ function playCardSound(ctx) {
   const osc = ctx.createOscillator();
   const gain = ctx.createGain();
   osc.connect(gain);
-  gain.connect(ctx.destination);
+  gain.connect(masterOut(ctx));
   osc.type = 'sine';
   osc.frequency.setValueAtTime(180, now);
   osc.frequency.exponentialRampToValueAtTime(60, now + 0.08);
@@ -63,7 +127,7 @@ function playBluffSound(ctx) {
     const osc = ctx.createOscillator();
     const gain = ctx.createGain();
     osc.connect(gain);
-    gain.connect(ctx.destination);
+    gain.connect(masterOut(ctx));
     osc.type = 'sine';
     osc.frequency.value = freq;
     const start = now + i * 0.04;
@@ -98,7 +162,7 @@ function playSpinSound(ctx) {
   nGain.gain.setValueAtTime(0.0001, now);
   nGain.gain.linearRampToValueAtTime(0.05, now + 0.08);
   nGain.gain.exponentialRampToValueAtTime(0.001, now + 0.34);
-  noise.connect(lp); lp.connect(nGain); nGain.connect(ctx.destination);
+  noise.connect(lp); lp.connect(nGain); nGain.connect(masterOut(ctx));
   noise.start(now);
 
   // Rising major arpeggio — warm bells of relief.
@@ -116,7 +180,7 @@ function playSpinSound(ctx) {
     gain.gain.setValueAtTime(0.0001, t);
     gain.gain.exponentialRampToValueAtTime(g, t + 0.02);
     gain.gain.exponentialRampToValueAtTime(0.001, t + 0.5);
-    osc.connect(gain); harm.connect(gain); gain.connect(ctx.destination);
+    osc.connect(gain); harm.connect(gain); gain.connect(masterOut(ctx));
     osc.start(t); harm.start(t);
     osc.stop(t + 0.55); harm.stop(t + 0.55);
   });
@@ -132,7 +196,7 @@ function playWinSound(ctx) {
         const osc = ctx.createOscillator();
         const gain = ctx.createGain();
         osc.connect(gain);
-        gain.connect(ctx.destination);
+        gain.connect(masterOut(ctx));
         osc.type = 'triangle';
         osc.frequency.value = freq;
         const t = now + ci * 0.22;
@@ -161,7 +225,7 @@ function playEliminateSound(ctx) {
   boom.frequency.exponentialRampToValueAtTime(28, now + 0.5);
   boomGain.gain.setValueAtTime(0.3, now);
   boomGain.gain.exponentialRampToValueAtTime(0.001, now + 0.6);
-  boom.connect(boomGain); boomGain.connect(ctx.destination);
+  boom.connect(boomGain); boomGain.connect(masterOut(ctx));
   boom.start(now); boom.stop(now + 0.65);
 
   // Hollow funeral-bell toll — dull, slightly detuned partials.
@@ -174,7 +238,7 @@ function playEliminateSound(ctx) {
     gain.gain.setValueAtTime(0.0001, now + 0.04);
     gain.gain.exponentialRampToValueAtTime(g, now + 0.09);
     gain.gain.exponentialRampToValueAtTime(0.001, now + 1.4);
-    osc.connect(gain); gain.connect(ctx.destination);
+    osc.connect(gain); gain.connect(masterOut(ctx));
     osc.start(now + 0.04); osc.stop(now + 1.45);
   });
 
@@ -187,7 +251,7 @@ function playEliminateSound(ctx) {
   fallGain.gain.setValueAtTime(0.0001, now + 0.5);
   fallGain.gain.exponentialRampToValueAtTime(0.1, now + 0.56);
   fallGain.gain.exponentialRampToValueAtTime(0.001, now + 1.5);
-  fall.connect(fallGain); fallGain.connect(ctx.destination);
+  fall.connect(fallGain); fallGain.connect(masterOut(ctx));
   fall.start(now + 0.5); fall.stop(now + 1.55);
 }
 
@@ -259,7 +323,7 @@ function playSpinClick(ctx) {
   gain.gain.exponentialRampToValueAtTime(0.001, now + 0.015);
   src.connect(bp);
   bp.connect(gain);
-  gain.connect(ctx.destination);
+  gain.connect(masterOut(ctx));
   src.start(now);
 }
 
@@ -270,7 +334,7 @@ function playSpinClunk(ctx) {
   const osc = ctx.createOscillator();
   const gain = ctx.createGain();
   osc.connect(gain);
-  gain.connect(ctx.destination);
+  gain.connect(masterOut(ctx));
   osc.type = 'sine';
   osc.frequency.setValueAtTime(95, now);
   osc.frequency.exponentialRampToValueAtTime(30, now + 0.15);
@@ -364,7 +428,7 @@ function _ensureMusicEngine() {
   warmth.frequency.value = 1500;
   warmth.Q.value = 0.5;
   warmth.connect(musicGain);
-  musicGain.connect(ctx.destination);
+  musicGain.connect(masterOut(ctx));
 
   // Drone bus (steady) + pad bus (breathing) both feed the warmth filter.
   const droneBus = ctx.createGain();
@@ -409,6 +473,9 @@ function _ensureMusicEngine() {
 }
 
 function _musicStart() {
+  // Arm the mobile/iOS unlock so the first real gesture resumes + unlocks audio
+  // for BOTH the bed and the game cues (they share one context).
+  installAudioUnlock();
   const m = _ensureMusicEngine();
   if (!m) return;
   resume(m.ctx);
