@@ -26,6 +26,16 @@ To change a track, drop a file here and update its path in `MUSIC_SECTIONS`.
   lobby: ['/audio/BLUFF Tavern.mp3', '/audio/Nordic Hums.mp3'],
   ```
 
+## Resume on return
+Leaving a section remembers its spot (which track + how far in) and **resumes
+there** when you come back — you rejoin the music where you left it, not at the
+top. (Single-track sections that have looped simply continue.)
+
+## Group rooms
+A group room's **lobby** stays on the `groups` track — it does **not** switch to
+the normal `lobby` track. It only moves to `game` once the match actually starts,
+then `gameover` at the end.
+
 ## Notes
 - Plays at ~28% volume and auto-ducks when a sound cue fires. Tune
   `MUSIC_BASE_VOL` in `useAtmosphere.js`.

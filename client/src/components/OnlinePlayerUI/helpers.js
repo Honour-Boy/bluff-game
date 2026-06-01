@@ -61,6 +61,57 @@ export const GAME_UI_STYLE = `
     animation: cardPlayPhysics 0.45s cubic-bezier(0.22,1,0.36,1) forwards;
   }
 
+  /* ── The real oval card table ────────────────────────────────────────────
+     A dark plank floor (.tavern-floor) holds an elliptical table built from
+     nested layers: a carved-wood RAIL, a ring of brass STUDS, the green FELT
+     (recessed under the rail with an inner shadow), and a stitched edge. All
+     decorative + pointer-events:none; the seats and play area render on top. */
+  .tavern-floor {
+    position: relative;
+    background:
+      radial-gradient(ellipse 92% 72% at 50% 42%, rgba(52,34,20,0.55) 0%, rgba(14,10,7,0.92) 66%, #090605 100%),
+      repeating-linear-gradient(91deg, #16110c 0px, #16110c 46px, #110c08 46px, #110c08 48px);
+  }
+  .poker-table-oval {
+    position: absolute;
+    inset: 4.5% 3% 3% 3%;
+    border-radius: 50%;
+    background:
+      radial-gradient(ellipse at 50% -8%, rgba(214,158,70,0.18) 0%, transparent 55%),
+      linear-gradient(180deg, #3e2817 0%, #2b1910 44%, #1c0f09 100%);
+    border: 1px solid rgba(120,80,40,0.5);
+    box-shadow:
+      0 40px 74px rgba(0,0,0,0.72),
+      inset 0 2px 5px rgba(255,210,140,0.16),
+      inset 0 -12px 34px rgba(0,0,0,0.6);
+    pointer-events: none;
+  }
+  .poker-table-studs {
+    position: absolute;
+    inset: 7px;
+    border-radius: 50%;
+    border: 3px dotted rgba(198,152,76,0.5);
+    box-shadow: 0 0 9px rgba(198,152,76,0.18);
+    pointer-events: none;
+  }
+  .poker-table-felt {
+    position: absolute;
+    inset: 18px;
+    border-radius: 50%;
+    background:
+      radial-gradient(ellipse 56% 44% at 50% 38%, rgba(220,164,76,0.18) 0%, rgba(220,164,76,0.05) 42%, transparent 72%),
+      radial-gradient(ellipse 82% 72% at 50% 50%, #2f5e3f 0%, #245132 36%, #18391f 64%, #0e2415 84%, #0a1a10 100%);
+    box-shadow: inset 0 0 56px rgba(0,0,0,0.55), inset 0 7px 24px rgba(0,0,0,0.45);
+    pointer-events: none;
+  }
+  .poker-table-stitch {
+    position: absolute;
+    inset: 9px;
+    border-radius: 50%;
+    border: 1px dashed rgba(232,216,184,0.16);
+    pointer-events: none;
+  }
+
   @media (max-width: 640px) {
     .topdown-middle { gap: 6px !important; }
     .topdown-side { max-height: 48vh !important; }
@@ -69,6 +120,8 @@ export const GAME_UI_STYLE = `
       height: 88px !important;
       padding: 5px !important;
     }
+    .poker-table-oval { inset: 2.5% 1% 1.5% 1%; }
+    .poker-table-felt { inset: 14px; }
   }
 `;
 

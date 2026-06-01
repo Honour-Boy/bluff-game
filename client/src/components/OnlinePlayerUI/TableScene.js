@@ -1,8 +1,12 @@
 import { CenterTablePanel } from './CenterTablePanel';
 
-// ─── TableScene — the dark wood poker table, top-down view ────────────────────
-// The table surface is rendered as a radial felt-green oval surrounded by a
-// dark mahogany rail. Players sit around it as carved wooden chips.
+// ─── TableScene — a real oval card table, top-down ───────────────────────────
+// A dark plank floor holds an elliptical table: a carved-wood rail, a ring of
+// brass studs, and a recessed green felt with a stitched edge (all built in CSS,
+// see .tavern-floor / .poker-table-* in helpers.js). The seats (player chips)
+// and the centre play area render ON TOP of the felt in a relative grid, so the
+// players read as seated around the rail with the dealer's tray sunk into the
+// middle of the cloth.
 export function TableScene({
   tableCenterRef,
   distributed,
@@ -37,129 +41,123 @@ export function TableScene({
 }) {
   return (
     <div
-      className="topdown-table-scene"
+      className="topdown-table-scene tavern-floor"
       style={{
         flex: 1,
         position: 'relative',
-        /* Warm candle-lit felt: a soft gold light pool over a forest-green
-           surface (warmed off the old teal so it sits with the tavern wood +
-           gold), brightening toward the middle then fading to deep wood. */
-        background: `
-          radial-gradient(
-            ellipse 50% 38% at 50% 44%,
-            rgba(200,146,46,0.12) 0%,
-            rgba(200,146,46,0.04) 45%,
-            transparent 72%
-          ),
-          radial-gradient(
-            ellipse 72% 58% at 50% 48%,
-            #275437 0%,
-            #1c4029 38%,
-            #122c1c 64%,
-            #0a1a11 82%,
-            transparent 100%
-          )
-        `,
+        overflow: 'hidden',
+        minHeight: '64vh',
         padding: '0 6px',
       }}
     >
-      {/* Top row of player chips */}
-      <div
-        className="topdown-top"
-        style={{
-          minHeight: '22vh',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          flexWrap: 'wrap',
-          gap: 8,
-          padding: '10px 4px 4px',
-        }}
-      >
-        {distributed.top.length > 0 ? (
-          distributed.top.map(renderChip)
-        ) : (
-          <div style={{
-            fontFamily: "'Cinzel', serif",
-            fontSize: 9,
-            color: 'var(--text-dim)',
-            letterSpacing: '0.16em',
-            textTransform: 'uppercase',
-            opacity: 0.5,
-          }}>
-            {otherPlayers.length === 0 ? 'Awaiting players…' : ''}
-          </div>
-        )}
+      {/* ── The table itself (decorative): rail → studs → felt → stitching ── */}
+      <div className="poker-table-oval" aria-hidden="true">
+        <div className="poker-table-studs" />
+        <div className="poker-table-felt">
+          <div className="poker-table-stitch" />
+        </div>
       </div>
 
-      {/* Middle: left chips | center panel | right chips */}
-      <div
-        className="topdown-middle"
-        style={{
-          display: 'grid',
-          gridTemplateColumns: 'auto 1fr auto',
-          gap: 10,
-          alignItems: 'center',
-          minHeight: '46vh',
-          padding: '4px 0',
-        }}
-      >
+      {/* ── Seats + play area, layered on top of the felt ── */}
+      <div style={{ position: 'relative', zIndex: 1, display: 'flex', flexDirection: 'column' }}>
+        {/* Top row of player chips — seated along the far rail */}
         <div
-          className="topdown-side"
+          className="topdown-top"
           style={{
+            minHeight: '22vh',
             display: 'flex',
-            flexDirection: 'column',
+            alignItems: 'center',
+            justifyContent: 'center',
             flexWrap: 'wrap',
             gap: 8,
-            maxHeight: '46vh',
-            alignContent: 'flex-start',
+            padding: '14px 4px 4px',
           }}
         >
-          {distributed.left.map(renderChip)}
+          {distributed.top.length > 0 ? (
+            distributed.top.map(renderChip)
+          ) : (
+            <div style={{
+              fontFamily: "'Cinzel', serif",
+              fontSize: 9,
+              color: 'var(--text-dim)',
+              letterSpacing: '0.16em',
+              textTransform: 'uppercase',
+              opacity: 0.5,
+            }}>
+              {otherPlayers.length === 0 ? 'Awaiting players…' : ''}
+            </div>
+          )}
         </div>
 
-        <CenterTablePanel
-          tableCenterRef={tableCenterRef}
-          isPlaying={isPlaying}
-          isSpinPending={isSpinPending}
-          isRoundEnd={isRoundEnd}
-          isGameOver={isGameOver}
-          isLobby={isLobby}
-          deckSize={deckSize}
-          currentCardType={currentCardType}
-          playedPileSize={playedPileSize}
-          alivePlayers={alivePlayers}
-          isHost={isHost}
-          roomState={roomState}
-          updateRoomConfig={updateRoomConfig}
-          startGame={startGame}
-          getGroupLeaderboard={getGroupLeaderboard}
-          leaderboardUpdateNonce={leaderboardUpdateNonce}
-          myPlayer={myPlayer}
-          lastAction={lastAction}
-          displayedLastAction={displayedLastAction}
-          isMySpinTurn={isMySpinTurn}
-          isEliminated={isEliminated}
-          playerSpin={playerSpin}
-          spinTargetPlayer={spinTargetPlayer}
-          restartRoom={restartRoom}
-          leaveGame={leaveGame}
-          isMyTurn={isMyTurn}
-          currentPlayer={currentPlayer}
-        />
-
+        {/* Middle: left chips | centre tray | right chips */}
         <div
-          className="topdown-side"
+          className="topdown-middle"
           style={{
-            display: 'flex',
-            flexDirection: 'column',
-            flexWrap: 'wrap',
-            gap: 8,
-            maxHeight: '46vh',
-            alignContent: 'flex-start',
+            display: 'grid',
+            gridTemplateColumns: 'auto 1fr auto',
+            gap: 10,
+            alignItems: 'center',
+            minHeight: '42vh',
+            padding: '4px 0',
           }}
         >
-          {distributed.right.map(renderChip)}
+          <div
+            className="topdown-side"
+            style={{
+              display: 'flex',
+              flexDirection: 'column',
+              flexWrap: 'wrap',
+              gap: 8,
+              maxHeight: '42vh',
+              alignContent: 'flex-start',
+            }}
+          >
+            {distributed.left.map(renderChip)}
+          </div>
+
+          <CenterTablePanel
+            tableCenterRef={tableCenterRef}
+            isPlaying={isPlaying}
+            isSpinPending={isSpinPending}
+            isRoundEnd={isRoundEnd}
+            isGameOver={isGameOver}
+            isLobby={isLobby}
+            deckSize={deckSize}
+            currentCardType={currentCardType}
+            playedPileSize={playedPileSize}
+            alivePlayers={alivePlayers}
+            isHost={isHost}
+            roomState={roomState}
+            updateRoomConfig={updateRoomConfig}
+            startGame={startGame}
+            getGroupLeaderboard={getGroupLeaderboard}
+            leaderboardUpdateNonce={leaderboardUpdateNonce}
+            myPlayer={myPlayer}
+            lastAction={lastAction}
+            displayedLastAction={displayedLastAction}
+            isMySpinTurn={isMySpinTurn}
+            isEliminated={isEliminated}
+            playerSpin={playerSpin}
+            spinTargetPlayer={spinTargetPlayer}
+            restartRoom={restartRoom}
+            leaveGame={leaveGame}
+            isMyTurn={isMyTurn}
+            currentPlayer={currentPlayer}
+          />
+
+          <div
+            className="topdown-side"
+            style={{
+              display: 'flex',
+              flexDirection: 'column',
+              flexWrap: 'wrap',
+              gap: 8,
+              maxHeight: '42vh',
+              alignContent: 'flex-start',
+            }}
+          >
+            {distributed.right.map(renderChip)}
+          </div>
         </div>
       </div>
     </div>

@@ -86,10 +86,17 @@ function HomeContent() {
   // _setSection arms the mobile autoplay unlock, so no explicit gesture
   // listener is needed here. Muteable from the settings gear.
   const { musicEnabled, toggleMusic, setSection } = useMusic();
+  // A group room's lobby belongs to the Groups area — keep it on the GROUPS
+  // track instead of switching to the normal online-lobby sound. It only moves
+  // to 'game' once the match actually starts (phase leaves lobby), and to
+  // 'gameover' at the end.
+  const inGroupRoom = !!roomState?.groupId;
   const musicSection = roomCode
     ? (roomState?.phase === 'game_over'
         ? 'gameover'
-        : (roomState?.phase && roomState.phase !== 'lobby') ? 'game' : 'lobby')
+        : (roomState?.phase && roomState.phase !== 'lobby')
+            ? 'game'
+            : (inGroupRoom ? 'groups' : 'lobby'))
     : (homeView === 'groups' || homeView === 'group') ? 'groups' : 'lobby';
   useEffect(() => {
     setSection(musicSection);

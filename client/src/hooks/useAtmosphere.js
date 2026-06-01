@@ -349,9 +349,11 @@ function playSpinClunk(ctx) {
 // Each app SECTION has its own track(s). Moving to a new section stops the old
 // track and starts the new one. A section with ONE track loops; a section with
 // TWO+ plays them in sequence and loops the sequence (assign two if you don't
-// want a single track to simply repeat). Subtle volume, auto-ducks under cues,
-// muteable, mobile-unlocked. Drop files in client/public/audio/ (see README);
-// a missing file for a section just leaves it silent — cues still play.
+// want a single track to simply repeat). Leaving a section REMEMBERS its spot
+// (track index + elapsed time) and RESUMES there on return — you come back to
+// the music where you left it, not at the top. Subtle volume, auto-ducks under
+// cues, muteable, mobile-unlocked. Drop files in client/public/audio/ (see
+// README); a missing file for a section just leaves it silent — cues still play.
 const MUSIC_SECTIONS = {
   lobby:    ['/audio/BLUFF Tavern.mp3'],                              // landing + setup + in-room lobby
   game:     ['/audio/Nordic Hums.mp3', '/audio/Call It Bluff.mp3'],  // active game (two tracks → alternate)
@@ -411,6 +413,13 @@ function _ensureTrack() {
     raf: 0,
     duckTimer: null,
     switchTimer: null,
+    // Per-section playback memory so re-entering a section resumes where it
+    // stopped: { [sectionName]: { idx, time } }. Plus the src we actually have
+    // loaded (so we never reset currentTime by re-assigning the same src) and a
+    // resume time deferred while muted.
+    positions: {},
+    loadedSrc: null,
+    pendingResume: 0,
   };
   // For a multi-track section, advance to the next track when one finishes
   // (single-track sections use native looping and never fire 'ended').
@@ -424,10 +433,29 @@ function _ensureTrack() {
   return t;
 }
 
-function _playCurrent(t) {
+function _playCurrent(t, resumeTime = 0) {
   const src = t.queue[t.idx];
   if (!src) return;
-  try { t.audio.src = encodeURI(src); } catch (_) { return; }
+  const encoded = encodeURI(src);
+  // Only (re)assign src when it actually changes — assigning the same URL resets
+  // currentTime to 0, which would defeat "resume where I stopped".
+  if (t.loadedSrc !== encoded) {
+    try { t.audio.src = encoded; } catch (_) { return; }
+    t.loadedSrc = encoded;
+    if (resumeTime > 0) {
+      // The element needs metadata before it can seek; do it once it's ready.
+      const seek = () => {
+        try {
+          if (!t.audio.duration || resumeTime < t.audio.duration) t.audio.currentTime = resumeTime;
+        } catch (_) {}
+      };
+      t.audio.addEventListener('loadedmetadata', seek, { once: true });
+    }
+  } else if (resumeTime > 0) {
+    try {
+      if (!t.audio.duration || resumeTime < t.audio.duration) t.audio.currentTime = resumeTime;
+    } catch (_) {}
+  }
   t.audio.loop = t.queue.length === 1; // one track loops; many cycle via 'ended'
   const p = t.audio.play();            // must run in a gesture on mobile
   if (p && p.catch) p.catch(() => {});
@@ -444,26 +472,38 @@ function _setSection(name) {
     if (!t.muted && t.audio.paused && t.queue.length) _playCurrent(t);
     return;
   }
+  // Remember where the OUTGOING section left off so we can resume it on return.
+  if (t.section && t.queue.length) {
+    t.positions[t.section] = { idx: t.idx, time: t.audio.currentTime || 0 };
+  }
   t.section = name;
   t.queue = MUSIC_SECTIONS[name] || [];
-  t.idx = 0;
+  // Restore this section's saved spot (track index + elapsed time) if we've
+  // been here before; otherwise start fresh at the top.
+  const saved = t.positions[name];
+  t.idx = saved ? Math.min(saved.idx || 0, Math.max(0, t.queue.length - 1)) : 0;
+  const resumeTime = saved ? (saved.time || 0) : 0;
   clearTimeout(t.switchTimer);
   if (t.queue.length === 0) {
     _tweenVol(t, 0, 250);
     t.switchTimer = setTimeout(() => { try { t.audio.pause(); } catch (_) {} }, 280);
     return;
   }
-  if (t.muted) { t.audio.loop = t.queue.length === 1; return; }
-  // Quick fade-out of the old track, then swap to the new section's first track.
+  if (t.muted) { t.audio.loop = t.queue.length === 1; t.pendingResume = resumeTime; return; }
+  // Quick fade-out of the old track, then swap to the new section — resuming
+  // from where we last heard it.
   _tweenVol(t, 0, 220);
-  t.switchTimer = setTimeout(() => _playCurrent(t), 230);
+  t.switchTimer = setTimeout(() => _playCurrent(t, resumeTime), 230);
 }
 
 // Resume the current section's track (first user gesture / unmute).
 function _musicResume() {
   const t = (typeof window !== 'undefined') ? window.__bluffTrack : null;
   if (!t || t.muted || !t.queue.length) return;
-  if (t.audio.paused) _playCurrent(t);
+  // Honour any resume point deferred while muted, then clear it.
+  const resume = t.pendingResume || 0;
+  t.pendingResume = 0;
+  if (t.audio.paused) _playCurrent(t, resume);
   else _tweenVol(t, MUSIC_BASE_VOL, 400);
 }
 
