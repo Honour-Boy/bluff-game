@@ -19,6 +19,14 @@ export const GAME_UI_STYLE = `
     40%  { transform: translateY(-30px) rotate(-4deg) scale(1.08); opacity: 1; }
     100% { transform: translateY(-80px) rotate(var(--card-land-rot,2deg)) scale(0.92); opacity: 0.85; }
   }
+  /* Card-fly: a fixed clone arcs from the hand to the centre pile, then fades.
+     --fly-dx/--fly-dy are the centre-to-centre delta set inline per flight. */
+  @keyframes cardFly {
+    0%   { transform: translate(0,0) rotate(0deg) scale(1); opacity: 1; }
+    18%  { transform: translate(calc(var(--fly-dx) * 0.12), calc(var(--fly-dy) * 0.12 - 34px)) rotate(-2deg) scale(1.06); opacity: 1; }
+    100% { transform: translate(var(--fly-dx), var(--fly-dy)) rotate(var(--fly-rot, 8deg)) scale(0.46); opacity: 0; }
+  }
+  .card-fly { animation: cardFly 0.62s cubic-bezier(0.45, 0, 0.2, 1) forwards; will-change: transform, opacity; }
   /* Active-turn chip: warm amber candlelight pulse */
   @keyframes chipTurnPulse {
     0%, 100% { box-shadow: 0 0 8px rgba(200,146,46,0.3), 0 2px 8px rgba(0,0,0,0.6); }

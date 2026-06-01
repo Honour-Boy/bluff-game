@@ -1,8 +1,17 @@
+import { useEffect, useRef, useState } from 'react';
 import { ShapeIcon } from '../shared/ShapeIcon';
 import { POWER_META, POWER_ICONS } from '../shared/PowerCard';
 
+const CARD_W = 58;
+const CARD_H = 84;
+
 // ─── Single card — physical card in a wooden cardholder ──────────────────────
-function renderOneCard({ card, index, totalCards, isSelected, isJustPlayed = false, interactive, powerInteractive, onCardClick, onPowerCardClick }) {
+// `arc` (shape fan only): precomputed { angle, scale, z } placing the card on
+// the shared-pivot fan. When null (power slot) the card renders upright in flow.
+function renderOneCard({
+  card, index, isSelected, isJustPlayed = false, interactive, powerInteractive,
+  onCardClick, onPowerCardClick, arc = null,
+}) {
   const isPower = card.type === 'power';
   const isWhot = !isPower && card.shape === 'whot';
   const powerMeta = isPower ? POWER_META[card.power] : null;
@@ -21,13 +30,39 @@ function renderOneCard({ card, index, totalCards, isSelected, isJustPlayed = fal
     else onCardClick && onCardClick(card.id);
   };
 
-  // Fan effect: slight rotation and slight vertical stagger
-  const fanAngle = totalCards > 1
-    ? ((index / (totalCards - 1)) - 0.5) * Math.min(totalCards * 4, 20)
-    : 0;
-  const fanLift = totalCards > 1
-    ? -Math.abs((index / (totalCards - 1)) - 0.5) * 6
-    : 0;
+  // Placement — arc (fan) vs. upright (power slot).
+  let outerStyle;
+  if (arc) {
+    const transform = isSelected
+      ? 'translateY(-26px) scale(1.12)'
+      : `rotate(${arc.angle}deg) scale(${arc.scale})`;
+    outerStyle = {
+      position: 'absolute',
+      left: `calc(50% - ${CARD_W / 2}px)`,
+      bottom: 6,
+      width: CARD_W,
+      height: CARD_H,
+      transformOrigin: 'bottom center',
+      transform: isJustPlayed ? undefined : transform,
+      zIndex: isJustPlayed ? 300 : isSelected ? 200 : arc.z,
+      cursor: cardInteractive ? 'pointer' : 'default',
+      pointerEvents: isArmed ? 'none' : 'auto',
+      transition: isJustPlayed ? 'none' : 'transform 0.22s cubic-bezier(0.22,1,0.36,1)',
+      // base opacity is always 1 — nothing can leave a card stranded invisible
+      opacity: 1,
+    };
+  } else {
+    outerStyle = {
+      position: 'relative',
+      width: CARD_W,
+      height: CARD_H,
+      flexShrink: 0,
+      transform: isSelected ? 'translateY(-10px) scale(1.06)' : undefined,
+      transition: 'transform 0.2s cubic-bezier(0.22,1,0.36,1)',
+      cursor: cardInteractive ? 'pointer' : 'default',
+      pointerEvents: isArmed ? 'none' : 'auto',
+    };
+  }
 
   const borderColor = isPower
     ? powerColor
@@ -37,39 +72,24 @@ function renderOneCard({ card, index, totalCards, isSelected, isJustPlayed = fal
         ? 'var(--accent)'
         : 'var(--border-lit)';
 
-  // Shadow: selected card gets dramatic lift-and-glow
   const boxShadow = isSelected
-    ? '0 16px 32px rgba(0,0,0,0.75), 0 0 18px rgba(200,146,46,0.3)'
+    ? '0 16px 32px rgba(0,0,0,0.75), 0 0 18px rgba(240,181,74,0.32)'
     : isPower
       ? `0 4px 16px rgba(0,0,0,0.5), 0 0 8px ${powerColor}44`
       : isWhot
-        ? '0 4px 16px rgba(0,0,0,0.5), 0 0 8px rgba(200,146,46,0.25)'
+        ? '0 4px 16px rgba(0,0,0,0.5), 0 0 8px rgba(240,181,74,0.25)'
         : '0 4px 12px rgba(0,0,0,0.5)';
-
-  const transform = isSelected
-    ? 'translateY(-22px) rotate(0deg) scale(1.08)'
-    : `translateY(${fanLift}px) rotate(${fanAngle}deg)`;
 
   return (
     <div
       key={card.id}
+      data-card-id={card.id}
       onClick={handleClick}
       title={isArmed ? armedLabel : (isPower && powerMeta ? `${powerMeta.label} — ${powerMeta.flavor}` : undefined)}
       aria-label={isPower && powerMeta ? `Power card: ${powerMeta.label}` : undefined}
       data-armed={isArmed ? 'true' : undefined}
       className={isJustPlayed ? 'card-play-physics' : undefined}
-      style={{
-        position: 'relative',
-        width: 58,
-        height: 84,
-        flexShrink: 0,
-        transform: isJustPlayed ? undefined : transform,
-        zIndex: isJustPlayed ? 200 : isSelected ? 100 : index + 1,
-        cursor: cardInteractive ? 'pointer' : 'default',
-        pointerEvents: isArmed ? 'none' : 'auto',
-        transition: isJustPlayed ? 'none' : 'transform 0.2s cubic-bezier(0.22,1,0.36,1), box-shadow 0.2s ease',
-        transformOrigin: 'bottom center',
-      }}
+      style={outerStyle}
     >
       {/* Card face */}
       <div
@@ -77,8 +97,8 @@ function renderOneCard({ card, index, totalCards, isSelected, isJustPlayed = fal
           width: '100%',
           height: '100%',
           background: isPower
-            ? `linear-gradient(160deg, #1a0e08 0%, #0d0805 55%, #090503 100%)`
-            : `linear-gradient(160deg, #1e1812 0%, #13100c 55%, #0d0a07 100%)`,
+            ? 'linear-gradient(160deg, #1a0e08 0%, #0d0805 55%, #090503 100%)'
+            : 'linear-gradient(160deg, #221a12 0%, #16110b 55%, #0f0b07 100%)',
           border: `2px solid ${borderColor}`,
           borderRadius: 7,
           display: 'flex',
@@ -91,7 +111,6 @@ function renderOneCard({ card, index, totalCards, isSelected, isJustPlayed = fal
           transition: 'opacity 0.15s ease, box-shadow 0.2s ease',
           userSelect: 'none',
           overflow: 'hidden',
-          /* Parchment corner marks */
           position: 'relative',
         }}
       >
@@ -181,7 +200,13 @@ function renderOneCard({ card, index, totalCards, isSelected, isJustPlayed = fal
   );
 }
 
-// ─── CardHand — physical fan in a wooden cardholder ──────────────────────────
+// ─── CardHand — true shared-pivot fan with drag-to-rotate (#4, redone) ────────
+// Shape cards share ONE bottom-centre pivot and splay by rotation — a real
+// semicircle, not a sliding row. Dragging the fan left/right rotates the whole
+// arc so the side cards swing up to the readable centre. Selection is bullet-
+// proof: NO pointer capture (so a tap's click still reaches the card), cards
+// keep base opacity 1 (nothing can strand them invisible), and a real drag is
+// suppressed from also firing a tap via a movement flag.
 export function CardHand({
   hand,
   powerCardSlot = [],
@@ -192,7 +217,21 @@ export function CardHand({
   powerInteractive = undefined,
   justPlayedCardId = null,
 }) {
-  const shapeCards = hand.filter(c => c?.type !== 'power');
+  const shapeCards = hand.filter((c) => c?.type !== 'power');
+  const n = shapeCards.length;
+
+  const MAX_SPREAD = 92;
+  const step = n > 1 ? Math.min(12, MAX_SPREAD / (n - 1)) : 0;
+  const half = (step * (n - 1)) / 2;
+
+  const [rotateOffset, setRotateOffset] = useState(0);
+  // {down, startX, startRot, moved} — moved starts false so the first tap works.
+  const dragRef = useRef({ down: false, startX: 0, startRot: 0, moved: false });
+
+  // Keep the offset within range as the hand grows/shrinks.
+  useEffect(() => {
+    setRotateOffset((o) => Math.max(-half, Math.min(half, o)));
+  }, [half]);
 
   if (shapeCards.length === 0 && powerCardSlot.length === 0) {
     return (
@@ -209,46 +248,69 @@ export function CardHand({
     );
   }
 
+  const draggable = n > 2;
+  const onPointerDown = (e) => {
+    if (!draggable) return;
+    dragRef.current = { down: true, startX: e.clientX, startRot: rotateOffset, moved: false };
+  };
+  const onPointerMove = (e) => {
+    const d = dragRef.current;
+    if (!d.down) return;
+    const dx = e.clientX - d.startX;
+    if (Math.abs(dx) > 6) d.moved = true;
+    setRotateOffset(Math.max(-half, Math.min(half, d.startRot + dx * 0.32)));
+  };
+  const endPointer = () => { dragRef.current.down = false; };
+
+  // A drag must not also select; the moved flag clears on the next pointerdown.
+  const guardedCardClick = (id) => { if (!dragRef.current.moved) onCardClick && onCardClick(id); };
+  const guardedPowerClick = (id) => { if (!dragRef.current.moved) onPowerCardClick && onPowerCardClick(id); };
+
   return (
     <div style={{ display: 'flex', gap: 14, alignItems: 'flex-end', flexWrap: 'wrap' }}>
       {/* Shape cards fan — wooden cardholder trough */}
-      {shapeCards.length > 0 && (
+      {n > 0 && (
         <div style={{
           flex: '1 1 auto',
           minWidth: 0,
-          /* Wooden cardholder trough */
-          background: 'linear-gradient(180deg, rgba(16,10,6,0.0) 0%, rgba(12,8,4,0.7) 100%)',
+          background: 'linear-gradient(180deg, rgba(20,15,9,0.0) 0%, rgba(14,10,6,0.7) 100%)',
           borderTop: '2px solid var(--border-lit)',
           borderRadius: '0 0 6px 6px',
           paddingTop: 6,
           paddingBottom: 4,
-          overflowX: 'auto',
-          WebkitOverflowScrolling: 'touch',
         }}>
-          <div style={{
-            display: 'flex',
-            flexDirection: 'row',
-            alignItems: 'flex-end',
-            justifyContent: 'center',
-            gap: 4,
-            paddingLeft: 10,
-            paddingRight: 10,
-            paddingTop: 26,
-            minWidth: 'max-content',
-          }}>
-            {shapeCards.map((card, index) =>
-              renderOneCard({
+          <div
+            onPointerDown={onPointerDown}
+            onPointerMove={onPointerMove}
+            onPointerUp={endPointer}
+            onPointerLeave={endPointer}
+            onPointerCancel={endPointer}
+            style={{
+              position: 'relative',
+              height: 128,
+              touchAction: 'pan-y',
+              cursor: draggable ? 'grab' : 'default',
+            }}
+          >
+            {shapeCards.map((card, index) => {
+              const angle = (index - (n - 1) / 2) * step + rotateOffset;
+              const centredness = 1 - Math.min(1, Math.abs(angle) / (MAX_SPREAD / 2 + 6));
+              return renderOneCard({
                 card,
                 index,
-                totalCards: shapeCards.length,
                 isSelected: selectedCardId === card.id,
                 isJustPlayed: justPlayedCardId === card.id,
                 interactive,
                 powerInteractive,
-                onCardClick,
-                onPowerCardClick,
-              })
-            )}
+                onCardClick: guardedCardClick,
+                onPowerCardClick: guardedPowerClick,
+                arc: {
+                  angle,
+                  scale: 1 + centredness * 0.06,
+                  z: Math.round(centredness * 100) + 1,
+                },
+              });
+            })}
           </div>
         </div>
       )}
@@ -276,12 +338,12 @@ export function CardHand({
             renderOneCard({
               card,
               index,
-              totalCards: 1,
               isSelected: selectedCardId === card.id,
               interactive,
               powerInteractive,
-              onCardClick,
-              onPowerCardClick,
+              onCardClick: guardedCardClick,
+              onPowerCardClick: guardedPowerClick,
+              arc: null,
             })
           )}
         </div>

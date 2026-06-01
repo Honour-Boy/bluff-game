@@ -21,6 +21,7 @@ export function CoreGameOverlays({
   setWhotPickerCard,
   setSelectedCardId,
   playCardOnline,
+  launchCardFlight,
   justEliminated,
   setJustEliminated,
   showHowToPlay,
@@ -34,6 +35,17 @@ export function CoreGameOverlays({
   bluffBlockedThisTurn,
   setShowTurnModal,
 }) {
+  // Launch a hand→pile card-fly. The hand card element (data-card-id) is still
+  // in the DOM at play time; the discard pile is data-flight-target.
+  const flyToPile = (card) => {
+    if (!launchCardFlight || !card || typeof document === 'undefined') return;
+    const fromEl = document.querySelector(`[data-card-id="${card.id}"]`);
+    const toEl = document.querySelector('[data-flight-target]');
+    if (fromEl && toEl) {
+      launchCardFlight(card, fromEl.getBoundingClientRect(), toEl.getBoundingClientRect());
+    }
+  };
+
   return (
     <>
       <SpinOverlay
@@ -95,6 +107,7 @@ export function CoreGameOverlays({
                   if (pendingCard.shape === 'whot') {
                     setWhotPickerCard(pendingCard.id);
                   } else {
+                    flyToPile(pendingCard);
                     playCardOnline(pendingCard.id);
                     setSelectedCardId(null);
                   }
@@ -152,6 +165,7 @@ export function CoreGameOverlays({
                 <button
                   key={shape}
                   onClick={() => {
+                    flyToPile({ id: whotPickerCard, type: 'shape', shape: 'whot' });
                     playCardOnline(whotPickerCard, shape);
                     setWhotPickerCard(null);
                     setSelectedCardId(null);
