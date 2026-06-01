@@ -353,10 +353,10 @@ function playSpinClunk(ctx) {
 // muteable, mobile-unlocked. Drop files in client/public/audio/ (see README);
 // a missing file for a section just leaves it silent — cues still play.
 const MUSIC_SECTIONS = {
-  lobby:    ['/audio/BLUFF Tavern.mp3'],          // landing + game setup + in-room lobby
-  game:     ['/audio/Gutter-Candle Dread.mp3'],   // active game at the table
-  groups:   ['/audio/Nordic Hums.mp3'],           // the whole Groups area
-  gameover: ['/audio/BLUFF Tavern (1).mp3'],      // after a game ends (results)
+  lobby:    ['/audio/BLUFF Tavern.mp3'],                              // landing + setup + in-room lobby
+  game:     ['/audio/Nordic Hums.mp3', '/audio/Call It Bluff.mp3'],  // active game (two tracks → alternate)
+  groups:   ['/audio/Click_Clack_Spin.mp3'],                         // the whole Groups area
+  gameover: ['/audio/Gutter-Candle Dread.mp3'],                      // after a game ends (results)
 };
 const MUSIC_BASE_VOL = 0.28;  // subtle bed level (0–1)
 const MUSIC_DUCK_VOL = 0.08;  // ducked level while a cue plays
