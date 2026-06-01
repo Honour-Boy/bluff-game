@@ -222,6 +222,16 @@ export function useGameActions({
     });
   }, [failError, roomCode, socket]);
 
+  // Group host: reset a (possibly remote) room by its cipher — boots everyone
+  // and tears the live room down so the next join rebuilds a fresh lobby with
+  // the same code. Called from the group detail screen, so it takes an explicit
+  // code rather than relying on the active roomCode. Resolves with the ack.
+  const resetRoom = useCallback((code) => {
+    const target = (code || roomCode || '').toUpperCase();
+    if (!target) return Promise.resolve({ success: false, error: 'No room code' });
+    return emitPromiseAction(socket, 'reset_room', { roomCode: target }, failError);
+  }, [failError, roomCode, socket]);
+
   // §3.4 — empty-hand recovery. Re-pull authoritative state (with myHand) when a
   // deal/state packet was dropped. Fire-and-forget and idempotent: the server
   // just re-emits room_state to this socket; never blocks or mutates anything.
@@ -266,6 +276,7 @@ export function useGameActions({
     closeChat,
     leaveGame,
     restartRoom,
+    resetRoom,
     refreshRoomState,
   };
 }
