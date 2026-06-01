@@ -57,7 +57,13 @@ export function PlayerList({ players, turnOrder, currentPlayerId, isHost, phase,
               color: isCurrent && isAlive ? '#0a0a0b' : 'var(--text-dim)',
               flexShrink: 0,
             }}>
-              {isAlive ? turnPosition + 1 : '✕'}
+              {isAlive ? turnPosition + 1 : (
+                /* Inline SVG ✕ — the text glyph silently fails to render in
+                   several of the app's display fonts (see CloseIcon). */
+                <svg width="11" height="11" viewBox="0 0 24 24" fill="none" aria-label="Eliminated" role="img">
+                  <path d="M6 6l12 12M18 6 6 18" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" />
+                </svg>
+              )}
             </div>
 
             {/* Player name + status */}
