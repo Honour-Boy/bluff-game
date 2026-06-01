@@ -19,6 +19,49 @@ import { SettingsGear } from '../components/shared/SettingsGear';
 import { ChatPanel } from '../components/ChatPanel';
 import { useIsMobile } from '../hooks/useIsMobile';
 
+// §M4 — non-blocking "reconnecting" pill shown while the socket is down but the
+// player is still in a room. Sits top-centre, above the table; the resilient
+// rejoin in useGame restores state automatically once the transport recovers.
+function ReconnectingBanner() {
+  return (
+    <div
+      role="status"
+      aria-live="polite"
+      style={{
+        position: 'fixed',
+        top: 12,
+        left: '50%',
+        transform: 'translateX(-50%)',
+        zIndex: 9999,
+        display: 'flex',
+        alignItems: 'center',
+        gap: 8,
+        padding: '7px 14px',
+        borderRadius: 999,
+        background: 'rgba(16,12,8,0.95)',
+        border: '1px solid var(--warning)',
+        color: 'var(--warning)',
+        fontSize: 11,
+        fontFamily: "'Space Mono', monospace",
+        letterSpacing: '0.08em',
+        boxShadow: '0 4px 20px rgba(0,0,0,0.55)',
+        pointerEvents: 'none',
+      }}
+    >
+      <span
+        style={{
+          width: 8,
+          height: 8,
+          borderRadius: '50%',
+          background: 'var(--warning)',
+          animation: 'pulse 1.2s ease-in-out infinite',
+        }}
+      />
+      Reconnecting…
+    </div>
+  );
+}
+
 // Inner component that safely calls useSearchParams inside a Suspense boundary
 function HomeContent() {
   const searchParams = useSearchParams();
@@ -398,6 +441,10 @@ function HomeContent() {
       ? { height: '100dvh', overflow: 'hidden', position: 'relative' }
       : { minHeight: '100vh', padding: '24px 16px' }}>
       <Notification notification={notification} />
+      {/* §M4 — in-room reconnect indicator. While the socket is down but we're
+          still in a room, show a non-blocking banner instead of freezing or
+          bouncing to the landing screen; useGame's resilient rejoin recovers us. */}
+      {roomCode && !connected && <ReconnectingBanner />}
       {children}
       {/* Global identity / settings gear — present on every signed-in screen
           (landing, groups, in-game). Holds username, music toggle, profile,

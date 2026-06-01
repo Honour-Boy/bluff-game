@@ -188,6 +188,12 @@ export function useAuth() {
       // the first one ever (handles sign-out → sign-in resets).
       if (_event === 'SIGNED_IN') writeLoginAt();
       const u = session?.user ?? null;
+      // §M4.2 — router isolation. A transient null session (e.g. a
+      // TOKEN_REFRESHED that briefly fails during a network blip) must NOT flip
+      // `user` to null, because page.js would unmount the in-room view into the
+      // AuthScreen — exactly the mid-game "kicked to login/landing" bounce we're
+      // eliminating. Only an explicit SIGNED_OUT clears the user.
+      if (!u && _event !== 'SIGNED_OUT') return;
       setUser(u);
       if (u) {
         clearGuestFromStorage();

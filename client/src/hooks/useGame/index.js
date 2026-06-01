@@ -6,6 +6,7 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { getSocket } from '../../lib/socket';
+import { clearRoomSession } from '../../lib/sessionStore';
 import { useGameBrowserEffects, useSocketAuthenticationEffect } from './browserEffects';
 import { useGameActions } from './gameActions';
 import { useGroupActions } from './groupActions';
@@ -113,13 +114,18 @@ export function useGame(getAccessToken, getGuestAuth, authIdentityKey = null) {
     notify(msg, 'error');
     // §2.3 — if the server says the room is gone, never leave the player stuck
     // in a frozen in-room view. Force the same local teardown + redirect to the
-    // dashboard that an explicit leave does (the socket is fine; only the room
-    // vanished — e.g. host left, inactivity sweep, server restart).
-    if (/room not found/i.test(msg)) {
-      try { sessionStorage.removeItem('bluff_session'); } catch (_) { /* non-fatal */ }
+    // dashboard that an explicit leave does (the room vanished — e.g. host left,
+    // inactivity sweep, server restart).
+    // §M4 — but ONLY while the socket is actually connected. During a transient
+    // network drop a stale/queued ack can arrive as "room not found" before the
+    // reconnect flow finishes rejoining; tearing down then would wrongly bounce
+    // the player to the landing screen. While disconnected we keep the session
+    // and let onConnect's resilient rejoin recover us instead.
+    if (/room not found/i.test(msg) && socket.connected) {
+      clearRoomSession();
       clearSession();
     }
-  }, [notify, clearSession]);
+  }, [notify, clearSession, socket]);
 
   const authenticateSocket = useCallback(() => {
     return new Promise(async (resolve) => {
