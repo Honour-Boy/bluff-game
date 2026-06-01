@@ -424,6 +424,69 @@ function register(io, socket, deps) {
       callback?.({ success: false, error: err.message });
     }
   });
+
+  // ─── GROUP HOST: Reset the room (boot everyone, fresh table, same cipher) ──
+  // Triggered from the group's detail screen. Tears the live in-memory room
+  // down and boots every connected participant back to the landing screen. The
+  // group's permanent cipher (code) is untouched — the next join rebuilds a
+  // clean lobby from the DB-backed group (settings + leaderboard live in the
+  // DB, so they survive). Only the group host-of-record may do this.
+  socket.on('reset_room', async ({ roomCode } = {}, callback) => {
+    if (!socket.userId) return callback?.({ success: false, error: 'Not authenticated' });
+    try {
+      const code = roomCode?.toUpperCase();
+      if (!code) return callback?.({ success: false, error: 'Room not found' });
+
+      const group = await groupsRepo.getActiveGroupByCode(code);
+      if (!group) return callback?.({ success: false, error: 'No such group room' });
+      if (group.host_user_id !== socket.userId) {
+        return callback?.({ success: false, error: 'Only the host can reset the room' });
+      }
+
+      const room = await getRoom(code);
+      if (!room) {
+        // Nothing live to reset — the next join already builds a fresh lobby.
+        return callback?.({ success: true, roomClosed: true });
+      }
+
+      _clearBettingTimer(code);
+      _clearGhostVoteTimer(code);
+      _clearPreGameTimer(code);
+      _clearSpinPendingTimer(code);
+      _clearGameOverTimer(code);
+      _clearRedemptionTimer(code);
+      _clearSpeedModeTimer(code);
+      discardLobbyIdleState(code);
+
+      // Boot everyone in the live room back to landing (mirrors game_ended).
+      io.to(code).emit('game_ended', { reason: 'The host reset the room.' });
+      io.in(code).socketsLeave(code);
+
+      // §3.3 — clear the directory's occupancy badge for this group.
+      if (room.groupId) {
+        io.to(`group:${room.groupId}`).emit('group_room_status', {
+          groupId: room.groupId,
+          code,
+          playerCount: 0,
+          phase: 'closed',
+          inLobby: false,
+          players: [],
+        });
+      }
+
+      logRoomDeletion(code, 'host_reset', {
+        phase: room.phase,
+        groupId: room.groupId || undefined,
+        rebuildable: true,
+      });
+      rooms.delete(code);
+      console.log(`[Room ${code}] Reset by group host (${socket.username}) — all booted, room torn down (rebuildable).`);
+      callback?.({ success: true, roomClosed: true });
+    } catch (err) {
+      console.error('[reset_room]', err.message);
+      callback?.({ success: false, error: err.message });
+    }
+  });
 }
 
 module.exports = { register };

@@ -75,11 +75,15 @@ export function GroupDetailScreen({
   onDeleteGroup,
   onLeaveGroup,
   onRevokeInvite,
+  onResetRoom,
   onRefresh,
 }) {
   const [inviteIdentifier, setInviteIdentifier] = useState('');
   const [busyAction, setBusyAction] = useState(null);
   const [copied, setCopied] = useState(false);
+  const [resetting, setResetting] = useState(false);
+  const [confirmReset, setConfirmReset] = useState(false);
+  const [resetMsg, setResetMsg] = useState('');
 
   const isHost = group?.role === 'host';
   const ownerUserId = group?.ownerUserId || null;
@@ -163,6 +167,19 @@ export function GroupDetailScreen({
     setBusyAction('leave');
     await onLeaveGroup();
     setBusyAction(null);
+  };
+
+  const handleResetRoom = async () => {
+    if (resetting || !onResetRoom) return;
+    setResetting(true);
+    setResetMsg('');
+    const res = await onResetRoom();
+    setResetting(false);
+    setConfirmReset(false);
+    setResetMsg(res?.success
+      ? 'Room reset — everyone was returned to the lobby.'
+      : (res?.error || 'Could not reset the room.'));
+    setTimeout(() => setResetMsg(''), 4000);
   };
 
   return (
@@ -458,13 +475,52 @@ export function GroupDetailScreen({
             }}>
               Share only with approved patrons. The server will bar non-members even if they carry the cipher.
             </div>
-            <button
-              type="button"
-              onClick={handleCopyCode}
-              style={{ marginTop: 14 }}
-            >
-              {copied ? 'Cipher Copied' : 'Copy Cipher'}
-            </button>
+            <div style={{ marginTop: 14, display: 'flex', flexWrap: 'wrap', gap: 10, alignItems: 'center' }}>
+              <button type="button" onClick={handleCopyCode}>
+                {copied ? 'Cipher Copied' : 'Copy Cipher'}
+              </button>
+
+              {/* Host-only: wipe the live table without changing the cipher. */}
+              {isHost && !confirmReset && (
+                <button
+                  type="button"
+                  className="danger"
+                  onClick={() => { setResetMsg(''); setConfirmReset(true); }}
+                  disabled={resetting}
+                  title="Boot everyone and start the room fresh — the cipher stays the same"
+                >
+                  Reset Room
+                </button>
+              )}
+              {isHost && confirmReset && (
+                <span style={{ display: 'inline-flex', gap: 8, alignItems: 'center' }}>
+                  <button type="button" className="danger" onClick={handleResetRoom} disabled={resetting}>
+                    {resetting ? 'Resetting…' : 'Confirm reset'}
+                  </button>
+                  <button type="button" onClick={() => setConfirmReset(false)} disabled={resetting}>
+                    Cancel
+                  </button>
+                </span>
+              )}
+            </div>
+
+            {isHost && (
+              <div style={{
+                marginTop: 8,
+                fontFamily: "'Crimson Text', serif",
+                fontSize: 12,
+                fontStyle: 'italic',
+                color: resetMsg
+                  ? 'var(--accent)'
+                  : 'var(--text-dim)',
+                lineHeight: 1.5,
+              }}>
+                {resetMsg
+                  || (confirmReset
+                    ? 'This boots every player back to the lobby and clears the table. The cipher stays the same.'
+                    : 'Reset boots everyone and starts a fresh table — same cipher.')}
+              </div>
+            )}
           </section>
 
           {/* Invite member */}

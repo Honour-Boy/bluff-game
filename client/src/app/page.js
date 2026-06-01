@@ -107,7 +107,7 @@ function HomeContent() {
     acknowledgeSpinResult, redemptionSpin, spinDismissed,
     chatMessages, chatUnread, chatOpen,
     sendChatMessage, openChat, closeChat,
-    leaveGame, restartRoom, setError,
+    leaveGame, restartRoom, resetRoom, setError,
     activatePowerCard,
     swapPick,
     preGameSelect,
@@ -383,6 +383,16 @@ function HomeContent() {
     return res;
   }, [fetchGroupDetail, invalidateGroupsCache, revokeInvite, selectedGroup?.id]);
 
+  const handleResetRoom = useCallback(async () => {
+    if (!selectedGroup?.code) return { success: false, error: 'Group not found' };
+    const res = await resetRoom(selectedGroup.code);
+    if (res?.success && selectedGroup?.id) {
+      // Refresh so the occupancy badge reflects the now-empty room.
+      await fetchGroupDetail(selectedGroup.id);
+    }
+    return res;
+  }, [resetRoom, fetchGroupDetail, selectedGroup?.code, selectedGroup?.id]);
+
   const handleDeleteGroup = useCallback(async () => {
     if (!selectedGroup?.id) return { success: false, error: 'Group not found' };
     const res = await deleteGroup(selectedGroup.id);
@@ -613,6 +623,7 @@ function HomeContent() {
           onDeleteGroup={handleDeleteGroup}
           onLeaveGroup={handleLeaveGroup}
           onRevokeInvite={handleRevokeInvite}
+          onResetRoom={handleResetRoom}
           onRefresh={refreshGroupDetail}
         />
       );
