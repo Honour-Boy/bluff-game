@@ -25,10 +25,10 @@ function SuitMark({ shape, delay = 0 }) {
 }
 
 // ─── Wooden plaque button ─────────────────────────────────────────────────────
-function PlaqueButton({ children, onClick, primary, disabled, style = {} }) {
+function PlaqueButton({ children, onClick, primary, ember, disabled, style = {} }) {
   return (
     <button
-      className={primary ? 'primary' : undefined}
+      className={ember ? 'ember' : primary ? 'primary' : undefined}
       onClick={onClick}
       disabled={disabled}
       style={{
@@ -313,30 +313,48 @@ export function LandingScreen({
         className="fade-in tilt-panel"
         style={{ width: '100%', maxWidth: 480, position: 'relative', zIndex: 1 }}
       >
-        {/* Tavern sign */}
-        <div style={{ textAlign: 'center', marginBottom: 38 }}>
-          <h1
-            className="candle-title"
-            style={{
-              fontFamily: "'Cinzel Decorative', 'Cinzel', serif",
-              fontSize: 88,
-              color: 'var(--accent)',
-              lineHeight: 0.9,
-              letterSpacing: '0.09em',
-              textShadow: '0 0 50px rgba(200,146,46,0.45), 0 3px 0 rgba(0,0,0,0.9)',
-            }}
-          >
-            BLUFF
-          </h1>
-          <div style={{
-            fontFamily: "'Cinzel', serif",
-            color: 'var(--text-dim)',
-            fontSize: 9,
-            letterSpacing: '0.28em',
-            marginTop: 9,
-            textTransform: 'uppercase',
-          }}>
-            The Card Game · Up to 15 Players
+        {/* Tavern sign — a carved board hung from chains, gently swaying */}
+        <div style={{ textAlign: 'center', marginBottom: 36, paddingTop: 20 }}>
+          <div className="hanging-sign" style={{ display: 'inline-block', position: 'relative', maxWidth: '100%' }}>
+            {/* Iron chains */}
+            <div aria-hidden="true" style={{ position: 'absolute', top: -18, left: '20%', width: 2, height: 18, background: 'linear-gradient(180deg, var(--border-glow), var(--border))' }} />
+            <div aria-hidden="true" style={{ position: 'absolute', top: -18, right: '20%', width: 2, height: 18, background: 'linear-gradient(180deg, var(--border-glow), var(--border))' }} />
+            {/* Carved board */}
+            <div
+              className="wood-grain"
+              style={{
+                position: 'relative',
+                padding: '16px 34px 18px',
+                border: '2px solid var(--border-lit)',
+                borderRadius: 10,
+                background: 'linear-gradient(160deg, var(--surface3) 0%, var(--surface) 100%)',
+                boxShadow: '0 12px 34px rgba(0,0,0,0.6), inset 0 0 30px rgba(0,0,0,0.45), inset 0 1px 0 rgba(255,210,140,0.06)',
+              }}
+            >
+              <h1
+                className="candle-title"
+                style={{
+                  fontFamily: "'Cinzel Decorative', 'Cinzel', serif",
+                  fontSize: 'clamp(56px, 16vw, 88px)',
+                  color: 'var(--accent)',
+                  lineHeight: 0.9,
+                  letterSpacing: '0.08em',
+                  textShadow: '0 0 50px rgba(240,181,74,0.5), 0 3px 0 rgba(0,0,0,0.9)',
+                }}
+              >
+                BLUFF
+              </h1>
+              <div style={{
+                fontFamily: "'Cinzel', serif",
+                color: 'var(--text-dim)',
+                fontSize: 9,
+                letterSpacing: '0.28em',
+                marginTop: 9,
+                textTransform: 'uppercase',
+              }}>
+                The Card Game · Up to 15 Players
+              </div>
+            </div>
           </div>
           <div style={{
             display: 'flex',
@@ -388,7 +406,7 @@ export function LandingScreen({
         {/* ── Main menu ── */}
         {!mode && (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-            <PlaqueButton primary onClick={() => setMode('host')} disabled={!connected}>
+            <PlaqueButton ember onClick={() => setMode('host')} disabled={!connected}>
               {/* Dice icon */}
               <svg width="15" height="15" viewBox="0 0 24 24" fill="none" aria-hidden="true">
                 <rect x="2" y="2" width="20" height="20" rx="4" stroke="currentColor" strokeWidth="1.8"/>

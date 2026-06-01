@@ -142,32 +142,35 @@ export function CenterTablePanel({
         }}>
           <FaceDownStack count={deckSize} label="Draw" warning={deckSize < 5 && deckSize > 0} />
 
-          {/* Required card type — carved oak frame */}
+          {/* Required suit — the table's bright focal point (dealer's tray) */}
           <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8 }}>
             <div style={{
               fontFamily: "'Cinzel', serif",
-              fontSize: 8,
-              color: 'var(--text-dim)',
+              fontSize: 9,
+              color: 'var(--accent)',
               letterSpacing: '0.2em',
               textTransform: 'uppercase',
             }}>
               Required
             </div>
-            <div style={{
-              padding: '8px 10px',
-              background: 'linear-gradient(160deg, rgba(30,22,14,0.9) 0%, rgba(16,12,8,0.9) 100%)',
-              border: '1px solid var(--border-glow)',
-              borderRadius: 5,
-              boxShadow: '0 0 12px rgba(200,146,46,0.15), inset 0 1px 0 rgba(255,255,255,0.04)',
-            }}>
+            <div
+              className="focal-breathe"
+              style={{
+                padding: '12px 14px',
+                background: 'radial-gradient(ellipse at 50% 35%, rgba(45,34,18,0.95) 0%, rgba(18,13,8,0.95) 100%)',
+                border: '2px solid var(--accent)',
+                borderRadius: 8,
+              }}
+            >
               <CardShape type={currentCardType} size="md" />
             </div>
             <div style={{
               fontFamily: "'Cinzel', serif",
-              fontSize: 9,
+              fontSize: 10,
               color: 'var(--accent)',
-              letterSpacing: '0.14em',
+              letterSpacing: '0.16em',
               textTransform: 'uppercase',
+              textShadow: '0 0 10px var(--glow-gold)',
             }}>
               {currentCardType}
             </div>

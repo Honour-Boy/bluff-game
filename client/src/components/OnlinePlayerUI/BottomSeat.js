@@ -334,41 +334,8 @@ export function BottomSeat({
         )
       )}
 
-      {/* Leave game link */}
-      {(() => {
-        const leaveBlocked = isMyTurn && isPlaying && !isEliminated;
-        return (
-          <button
-            onClick={() => {
-              if (leaveBlocked) return;
-              const isMidGame = !!phase && !['lobby', 'game_over'].includes(phase);
-              if (isMidGame && !window.confirm(
-                'Leave the table? You will forfeit and cannot rejoin this round.',
-              )) return;
-              leaveGame();
-            }}
-            disabled={leaveBlocked}
-            title={leaveBlocked ? 'Finish or end your turn before leaving' : undefined}
-            style={{
-              display: 'block',
-              margin: '4px auto 20px',
-              fontFamily: "'Cinzel', serif",
-              fontSize: 9,
-              letterSpacing: '0.12em',
-              textTransform: 'uppercase',
-              color: 'var(--text-dim)',
-              border: 'none',
-              background: 'none',
-              padding: '4px 8px',
-              textDecoration: 'underline',
-              cursor: leaveBlocked ? 'not-allowed' : 'pointer',
-              opacity: leaveBlocked ? 0.35 : 0.6,
-            }}
-          >
-            Leave Table
-          </button>
-        );
-      })()}
+      {/* Leave moved into the settings/FAB menu (#B) to declutter the dock. */}
+      <div style={{ height: 'calc(env(safe-area-inset-bottom, 0px) + 8px)' }} />
     </div>
   );
 }
