@@ -167,8 +167,10 @@ export function TableScene({
                 // (Module 1) Grown so the dealer's tray / reveal cards sit
                 // comfortably WITHIN the felt interior. The content panel below
                 // is deliberately narrower than this so nothing kisses the rail.
-                width: 'clamp(300px, 52vmin, 560px)',
-                height: 'clamp(200px, 36vmin, 360px)',
+                // The raised mobile minimum gives compact phones extra breathing
+                // room around the cards.
+                width: 'clamp(330px, 56vmin, 580px)',
+                height: 'clamp(216px, 40vmin, 380px)',
               }}
             >
               <div className="poker-table-studs" />
@@ -209,6 +211,7 @@ export function TableScene({
                 isMyTurn={isMyTurn}
                 currentPlayer={currentPlayer}
                 revealFlipped={revealFlipped}
+                isMobile={isMobile}
               />
             </div>
           </div>

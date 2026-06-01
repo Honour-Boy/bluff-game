@@ -328,6 +328,15 @@ export function OnlinePlayerUI({
     tickerText = `${spinTargetPlayer.username} is on the spot…`;
   }
 
+  // (Module 3.3) Bluff outcome line. Surfaced on the felt (desktop, bold/large)
+  // and above the Pull-Trigger morph (mobile, in BottomSeat).
+  const bluffOutcomeText = lastAction?.accusedName
+    ? (lastAction.bluffCorrect
+        ? `${lastAction.accusedName} bluffed`
+        : `${lastAction.accusedName} was not lying`)
+    : '';
+  const bluffOutcomeColor = lastAction?.bluffCorrect ? 'var(--accent2)' : 'var(--alive)';
+
   // #139 — eligibility to show the activation modal at all (turn/state gating).
   // The three turn actions are order-independent: neither `cardPlayedThisTurn`
   // nor `bluffUsedThisTurn` gates power activation — it's allowed before or
@@ -542,6 +551,9 @@ export function OnlinePlayerUI({
         tickerText={tickerText}
         isMySpinTurn={isMySpinTurn}
         playerSpin={playerSpin}
+        isMobile={ui.isMobile}
+        bluffOutcomeText={bluffOutcomeText}
+        bluffOutcomeColor={bluffOutcomeColor}
         showSpectatorView={showSpectatorView}
         alivePlayers={alivePlayers}
         spectatingId={ui.spectatingId}

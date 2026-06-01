@@ -109,6 +109,7 @@ export function CenterTablePanel({
   isMyTurn,
   currentPlayer,
   revealFlipped = false,
+  isMobile = false,
 }) {
   // (Module 3) The challenged card border + outcome line read green when the
   // accused told the truth (card matched) and red when they bluffed (mismatch).
@@ -280,18 +281,22 @@ export function CenterTablePanel({
             </div>
           </div>
 
-          {/* One compact outcome line (no text-heavy narration). */}
-          {lastAction?.accusedName && (
+          {/* Outcome line (Module 3.3). Desktop: heavy bold + larger on the felt.
+              Mobile: smaller; and suppressed for the spinner because it is shown
+              above their Pull-Trigger morph instead (BottomSeat). */}
+          {lastAction?.accusedName && !(isMobile && isMySpinTurn) && (
             <div style={{
               fontFamily: "'Cinzel', serif",
-              fontSize: 12,
+              fontSize: isMobile ? 11 : 19,
+              fontWeight: isMobile ? 600 : 800,
               letterSpacing: '0.06em',
               color: outcomeColor,
               textTransform: 'uppercase',
+              textShadow: isMobile ? 'none' : '0 2px 10px rgba(0,0,0,0.6)',
             }}>
               {lastAction.bluffCorrect
                 ? `${lastAction.accusedName} bluffed`
-                : `${lastAction.accusedName} told the truth`}
+                : `${lastAction.accusedName} was not lying`}
             </div>
           )}
         </div>
