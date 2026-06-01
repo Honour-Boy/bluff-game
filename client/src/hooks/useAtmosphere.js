@@ -345,32 +345,63 @@ function playSpinClunk(ctx) {
   osc.stop(now + 0.28);
 }
 
-// ─── Background music — SECTION-BASED, the player's OWN tracks (HTMLAudio) ───────
-// Each app SECTION has its own track(s). Moving to a new section stops the old
-// track and starts the new one. A section with ONE track loops; a section with
-// TWO+ plays them in sequence and loops the sequence (assign two if you don't
-// want a single track to simply repeat). Leaving a section REMEMBERS its spot
-// (track index + elapsed time) and RESUMES there on return — you come back to
-// the music where you left it, not at the top. Subtle volume, auto-ducks under
-// cues, muteable, mobile-unlocked. Drop files in client/public/audio/ (see
-// README); a missing file for a section just leaves it silent — cues still play.
-const MUSIC_SECTIONS = {
-  lobby:    ['/audio/BLUFF Tavern.mp3'],                              // landing + setup + in-room lobby
-  game:     ['/audio/Nordic Hums.mp3', '/audio/Call It Bluff.mp3'],  // active game (two tracks → alternate)
-  groups:   ['/audio/Click_Clack_Spin.mp3'],                         // the whole Groups area
-  gameover: ['/audio/Gutter-Candle Dread.mp3'],                      // after a game ends (results)
+// ─── Background music — multi-track playlists w/ crossfade (per view context) ───
+// Each app SECTION owns a PLAYLIST and a playback MODE. Two HTMLAudio "decks"
+// let us crossfade between tracks (a single element can't overlap itself). The
+// one-shot cues stay on the Web Audio path above; this only governs the bed.
+//
+//   lobby      SHUFFLE     — start on a RANDOM track, loop; when a track ends,
+//                            crossfade to the alternative in the pool.
+//   game       PROGRESSIVE — stage 0 = Nordic Hums (quiet tension); as stakes
+//                            rise, 3 s crossfade up to the Bluff Anthem
+//                            (instrumental), then Call It Bluff, to drive
+//                            momentum. Stage is fed from live game state
+//                            (player attrition) by page.js via setGameStage().
+//   groups     LOOP        — the vocal Bluff Anthem on a clean continuous loop.
+//   gameover   ONCE        — Gutter-Candle Dread, gently faded in over 2 s.
+//
+// Volume (per the brief): songs play at 8% of max, instrumentals at 12% (the
+// instrumentals sit a touch louder so the ambience still reads under the cues).
+// All files are PRE-FETCHED on boot so crossfades never stream-stall. Drop files
+// in client/public/audio/; a missing file just leaves that slot silent.
+
+const SONG_VOL = 0.08;          // vocal tracks → 8% of max
+const INSTRUMENTAL_VOL = 0.12;  // instrumental / ambient beds → 12% of max
+
+// src → { vol }. Classification: the "(instrumental)" anthem and the ambient
+// beds are instrumentals; the two vocal anthems (Bluff Anthem / Call It Bluff)
+// are songs.
+const TRACKS = {
+  '/audio/BLUFF Tavern.mp3':                { vol: INSTRUMENTAL_VOL },
+  '/audio/Click_Clack_Spin.mp3':            { vol: INSTRUMENTAL_VOL },
+  '/audio/Nordic Hums.mp3':                 { vol: INSTRUMENTAL_VOL },
+  '/audio/Bluff Anthem (instrumental).mp3': { vol: INSTRUMENTAL_VOL },
+  '/audio/Gutter-Candle Dread.mp3':         { vol: INSTRUMENTAL_VOL },
+  '/audio/Call It Bluff.mp3':               { vol: SONG_VOL },
+  '/audio/Bluff Anthem.mp3':                { vol: SONG_VOL },
 };
-const MUSIC_BASE_VOL = 0.24;  // subtle bed level (0–1)
-const MUSIC_DUCK_VOL = 0.06;  // ducked level while a cue plays
-// Per-section overrides of the base level. The in-game bed is the quietest so
-// it never competes with the table's cues/spin (kept well below the others).
-const MUSIC_SECTION_VOL = {
-  game: 0.11,
-};
-function _sectionVol(t) {
-  const v = MUSIC_SECTION_VOL[t?.section];
-  return typeof v === 'number' ? v : MUSIC_BASE_VOL;
+function _trackVol(src) {
+  return (TRACKS[src] && typeof TRACKS[src].vol === 'number') ? TRACKS[src].vol : SONG_VOL;
 }
+
+const MUSIC_SECTIONS = {
+  lobby:    ['/audio/BLUFF Tavern.mp3', '/audio/Click_Clack_Spin.mp3'],
+  game:     ['/audio/Nordic Hums.mp3', '/audio/Bluff Anthem (instrumental).mp3', '/audio/Call It Bluff.mp3'],
+  groups:   ['/audio/Bluff Anthem.mp3'],
+  gameover: ['/audio/Gutter-Candle Dread.mp3'],
+};
+const SECTION_MODE = {
+  lobby: 'shuffle',
+  game: 'progressive',
+  groups: 'loop',
+  gameover: 'once',
+};
+
+const SECTION_FADE_MS = 900;      // crossfade when switching view contexts
+const CROSSFADE_MS = 3000;        // game progressive stage crossfade (3 s)
+const LOBBY_CROSSFADE_MS = 2500;  // lobby track-end → alternative
+const GAMEOVER_FADEIN_MS = 2000;  // gameover gentle fade-in
+const MUSIC_DUCK_VOL = 0.04;      // ducked level while a one-shot cue plays
 
 function _musicMutedFromStorage() {
   try { return window.localStorage.getItem('bluff_music_muted') === '1'; }
@@ -385,189 +416,259 @@ function _subscribeMuted(cb) { _mutedListeners.add(cb); return () => _mutedListe
 function _notifyMuted() { _mutedListeners.forEach((cb) => { try { cb(); } catch (_) {} }); }
 function _getMutedSnapshot() {
   if (typeof window === 'undefined') return false;
-  const t = window.__bluffTrack;
-  return t ? !!t.muted : _musicMutedFromStorage();
+  const e = window.__bluffMusic;
+  return e ? !!e.muted : _musicMutedFromStorage();
 }
 
-// Smoothly tween the HTMLAudio element volume (it has no AudioParam ramp).
-function _tweenVol(t, to, ms) {
-  if (!t || !t.audio) return;
-  if (t.raf) cancelAnimationFrame(t.raf);
-  const from = t.audio.volume;
-  const start = (typeof performance !== 'undefined' ? performance.now() : Date.now());
-  const step = (now) => {
-    const k = ms <= 0 ? 1 : Math.min(1, (now - start) / ms);
-    try { t.audio.volume = Math.max(0, Math.min(1, from + (to - from) * k)); } catch (_) {}
-    if (k < 1) t.raf = requestAnimationFrame(step);
-    else t.raf = 0;
-  };
-  t.raf = requestAnimationFrame(step);
-}
-
-// Build (once) the single reusable <audio> element on the window singleton.
-function _ensureTrack() {
-  if (typeof window === 'undefined') return null;
-  if (window.__bluffTrack) return window.__bluffTrack;
-  if (typeof Audio === 'undefined') return null;
-
-  const audio = new Audio();
-  audio.preload = 'auto';
-  audio.volume = 0;
-  const t = {
-    audio,
-    section: null,
-    queue: [],
-    idx: 0,
-    muted: _musicMutedFromStorage(),
-    raf: 0,
-    duckTimer: null,
-    switchTimer: null,
-    // Per-section playback memory so re-entering a section resumes where it
-    // stopped: { [sectionName]: { idx, time } }. Plus the src we actually have
-    // loaded (so we never reset currentTime by re-assigning the same src) and a
-    // resume time deferred while muted.
-    positions: {},
-    loadedSrc: null,
-    pendingResume: 0,
-  };
-  // For a multi-track section, advance to the next track when one finishes
-  // (single-track sections use native looping and never fire 'ended').
-  audio.addEventListener('ended', () => {
-    if (t.queue.length > 1 && !t.muted) {
-      t.idx = (t.idx + 1) % t.queue.length;
-      _playCurrent(t);
-    }
-  });
-  window.__bluffTrack = t;
-  return t;
-}
-
-function _playCurrent(t, resumeTime = 0) {
-  const src = t.queue[t.idx];
-  if (!src) return;
-  const encoded = encodeURI(src);
-  // Only (re)assign src when it actually changes — assigning the same URL resets
-  // currentTime to 0, which would defeat "resume where I stopped".
-  if (t.loadedSrc !== encoded) {
-    try { t.audio.src = encoded; } catch (_) { return; }
-    t.loadedSrc = encoded;
-    if (resumeTime > 0) {
-      // The element needs metadata before it can seek; do it once it's ready.
-      const seek = () => {
-        try {
-          if (!t.audio.duration || resumeTime < t.audio.duration) t.audio.currentTime = resumeTime;
-        } catch (_) {}
-      };
-      t.audio.addEventListener('loadedmetadata', seek, { once: true });
-    }
-  } else if (resumeTime > 0) {
+// Proactively pre-fetch every track on boot so crossfades never stream-stall.
+// Detached <audio preload="auto"> elements pull each file into the HTTP cache;
+// the playback decks then load instantly. Runs once.
+function _prefetchAll() {
+  if (typeof window === 'undefined' || typeof Audio === 'undefined' || window.__bluffPrefetch) return;
+  window.__bluffPrefetch = [];
+  Object.keys(TRACKS).forEach((src) => {
     try {
-      if (!t.audio.duration || resumeTime < t.audio.duration) t.audio.currentTime = resumeTime;
-    } catch (_) {}
-  }
-  t.audio.loop = t.queue.length === 1; // one track loops; many cycle via 'ended'
-  const p = t.audio.play();            // must run in a gesture on mobile
-  if (p && p.catch) p.catch(() => {});
-  _tweenVol(t, t.muted ? 0 : _sectionVol(t), 700);
+      const a = new Audio();
+      a.preload = 'auto';
+      a.src = encodeURI(src);
+      a.load();
+      window.__bluffPrefetch.push(a);
+    } catch (_) { /* best effort */ }
+  });
 }
 
-// Switch the active section: stop the old track, start the new. No-op (but
-// ensures playback) if the section is unchanged.
+// The crossfade engine: two HTMLAudio decks + bookkeeping, on a window singleton.
+function _engine() {
+  if (typeof window === 'undefined' || typeof Audio === 'undefined') return null;
+  if (window.__bluffMusic) return window.__bluffMusic;
+  const mk = () => { const a = new Audio(); a.preload = 'auto'; a.volume = 0; return a; };
+  const eng = {
+    decks: [mk(), mk()],
+    rafs: [0, 0],
+    active: 0,          // index of the foreground (audible) deck
+    section: null,
+    mode: null,
+    queue: [],
+    idx: 0,             // current track index within the section's playlist
+    stage: 0,           // game progressive stage (0 calm → up)
+    currentSrc: null,
+    pendingSrc: null,   // deferred start while muted
+    muted: _musicMutedFromStorage(),
+    duckTimer: null,
+  };
+  // SHUFFLE sections crossfade to the alternative when a track ends; LOOP/ONCE/
+  // PROGRESSIVE tracks set loop=true so 'ended' never fires.
+  eng.decks.forEach((deck, i) => {
+    deck.addEventListener('ended', () => _onDeckEnded(eng, i));
+  });
+  window.__bluffMusic = eng;
+  _prefetchAll();
+  return eng;
+}
+
+// Tween one deck's volume to `to` over `ms`. `curve` shapes the ramp: 'in'
+// (ease-in) for the rising side and 'out' (ease-out) for the falling side
+// approximate a perceptual / logarithmic crossfade when paired.
+function _fadeDeck(eng, deckIdx, to, ms, curve = 'linear', onDone) {
+  const deck = eng.decks[deckIdx];
+  if (!deck) return;
+  if (eng.rafs[deckIdx]) cancelAnimationFrame(eng.rafs[deckIdx]);
+  const from = deck.volume;
+  const startT = (typeof performance !== 'undefined' ? performance.now() : Date.now());
+  const ease = (k) => (curve === 'in' ? k * k : curve === 'out' ? 1 - (1 - k) * (1 - k) : k);
+  const step = (now) => {
+    const k = ms <= 0 ? 1 : Math.min(1, (now - startT) / ms);
+    try { deck.volume = Math.max(0, Math.min(1, from + (to - from) * ease(k))); } catch (_) {}
+    if (k < 1) { eng.rafs[deckIdx] = requestAnimationFrame(step); }
+    else { eng.rafs[deckIdx] = 0; if (onDone) { try { onDone(); } catch (_) {} } }
+  };
+  eng.rafs[deckIdx] = requestAnimationFrame(step);
+}
+
+// Crossfade the foreground deck out while bringing `src` up on the other deck.
+// Used for section switches, lobby track-ends, and game stage escalations.
+function _crossfadeTo(eng, src, ms, loop) {
+  const curIdx = eng.active;
+  const nxtIdx = 1 - eng.active;
+  const cur = eng.decks[curIdx];
+  const nxt = eng.decks[nxtIdx];
+  try {
+    nxt.src = encodeURI(src);
+    nxt.loop = !!loop;
+    nxt.currentTime = 0;
+    nxt.volume = 0;
+  } catch (_) { return; }
+  const target = eng.muted ? 0 : _trackVol(src);
+  const p = nxt.play(); if (p && p.catch) p.catch(() => {}); // must run in a gesture on mobile
+  _fadeDeck(eng, nxtIdx, target, ms, 'in');
+  _fadeDeck(eng, curIdx, 0, ms, 'out', () => { try { cur.pause(); } catch (_) {} });
+  eng.active = nxtIdx;
+  eng.currentSrc = src;
+}
+
+// Lobby SHUFFLE: when the foreground deck's (non-looping) track ends, crossfade
+// to a different track in the pool.
+function _onDeckEnded(eng, deckIdx) {
+  if (eng.muted || deckIdx !== eng.active || eng.mode !== 'shuffle') return;
+  if (!eng.queue.length) return;
+  let next = eng.idx;
+  if (eng.queue.length > 1) {
+    do { next = Math.floor(Math.random() * eng.queue.length); } while (next === eng.idx);
+  }
+  eng.idx = next;
+  _crossfadeTo(eng, eng.queue[next], LOBBY_CROSSFADE_MS, false);
+}
+
+// Switch the active view context. Picks the starting track per the section's
+// MODE and crossfades to it. No-op (but ensures playback) if unchanged.
 function _setSection(name) {
   installAudioUnlock();
-  const t = _ensureTrack();
-  if (!t) return;
-  if (t.section === name) {
-    if (!t.muted && t.audio.paused && t.queue.length) _playCurrent(t);
+  const eng = _engine();
+  if (!eng) return;
+  if (eng.section === name) {
+    if (!eng.muted && eng.currentSrc) {
+      const d = eng.decks[eng.active];
+      if (d.paused) {
+        const p = d.play(); if (p && p.catch) p.catch(() => {});
+        _fadeDeck(eng, eng.active, _trackVol(eng.currentSrc), 400, 'in');
+      }
+    }
     return;
   }
-  // Remember where the OUTGOING section left off so we can resume it on return.
-  if (t.section && t.queue.length) {
-    t.positions[t.section] = { idx: t.idx, time: t.audio.currentTime || 0 };
-  }
-  t.section = name;
-  t.queue = MUSIC_SECTIONS[name] || [];
-  // Restore this section's saved spot (track index + elapsed time) if we've
-  // been here before; otherwise start fresh at the top.
-  const saved = t.positions[name];
-  t.idx = saved ? Math.min(saved.idx || 0, Math.max(0, t.queue.length - 1)) : 0;
-  const resumeTime = saved ? (saved.time || 0) : 0;
-  clearTimeout(t.switchTimer);
-  if (t.queue.length === 0) {
-    _tweenVol(t, 0, 250);
-    t.switchTimer = setTimeout(() => { try { t.audio.pause(); } catch (_) {} }, 280);
+  eng.section = name;
+  eng.mode = SECTION_MODE[name] || 'loop';
+  eng.queue = MUSIC_SECTIONS[name] || [];
+  eng.stage = 0;
+  if (!eng.queue.length) {
+    _fadeDeck(eng, eng.active, 0, SECTION_FADE_MS, 'out', () => { try { eng.decks[eng.active].pause(); } catch (_) {} });
+    eng.currentSrc = null;
     return;
   }
-  if (t.muted) { t.audio.loop = t.queue.length === 1; t.pendingResume = resumeTime; return; }
-  // Quick fade-out of the old track, then swap to the new section — resuming
-  // from where we last heard it.
-  _tweenVol(t, 0, 220);
-  t.switchTimer = setTimeout(() => _playCurrent(t, resumeTime), 230);
+  // Pick the opening track: random for shuffle, top for everything else.
+  if (eng.mode === 'shuffle') eng.idx = Math.floor(Math.random() * eng.queue.length);
+  else eng.idx = 0;
+  const src = eng.queue[eng.idx];
+  // Shuffle tracks must NOT loop (so 'ended' fires → crossfade to the other);
+  // every other mode loops its current track.
+  const loop = eng.mode !== 'shuffle';
+  const fadeMs = eng.mode === 'once' ? GAMEOVER_FADEIN_MS : SECTION_FADE_MS;
+  if (eng.muted) { eng.currentSrc = src; eng.pendingSrc = src; return; }
+  _crossfadeTo(eng, src, fadeMs, loop);
 }
 
-// Resume the current section's track (first user gesture / unmute).
+// Game PROGRESSIVE: escalate to a higher-intensity track. Monotonic within a
+// game (never steps back down); a fresh game resets stage via _setSection.
+function _setGameStage(stage) {
+  const eng = (typeof window !== 'undefined') ? window.__bluffMusic : null;
+  if (!eng || eng.section !== 'game' || eng.mode !== 'progressive' || !eng.queue.length) return;
+  const clamped = Math.max(0, Math.min(stage | 0, eng.queue.length - 1));
+  if (clamped <= eng.stage) return;
+  eng.stage = clamped;
+  eng.idx = clamped;
+  const src = eng.queue[clamped];
+  if (eng.muted) { eng.currentSrc = src; eng.pendingSrc = src; return; }
+  _crossfadeTo(eng, src, CROSSFADE_MS, true); // 3 s logarithmic-feel crossfade, looped
+}
+
+// Resume the current section (first user gesture / unmute).
 function _musicResume() {
-  const t = (typeof window !== 'undefined') ? window.__bluffTrack : null;
-  if (!t || t.muted || !t.queue.length) return;
-  // Honour any resume point deferred while muted, then clear it.
-  const resume = t.pendingResume || 0;
-  t.pendingResume = 0;
-  if (t.audio.paused) _playCurrent(t, resume);
-  else _tweenVol(t, _sectionVol(t), 400);
+  const eng = (typeof window !== 'undefined') ? window.__bluffMusic : null;
+  if (!eng || eng.muted || !eng.queue.length) return;
+  const src = eng.pendingSrc || eng.currentSrc;
+  if (!src) return;
+  const idx = eng.active;
+  const deck = eng.decks[idx];
+  if (deck.paused || eng.pendingSrc) {
+    const loop = eng.mode !== 'shuffle';
+    try {
+      deck.src = encodeURI(src);
+      deck.loop = loop;
+      if (eng.pendingSrc) deck.currentTime = 0;
+      deck.volume = 0;
+    } catch (_) {}
+    const p = deck.play(); if (p && p.catch) p.catch(() => {});
+    _fadeDeck(eng, idx, _trackVol(src), 600, 'in');
+    eng.currentSrc = src;
+    eng.pendingSrc = null;
+  } else {
+    _fadeDeck(eng, idx, _trackVol(src), 400, 'in');
+  }
 }
 
 function _musicSetMuted(muted) {
-  const t = _ensureTrack();
+  const eng = _engine();
   try { window.localStorage.setItem('bluff_music_muted', muted ? '1' : '0'); } catch (_) {}
-  if (t) {
-    t.muted = muted;
+  if (eng) {
+    eng.muted = muted;
     if (muted) {
-      _tweenVol(t, 0, 250);
-      clearTimeout(t.switchTimer);
-      t.switchTimer = setTimeout(() => { try { t.audio.pause(); } catch (_) {} }, 280);
+      [0, 1].forEach((i) => _fadeDeck(eng, i, 0, 250, 'out', () => { try { eng.decks[i].pause(); } catch (_) {} }));
     } else {
-      clearTimeout(t.switchTimer);
       _musicResume();
     }
   }
   _notifyMuted();
 }
 
-// Sidechain duck: dip the track under a cue, then ease it back up.
+// Sidechain duck: dip the foreground deck under a cue, then ease it back up.
 function _duckMusic(holdMs) {
-  const t = (typeof window !== 'undefined') ? window.__bluffTrack : null;
-  if (!t || t.muted || !t.queue.length || t.audio.paused) return;
-  clearTimeout(t.duckTimer);
-  _tweenVol(t, Math.min(MUSIC_DUCK_VOL, _sectionVol(t)), 90);
-  t.duckTimer = setTimeout(() => {
-    if (!t.muted) _tweenVol(t, _sectionVol(t), 450);
+  const eng = (typeof window !== 'undefined') ? window.__bluffMusic : null;
+  if (!eng || eng.muted || !eng.currentSrc) return;
+  const deck = eng.decks[eng.active];
+  if (deck.paused) return;
+  clearTimeout(eng.duckTimer);
+  const base = _trackVol(eng.currentSrc);
+  _fadeDeck(eng, eng.active, Math.min(MUSIC_DUCK_VOL, base), 90, 'out');
+  eng.duckTimer = setTimeout(() => {
+    if (!eng.muted) _fadeDeck(eng, eng.active, _trackVol(eng.currentSrc), 450, 'in');
   }, Math.max(100, holdMs));
 }
 
 // How long to hold the duck per cue kind (ms), matched to each cue's tail.
 const DUCK_MS = { bluff: 700, card: 200, win: 1700, spin: 1600, eliminate: 1500 };
 
+// ─── Game-state → progressive music stage ────────────────────────────────────
+// Derive the game music intensity from live room state. Escalation tracks player
+// attrition (a proxy for "move-count escalation / high stakes"): early game is
+// calm, the field thinning pushes momentum up, and the final two players hit the
+// peak. Exported pure so it can be unit-tested without audio.
+//   0 = calm (Nordic Hums) · 1 = building (Bluff Anthem instrumental) · 2 = peak (Call It Bluff)
+export function gameMusicStage(roomState) {
+  if (!roomState || !Array.isArray(roomState.players)) return 0;
+  const phase = roomState.phase;
+  if (phase === 'lobby' || phase === 'pre_game' || !phase) return 0;
+  const total = roomState.players.length || 1;
+  const alive = roomState.players.filter((p) => p && p.status === 'alive').length;
+  if (alive <= 2) return 2;                       // last two standing — peak stakes
+  if (alive <= Math.ceil(total * 0.6)) return 1;  // the field is thinning — build
+  return 0;                                       // early game — quiet tension
+}
+
 // ─── useMusic ───────────────────────────────────────────────────────────────────
-// Standalone control surface for the background tavern bed, decoupled from the
+// Standalone control surface for the background bed, decoupled from the
 // per-screen atmosphere hook. Used at the app root (start on first gesture) and
 // by any settings UI (mute toggle). Mute state is shared via the module store
 // so the landing gear and the in-game menu never drift apart.
-//   setSection(name) — switch the active section's track ('lobby'|'game'|
-//                      'groups'|'gameover'); the app root drives this.
-//   startMusic() — arm the mobile unlock + resume the current section.
-//   toggleMusic() — flip mute (persisted); unmuting resumes the section.
-//   musicEnabled — boolean, reactive.
+//   setSection(name)   — switch the active view context ('lobby'|'game'|
+//                        'groups'|'gameover'); the app root drives this.
+//   setGameStage(n)    — escalate the in-game progressive playlist (0..2).
+//   startMusic()       — arm the mobile unlock + resume the current section.
+//   toggleMusic()      — flip mute (persisted); unmuting resumes the section.
+//   musicEnabled       — boolean, reactive.
 export function useMusic() {
   const muted = useSyncExternalStore(_subscribeMuted, _getMutedSnapshot, () => false);
+  // Pre-fetch + build the engine on boot so the playlists are warm before the
+  // first section switch.
+  useEffect(() => { try { _engine(); } catch (_) {} }, []);
   const setSection = useCallback((name) => { try { _setSection(name); } catch (_) {} }, []);
+  const setGameStage = useCallback((stage) => { try { _setGameStage(stage); } catch (_) {} }, []);
   const startMusic = useCallback(() => {
-    try { installAudioUnlock(); _musicResume(); } catch (_) {}
+    try { installAudioUnlock(); _engine(); _musicResume(); } catch (_) {}
   }, []);
   const toggleMusic = useCallback(() => {
     const willMute = !_getMutedSnapshot();
     try { _musicSetMuted(willMute); } catch (_) {}
   }, []);
-  return { musicEnabled: !muted, setSection, startMusic, toggleMusic };
+  return { musicEnabled: !muted, setSection, setGameStage, startMusic, toggleMusic };
 }
 
 // ─── Hook ─────────────────────────────────────────────────────────────────────
