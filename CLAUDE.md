@@ -35,7 +35,7 @@ cd client && npm test         # client suite — REQUIRES Node ^20.19.0 || >=22.
 Required for anything beyond the landing page to work:
 
 **`server/.env`**
-- `PORT` — server port (defaults to `3001` in code; `.env.example` suggests `4000`)
+- `PORT` — server port (defaults to `3001` in code; `.env.example` also uses `3001`)
 - `CLIENT_URL` — CORS origin (defaults to `*`)
 - `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY` — used to verify Supabase JWTs on the `authenticate` socket event
 
@@ -43,7 +43,7 @@ Required for anything beyond the landing page to work:
 - `NEXT_PUBLIC_SERVER_URL` — where the socket connects (falls back to `http://localhost:3001` in `lib/socket.js`)
 - `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY` — browser Supabase client
 
-⚠️ **Port mismatch in the examples:** `server/.env.example` ships `PORT=4000` and `client/.env.local.example` ships `NEXT_PUBLIC_SERVER_URL=http://localhost:4000`, but the code defaults are `3001`. Pick one and keep both `.env` files aligned, or the client won't connect.
+ℹ️ **Ports are aligned on `3001`:** both `.env.example` files and the code defaults (`server/index.js`, `lib/socket.js`) use `3001`, so a fresh clone connects out of the box. If you change the server `PORT`, update `client` `NEXT_PUBLIC_SERVER_URL` to match.
 
 ## Architecture
 
