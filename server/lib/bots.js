@@ -18,7 +18,7 @@
 // DEFERRED requires inside the expiry handler (same trick idleTurn.js uses).
 
 const engine = require('../gameEngine');
-const { chooseCardPlay } = require('../engine/botStrategy');
+const { chooseCardPlay, shouldCallBluff } = require('../engine/botStrategy');
 const {
   getRoom,
   saveRoom,
@@ -80,9 +80,10 @@ function _pendingBotAction(room) {
 }
 
 // Stable per-beat key so repeated broadcasts inside one beat don't restack the
-// timer, but a genuine progression (play → end, or a new spin) re-arms a fresh
-// one. `cardPlayedThisTurn` flips false→true between play and end, so the key
-// changes exactly when the next beat is due.
+// timer, but a genuine progression re-arms a fresh one:
+//   • cardPlayedThisTurn flips false→true between the play beat and the end beat;
+//   • bluffUsedThisTurn flips false→true when the bot opens its turn by calling
+//     a bluff, so the post-bluff "now play a card" beat re-arms distinctly.
 function _botActionKey(action, room) {
   return [
     action.kind,
@@ -91,6 +92,7 @@ function _botActionKey(action, room) {
     room.currentTurnIndex,
     room.phase,
     room.cardPlayedThisTurn ? 1 : 0,
+    room.bluffUsedThisTurn ? 1 : 0,
     room.spinTargetId || '',
   ].join(':');
 }
@@ -197,7 +199,7 @@ async function _botEndTurn(io, code, room) {
  */
 async function _onBotActExpire(io, code, key) {
   const { broadcastRoomState } = require('./broadcast');
-  const { applySpinAndBroadcast } = require('./orchestration');
+  const { applySpinAndBroadcast, _resolveOnlineBluff } = require('./orchestration');
 
   _clearBotTimer(code);
   const room = await getRoom(code);
@@ -220,6 +222,18 @@ async function _onBotActExpire(io, code, key) {
   }
 
   if (action.kind === 'play') {
+    // Open the turn by maybe CHALLENGING the previous player (once per turn,
+    // before playing a card). Mirrors the call_bluff handler: stamp the ledger
+    // flag, then run the shared resolver (which sets spin_pending + broadcasts).
+    // After it resolves (a spin lands on the bot or the human), the bot's turn
+    // continues on the next beat — bluffUsedThisTurn is now set, so it can't
+    // bluff again and will just play a card.
+    if (shouldCallBluff(room, action.botId)) {
+      room.bluffUsedThisTurn = true;
+      await _resolveOnlineBluff(io, code, room, action.botId, NOOP_LEADERBOARD_REPO);
+      return;
+    }
+
     const played = _botPlayCard(room, action.botId);
     if (!played) {
       // Nothing playable (only power cards / empty) — don't stall; end the turn.

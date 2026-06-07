@@ -17,7 +17,7 @@ import { createRequire } from 'module';
 const require = createRequire(import.meta.url);
 
 const engine = require('../gameEngine.js');
-const { chooseCardPlay } = require('../engine/botStrategy.js');
+const { chooseCardPlay, shouldCallBluff } = require('../engine/botStrategy.js');
 const {
   armBotTurn,
   _pendingBotAction,
@@ -130,6 +130,46 @@ describe('botStrategy.chooseCardPlay', () => {
   it('returns null when the bot has nothing playable', () => {
     const hand = [{ id: 'pw', type: 'power', power: 'shield' }];
     expect(chooseCardPlay(roomWithBotHand(hand), 'bot:1', () => 0.5)).toBeNull();
+  });
+});
+
+describe('botStrategy.shouldCallBluff', () => {
+  function room(extra = {}) {
+    return {
+      isFirstTurn: false,
+      bluffUsedThisTurn: false,
+      bluffBlockedThisTurn: false,
+      challengeableCard: { id: 'c', type: 'shape', shape: 'circle' },
+      prevTurnPlayerId: 'human',
+      turnOrder: ['human', 'bot:1'],
+      currentTurnIndex: 1,
+      players: [
+        { id: 'human', status: 'alive' },
+        { id: 'bot:1', status: 'alive' },
+      ],
+      ...extra,
+    };
+  }
+
+  it('is eligible only as a probability gamble when there is a card to challenge', () => {
+    expect(shouldCallBluff(room(), 'bot:1', () => 0.0)).toBe(true);
+    expect(shouldCallBluff(room(), 'bot:1', () => 0.99)).toBe(false);
+  });
+
+  it('never challenges on the first turn / after a bluff / when frozen / with no card', () => {
+    expect(shouldCallBluff(room({ isFirstTurn: true }), 'bot:1', () => 0)).toBe(false);
+    expect(shouldCallBluff(room({ bluffUsedThisTurn: true }), 'bot:1', () => 0)).toBe(false);
+    expect(shouldCallBluff(room({ bluffBlockedThisTurn: true }), 'bot:1', () => 0)).toBe(false);
+    expect(shouldCallBluff(room({ challengeableCard: null }), 'bot:1', () => 0)).toBe(false);
+  });
+
+  it('never challenges itself or a non-alive accused', () => {
+    expect(shouldCallBluff(room({ prevTurnPlayerId: 'bot:1' }), 'bot:1', () => 0)).toBe(false);
+    expect(shouldCallBluff(
+      room({ players: [{ id: 'human', status: 'eliminated' }, { id: 'bot:1', status: 'alive' }] }),
+      'bot:1',
+      () => 0,
+    )).toBe(false);
   });
 });
 
@@ -277,6 +317,58 @@ describe('bot turn driver — beats', () => {
     expect(room.lastAction.type).toBe('game_over');
     expect(room.lastAction.winnerId).toBe('bot:1');
     expect(bot.isBot).toBe(true);
+  });
+
+  it('opens its turn by challenging the human when the bluff roll fires', async () => {
+    const room = makeTutorialRoom();
+    // Human leads: play a card, then advance so it's the bot's turn with a
+    // challengeable card on the table and isFirstTurn cleared.
+    const humanHand = room.hands.get('human');
+    engine.validateAndPlayCard(room, 'human', humanHand[0].id);
+    engine.advanceTurn(room);
+    expect(room.currentTurnIndex).toBe(1);        // bot's turn
+    expect(room.challengeableCard).toBeTruthy();
+    expect(room.isFirstTurn).toBe(false);
+    await saveRoom(room);
+    const io = makeIo();
+
+    // Force the bluff roll to fire (and pin spin RNG) deterministically.
+    const rng = vi.spyOn(Math, 'random').mockReturnValue(0);
+    try {
+      await broadcastRoomState(io, room.code); // arms the bot's pre-card beat
+      await vi.advanceTimersByTimeAsync(1200);  // bot challenges the human
+
+      // The bot called bluff → it resolved into a pending spin on someone.
+      expect(room.bluffUsedThisTurn).toBe(true);
+      expect(room.phase).toBe('spin_pending');
+      expect(room.lastAction.type).toBe('spin_pending');
+      expect(room.lastAction.accuserId).toBe('bot:1');
+      expect(room.lastAction.accusedId).toBe('human');
+    } finally {
+      rng.mockRestore();
+    }
+  });
+
+  it('does NOT challenge when the bluff roll misses — it just plays', async () => {
+    const room = makeTutorialRoom();
+    const humanHand = room.hands.get('human');
+    engine.validateAndPlayCard(room, 'human', humanHand[0].id);
+    engine.advanceTurn(room);
+    await saveRoom(room);
+    const io = makeIo();
+
+    const rng = vi.spyOn(Math, 'random').mockReturnValue(0.99); // miss the bluff roll
+    try {
+      const botHandBefore = handLen(room, 'bot:1');
+      await broadcastRoomState(io, room.code);
+      await vi.advanceTimersByTimeAsync(1200);
+
+      expect(room.bluffUsedThisTurn).toBe(false);
+      expect(room.phase).toBe('playing');
+      expect(handLen(room, 'bot:1')).toBe(botHandBefore - 1); // played a card instead
+    } finally {
+      rng.mockRestore();
+    }
   });
 });
 
