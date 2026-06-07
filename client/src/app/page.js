@@ -95,7 +95,7 @@ function HomeContent() {
     roomCode, isHost, playerId,
     roomState, myPlayer, isMyTurn, currentPlayer,
     gameMode, error, connected, authenticated, notification,
-    createRoom, joinRoom, startGame,
+    createRoom, startTutorial, joinRoom, startGame,
     createGroup, listMyGroups, getGroup,
     inviteToGroup, listMyInvites, respondToInvite,
     revokeInvite, removeMember, transferHost,
@@ -662,6 +662,7 @@ function HomeContent() {
         username={username}
         isGuest={isGuest}
         onCreateRoom={createRoom}
+        onStartTutorial={startTutorial}
         onJoinRoom={joinRoom}
         onOpenGroups={openGroupsHome}
         onSignOut={handleSignOut}

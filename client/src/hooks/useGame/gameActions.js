@@ -38,6 +38,24 @@ export function useGameActions({
     });
   }, [setError, setIsHost, setPlayerId, setRoomCode, socket]);
 
+  // Tutorial / Practice — spin up a solo online room seeded with a bot. Mirrors
+  // createRoom's local state plumbing (the server seats the human host + bot and
+  // returns the same { roomCode, isHost, playerId } shape); gameMode then derives
+  // from the room_state broadcast like any online room, so the player lands in
+  // the lobby with the bot already seated.
+  const startTutorial = useCallback(() => {
+    socket.emit('create_tutorial_room', {}, (res) => {
+      if (res?.success) {
+        setError(null);
+        setRoomCode(res.roomCode);
+        setIsHost(true);
+        if (res.playerId) setPlayerId(res.playerId);
+      } else {
+        setError(res?.error || 'Could not start the tutorial');
+      }
+    });
+  }, [setError, setIsHost, setPlayerId, setRoomCode, socket]);
+
   const joinRoom = useCallback((code) => {
     socket.emit('join_room', { roomCode: code.toUpperCase() }, (res) => {
       if (res.success) {
@@ -253,6 +271,7 @@ export function useGameActions({
 
   return {
     createRoom,
+    startTutorial,
     joinRoom,
     startGame,
     nextTurn,

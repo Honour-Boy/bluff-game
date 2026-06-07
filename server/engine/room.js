@@ -191,11 +191,15 @@ function resetRoomForReplay(room) {
   const groupSettingsMeta = room.groupSettingsMeta || null;
   const createdAt    = room.createdAt;
   const chatLog      = room.chatLog || [];
+  // Tutorial flag + bot seats must survive a replay reset, or "play again" in a
+  // practice room would strip the bot and leave a one-player table.
+  const isTutorial   = !!room.isTutorial;
 
   const playerIdentities = room.players.map(p => ({
     id: p.id,
     username: p.username,
     socketId: p.socketId,
+    isBot: !!p.isBot,
   }));
 
   for (const key of Object.keys(room)) delete room[key];
@@ -209,9 +213,12 @@ function resetRoomForReplay(room) {
   room.createdAt      = createdAt;
   room.lastActivityAt = Date.now();
   room.chatLog        = chatLog;
+  room.isTutorial     = isTutorial;
 
   for (const ident of playerIdentities) {
-    room.players.push(createPlayer(ident.id, ident.username, ident.socketId));
+    const player = createPlayer(ident.id, ident.username, ident.socketId);
+    if (ident.isBot) player.isBot = true;
+    room.players.push(player);
   }
 
   return room;

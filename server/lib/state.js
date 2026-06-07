@@ -50,6 +50,15 @@ const speedModeTimers = new Map();    // roomCode → setTimeout handle
 // cleared on teardown — exactly the Speed Mode lifecycle, just a separate handle.
 const idleTurnTimers = new Map();     // roomCode → setTimeout handle
 
+// Tutorial / Practice — bot turn driver. One short per-beat handle per room
+// while a seated bot owes an action (play a card, end its turn, or take a spin
+// it's the target of). Armed at the end of broadcastRoomState (next to the idle
+// timer) and re-armed each broadcast as the bot's beats progress. Bot rooms are
+// always online + isTutorial; the handle is .unref()'d and the expiry re-checks
+// room state defensively, so a stale fire after teardown is a harmless no-op
+// (no separate teardown-clear is wired, unlike the longer-lived timers above).
+const botTimers = new Map();          // roomCode → setTimeout handle
+
 // Host / player disconnect grace timers.
 const hostDisconnectTimers = new Map();
 // Player disconnect timers must be visible across socket connections —
@@ -93,6 +102,10 @@ function _clearSpeedModeTimer(code) {
 function _clearIdleTurnTimer(code) {
   const t = idleTurnTimers.get(code);
   if (t) { clearTimeout(t); idleTurnTimers.delete(code); }
+}
+function _clearBotTimer(code) {
+  const t = botTimers.get(code);
+  if (t) { clearTimeout(t); botTimers.delete(code); }
 }
 
 // §2.1 — verbose, single-line structured logging for every room teardown so
@@ -151,6 +164,7 @@ module.exports = {
   redemptionTimers,
   speedModeTimers,
   idleTurnTimers,
+  botTimers,
   hostDisconnectTimers,
   playerDisconnectTimers,
   dcKey,
@@ -163,6 +177,7 @@ module.exports = {
   _clearRedemptionTimer,
   _clearSpeedModeTimer,
   _clearIdleTurnTimer,
+  _clearBotTimer,
   logRoomDeletion,
   logTurnState,
   getRoom,
