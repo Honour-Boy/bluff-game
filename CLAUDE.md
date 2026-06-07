@@ -72,6 +72,15 @@ Rooms have `mode: 'physical' | 'online'`:
 
 Many handlers branch on `room.mode`. When adding behavior, decide whether it applies to one mode or both, and gate it explicitly. `serializeRoom()` already does mode-aware filtering (e.g. `myHand` only sent in online mode, only to its owner).
 
+### Tutorial / Practice mode (bot opponent)
+
+"Practice vs Bot" (landing screen) creates a normal **online** room via `create_tutorial_room`, flagged `room.isTutorial`, seated with the human host + one bot player (`id 'bot:1'`, `isBot: true`, `socketId: null`). Config is all-off, so at 2 players there are no roles/powers/modifiers — just the core loop.
+
+- The bot has no socket, so it can't emit events. It's driven **server-side** by `lib/bots.js` (`armBotTurn` / `_onBotActExpire`), modeled on the idle-turn auto-resolver: armed at the end of `broadcastRoomState` (next to `armIdleTurnTimer`), it runs the bot's beats (play a card → end turn; spin when it's the bluff-called target) by calling the engine + shared `applySpinAndBroadcast` directly, then broadcasting. Decisions live in pure `engine/botStrategy.js`. **`armBotTurn` is a no-op without bots, so normal rooms are untouched** — gate any new bot/tutorial behavior on `isTutorial` / `isBot` the same way.
+- `lib/bots.js` is required at the top of `lib/broadcast.js`, so it must use **deferred requires** for `./broadcast` and `./orchestration` (inside the expiry fn) to avoid the cycle — same trick `lib/idleTurn.js` uses. Tutorial rooms are never group rooms, so pass an inert stub leaderboard repo (don't `require('./supabaseClient')`, which throws without env).
+- Tutorial rooms opt out of the 40s idle auto-play (`_idleTurnActive`) and skip the `pre_game` role-reveal (`start_game`), so a learner is paced by the guided UI, not by timers.
+- Client guided layer: `components/tutorial/` (`TutorialLayer` intro modal + state-driven coach bar, pure copy in `tutorialContent.js`), mounted in `OnlinePlayerUI` only when `roomState.isTutorial`. No DOM spotlights (deliberately — too fragile over the pannable/responsive table).
+
 ### Phase state machine
 
 `room.phase` flows: `lobby` → `playing` → (`bluff_resolution` for physical | `spin_pending`) → `playing` → ... → `round_end` (online round win) → `playing` → `game_over`.

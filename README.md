@@ -44,6 +44,7 @@ The host configures these per-room from the pre-game settings panel before creat
 - **Last Stand** — final two players auto-enter a stripped-down duel: spin or pass, no cards
 
 **Other**:
+- **Practice vs Bot** — a solo tutorial table against a server-driven bot opponent, with a guided intro walkthrough + a live coach that narrates each beat. One click from the landing screen; no room code, no second player. See the "Tutorial / Practice mode" note in `CLAUDE.md`.
 - LiveKit voice chat (opt-in, mute toggle)
 - Per-room text chat (Socket.IO, 50-message rolling cap)
 - Magic-link email auth (passwordless) + Google OAuth via Supabase
@@ -153,6 +154,8 @@ bluff-game/
 2. Host shares the code physically (or via any message channel)
 3. **Players** open the app → click "Join Room" → enter username + room code
 4. Host clicks **Start Game** (minimum 2 players, max 15)
+
+> **New here?** Click **Practice vs Bot** on the landing screen for a guided solo round against a bot — a stepped intro, then a live coach that tells you what to do each turn. No room code or second player needed.
 
 ### Turn Flow
 1. Server picks a random required card type (square, circle, triangle, cross, star)
