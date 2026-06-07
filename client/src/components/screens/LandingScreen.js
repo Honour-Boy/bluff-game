@@ -52,6 +52,7 @@ export function LandingScreen({
   username,
   isGuest = false,
   onCreateRoom,
+  onStartTutorial,
   onJoinRoom,
   onOpenGroups,
   onSignOut,
@@ -69,6 +70,9 @@ export function LandingScreen({
   const [roomCode, setRoomCode] = useState('');
   const [selectedGameMode, setSelectedGameMode] = useState(null);
   const [codeLocked, setCodeLocked] = useState(false);
+  // First-run nudge: badge the Practice button until the player has tried it
+  // once. Read in an effect (not initial state) to avoid an SSR hydration mismatch.
+  const [tutorialHint, setTutorialHint] = useState(false);
 
   useEffect(() => {
     if (initialJoinCode) {
@@ -77,6 +81,21 @@ export function LandingScreen({
       setMode('join');
     }
   }, [initialJoinCode]); // eslint-disable-line
+
+  useEffect(() => {
+    try {
+      if (typeof window !== 'undefined' && !window.localStorage.getItem('bluff_tutorial_seen')) {
+        setTutorialHint(true);
+      }
+    } catch (_) { /* localStorage blocked — just skip the nudge */ }
+  }, []);
+
+  const handleStartTutorial = () => {
+    setError(null);
+    try { window.localStorage.setItem('bluff_tutorial_seen', '1'); } catch (_) { /* ignore */ }
+    setTutorialHint(false);
+    onStartTutorial?.();
+  };
 
   const handleJoin = (e) => {
     e.preventDefault();
@@ -271,6 +290,38 @@ export function LandingScreen({
               </svg>
               Enter a Room (Player)
             </PlaqueButton>
+
+            {/* Learn by playing — a solo practice table against a bot. The single
+                lowest-friction way in for a first-timer: no code, no second
+                player, the bot autoplays the opposite seat. */}
+            {onStartTutorial && (
+              <PlaqueButton onClick={handleStartTutorial} disabled={!connected}>
+                {/* Target / practice icon */}
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                  <circle cx="12" cy="12" r="9" stroke="currentColor" strokeWidth="1.8"/>
+                  <circle cx="12" cy="12" r="5" stroke="currentColor" strokeWidth="1.6"/>
+                  <circle cx="12" cy="12" r="1.6" fill="currentColor"/>
+                </svg>
+                Practice vs Bot
+                {tutorialHint && (
+                  <span
+                    style={{
+                      marginLeft: 8,
+                      padding: '2px 7px',
+                      borderRadius: 999,
+                      background: 'var(--accent)',
+                      color: '#1a1714',
+                      fontFamily: "'Space Mono', monospace",
+                      fontSize: 9,
+                      letterSpacing: '0.1em',
+                      fontWeight: 700,
+                    }}
+                  >
+                    NEW
+                  </span>
+                )}
+              </PlaqueButton>
+            )}
 
             {!isGuest && (
               <PlaqueButton onClick={() => { setError(null); onOpenGroups?.(); }} disabled={!connected}>

@@ -19,9 +19,14 @@ const { IDLE_TURN_TIMEOUT_MS } = engine;
 
 // Active only in an online room mid-`playing` with a live turn order AND Speed
 // Mode OFF — when Speed Mode is on, armSpeedModeTimer owns the per-turn timeout.
+// Tutorial / Practice rooms opt OUT: a learner reading the on-screen guide must
+// never be rushed off their turn, and the only other seat is a bot (which drives
+// its OWN turns via lib/bots.js), so an idle human only ever blocks themselves —
+// the inactivity sweep GCs an abandoned practice room anyway.
 function _idleTurnActive(room) {
   return !!room
     && room.mode === engine.MODES.ONLINE
+    && !room.isTutorial
     && !room.config?.roomModifiers?.speedMode
     && room.phase === 'playing'
     && Array.isArray(room.turnOrder)

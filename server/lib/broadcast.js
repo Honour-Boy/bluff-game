@@ -6,6 +6,7 @@ const engine = require('../gameEngine');
 const { getRoom } = require('./state');
 const { armSpeedModeTimer } = require('./speedMode');
 const { armIdleTurnTimer } = require('./idleTurn');
+const { armBotTurn } = require('./bots');
 
 /**
  * Fan out the bluff-pipeline's announce events to every socket in
@@ -43,6 +44,10 @@ async function broadcastRoomState(io, roomCode) {
   // #239 — and the idle-turn safety net (mutually exclusive with Speed Mode:
   // _idleTurnActive requires speedMode OFF, so only one ever arms per turn).
   armIdleTurnTimer(io, room);
+  // Tutorial / Practice — drive any seated bot's next beat (play / end / spin).
+  // No-op for rooms without bots, so production rooms are untouched. Armed here
+  // so a bot's move ships from the same authoritative push as everything else.
+  armBotTurn(io, room);
 
   // §3.3 — push live pre-room occupancy to anyone watching this group's
   // directory (members are subscribed to `group:<id>` via list_my_groups /

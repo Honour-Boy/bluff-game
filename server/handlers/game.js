@@ -149,7 +149,10 @@ function register(io, socket, deps) {
       // has already dealt + assigned roles; beginPreGame just flips the
       // phase to 'pre_game' and builds the selection pools. Physical
       // mode keeps the direct lobby → playing transition.
-      const runsPreGame = room.mode === engine.MODES.ONLINE;
+      // Tutorial / Practice skips pre_game too: a 2-player table has no secret
+      // roles and powers are off, so the role-reveal + selection window would
+      // just stall the learner on a "you are Barehand" card. Deal straight in.
+      const runsPreGame = room.mode === engine.MODES.ONLINE && !room.isTutorial;
       if (runsPreGame) engine.beginPreGame(room);
 
       if (room.groupId) {

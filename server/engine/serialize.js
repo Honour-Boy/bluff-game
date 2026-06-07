@@ -51,6 +51,9 @@ function serializeRoom(room, requestingPlayerId = null, opts = {}) {
     // was supplied, i.e. the per-socket online broadcast).
     hostUserId: room.hostUserId || null,
     amHost: requestingPlayerId != null ? (requestingPlayerId === room.hostUserId) : undefined,
+    // Tutorial / Practice — flag the room so the client can brand it (and a
+    // future guided tour can key off it). Always present (false for normal rooms).
+    isTutorial: !!room.isTutorial,
     players: room.players.map(p => ({
       id: p.id,
       username: p.username,
@@ -58,6 +61,8 @@ function serializeRoom(room, requestingPlayerId = null, opts = {}) {
       riskLevel: p.riskLevel,
       chamber: p.chamber,
       isSpectator: p.isSpectator,
+      // Tutorial bots are real seats; surface the flag so the UI can mark them.
+      isBot: !!p.isBot,
       handSize: isOnline && room.hands ? (room.hands.get(p.id) || []).length : undefined,
       armedPowerCard: p.armedPowerCard
         ? { power: p.armedPowerCard.power }

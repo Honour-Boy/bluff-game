@@ -16,6 +16,7 @@ import RedemptionOverlay from './RedemptionOverlay';
 import SpeedModeTimer from './SpeedModeTimer';
 import { PreGameSelectionModal } from '../PreGameSelectionModal';
 import { SmokeLayer } from '../shared/SmokeLayer';
+import { TutorialLayer } from '../tutorial/TutorialLayer';
 import {
   arcPlayers,
   distributePlayers,
@@ -815,6 +816,17 @@ export function OnlinePlayerUI({
       />
 
       <FlyingCardLayer flights={flights} />
+
+      {/* Tutorial / Practice — guided intro + live coach, gated to tutorial rooms. */}
+      {roomState?.isTutorial && (
+        <TutorialLayer
+          roomState={roomState}
+          myPlayerId={myPlayer?.id || null}
+          isHost={isHost}
+          startGame={startGame}
+          isMobile={ui.isMobile}
+        />
+      )}
 
       <style>{GAME_UI_STYLE}</style>
     </div>

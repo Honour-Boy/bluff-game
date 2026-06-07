@@ -67,6 +67,57 @@ function register(io, socket, deps) {
     }
   });
 
+  // ─── Tutorial / Practice: solo room vs. a bot ────────────
+  // A frictionless single-human online room seeded with a practice bot. No code
+  // to share, no second player to wait for — the human lands in the lobby as host
+  // with the bot already seated, presses Start, and the bot autoplays via the
+  // server-side bot driver (lib/bots.js). Powers / modifiers / systems are all
+  // OFF (the all-false defaultRoomConfig), and at 2 players no secret roles are
+  // assigned, so the room teaches the clean core loop. Works for guests too.
+  socket.on('create_tutorial_room', async (_payload = {}, callback) => {
+    if (!socket.userId) return callback?.({ success: false, error: 'Not authenticated' });
+    if (!socketRateLimit(socket, 'create_tutorial_room', 5, 60_000).allowed) {
+      return callback?.({ success: false, error: 'Rate limit exceeded' });
+    }
+
+    try {
+      // null config → normalizeRoomConfig fills in the all-off defaults.
+      const room = await buildAdHocRoom(socket, engine.MODES.ONLINE, null, groupsRepo);
+      room.hostUserId = socket.userId;
+      room.isTutorial = true;
+      room.cardPlayedThisTurn = false;
+      room.bluffUsedThisTurn = false;
+      room.powerActivatedThisTurn = false;
+
+      // Seat the human host.
+      const human = engine.createPlayer(socket.userId, socket.username, socket.id);
+      room.players.push(human);
+
+      // Seat the practice bot. The id is namespaced so it can never collide with
+      // a Supabase user id or a guest id; socketId is null (it never connects).
+      const bot = engine.createPlayer('bot:1', 'Dealer Bot', null);
+      bot.isBot = true;
+      room.players.push(bot);
+
+      await saveRoom(room);
+      socket.join(room.code);
+      console.log(`[Room ${room.code}] Tutorial created by ${socket.username} (vs Dealer Bot)`);
+
+      callback?.({
+        success: true,
+        roomCode: room.code,
+        isHost: true,
+        mode: engine.MODES.ONLINE,
+        playerId: socket.userId,
+        isTutorial: true,
+      });
+
+      await broadcastRoomState(io, room.code);
+    } catch (err) {
+      callback?.({ success: false, error: err.message });
+    }
+  });
+
   // ─── PLAYER: Join an existing room ──────────────────────
   socket.on('join_room', async ({ roomCode } = {}, callback) => {
     if (!socket.userId) return callback({ success: false, error: 'Not authenticated' });
