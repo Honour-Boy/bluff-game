@@ -6,6 +6,7 @@ import {
   coachContextFromRoom,
   introSlidesFor,
   clinicCoachFor,
+  clinicBriefingFor,
   BASICS_HANDOFF_COACH,
   CLINIC_COMPLETE_COACH,
 } from '../tutorialContent';
@@ -191,13 +192,18 @@ describe('clinicCoachFor (Power Clinic drills)', () => {
     }
   });
 
-  it('prefixes a "Power N of M" counter', () => {
-    const c = clinicCoachFor({ power: 'mirror', actor: 'player', step: 'intro', index: 3, total: 7 });
-    expect(c.title).toContain('Power 4 of 7');
+  it('prefixes a "Power N of M" counter from playerStep/playerTotal', () => {
+    const c = clinicCoachFor({ power: 'mirror', actor: 'player', step: 'intro', playerStep: 4, playerTotal: 6 });
+    expect(c.title).toContain('Power 4 of 6');
+  });
+
+  it('does NOT number the bot demo', () => {
+    const c = clinicCoachFor({ power: 'shield', actor: 'bot', step: 'intro', playerStep: null, playerTotal: 6 });
+    expect(c.title).not.toMatch(/Power \d/);
   });
 
   it('frames the bot-Shield demo as the bot defending', () => {
-    const c = clinicCoachFor({ power: 'shield', actor: 'bot', step: 'resolved', index: 3, total: 7 });
+    const c = clinicCoachFor({ power: 'shield', actor: 'bot', step: 'resolved', playerStep: null, playerTotal: 6 });
     expect(c.body).toContain(BOT_NAME);
     expect(c.body.toLowerCase()).toContain('shield');
   });
@@ -210,5 +216,23 @@ describe('clinicCoachFor (Power Clinic drills)', () => {
   it('exposes hand-off + completion copy', () => {
     expect(BASICS_HANDOFF_COACH.body).toContain(BOT_NAME);
     expect(CLINIC_COMPLETE_COACH.tone).toBe('win');
+  });
+});
+
+describe('clinicBriefingFor (per-power pop-up)', () => {
+  it('titles a player drill "Power Card N: <Name>"', () => {
+    const b = clinicBriefingFor({ power: 'shield', actor: 'player', playerStep: 1, playerTotal: 6 });
+    expect(b.title).toBe('Power Card 1 of 6: Shield');
+    expect(b.body).toBeTruthy();
+  });
+
+  it('frames the bot demo without a number', () => {
+    const b = clinicBriefingFor({ power: 'shield', actor: 'bot', playerStep: null });
+    expect(b.title).not.toMatch(/Power Card \d/);
+    expect(b.body).toContain(BOT_NAME);
+  });
+
+  it('is null without a scenario', () => {
+    expect(clinicBriefingFor(null)).toBeNull();
   });
 });

@@ -95,7 +95,7 @@ function HomeContent() {
     roomCode, isHost, playerId,
     roomState, myPlayer, isMyTurn, currentPlayer,
     gameMode, error, connected, authenticated, notification,
-    createRoom, startTutorial, joinRoom, startGame,
+    createRoom, startTutorial, skipToPowers, advanceTutorial, joinRoom, startGame,
     createGroup, listMyGroups, getGroup,
     inviteToGroup, listMyInvites, respondToInvite,
     revokeInvite, removeMember, transferHost,
@@ -689,6 +689,8 @@ function HomeContent() {
           isMyTurn={isMyTurn}
           isHost={true}
           startGame={startGame}
+          skipToPowers={skipToPowers}
+          advanceTutorial={advanceTutorial}
           playCardOnline={playCardOnline}
           callBluff={callBluff}
           endTurn={endTurn}
@@ -750,6 +752,9 @@ function HomeContent() {
           roomState={roomState}
           myPlayer={myPlayer}
           isMyTurn={isMyTurn}
+          startGame={startGame}
+          skipToPowers={skipToPowers}
+          advanceTutorial={advanceTutorial}
           playCardOnline={playCardOnline}
           callBluff={callBluff}
           endTurn={endTurn}

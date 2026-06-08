@@ -105,11 +105,8 @@ function _holds(room, holderId, power) {
   return (room.powerCardSlot?.[holderId] || []).some(c => c?.power === power);
 }
 
-// ─── Drill specs ──────────────────────────────────────────────────────────────
-// Order is pedagogical: a gentle info power, a tempo power, then the bluff-time
-// defences (with a bot-uses-Shield demo wedged in), then the offensive trap LAST
-// — its kill ends the round, which is exactly the clinic-complete beat.
-const POWER_CLINIC = [
+// ─── Drill defs (keyed by id; run order set by _CLINIC_ORDER below) ────────────
+const _DRILL_DEFS = [
   // 0 — PEEK: own-turn, reveals the previous play.
   {
     id: 'peek', power: 'peek', actor: 'player', lockBluff: true,
@@ -237,6 +234,12 @@ const POWER_CLINIC = [
   },
 ];
 
+// Run order. Shield is "Power Card 1" (onboarding spec); the bot-Shield demo
+// follows so the learner immediately sees the same card from the other side; the
+// offensive Assassin is LAST because its kill ends the round = clinic complete.
+const _CLINIC_ORDER = ['shield', 'bot-shield', 'peek', 'freeze', 'mirror', 'swap', 'assassin'];
+const POWER_CLINIC = _CLINIC_ORDER.map(id => _DRILL_DEFS.find(d => d.id === id));
+
 // Stage an intercept drill: the human has "played" a mismatch, the bot has just
 // challenged it, and the human holds an un-armed defensive `power`. For Swap a
 // matching card is seeded into the played pile so the holder has something to
@@ -289,6 +292,12 @@ function stageScenario(room, index) {
   spec.stage(room);
   // Intercept drills set their own phase; everything else is normal play.
   if (room.phase !== 'bluff_intercept_pending') room.phase = 'playing';
+  // "Power Card N of M" numbering counts only the player-facing drills — the bot
+  // demo is an un-numbered aside (playerStep = null).
+  const playerTotal = POWER_CLINIC.filter(d => (d.actor || 'player') === 'player').length;
+  const playerStep = (spec.actor === 'bot')
+    ? null
+    : POWER_CLINIC.slice(0, index + 1).filter(d => (d.actor || 'player') === 'player').length;
   return {
     index,
     id: spec.id,
@@ -300,6 +309,8 @@ function stageScenario(room, index) {
     forceBotBluff: !!spec.forceBotBluff,
     botArmsIntercept: !!spec.botArmsIntercept,
     total: POWER_CLINIC.length,
+    playerStep,
+    playerTotal,
   };
 }
 

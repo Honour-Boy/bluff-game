@@ -30,8 +30,6 @@ const {
 const DELAYS = {
   start_clinic: 2600,  // "you finished the basics round" → deal the clinic
   resolve: 650,        // brief beat after the power lands → show the explanation
-  advance: 2900,       // hold the "what happened" copy before the next drill
-  finish: 1700,        // last drill done → clinic-complete screen
 };
 
 const ALL_POWERS_ON = {
@@ -42,8 +40,10 @@ const ALL_POWERS_ON = {
  * The one staged step the room owes right now, or null. Pure read.
  *   start_clinic — a Basics tutorial reached game over; move to the clinic.
  *   resolve      — the current drill's power was used; show the explanation.
- *   advance      — the explanation beat elapsed; stage the next drill.
- *   finish       — the last drill is done; show clinic-complete.
+ *
+ * Advancing PAST a resolved drill is NOT timed — it waits for the learner to tap
+ * "I Understand" (the `tutorial_advance` socket event → advanceClinic below), so
+ * each power's explanation stays up until the player is ready.
  */
 function _pendingDirectorAction(room) {
   if (!room || !room.isTutorial) return null;
@@ -57,16 +57,11 @@ function _pendingDirectorAction(room) {
     return null;
   }
 
-  // Inside the clinic.
+  // Inside the clinic: only the intro→resolved beat is timed.
   const sc = room.tutorialScenario;
   if (!sc || typeof sc.index !== 'number') return null;
-  if (sc.step === 'intro') {
-    if (scenarioComplete(room, sc.index)) return { kind: 'resolve', index: sc.index };
-    return null;
-  }
-  if (sc.step === 'resolved') {
-    const isLast = sc.index >= POWER_CLINIC.length - 1;
-    return isLast ? { kind: 'finish', index: sc.index } : { kind: 'advance', index: sc.index };
+  if (sc.step === 'intro' && scenarioComplete(room, sc.index)) {
+    return { kind: 'resolve', index: sc.index };
   }
   return null;
 }
@@ -157,12 +152,6 @@ async function _onDirectorExpire(io, code, key) {
     case 'resolve':
       if (room.tutorialScenario) room.tutorialScenario.step = 'resolved';
       break;
-    case 'advance':
-      room.tutorialScenario = stageScenario(room, action.index + 1);
-      break;
-    case 'finish':
-      _finishClinic(room);
-      break;
     default:
       return;
   }
@@ -171,9 +160,26 @@ async function _onDirectorExpire(io, code, key) {
   await broadcastRoomState(io, code);
 }
 
+/**
+ * Player-driven advance past a RESOLVED clinic drill ("I Understand"). Stages the
+ * next drill, or finishes the clinic after the last one. Returns true on advance.
+ */
+function advanceClinic(room) {
+  if (!room || !room.isTutorial || (room.tutorialLesson || 'basics') !== 'powers') return false;
+  const sc = room.tutorialScenario;
+  if (!sc || sc.step !== 'resolved') return false;
+  if (sc.index >= POWER_CLINIC.length - 1) {
+    _finishClinic(room);
+  } else {
+    room.tutorialScenario = stageScenario(room, sc.index + 1);
+  }
+  return true;
+}
+
 module.exports = {
   armTutorialDirector,
   _pendingDirectorAction,
   _beginPowerClinic,
   _finishClinic,
+  advanceClinic,
 };

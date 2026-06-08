@@ -525,6 +525,11 @@ async function applySpinAndBroadcast(io, code, room, player, leaderboardRepo) {
 
   room.lastAction = {
     type: 'spin_result',
+    // Monotonic per-room id so the client keys each spin uniquely. Two spins can
+    // share a target AND an identical pre-spin chamber (e.g. the tutorial bot's
+    // empty chamber across drills), which would otherwise collide the client's
+    // dedup key and skip the second animation.
+    spinSeq: (room.spinSeq = (room.spinSeq || 0) + 1),
     spinTargetId: player.id,
     spinTargetName: player.username,
     spinIndex: spinResult.spinIndex,
@@ -720,6 +725,7 @@ async function resolveRedemption(io, code, room, leaderboardRepo) {
 
   room.lastAction = {
     type: 'spin_result',
+    spinSeq: (room.spinSeq = (room.spinSeq || 0) + 1),
     redemption: true,
     spinTargetId: result.playerId,
     spinTargetName: player?.username || pending.playerName || null,
@@ -806,6 +812,7 @@ async function runMirrorMatchSpin(io, room, pending, leaderboardRepo) {
 
     room.lastAction = {
       type: 'spin_result',
+      spinSeq: (room.spinSeq = (room.spinSeq || 0) + 1),
       spinTargetId: target.id,
       spinTargetName: target.username,
       spinIndex: spinResult.spinIndex,

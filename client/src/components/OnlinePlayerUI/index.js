@@ -35,6 +35,8 @@ export function OnlinePlayerUI({
   isMyTurn,
   isHost = false,
   startGame,
+  skipToPowers,
+  advanceTutorial,
   playCardOnline,
   callBluff,
   endTurn,
@@ -705,7 +707,7 @@ export function OnlinePlayerUI({
         cylinderRotation={ui.cylinderRotation}
         cylinderAnimating={ui.cylinderAnimating}
         isSpinTarget={isSpinTarget}
-        acknowledgeSpinResult={acknowledgeSpinResult}
+        acknowledgeSpinResult={ui.handleSpinContinue}
         pendingCard={ui.pendingCard}
         setPendingCard={ui.setPendingCard}
         whotPickerCard={ui.whotPickerCard}
@@ -832,6 +834,8 @@ export function OnlinePlayerUI({
           myPlayerId={myPlayer?.id || null}
           isHost={isHost}
           startGame={startGame}
+          skipToPowers={skipToPowers}
+          advanceTutorial={advanceTutorial}
           restartRoom={restartRoom}
           leaveGame={leaveGame}
           isMobile={ui.isMobile}
