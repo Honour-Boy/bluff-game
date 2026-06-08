@@ -7,6 +7,7 @@ const { getRoom } = require('./state');
 const { armSpeedModeTimer } = require('./speedMode');
 const { armIdleTurnTimer } = require('./idleTurn');
 const { armBotTurn } = require('./bots');
+const { armTutorialDirector } = require('./tutorialDirector');
 
 /**
  * Fan out the bluff-pipeline's announce events to every socket in
@@ -48,6 +49,9 @@ async function broadcastRoomState(io, roomCode) {
   // No-op for rooms without bots, so production rooms are untouched. Armed here
   // so a bot's move ships from the same authoritative push as everything else.
   armBotTurn(io, room);
+  // Tutorial / Practice — advance the guided lesson (Basics→clinic hand-off and
+  // the scripted Power-Clinic drills). No-op for non-tutorial rooms.
+  armTutorialDirector(io, room);
 
   // §3.3 — push live pre-room occupancy to anyone watching this group's
   // directory (members are subscribed to `group:<id>` via list_my_groups /

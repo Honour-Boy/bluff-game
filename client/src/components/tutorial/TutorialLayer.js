@@ -15,7 +15,10 @@
 
 import { useEffect, useRef, useState } from 'react';
 import { CloseIcon } from '../shared/CloseIcon';
-import { introSlidesFor, coachFor, coachContextFromRoom } from './tutorialContent';
+import {
+  introSlidesFor, coachFor, coachContextFromRoom,
+  clinicCoachFor, BASICS_HANDOFF_COACH, CLINIC_COMPLETE_COACH,
+} from './tutorialContent';
 
 const TONE_COLORS = {
   info: 'var(--accent)',
@@ -115,7 +118,7 @@ function IntroModal({ slides, step, slide, canBegin, isHost, onBack, onNext, onS
             </button>
           ) : (
             <button onClick={onBegin} className="primary" style={{ flex: 1, minHeight: 44, fontSize: 13 }}>
-              {canBegin && isHost ? (slide.cta || 'Begin practice') : 'Got it'}
+              {canBegin ? (slide.cta || 'Begin practice') : 'Got it'}
             </button>
           )}
         </div>
@@ -193,12 +196,48 @@ function CoachBar({ coach, isMobile, onHide, onReplayIntro }) {
 }
 
 // ─── Idle "tap a card" nudge — points at the hand when the player stalls ──────
+// Anchors to the real hand fan (`[data-tour-id="my-hand"]`, set in BottomSeat)
+// so the bubble sits centred just above the cards on ANY viewport — the old
+// fixed `bottom` guess drifted off the hand on wide screens. Falls back to the
+// fixed offset until the anchor is measurable.
 function CardNudge({ isMobile, canBluff }) {
+  const [pos, setPos] = useState(null); // { centerX, bottom } | null → fallback
+
+  useEffect(() => {
+    if (typeof document === 'undefined') return undefined;
+    const measure = () => {
+      const el = document.querySelector('[data-tour-id="my-hand"]');
+      const r = el?.getBoundingClientRect();
+      if (!r || !r.width || !r.height) { setPos(null); return; }
+      // Sit the bubble's bottom edge (the ▼ arrow) just above the hand's top,
+      // centred on the fan's horizontal middle.
+      setPos({ centerX: r.left + r.width / 2, bottom: window.innerHeight - r.top + 6 });
+    };
+    measure();
+    const raf = requestAnimationFrame(measure); // re-measure after layout settles
+    window.addEventListener('resize', measure);
+    let ro;
+    const el = document.querySelector('[data-tour-id="my-hand"]');
+    if (el && typeof ResizeObserver !== 'undefined') {
+      ro = new ResizeObserver(measure);
+      ro.observe(el);
+    }
+    return () => {
+      cancelAnimationFrame(raf);
+      window.removeEventListener('resize', measure);
+      if (ro) ro.disconnect();
+    };
+  }, []);
+
+  const anchored = pos != null;
   return (
     <div
       className="fade-in"
       style={{
-        position: 'fixed', bottom: isMobile ? 150 : 176, left: '50%', transform: 'translateX(-50%)',
+        position: 'fixed',
+        ...(anchored
+          ? { left: pos.centerX, bottom: pos.bottom, transform: 'translateX(-50%)' }
+          : { left: '50%', bottom: isMobile ? 150 : 176, transform: 'translateX(-50%)' }),
         zIndex: 2900, width: 'min(90vw, 420px)', pointerEvents: 'none', textAlign: 'center',
       }}
     >
@@ -225,12 +264,54 @@ function CardNudge({ isMobile, canBluff }) {
   );
 }
 
+// ─── Clinic-complete end card — celebrate + replay / leave ───────────────────
+function ClinicCompleteCard({ coach, onReplay, onLeave }) {
+  return (
+    <div
+      style={{
+        position: 'fixed', inset: 0, zIndex: 9400,
+        background: 'rgba(0,0,0,0.86)',
+        display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16,
+      }}
+    >
+      <div className="card fade-in" style={{ maxWidth: 440, width: '100%', textAlign: 'center' }}>
+        <div style={{
+          fontFamily: "'Bebas Neue', sans-serif", fontSize: 32, lineHeight: 1.05,
+          letterSpacing: '0.05em', color: 'var(--accent)', marginBottom: 12,
+        }}>
+          {coach.title}
+        </div>
+        <div style={{
+          fontFamily: "'Crimson Text', serif", fontSize: 15, lineHeight: 1.7,
+          color: 'var(--text)', marginBottom: 22,
+        }}>
+          {coach.body}
+        </div>
+        <div style={{ display: 'flex', gap: 10 }}>
+          {typeof onReplay === 'function' && (
+            <button onClick={onReplay} className="primary" style={{ flex: 1, minHeight: 46, fontSize: 13 }}>
+              Play again
+            </button>
+          )}
+          {typeof onLeave === 'function' && (
+            <button onClick={onLeave} style={{ flex: 1, minHeight: 46, fontSize: 13 }}>
+              Leave practice
+            </button>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ─── Orchestrator ─────────────────────────────────────────────────────────────
 export function TutorialLayer({
   roomState,
   myPlayerId,
   isHost = false,
   startGame,
+  restartRoom,
+  leaveGame,
   isMobile = false,
   isMyTurn = false,
   reopenSignal = 0,
@@ -238,6 +319,8 @@ export function TutorialLayer({
 }) {
   const phase = roomState?.phase;
   const isLobby = phase === 'lobby';
+  const scenario = roomState?.tutorialScenario || null;
+  const clinicComplete = !!roomState?.tutorialClinicComplete;
   const slides = introSlidesFor(lesson);
 
   const [introDone, setIntroDone] = useState(false); // auto-intro dismissed/began
@@ -260,7 +343,10 @@ export function TutorialLayer({
   };
 
   const handleBegin = () => {
-    if (isLobby && isHost && typeof startGame === 'function') startGame();
+    // The bot hosts the practice table, but the learner paces the first deal:
+    // this layer only mounts in tutorial rooms, so the local human starts the
+    // game (the server's start_game tutorial bypass accepts it). No isHost gate.
+    if (isLobby && typeof startGame === 'function') startGame();
     closeIntro();
   };
 
@@ -270,7 +356,20 @@ export function TutorialLayer({
     setCoachHidden(false);
   };
 
-  const coach = !showIntro && !isLobby ? coachFor(coachContextFromRoom(roomState, myPlayerId)) : null;
+  // Coach selection. The clinic + its hand-offs take priority over the generic
+  // state-driven coach, so the guided lesson speaks with one voice:
+  //   • clinic complete → the celebratory end card (with replay/leave);
+  //   • an active drill → its scripted before/after copy;
+  //   • a finished Basics round → the "now let's learn powers" hand-off;
+  //   • otherwise → the normal contextual coach.
+  let coach = null;
+  if (!showIntro && !isLobby) {
+    if (clinicComplete) coach = CLINIC_COMPLETE_COACH;
+    else if (scenario) coach = clinicCoachFor(scenario);
+    else if (lesson !== 'powers' && (phase === 'game_over' || phase === 'round_end')) {
+      coach = BASICS_HANDOFF_COACH;
+    } else coach = coachFor(coachContextFromRoom(roomState, myPlayerId));
+  }
 
   // Header "Guide" button → reopen the walkthrough. Skip the initial mount so it
   // only fires on an actual press (reopenSignal is bumped by OnlinePlayerUI).
@@ -290,13 +389,16 @@ export function TutorialLayer({
   const canBluff = canPlay
     && !roomState?.isFirstTurn
     && !roomState?.bluffUsedThisTurn
-    && !roomState?.bluffBlockedThisTurn;
+    && !roomState?.bluffBlockedThisTurn
+    && !scenario?.lockBluff;
+  // The clinic gives explicit, drill-specific guidance, so the generic idle
+  // "tap a card" nudge would only add noise — suppress it during the clinic.
   const [showCardNudge, setShowCardNudge] = useState(false);
   useEffect(() => {
-    if (!canPlay || showIntro) { setShowCardNudge(false); return undefined; }
+    if (!canPlay || showIntro || scenario) { setShowCardNudge(false); return undefined; }
     const t = setTimeout(() => setShowCardNudge(true), 3500);
     return () => clearTimeout(t);
-  }, [canPlay, showIntro]);
+  }, [canPlay, showIntro, scenario]);
 
   return (
     <>
@@ -314,7 +416,15 @@ export function TutorialLayer({
         />
       )}
 
-      {coach && !coachHidden && (
+      {clinicComplete && coach && (
+        <ClinicCompleteCard
+          coach={coach}
+          onReplay={typeof restartRoom === 'function' ? restartRoom : undefined}
+          onLeave={typeof leaveGame === 'function' ? leaveGame : undefined}
+        />
+      )}
+
+      {coach && !clinicComplete && !coachHidden && (
         <CoachBar
           coach={coach}
           isMobile={isMobile}

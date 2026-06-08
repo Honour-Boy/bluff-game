@@ -423,7 +423,10 @@ export function CenterTablePanel({
               color: 'var(--text-dim)',
               fontStyle: 'italic',
             }}>
-              Awaiting the proprietor to reshuffle…
+              {/* In a practice room the bot "hosts"; the guided layer owns the
+                  next step (clinic hand-off / replay), so avoid the group-room
+                  "awaiting the host" copy. */}
+              {roomState?.isTutorial ? 'Setting up the next lesson…' : 'Awaiting the proprietor to reshuffle…'}
             </div>
           )}
         </div>

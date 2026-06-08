@@ -50,7 +50,7 @@ function ArmCardButton({ option, busy, onArm }) {
   );
 }
 
-export function BluffInterceptOverlay({ pending, bluffIntercept }) {
+export function BluffInterceptOverlay({ pending, bluffIntercept, tutorial = false }) {
   const [busy, setBusy] = useState(false);
   const [secondsLeft, setSecondsLeft] = useState(null);
 
@@ -130,7 +130,9 @@ export function BluffInterceptOverlay({ pending, bluffIntercept }) {
           {pending.accuserName || 'A player'} is challenging you.
         </div>
         <div style={{ fontSize: 12, color: 'var(--text-dim)', marginBottom: 18, lineHeight: 1.55 }}>
-          Play a defensive card to respond before it resolves — or pass and let the call stand.
+          {tutorial
+            ? 'Tap your power card below to defend — take your time, the coach has you.'
+            : 'Play a defensive card to respond before it resolves — or pass and let the call stand.'}
         </div>
 
         <div style={{ display: 'flex', gap: 12, justifyContent: 'center', flexWrap: 'wrap', marginBottom: 18 }}>
@@ -139,23 +141,27 @@ export function BluffInterceptOverlay({ pending, bluffIntercept }) {
           ))}
         </div>
 
-        <button
-          onClick={() => respond(null)}
-          disabled={busy}
-          style={{
-            fontSize: 12,
-            color: 'var(--text-dim)',
-            background: 'none',
-            border: 'none',
-            cursor: busy ? 'wait' : 'pointer',
-            textDecoration: 'underline',
-            marginBottom: 8,
-          }}
-        >
-          Pass — let the call resolve
-        </button>
+        {/* In the clinic there's no auto-timeout and passing would skip the
+            lesson, so hide both — the learner must use the power. */}
+        {!tutorial && (
+          <button
+            onClick={() => respond(null)}
+            disabled={busy}
+            style={{
+              fontSize: 12,
+              color: 'var(--text-dim)',
+              background: 'none',
+              border: 'none',
+              cursor: busy ? 'wait' : 'pointer',
+              textDecoration: 'underline',
+              marginBottom: 8,
+            }}
+          >
+            Pass — let the call resolve
+          </button>
+        )}
 
-        {secondsLeft != null && (
+        {!tutorial && secondsLeft != null && (
           <div style={{ fontFamily: "'Space Mono', monospace", fontSize: 12, color: secondsLeft <= 3 ? 'var(--eliminated)' : 'var(--text-dim)', letterSpacing: '0.1em' }}>
             Auto-resolves in {secondsLeft}s
           </div>

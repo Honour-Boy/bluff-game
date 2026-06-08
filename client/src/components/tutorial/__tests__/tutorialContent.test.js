@@ -5,6 +5,9 @@ import {
   coachFor,
   coachContextFromRoom,
   introSlidesFor,
+  clinicCoachFor,
+  BASICS_HANDOFF_COACH,
+  CLINIC_COMPLETE_COACH,
 } from '../tutorialContent';
 
 describe('INTRO_SLIDES', () => {
@@ -161,5 +164,51 @@ describe('coachFor — power-cards lesson', () => {
     const c = coachFor({ phase: 'playing', isMyTurn: true, cardPlayedThisTurn: false, heldPowerLabel: 'Peek' });
     expect(c.key).toBe('play-or-bluff');
     expect(c.body).toContain('Peek');
+  });
+});
+
+describe('clinicCoachFor (Power Clinic drills)', () => {
+  const drills = [
+    ['peek', 'player'],
+    ['freeze', 'player'],
+    ['shield', 'player'],
+    ['shield', 'bot'],
+    ['mirror', 'player'],
+    ['swap', 'player'],
+    ['assassin', 'player'],
+  ];
+
+  it('returns distinct intro + resolved copy for every drill', () => {
+    for (const [power, actor] of drills) {
+      const intro = clinicCoachFor({ power, actor, step: 'intro', index: 0, total: 7 });
+      const resolved = clinicCoachFor({ power, actor, step: 'resolved', index: 0, total: 7 });
+      expect(intro.title).toBeTruthy();
+      expect(intro.body).toBeTruthy();
+      expect(resolved.title).toBeTruthy();
+      expect(resolved.body).toBeTruthy();
+      expect(intro.body).not.toBe(resolved.body);
+      expect(intro.key).toContain(power);
+    }
+  });
+
+  it('prefixes a "Power N of M" counter', () => {
+    const c = clinicCoachFor({ power: 'mirror', actor: 'player', step: 'intro', index: 3, total: 7 });
+    expect(c.title).toContain('Power 4 of 7');
+  });
+
+  it('frames the bot-Shield demo as the bot defending', () => {
+    const c = clinicCoachFor({ power: 'shield', actor: 'bot', step: 'resolved', index: 3, total: 7 });
+    expect(c.body).toContain(BOT_NAME);
+    expect(c.body.toLowerCase()).toContain('shield');
+  });
+
+  it('is null without a scenario', () => {
+    expect(clinicCoachFor(null)).toBeNull();
+    expect(clinicCoachFor({})).toBeNull();
+  });
+
+  it('exposes hand-off + completion copy', () => {
+    expect(BASICS_HANDOFF_COACH.body).toContain(BOT_NAME);
+    expect(CLINIC_COMPLETE_COACH.tone).toBe('win');
   });
 });

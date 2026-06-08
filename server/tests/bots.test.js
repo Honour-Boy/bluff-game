@@ -442,7 +442,7 @@ describe('create_tutorial_room', () => {
     return handlers;
   }
 
-  it('seats the human host + one bot in an all-off online tutorial room', async () => {
+  it('seats a non-host human + a bot HOST in an all-off online tutorial room', async () => {
     const io = makeIo();
     const handlers = captureHandlers(io);
     const cb = vi.fn();
@@ -453,7 +453,8 @@ describe('create_tutorial_room', () => {
     const res = cb.mock.calls[0][0];
     expect(res.success).toBe(true);
     expect(res.isTutorial).toBe(true);
-    expect(res.isHost).toBe(true);
+    // A newbie should NOT hold the room controls — the bot "hosts" the table.
+    expect(res.isHost).toBe(false);
     expect(res.mode).toBe(engine.MODES.ONLINE);
     expect(res.playerId).toBe('human');
 
@@ -470,6 +471,12 @@ describe('create_tutorial_room', () => {
     expect(bot).toBeTruthy();
     expect(bot.username).toBe('Dealer Bot');
     expect(bot.socketId).toBeNull();
+
+    // Bot is host-of-record (no socket); the human's amHost is therefore false.
+    expect(room.hostUserId).toBe('bot:1');
+    expect(room.hostSocketId).toBeNull();
+    expect(room.botBluffCallsThisGame).toBe(0);
+    expect(engine.serializeRoom(room, 'human').amHost).toBe(false);
 
     // All powers / modifiers / systems off.
     expect(Object.values(room.config.powerCards.enabled).every((v) => v === false)).toBe(true);

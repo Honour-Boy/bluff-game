@@ -47,6 +47,17 @@ function _roomHasBots(room) {
   return Array.isArray(room?.players) && room.players.some((p) => p?.isBot);
 }
 
+// Is the bot eligible to CHALLENGE the previous play right now? (Clinic-scripted
+// bluff calls bypass the random rate but still need a real, live target.)
+function _botCanForceBluff(room, botId) {
+  if (room.isFirstTurn || room.bluffUsedThisTurn || room.bluffBlockedThisTurn) return false;
+  if (!room.challengeableCard) return false;
+  const accusedId = engine.getPreviousTurnPlayerId(room);
+  if (!accusedId || accusedId === botId) return false;
+  const accused = room.players.find((p) => p.id === accusedId);
+  return !!accused && accused.status === 'alive';
+}
+
 /**
  * What, if anything, does a seated bot owe right now? Returns
  *   { kind: 'play' | 'end' | 'spin', botId }
@@ -56,12 +67,17 @@ function _roomHasBots(room) {
 function _pendingBotAction(room) {
   if (!room || room.mode !== engine.MODES.ONLINE || !_roomHasBots(room)) return null;
 
-  // A bot accused during a bluff-intercept window auto-passes — it has no socket
-  // to arm a defensive power, so without this a human bluff against a power-holding
-  // bot would stall the whole 8s window before resolving.
+  // A bot accused during a bluff-intercept window normally auto-passes — it has
+  // no socket to arm a defence, so without this a human bluff against a power-
+  // holding bot would stall the whole window. EXCEPTION: the clinic's bot-Shield
+  // demo scripts the bot to ARM its defence so the learner sees a power used
+  // against them.
   if (room.phase === 'bluff_intercept_pending' && room.pendingBluffIntercept) {
     const accused = room.players.find((p) => p.id === room.pendingBluffIntercept.accusedId);
     if (accused?.isBot && accused.status === 'alive') {
+      if (room.tutorialScenario?.botArmsIntercept) {
+        return { kind: 'intercept_arm', botId: accused.id };
+      }
       return { kind: 'intercept_pass', botId: accused.id };
     }
     return null;
@@ -83,6 +99,15 @@ function _pendingBotAction(room) {
     const currentId = room.turnOrder[room.currentTurnIndex];
     const current = room.players.find((p) => p.id === currentId);
     if (current?.isBot && current.status === 'alive') {
+      // Inside a scripted clinic drill the bot does NOT free-play — it stays idle
+      // unless the drill scripts it to CHALLENGE (the Assassin drill), so a stray
+      // bot card can't derail the staged instance. The director owns the flow.
+      if (room.tutorialScenario) {
+        if (room.tutorialScenario.forceBotBluff && _botCanForceBluff(room, current.id)) {
+          return { kind: 'force_bluff', botId: current.id };
+        }
+        return null;
+      }
       return { kind: room.cardPlayedThisTurn ? 'end' : 'play', botId: current.id };
     }
   }
@@ -228,6 +253,45 @@ async function _onBotActExpire(io, code, key) {
 
   room._botActionKey = null;
 
+  if (action.kind === 'intercept_arm') {
+    // Clinic bot-Shield demo: the bot arms its defence in response to the human's
+    // challenge so the learner sees a power used against them. Mirrors the human
+    // bluff_intercept "arm" path: arm → close window → resolve.
+    const { _resolveOnlineBluff } = require('./orchestration');
+    const pending = room.pendingBluffIntercept;
+    const accuserId = pending?.accuserId || null;
+    const optionCardId = pending?.options?.[0]?.cardId || null;
+    _clearBluffInterceptTimer(code);
+    const res = engine.armInterceptCard(room, action.botId, optionCardId);
+    room.pendingBluffIntercept = null;
+    room.phase = 'playing';
+    if (res?.ok) {
+      const bot = room.players.find((p) => p.id === action.botId);
+      io.to(code).emit('power_card_triggered', {
+        kind: 'bluff_intercept_armed',
+        holderId: action.botId,
+        holderName: bot?.username || null,
+        power: res.power,
+      });
+    }
+    if (!accuserId) {
+      await saveRoom(room);
+      await broadcastRoomState(io, code);
+      return;
+    }
+    await _resolveOnlineBluff(io, code, room, accuserId, NOOP_LEADERBOARD_REPO);
+    return;
+  }
+
+  if (action.kind === 'force_bluff') {
+    // Clinic-scripted challenge (Assassin drill): the bot calls bluff on the
+    // human's honest play. NOT counted toward the Basics ≥2 guarantee.
+    const { _resolveOnlineBluff } = require('./orchestration');
+    room.bluffUsedThisTurn = true;
+    await _resolveOnlineBluff(io, code, room, action.botId, NOOP_LEADERBOARD_REPO);
+    return;
+  }
+
   if (action.kind === 'intercept_pass') {
     // The bot declines to arm a defence; resolve the bluff exactly as the
     // bluff_intercept "pass" path does (clear the window, restore play, resolve).
@@ -263,6 +327,8 @@ async function _onBotActExpire(io, code, key) {
     // bluff again and will just play a card.
     if (shouldCallBluff(room, action.botId)) {
       room.bluffUsedThisTurn = true;
+      // Tutorial "≥2 calls per game" guarantee reads this counter (botStrategy).
+      room.botBluffCallsThisGame = (room.botBluffCallsThisGame || 0) + 1;
       await _resolveOnlineBluff(io, code, room, action.botId, NOOP_LEADERBOARD_REPO);
       return;
     }

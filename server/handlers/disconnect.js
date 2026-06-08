@@ -19,6 +19,7 @@ const {
   _clearSpeedModeTimer,
   _clearIdleTurnTimer,
   _clearBotTimer,
+  _clearTutorialTimer,
   logRoomDeletion,
   saveRoom,
 } = require('../lib/state');
@@ -34,6 +35,29 @@ function register(io, socket, deps) {
     console.log(`[Socket] Disconnected: ${socket.id}`);
 
     for (const [code, room] of rooms.entries()) {
+      // ── Tutorial / Practice: the human is a non-host seat (the bot "hosts"),
+      //    so a dropped human no longer trips the host-teardown path below.
+      //    A practice room is only ever human + bot, so the human dropping ends
+      //    the session — destroy the whole room (mirrors the leave_room tutorial
+      //    teardown) instead of auto-eliminating into a bot-only zombie room. ──
+      if (room.isTutorial && room.players.some(p => p.socketId === socket.id && !p.isBot)) {
+        logRoomDeletion(code, 'tutorial_disconnected', { phase: room.phase });
+        io.in(code).socketsLeave(code);
+        _clearBettingTimer(code);
+        _clearGhostVoteTimer(code);
+        _clearPreGameTimer(code);
+        _clearSpinPendingTimer(code);
+        _clearGameOverTimer(code);
+        _clearRedemptionTimer(code);
+        _clearSpeedModeTimer(code);
+        _clearIdleTurnTimer(code);
+        _clearBotTimer(code);
+        _clearTutorialTimer(code);
+        rooms.delete(code);
+        console.log(`[Room ${code}] tutorial — human disconnected, practice room destroyed.`);
+        continue;
+      }
+
       // ── Host dropped → end the room immediately (no grace). ──
       if (room.hostSocketId === socket.id) {
         logRoomDeletion(code, 'host_disconnected', { phase: room.phase, groupId: room.groupId || undefined });

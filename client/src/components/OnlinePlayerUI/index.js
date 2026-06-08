@@ -658,6 +658,7 @@ export function OnlinePlayerUI({
         bluffUsedThisTurn={bluffUsedThisTurn}
         cardPlayedThisTurn={cardPlayedThisTurn}
         bluffBlockedThisTurn={bluffBlockedThisTurn}
+        bluffLocked={!!roomState?.tutorialScenario?.lockBluff}
         actionHint={actionHint}
         tickerText={tickerText}
         isMySpinTurn={isMySpinTurn}
@@ -804,6 +805,7 @@ export function OnlinePlayerUI({
         <BluffInterceptOverlay
           pending={roomState.pendingBluffIntercept}
           bluffIntercept={bluffIntercept}
+          tutorial={isTutorial && !!roomState?.tutorialScenario}
         />
       )}
 
@@ -830,6 +832,8 @@ export function OnlinePlayerUI({
           myPlayerId={myPlayer?.id || null}
           isHost={isHost}
           startGame={startGame}
+          restartRoom={restartRoom}
+          leaveGame={leaveGame}
           isMobile={ui.isMobile}
           isMyTurn={isMyTurn}
           reopenSignal={guideSignal}
