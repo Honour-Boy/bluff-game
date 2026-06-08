@@ -833,6 +833,7 @@ export function OnlinePlayerUI({
           isMobile={ui.isMobile}
           isMyTurn={isMyTurn}
           reopenSignal={guideSignal}
+          lesson={roomState?.tutorialLesson || 'basics'}
         />
       )}
 

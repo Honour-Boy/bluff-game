@@ -64,6 +64,33 @@ export const INTRO_SLIDES = [
   },
 ];
 
+// Extra slide for the Power Cards lesson, inserted before the final "ready" slide.
+const POWERS_SLIDE = {
+  id: 'powers',
+  title: 'Power Cards',
+  body: 'This round mixes two power cards into the deck. You start holding one in a slot beside your hand:',
+  points: [
+    'Peek — privately see the last card played before you decide.',
+    'Shield — block the next bluff called against you.',
+    'Tap your power card on your turn to use it (you hold one at a time).',
+  ],
+};
+
+// Display labels for the power keys the coach references.
+const POWER_LABELS = {
+  shield: 'Shield', mirror: 'Mirror', swap: 'Swap',
+  peek: 'Peek', freeze: 'Freeze', assassin: 'Assassin',
+};
+
+// The intro deck for a given lesson. 'powers' splices the Power Cards slide in
+// just before the closing "ready" slide; everything else gets the basics deck.
+export function introSlidesFor(lesson) {
+  if (lesson === 'powers') {
+    return [...INTRO_SLIDES.slice(0, -1), POWERS_SLIDE, INTRO_SLIDES[INTRO_SLIDES.length - 1]];
+  }
+  return INTRO_SLIDES;
+}
+
 // Tone drives the coach card's accent colour in the layer.
 //   'info'   — neutral teaching
 //   'action' — it's on you to do something now
@@ -93,7 +120,32 @@ export function coachFor(ctx = {}) {
     amWinner = false,
     winnerName = null,
     eliminated = false,
+    heldPowerLabel = null,
+    amAccusedIntercept = false,
   } = ctx;
+
+  // Power Cards lesson — a defensive-power holder being bluff-called can block it.
+  if (phase === 'bluff_intercept_pending') {
+    if (amAccusedIntercept) {
+      return {
+        key: 'intercept-defend',
+        tone: 'danger',
+        title: 'Block it!',
+        body: `${BOT_NAME} called bluff on your card. Arm your ${heldPowerLabel || 'defence'} to block it — or pass to let the bluff resolve.`,
+      };
+    }
+    return {
+      key: 'intercept-wait',
+      tone: 'info',
+      title: 'Defence window',
+      body: `${BOT_NAME} is deciding whether to block your challenge…`,
+    };
+  }
+
+  // Appended to the on-turn tips when the player is holding a power card.
+  const powerNote = heldPowerLabel
+    ? ` You also hold a ${heldPowerLabel} — tap it beside your hand to use it.`
+    : '';
 
   if (phase === 'pre_game') {
     return {
@@ -153,7 +205,7 @@ export function coachFor(ctx = {}) {
           key: 'first-play',
           tone: 'action',
           title: 'Your turn — you lead',
-          body: 'You play first this round, so there’s nothing to challenge yet. Tap a card to play it (matching the shape is the safe move).',
+          body: 'You play first this round, so there’s nothing to challenge yet. Tap a card to play it (matching the shape is the safe move).' + powerNote,
         };
       }
       if (bluffBlockedThisTurn) {
@@ -168,7 +220,7 @@ export function coachFor(ctx = {}) {
         key: 'play-or-bluff',
         tone: 'action',
         title: 'Your turn',
-        body: `Play a card that matches the shape — or, if you think ${BOT_NAME} just bluffed, hit Call Bluff to flip its card. Right → it spins. Wrong → you do.`,
+        body: `Play a card that matches the shape — or, if you think ${BOT_NAME} just bluffed, hit Call Bluff to flip its card. Right → it spins. Wrong → you do.` + powerNote,
       };
     }
     // Bot's turn.
@@ -214,5 +266,10 @@ export function coachContextFromRoom(roomState, myPlayerId) {
     amWinner: winnerId === myPlayerId,
     winnerName: roomState.lastAction?.winnerName || null,
     eliminated: me?.status === 'eliminated',
+    // Power Cards lesson — what the player is holding + whether they're the one
+    // being bluff-called (so the coach can prompt a block).
+    heldPowerLabel: POWER_LABELS[roomState.myPowerCardSlot?.[0]?.power] || null,
+    amAccusedIntercept: roomState.phase === 'bluff_intercept_pending'
+      && !!roomState.pendingBluffIntercept?.amAccused,
   };
 }

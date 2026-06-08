@@ -4,6 +4,7 @@ import {
   BOT_NAME,
   coachFor,
   coachContextFromRoom,
+  introSlidesFor,
 } from '../tutorialContent';
 
 describe('INTRO_SLIDES', () => {
@@ -112,5 +113,53 @@ describe('coachContextFromRoom', () => {
 
   it('is safe on a null room', () => {
     expect(coachContextFromRoom(null, 'me')).toEqual({});
+  });
+
+  it('derives the held power label and the intercept flag (powers lesson)', () => {
+    const room = {
+      phase: 'bluff_intercept_pending',
+      currentPlayerId: 'me',
+      players: [{ id: 'me', username: 'You', status: 'alive' }],
+      myPowerCardSlot: [{ id: 'sh', type: 'power', power: 'shield' }],
+      pendingBluffIntercept: { amAccused: true },
+      lastAction: {},
+    };
+    const ctx = coachContextFromRoom(room, 'me');
+    expect(ctx.heldPowerLabel).toBe('Shield');
+    expect(ctx.amAccusedIntercept).toBe(true);
+  });
+});
+
+describe('introSlidesFor (Phase 4 lessons)', () => {
+  it('returns the basics deck unchanged for the basics lesson', () => {
+    expect(introSlidesFor('basics')).toBe(INTRO_SLIDES);
+    expect(introSlidesFor(undefined)).toBe(INTRO_SLIDES);
+  });
+
+  it('splices a Power Cards slide in for the powers lesson, keeping Begin last', () => {
+    const slides = introSlidesFor('powers');
+    expect(slides.length).toBe(INTRO_SLIDES.length + 1);
+    expect(slides.some((s) => s.id === 'powers')).toBe(true);
+    expect(slides[slides.length - 1].cta).toBeTruthy(); // final slide still deals the cards
+  });
+});
+
+describe('coachFor — power-cards lesson', () => {
+  it('prompts a block when the player is bluff-called while holding a defence', () => {
+    const c = coachFor({ phase: 'bluff_intercept_pending', amAccusedIntercept: true, heldPowerLabel: 'Shield' });
+    expect(c.key).toBe('intercept-defend');
+    expect(c.tone).toBe('danger');
+    expect(c.body).toContain('Shield');
+  });
+
+  it('shows a brief waiting tip while the bot decides on a challenge', () => {
+    const c = coachFor({ phase: 'bluff_intercept_pending', amAccusedIntercept: false });
+    expect(c.key).toBe('intercept-wait');
+  });
+
+  it('mentions a held power in the on-turn play tip', () => {
+    const c = coachFor({ phase: 'playing', isMyTurn: true, cardPlayedThisTurn: false, heldPowerLabel: 'Peek' });
+    expect(c.key).toBe('play-or-bluff');
+    expect(c.body).toContain('Peek');
   });
 });

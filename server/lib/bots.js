@@ -25,11 +25,13 @@ const {
   botTimers,
   _clearBotTimer,
   _clearSpinPendingTimer,
+  _clearBluffInterceptTimer,
 } = require('./state');
 
 // Beat timing — long enough to read on screen, short enough to feel responsive.
 const BOT_MOVE_DELAY_MS = 1100; // play a card / end the turn
 const BOT_SPIN_DELAY_MS = 1500; // pause on "<bot> is on the spot" before spinning
+const BOT_INTERCEPT_DELAY_MS = 700; // brief "deciding" beat before auto-passing a bluff intercept
 
 // Tutorial rooms are never group rooms (room.groupId is null), so the leaderboard
 // repo handed to the spin pipeline is never actually invoked — every call site
@@ -53,6 +55,17 @@ function _roomHasBots(room) {
  */
 function _pendingBotAction(room) {
   if (!room || room.mode !== engine.MODES.ONLINE || !_roomHasBots(room)) return null;
+
+  // A bot accused during a bluff-intercept window auto-passes — it has no socket
+  // to arm a defensive power, so without this a human bluff against a power-holding
+  // bot would stall the whole 8s window before resolving.
+  if (room.phase === 'bluff_intercept_pending' && room.pendingBluffIntercept) {
+    const accused = room.players.find((p) => p.id === room.pendingBluffIntercept.accusedId);
+    if (accused?.isBot && accused.status === 'alive') {
+      return { kind: 'intercept_pass', botId: accused.id };
+    }
+    return null;
+  }
 
   // A bot is on the spot for a spin.
   if (room.phase === 'spin_pending' && room.spinTargetId) {
@@ -118,7 +131,11 @@ function armBotTurn(io, room) {
 
   _clearBotTimer(code);
   room._botActionKey = key;
-  const delay = action.kind === 'spin' ? BOT_SPIN_DELAY_MS : BOT_MOVE_DELAY_MS;
+  const delay = action.kind === 'spin'
+    ? BOT_SPIN_DELAY_MS
+    : action.kind === 'intercept_pass'
+      ? BOT_INTERCEPT_DELAY_MS
+      : BOT_MOVE_DELAY_MS;
   const handle = setTimeout(() => {
     _onBotActExpire(io, code, key).catch((err) => {
       console.error('[bot] act handler failed', err);
@@ -210,6 +227,22 @@ async function _onBotActExpire(io, code, key) {
   if (key && _botActionKey(action, room) !== key) return;
 
   room._botActionKey = null;
+
+  if (action.kind === 'intercept_pass') {
+    // The bot declines to arm a defence; resolve the bluff exactly as the
+    // bluff_intercept "pass" path does (clear the window, restore play, resolve).
+    const accuserId = room.pendingBluffIntercept?.accuserId || null;
+    _clearBluffInterceptTimer(code);
+    room.pendingBluffIntercept = null;
+    room.phase = 'playing';
+    if (!accuserId) {
+      await saveRoom(room);
+      await broadcastRoomState(io, code);
+      return;
+    }
+    await _resolveOnlineBluff(io, code, room, accuserId, NOOP_LEADERBOARD_REPO);
+    return;
+  }
 
   if (action.kind === 'spin') {
     const player = room.players.find((p) => p.id === action.botId);

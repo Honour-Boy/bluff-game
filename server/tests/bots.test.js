@@ -224,6 +224,17 @@ describe('_pendingBotAction', () => {
       expect(_pendingBotAction(room)).toBeNull();
     }
   });
+
+  it('auto-passes a bluff intercept only when the accused is a bot', () => {
+    const room = makeTutorialRoom();
+    room.phase = 'bluff_intercept_pending';
+    room.pendingBluffIntercept = { accuserId: 'human', accusedId: 'bot:1' };
+    expect(_pendingBotAction(room)).toEqual({ kind: 'intercept_pass', botId: 'bot:1' });
+
+    // The human decides their own defence — no bot action.
+    room.pendingBluffIntercept = { accuserId: 'bot:1', accusedId: 'human' };
+    expect(_pendingBotAction(room)).toBeNull();
+  });
 });
 
 // ─── Beat execution (driven through the real broadcast path) ──────────────────
@@ -347,6 +358,42 @@ describe('bot turn driver — beats', () => {
     } finally {
       rng.mockRestore();
     }
+  });
+
+  it('auto-passes a bluff-intercept window aimed at the bot (no 8s stall)', async () => {
+    const room = makeTutorialRoom();
+    // Stage a window: the bot was the previous player, holds an un-armed Shield,
+    // and the human (now on turn) has called bluff on it.
+    room.turnOrder = ['bot:1', 'human'];
+    room.currentTurnIndex = 1;
+    room.isFirstTurn = false;
+    room.prevTurnPlayerId = 'bot:1';
+    const card = { id: 'c1', type: 'shape', shape: 'square', number: 3 };
+    room.lastPlayedCard = card;
+    room.challengeableCard = card;
+    room.challengeableCardType = 'circle'; // square ≠ circle → the bot "lied"
+    room.playedPile = [card];
+    room.powerCardSlot = { human: [], 'bot:1': [{ id: 'sh', type: 'power', power: 'shield' }] };
+    room.bluffUsedThisTurn = true;
+    room.phase = 'bluff_intercept_pending';
+    room.pendingBluffIntercept = {
+      accuserId: 'human', accuserName: 'You',
+      accusedId: 'bot:1', accusedName: 'Dealer Bot',
+      deadline: Date.now() + 8000,
+      options: [{ cardId: 'sh', power: 'shield' }],
+    };
+    await saveRoom(room);
+    const io = makeIo();
+
+    expect(_pendingBotAction(room)).toEqual({ kind: 'intercept_pass', botId: 'bot:1' });
+
+    await broadcastRoomState(io, room.code);
+    await vi.advanceTimersByTimeAsync(900); // BOT_INTERCEPT_DELAY_MS = 700
+
+    // Window closed and the bluff resolved (the bot didn't shield → it spins).
+    expect(room.pendingBluffIntercept).toBeNull();
+    expect(room.phase).toBe('spin_pending');
+    expect(room.spinTargetId).toBe('bot:1');
   });
 
   it('does NOT challenge when the bluff roll misses — it just plays', async () => {
@@ -542,5 +589,53 @@ describe('tutorial teardown on leave', () => {
     expect(leaveCb).toHaveBeenCalledWith({ success: true, roomClosed: true });
     expect(rooms.has(code)).toBe(false);                                  // destroyed
     expect(io.log.some((e) => e.event === 'host_migrated')).toBe(false);  // never migrated to the bot
+  });
+});
+
+// ─── Phase 4 — power-cards lesson ─────────────────────────────────────────────
+describe('power-cards lesson', () => {
+  const deps = {
+    groupsRepo: { getActiveGroupByCode: async () => null },
+    groupSettingsRepo: { upsertGroupSettings: vi.fn() },
+    leaderboardRepo: { recordWinner: vi.fn(), recordGameStart: vi.fn() },
+  };
+  function capture(io) {
+    const handlers = {};
+    const socket = {
+      id: 'host-sock', userId: 'human', username: 'You', data: {},
+      on: (e, cb) => { handlers[e] = cb; }, join: () => {}, leave: () => {},
+    };
+    roomHandler.register(io, socket, deps);
+    gameHandler.register(io, socket, deps);
+    return handlers;
+  }
+
+  it("defaults to the basics lesson (all powers off) when unspecified", async () => {
+    const handlers = capture(makeIo());
+    const cb = vi.fn();
+    await handlers['create_tutorial_room']({}, cb);
+    const room = rooms.get(cb.mock.calls[0][0].roomCode);
+    expect(room.tutorialLesson).toBe('basics');
+    expect(Object.values(room.config.powerCards.enabled).every((v) => v === false)).toBe(true);
+  });
+
+  it('seeds Peek + Shield and guarantees a power card per seat for the powers lesson', async () => {
+    const handlers = capture(makeIo());
+    const cb = vi.fn();
+    await handlers['create_tutorial_room']({ lesson: 'powers' }, cb);
+    const res = cb.mock.calls[0][0];
+    expect(res.lesson).toBe('powers');
+
+    const room = rooms.get(res.roomCode);
+    expect(room.tutorialLesson).toBe('powers');
+    expect(room.config.powerCards.enabled.peek).toBe(true);
+    expect(room.config.powerCards.enabled.shield).toBe(true);
+    expect(room.config.powerCards.enabled.assassin).toBe(false);
+    expect(engine.serializeRoom(room, 'human').tutorialLesson).toBe('powers');
+
+    await handlers['start_game']({ roomCode: res.roomCode }, vi.fn());
+    expect((room.powerCardSlot.human || []).length).toBeGreaterThanOrEqual(1);
+    expect((room.powerCardSlot['bot:1'] || []).length).toBeGreaterThanOrEqual(1);
+    _clearBotTimer(res.roomCode);
   });
 });
