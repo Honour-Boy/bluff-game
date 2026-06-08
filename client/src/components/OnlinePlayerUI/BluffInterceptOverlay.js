@@ -17,7 +17,7 @@ import { POWER_META, POWER_ICONS } from '../shared/PowerCard';
 
 const ACCENT = 'var(--warning)';
 
-function ArmCardButton({ option, busy, onArm }) {
+function ArmCardButton({ option, busy, onArm, glow = false }) {
   const meta = POWER_META[option.power] || POWER_META.shield;
   const draw = POWER_ICONS[option.power] || POWER_ICONS.shield;
   return (
@@ -34,12 +34,18 @@ function ArmCardButton({ option, busy, onArm }) {
         width: 104,
         height: 150,
         background: 'linear-gradient(160deg, #0d0d10 0%, #08080a 55%, #050507 100%)',
-        border: `2px solid ${meta.color}`,
+        // Tutorial: a thick high-visibility border + pulsing glow isolates exactly
+        // where to tap to defend (Module 4 Step E).
+        border: `${glow ? 3 : 2}px solid ${meta.color}`,
         borderRadius: 8,
         cursor: busy ? 'wait' : 'pointer',
         boxShadow: `0 0 16px ${meta.color}55, inset 0 0 10px ${meta.color}1a`,
+        animation: glow ? 'interceptGlow 1.1s ease-in-out infinite' : 'none',
       }}
     >
+      {glow && (
+        <style>{`@keyframes interceptGlow{0%,100%{box-shadow:0 0 14px ${meta.color}66,inset 0 0 10px ${meta.color}1a;transform:scale(1)}50%{box-shadow:0 0 30px ${meta.color},0 0 12px ${meta.color}aa,inset 0 0 14px ${meta.color}33;transform:scale(1.05)}}`}</style>
+      )}
       <svg viewBox="0 0 100 100" width={48} height={48} aria-label={meta.label} style={{ filter: `drop-shadow(0 0 8px ${meta.color}aa)` }}>
         {draw(meta.color)}
       </svg>
@@ -137,7 +143,7 @@ export function BluffInterceptOverlay({ pending, bluffIntercept, tutorial = fals
 
         <div style={{ display: 'flex', gap: 12, justifyContent: 'center', flexWrap: 'wrap', marginBottom: 18 }}>
           {options.map((option) => (
-            <ArmCardButton key={option.cardId} option={option} busy={busy} onArm={respond} />
+            <ArmCardButton key={option.cardId} option={option} busy={busy} onArm={respond} glow={tutorial} />
           ))}
         </div>
 

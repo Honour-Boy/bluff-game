@@ -840,6 +840,7 @@ export function OnlinePlayerUI({
           leaveGame={leaveGame}
           isMobile={ui.isMobile}
           isMyTurn={isMyTurn}
+          spinActive={!!ui.spinData}
           reopenSignal={guideSignal}
           lesson={roomState?.tutorialLesson || 'basics'}
         />

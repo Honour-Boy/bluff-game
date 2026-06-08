@@ -205,11 +205,13 @@ function CardNudge({ isMobile, canBluff }) {
 
   useEffect(() => {
     if (typeof document === 'undefined') return undefined;
+    // Prefer the actual card FAN; fall back to the wider hand wrapper.
+    const anchorEl = () => document.querySelector('[data-tour-id="my-hand-fan"]')
+      || document.querySelector('[data-tour-id="my-hand"]');
     const measure = () => {
-      const el = document.querySelector('[data-tour-id="my-hand"]');
-      const r = el?.getBoundingClientRect();
+      const r = anchorEl()?.getBoundingClientRect();
       if (!r || !r.width || !r.height) { setPos(null); return; }
-      // Sit the bubble's bottom edge (the ▼ arrow) just above the hand's top,
+      // Sit the bubble's bottom edge (the ▼ arrow) just above the fan's top,
       // centred on the fan's horizontal middle.
       setPos({ centerX: r.left + r.width / 2, bottom: window.innerHeight - r.top + 6 });
     };
@@ -217,7 +219,7 @@ function CardNudge({ isMobile, canBluff }) {
     const raf = requestAnimationFrame(measure); // re-measure after layout settles
     window.addEventListener('resize', measure);
     let ro;
-    const el = document.querySelector('[data-tour-id="my-hand"]');
+    const el = anchorEl();
     if (el && typeof ResizeObserver !== 'undefined') {
       ro = new ResizeObserver(measure);
       ro.observe(el);
@@ -260,6 +262,27 @@ function CardNudge({ isMobile, canBluff }) {
       }}>
         ▼
       </div>
+    </div>
+  );
+}
+
+// ─── Clinic progress bar — a thin fixed strip at the very top edge ───────────
+// position:fixed at top:0 so it can NEVER shift the gameplay HUD layout.
+function ClinicProgressBar({ pct }) {
+  return (
+    <div
+      aria-hidden
+      style={{
+        position: 'fixed', top: 0, left: 0, right: 0, height: 3, zIndex: 9500,
+        background: 'rgba(0,0,0,0.35)', pointerEvents: 'none',
+      }}
+    >
+      <div style={{
+        height: '100%', width: `${Math.max(0, Math.min(100, pct))}%`,
+        background: 'linear-gradient(90deg, var(--accent), var(--alive))',
+        boxShadow: '0 0 8px var(--accent)',
+        transition: 'width 0.5s cubic-bezier(0.22,1,0.36,1)',
+      }} />
     </div>
   );
 }
@@ -317,10 +340,20 @@ function ChoiceModal({ onBasics, onSkip, onLeave }) {
         cursor: 'pointer', color: 'var(--text)', width: '100%',
       }}
     >
-      <div style={{ fontFamily: "'Cinzel', serif", fontSize: 16, color: 'var(--accent)', marginBottom: 4, letterSpacing: '0.06em' }}>
+      {/* On the gold (primary) option the accent/dim tones vanish — force a flat,
+          deeply bold dark tone so the text stays legible on the bright background. */}
+      <div style={{
+        fontFamily: "'Cinzel', serif", fontSize: 16, marginBottom: 4, letterSpacing: '0.06em',
+        color: primary ? '#140f08' : 'var(--accent)',
+        fontWeight: primary ? 800 : 600,
+      }}>
         {title}
       </div>
-      <div style={{ fontFamily: "'Crimson Text', serif", fontSize: 13, color: 'var(--text-dim)', lineHeight: 1.5 }}>
+      <div style={{
+        fontFamily: "'Crimson Text', serif", fontSize: 13, lineHeight: 1.5,
+        color: primary ? 'rgba(20,15,8,0.85)' : 'var(--text-dim)',
+        fontWeight: primary ? 600 : 400,
+      }}>
         {desc}
       </div>
     </button>
@@ -360,8 +393,24 @@ function ChoiceModal({ onBasics, onSkip, onLeave }) {
 }
 
 // ─── Generic guided modal (briefing pop-up + resolved explanation) ────────────
-function GuidedModal({ kicker, title, body, cta, onCta, tone = 'info' }) {
+// `gateMs` holds the CTA disabled for that long (a countdown) so the info has
+// time to settle — Module 4 mandates a 5s pause before the "I understand now"
+// button becomes active on each power's explanation.
+function GuidedModal({ kicker, title, body, cta, onCta, tone = 'info', gateMs = 0 }) {
   const color = TONE_COLORS[tone] || 'var(--accent)';
+  const [remaining, setRemaining] = useState(gateMs ? Math.ceil(gateMs / 1000) : 0);
+  useEffect(() => {
+    if (!gateMs) return undefined;
+    const t0 = Date.now();
+    setRemaining(Math.ceil(gateMs / 1000));
+    const id = setInterval(() => {
+      const left = Math.max(0, Math.ceil((gateMs - (Date.now() - t0)) / 1000));
+      setRemaining(left);
+      if (left <= 0) clearInterval(id);
+    }, 250);
+    return () => clearInterval(id);
+  }, [gateMs]);
+  const locked = gateMs > 0 && remaining > 0;
   return (
     <div style={{
       position: 'fixed', inset: 0, zIndex: 9350, background: 'rgba(0,0,0,0.82)',
@@ -388,8 +437,16 @@ function GuidedModal({ kicker, title, body, cta, onCta, tone = 'info' }) {
         }}>
           {body}
         </div>
-        <button onClick={onCta} className="primary" style={{ width: '100%', minHeight: 46, fontSize: 13 }}>
-          {cta}
+        <button
+          onClick={locked ? undefined : onCta}
+          disabled={locked}
+          className="primary"
+          style={{
+            width: '100%', minHeight: 46, fontSize: 13,
+            opacity: locked ? 0.5 : 1, cursor: locked ? 'default' : 'pointer',
+          }}
+        >
+          {locked ? `${cta} · ${remaining}s` : cta}
         </button>
       </div>
     </div>
@@ -408,6 +465,7 @@ export function TutorialLayer({
   leaveGame,
   isMobile = false,
   isMyTurn = false,
+  spinActive = false,
   reopenSignal = 0,
   lesson = 'basics',
 }) {
@@ -468,7 +526,9 @@ export function TutorialLayer({
   const briefing = scenario && scenario.step === 'intro' && briefedIndex !== scenario.index
     ? clinicBriefingFor(scenario)
     : null;
-  const showExplanation = !!scenario && scenario.step === 'resolved' && !clinicComplete;
+  // Hold the explanation until any reflected-spin overlay (Mirror/Swap) has
+  // finished animating, so it never pops over a live spinning cylinder.
+  const showExplanation = !!scenario && scenario.step === 'resolved' && !clinicComplete && !spinActive;
 
   // Coach bar. Hidden while a guided modal (briefing / explanation / choice /
   // intro) owns the screen, and during clinic-complete (its own card shows).
@@ -476,7 +536,7 @@ export function TutorialLayer({
   const modalUp = showIntro || showChoice || briefing || showExplanation;
   if (!modalUp && !isLobby) {
     if (clinicComplete) coach = CLINIC_COMPLETE_COACH;
-    else if (scenario) coach = clinicCoachFor(scenario);
+    else if (scenario) coach = clinicCoachFor(scenario, { phase });
     else if (lesson !== 'powers' && (phase === 'game_over' || phase === 'round_end')) {
       coach = BASICS_HANDOFF_COACH;
     } else coach = coachFor(coachContextFromRoom(roomState, myPlayerId));
@@ -513,9 +573,15 @@ export function TutorialLayer({
   }, [canPlay, modalUp, scenario]);
 
   const isLastDrill = scenario && scenario.total != null && scenario.index >= scenario.total - 1;
+  // Clinic completion %, for the non-intrusive top-edge progress bar.
+  const clinicPct = clinicComplete
+    ? 100
+    : (scenario ? Math.round(((scenario.index + 1) / (scenario.total || 7)) * 100) : null);
 
   return (
     <>
+      {clinicPct != null && <ClinicProgressBar pct={clinicPct} />}
+
       {showChoice && (
         <ChoiceModal
           onBasics={() => setPath('basics')}
@@ -549,13 +615,14 @@ export function TutorialLayer({
         />
       )}
 
-      {showExplanation && coach == null && (
+      {showExplanation && (
         <GuidedModal
           kicker="What just happened"
           tone={clinicCoachFor(scenario)?.tone || 'win'}
           title={clinicCoachFor(scenario)?.title || ''}
           body={clinicCoachFor(scenario)?.body || ''}
-          cta={isLastDrill ? 'Finish' : 'I Understand'}
+          gateMs={5000}
+          cta={isLastDrill ? 'Finish' : 'I understand now'}
           onCta={() => { if (typeof advanceTutorial === 'function') advanceTutorial(); }}
         />
       )}
