@@ -182,6 +182,11 @@ function register(io, socket, deps) {
       if (room.bluffBlockedThisTurn) {
         return callback({ success: false, error: 'No card to challenge — last turn was frozen' });
       }
+      // Tutorial clinic — own-turn drills (Peek/Freeze/Assassin) disable Call Bluff
+      // so the learner stays on script. (The client also hides the button.)
+      if (room.tutorialScenario?.lockBluff) {
+        return callback({ success: false, error: 'Not part of this lesson step' });
+      }
 
       room.bluffUsedThisTurn = true;
       const callerPlayer = room.players.find(p => p.id === playerId);

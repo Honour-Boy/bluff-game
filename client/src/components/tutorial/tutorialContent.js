@@ -82,6 +82,97 @@ const POWER_LABELS = {
   peek: 'Peek', freeze: 'Freeze', assassin: 'Assassin',
 };
 
+// ─── Power Clinic — scripted before/after coaching ────────────────────────────
+// The Powers lesson runs as a clinic: each drill stages the exact moment one
+// power is needed. `room.tutorialScenario` carries { power, actor, step, index,
+// total }; clinicCoachFor maps that to the tip — `intro` tells the learner WHY +
+// HOW to use it now, `resolved` explains WHAT just happened (including when the
+// bot uses one). Pure copy, keyed by a `${power}:${actor}` slug.
+const CLINIC_COACH = {
+  'peek:player': {
+    intro: { tone: 'action', title: 'Peek — look before you leap',
+      body: `It's your turn, but did ${BOT_NAME} play honestly? Tap your Peek card in the Power slot beside your hand to secretly see its last card.` },
+    resolved: { tone: 'info', title: "That's Peek",
+      body: `You alone saw the real card — now you'd know if a challenge is safe. Peek is spent after one look.` },
+  },
+  'freeze:player': {
+    intro: { tone: 'action', title: 'Freeze — skip their turn',
+      body: `Tap your Freeze card, play any card, then End Turn. Freeze makes ${BOT_NAME} lose its very next turn.` },
+    resolved: { tone: 'info', title: 'Frozen out',
+      body: `${BOT_NAME}'s next turn just got skipped — you stole the tempo. Freeze triggers once, then it's gone.` },
+  },
+  'shield:player': {
+    intro: { tone: 'danger', title: 'Caught — Shield up!',
+      body: `You played a card that didn't match the shape, and ${BOT_NAME} called your bluff. Tap your Shield to block the challenge completely.` },
+    resolved: { tone: 'win', title: 'Blocked!',
+      body: `Shield cancelled the bluff outright — no spin, no risk. It blocks one challenge, then it's spent.` },
+  },
+  'shield:bot': {
+    intro: { tone: 'action', title: 'Now challenge the bot',
+      body: `${BOT_NAME} just played. Hit Call Bluff — then watch how it defends itself.` },
+    resolved: { tone: 'info', title: 'The bot shielded',
+      body: `Even though your call was right, ${BOT_NAME} armed a Shield and blocked it — no spin. Powers work for the bot too, so read the table.` },
+  },
+  'mirror:player': {
+    intro: { tone: 'danger', title: 'Bounce it back',
+      body: `${BOT_NAME} called your bluff. Tap your Mirror to reflect the spin straight back onto ${BOT_NAME} instead of you.` },
+    resolved: { tone: 'win', title: 'Reflected!',
+      body: `Mirror sent the spin to ${BOT_NAME} — they're on the spot now, not you. One use, then it's spent.` },
+  },
+  'swap:player': {
+    intro: { tone: 'danger', title: 'Swap the evidence',
+      body: `${BOT_NAME} called your bluff. Tap Swap, then pick the matching card from the table to switch with your played card — making your play honest after all.` },
+    resolved: { tone: 'win', title: 'Swapped!',
+      body: `Your played card became a match, so the bluff failed — ${BOT_NAME} spins instead. Swap re-faces your card once.` },
+  },
+  'assassin:player': {
+    intro: { tone: 'action', title: 'Assassin — bait the trap',
+      body: `Tap your Assassin to arm it, play a card that MATCHES the shape (an honest play), then End Turn. If ${BOT_NAME} recklessly challenges you…` },
+    resolved: { tone: 'win', title: 'Struck!',
+      body: `${BOT_NAME} challenged your honest play — and your Assassin eliminated it on the spot. A wrong challenge against an armed Assassin is fatal. That's every power — clinic complete!` },
+  },
+};
+
+/**
+ * The coaching tip for the active clinic drill. `scenario` is the serialized
+ * room.tutorialScenario ({ power, actor, step, index, total }); returns
+ * { key, tone, title, body } or null.
+ */
+export function clinicCoachFor(scenario) {
+  if (!scenario || !scenario.power) return null;
+  const slug = `${scenario.power}:${scenario.actor || 'player'}`;
+  const entry = CLINIC_COACH[slug] || CLINIC_COACH[`${scenario.power}:player`];
+  if (!entry) return null;
+  const step = scenario.step === 'resolved' ? 'resolved' : 'intro';
+  const tip = entry[step];
+  const n = typeof scenario.index === 'number' ? scenario.index + 1 : null;
+  const total = scenario.total || null;
+  const counter = n && total ? `Power ${n} of ${total} · ` : '';
+  return {
+    key: `clinic-${slug}-${step}`,
+    tone: tip.tone,
+    title: `${counter}${tip.title}`,
+    body: tip.body,
+  };
+}
+
+// Shown on the felt the moment a Basics practice round ends, just before the bot
+// ushers the learner into the Power Clinic.
+export const BASICS_HANDOFF_COACH = {
+  key: 'basics-handoff',
+  tone: 'win',
+  title: 'Nice — that’s the core loop',
+  body: `Play, bluff, spin, survive. Now ${BOT_NAME} will deal you into the Power Cards lesson…`,
+};
+
+// Shown once every clinic drill is done.
+export const CLINIC_COMPLETE_COACH = {
+  key: 'clinic-complete',
+  tone: 'win',
+  title: 'You’ve learned the powers! 🎉',
+  body: 'Peek, Freeze, Shield, Mirror, Swap, Assassin — you’ve used them all. Play again to practise, or jump into a real game.',
+};
+
 // The intro deck for a given lesson. 'powers' splices the Power Cards slide in
 // just before the closing "ready" slide; everything else gets the basics deck.
 export function introSlidesFor(lesson) {

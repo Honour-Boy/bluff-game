@@ -57,6 +57,24 @@ function serializeRoom(room, requestingPlayerId = null, opts = {}) {
     // Which guided lesson this practice room is running ('basics' | 'powers'),
     // so the coach + intro can adapt. null outside tutorial rooms.
     tutorialLesson: room.isTutorial ? (room.tutorialLesson || 'basics') : null,
+    // Active scripted Power-Clinic drill (engine/tutorialScenarios.js). The
+    // client coach keys off { power, actor, step } to show the before/after copy;
+    // `lockBluff` disables the Call-Bluff button during own-turn drills. null
+    // outside the clinic. No card data here — hands stay gated to their owner.
+    tutorialScenario: room.isTutorial && room.tutorialScenario
+      ? {
+          index: room.tutorialScenario.index,
+          power: room.tutorialScenario.power,
+          actor: room.tutorialScenario.actor || 'player',
+          step: room.tutorialScenario.step || 'intro',
+          lockBluff: !!room.tutorialScenario.lockBluff,
+          expect: room.tutorialScenario.expect || null,
+          total: room.tutorialScenario.total || null,
+        }
+      : null,
+    // True once the clinic's final drill is done (drives the "you've learned the
+    // powers" end screen). Only meaningful in a tutorial room.
+    tutorialClinicComplete: room.isTutorial ? !!room.tutorialClinicComplete : undefined,
     players: room.players.map(p => ({
       id: p.id,
       username: p.username,

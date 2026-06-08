@@ -48,7 +48,10 @@ export function useGameActions({
       if (res?.success) {
         setError(null);
         setRoomCode(res.roomCode);
-        setIsHost(true);
+        // The bot "hosts" a practice table — the human is a non-host player, so
+        // they get no host controls. They still start their own game via the
+        // tutorial "Begin practice" button (server-side start_game bypass).
+        setIsHost(!!res.isHost);
         if (res.playerId) setPlayerId(res.playerId);
       } else {
         setError(res?.error || 'Could not start the tutorial');

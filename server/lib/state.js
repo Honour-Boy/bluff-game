@@ -59,6 +59,13 @@ const idleTurnTimers = new Map();     // roomCode → setTimeout handle
 // (no separate teardown-clear is wired, unlike the longer-lived timers above).
 const botTimers = new Map();          // roomCode → setTimeout handle
 
+// Tutorial / Practice — guided progression director (lib/tutorialDirector.js).
+// One short handle per room while the director owes a staged step: the Basics→
+// Powers hand-off, or advancing to the next scripted Power-Clinic drill. Armed at
+// the end of broadcastRoomState (next to the bot timer); .unref()'d and the expiry
+// re-validates room state, so a stale fire after teardown is a harmless no-op.
+const tutorialTimers = new Map();     // roomCode → setTimeout handle
+
 // Host / player disconnect grace timers.
 const hostDisconnectTimers = new Map();
 // Player disconnect timers must be visible across socket connections —
@@ -106,6 +113,10 @@ function _clearIdleTurnTimer(code) {
 function _clearBotTimer(code) {
   const t = botTimers.get(code);
   if (t) { clearTimeout(t); botTimers.delete(code); }
+}
+function _clearTutorialTimer(code) {
+  const t = tutorialTimers.get(code);
+  if (t) { clearTimeout(t); tutorialTimers.delete(code); }
 }
 
 // §2.1 — verbose, single-line structured logging for every room teardown so
@@ -165,6 +176,7 @@ module.exports = {
   speedModeTimers,
   idleTurnTimers,
   botTimers,
+  tutorialTimers,
   hostDisconnectTimers,
   playerDisconnectTimers,
   dcKey,
@@ -178,6 +190,7 @@ module.exports = {
   _clearSpeedModeTimer,
   _clearIdleTurnTimer,
   _clearBotTimer,
+  _clearTutorialTimer,
   logRoomDeletion,
   logTurnState,
   getRoom,

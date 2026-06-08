@@ -103,7 +103,15 @@ function register(io, socket, deps) {
     try {
       const room = await getRoom(roomCode);
       if (!room) return callback({ success: false, error: 'Room not found' });
-      if (room.hostSocketId !== socket.id) return callback({ success: false, error: 'Not the host' });
+      // Tutorial bypass — the bot "hosts" a practice room (hostSocketId is null),
+      // so the host check would block the lone human. Let the seated human start
+      // their own practice game; everything else still requires the real host.
+      const isTutorialStarter = room.isTutorial
+        && !!socket.userId
+        && room.players.some(p => p.id === socket.userId && !p.isBot);
+      if (room.hostSocketId !== socket.id && !isTutorialStarter) {
+        return callback({ success: false, error: 'Not the host' });
+      }
 
       // v2 Phase E2 — Mirror Match auto-disable when alive count is odd.
       let mirrorMatchAutoDisabled = false;

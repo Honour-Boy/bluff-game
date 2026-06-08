@@ -21,6 +21,9 @@ export function BottomSeat({
   bluffUsedThisTurn,
   cardPlayedThisTurn,
   bluffBlockedThisTurn,
+  // Tutorial clinic — own-turn drills (Peek/Freeze/Assassin) disable Call Bluff
+  // so the learner stays on script.
+  bluffLocked = false,
   actionHint,
   // (Module 5) unified status ticker text (active → instructions; otherwise →
   // what the active player is doing). (Module 3) spin-turn morph.
@@ -363,7 +366,7 @@ export function BottomSeat({
                   button above the rail. */}
               {!isFirstTurn && (() => {
                 const bluffDisabled = !isMyTurn || !isPlaying || isEliminated
-                  || bluffUsedThisTurn || bluffBlockedThisTurn;
+                  || bluffUsedThisTurn || bluffBlockedThisTurn || bluffLocked;
                 return (
                   <button
                     className="danger"
@@ -401,14 +404,20 @@ export function BottomSeat({
                   drawing a line across the card count. The fan sits in its own
                   flow now, clear of the label.
                   (Module 2.2) A shorter fan on mobile keeps the dock compact. */}
-              <div style={{
-                flex: 1,
-                minWidth: 0,
-                // (Global redeal) empty the fan during the fly-out/deal-back so
-                // the flying card backs are the only cards visible mid-swap.
-                opacity: reshuffling ? 0 : 1,
-                transition: 'opacity .3s',
-              }}>
+              <div
+                // Stable anchor for the tutorial idle "tap a card" nudge — it
+                // measures this element's rect so the bubble sits centred over
+                // the real card fan on any viewport (not a fixed bottom offset).
+                data-tour-id="my-hand"
+                style={{
+                  flex: 1,
+                  minWidth: 0,
+                  // (Global redeal) empty the fan during the fly-out/deal-back so
+                  // the flying card backs are the only cards visible mid-swap.
+                  opacity: reshuffling ? 0 : 1,
+                  transition: 'opacity .3s',
+                }}
+              >
                 <CardHand
                   hand={myHand}
                   powerCardSlot={myPowerCardSlot}

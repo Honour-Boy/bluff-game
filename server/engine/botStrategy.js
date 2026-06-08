@@ -27,6 +27,27 @@ const BOT_BLUFF_RATE = 0.25;
 // round, without spins dominating the game.
 const BOT_BLUFF_CALL_RATE = 0.34;
 
+// Tutorial guarantee — a practice game must SHOW the bot calling bluff at least
+// twice so the learner experiences being challenged. Until that minimum is met in
+// a tutorial game the bot challenges far more eagerly (BELOW_MIN rate), and HARD-
+// forces a call once the round is winding down (the human is at/under
+// FORCE_HAND_SIZE shape cards, so few eligible turns remain). Tracked on
+// `room.botBluffCallsThisGame`, incremented by the bot driver when a call fires.
+const BOT_BLUFF_MIN_CALLS = 2;
+const BOT_BLUFF_CALL_RATE_BELOW_MIN = 0.85;
+const BOT_BLUFF_FORCE_HAND_SIZE = 3;
+
+// Shape-hand size of the bot's live human opponent (the only non-bot alive seat
+// in a practice room). null when it can't be determined.
+function _humanOpponentHandSize(room, botId) {
+  const opp = (room.players || []).find(
+    (p) => p && p.id !== botId && !p.isBot && p.status === 'alive',
+  );
+  if (!opp) return null;
+  const hand = room.hands?.get?.(opp.id);
+  return Array.isArray(hand) ? hand.length : null;
+}
+
 // Plain = a normal shape card (not a Whot wild). Whot can never be a "lie"
 // (it matches anything) so it's handled separately and only as a fallback.
 function _plainShapeCards(hand) {
@@ -102,12 +123,24 @@ function shouldCallBluff(room, botId, rng = Math.random) {
   if (!accusedId || accusedId === botId) return false;
   const accused = (room.players || []).find((p) => p.id === accusedId);
   if (!accused || accused.status !== 'alive') return false;
+
+  // Tutorial: lean on the challenge until the learner has seen ≥2 calls.
+  if (room.isTutorial && (room.botBluffCallsThisGame || 0) < BOT_BLUFF_MIN_CALLS) {
+    const oppHand = _humanOpponentHandSize(room, botId);
+    // Round winding down + minimum not met → take the eligible call for certain.
+    if (oppHand != null && oppHand <= BOT_BLUFF_FORCE_HAND_SIZE) return true;
+    return rng() < BOT_BLUFF_CALL_RATE_BELOW_MIN;
+  }
+
   return rng() < BOT_BLUFF_CALL_RATE;
 }
 
 module.exports = {
   BOT_BLUFF_RATE,
   BOT_BLUFF_CALL_RATE,
+  BOT_BLUFF_MIN_CALLS,
+  BOT_BLUFF_CALL_RATE_BELOW_MIN,
+  BOT_BLUFF_FORCE_HAND_SIZE,
   chooseCardPlay,
   shouldCallBluff,
 };

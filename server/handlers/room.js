@@ -19,6 +19,7 @@ const {
   _clearSpeedModeTimer,
   _clearIdleTurnTimer,
   _clearBotTimer,
+  _clearTutorialTimer,
   logRoomDeletion,
 } = require('../lib/state');
 const { socketRateLimit } = require('../lib/rateLimiter');
@@ -97,14 +98,16 @@ function register(io, socket, deps) {
       }
 
       const room = await buildAdHocRoom(socket, engine.MODES.ONLINE, config, groupsRepo);
-      room.hostUserId = socket.userId;
       room.isTutorial = true;
       room.tutorialLesson = chosenLesson;
       room.cardPlayedThisTurn = false;
       room.bluffUsedThisTurn = false;
       room.powerActivatedThisTurn = false;
+      // Tutorial "≥2 bluff calls per game" guarantee counter (botStrategy).
+      room.botBluffCallsThisGame = 0;
 
-      // Seat the human host.
+      // Seat the human as a normal player — NOT the host. A newbie shouldn't hold
+      // the room controls; the bot "hosts" the table and the server drives it.
       const human = engine.createPlayer(socket.userId, socket.username, socket.id);
       room.players.push(human);
 
@@ -114,6 +117,14 @@ function register(io, socket, deps) {
       bot.isBot = true;
       room.players.push(bot);
 
+      // Bot is host-of-record. It has no socket, so hostSocketId is null — which
+      // makes the human's `amHost` false in serializeRoom (host controls hidden)
+      // and routes every host-gated event away from the human. The learner can
+      // still start the game via the tutorial bypass in `start_game`, and the
+      // human dropping is torn down by the tutorial paths in leave_room/disconnect.
+      room.hostUserId = bot.id;
+      room.hostSocketId = null;
+
       await saveRoom(room);
       socket.join(room.code);
       console.log(`[Room ${room.code}] Tutorial (${chosenLesson}) created by ${socket.username} (vs Dealer Bot)`);
@@ -121,7 +132,7 @@ function register(io, socket, deps) {
       callback?.({
         success: true,
         roomCode: room.code,
-        isHost: true,
+        isHost: false, // the bot hosts the practice table; the human is a player
         mode: engine.MODES.ONLINE,
         playerId: socket.userId,
         isTutorial: true,
@@ -382,6 +393,7 @@ function register(io, socket, deps) {
         _clearSpeedModeTimer(code);
         _clearIdleTurnTimer(code);
         _clearBotTimer(code);
+        _clearTutorialTimer(code);
         discardLobbyIdleState(code);
         socket.leave(code);
         logRoomDeletion(code, 'tutorial_left', { phase: room.phase });
@@ -573,7 +585,11 @@ function register(io, socket, deps) {
       const code = roomCode?.toUpperCase();
       const room = await getRoom(code);
       if (!room) return callback?.({ success: false, error: 'Room not found' });
-      if (room.hostUserId !== socket.userId) {
+      // Tutorial bypass — the bot "hosts" a practice room, so let the seated human
+      // replay it. Otherwise only the real host can restart.
+      const isTutorialRestarter = room.isTutorial
+        && room.players.some(p => p.id === socket.userId && !p.isBot);
+      if (room.hostUserId !== socket.userId && !isTutorialRestarter) {
         return callback?.({ success: false, error: 'Only the host can restart the room' });
       }
       if (room.phase !== 'game_over') {
@@ -581,7 +597,21 @@ function register(io, socket, deps) {
       }
 
       engine.resetRoomForReplay(room);
-      room.hostSocketId = socket.id;
+      if (room.isTutorial) {
+        // Replay the whole journey from Basics: all-off config, fresh counters,
+        // no staged clinic. The bot stays host-of-record (no socket) so the
+        // learner never inherits host controls on a replay.
+        room.tutorialLesson = 'basics';
+        room.config = engine.defaultRoomConfig();
+        room.botBluffCallsThisGame = 0;
+        room.tutorialScenario = null;
+        room.tutorialStage = null;
+        room.cardPlayedThisTurn = false;
+        room.bluffUsedThisTurn = false;
+        room.powerActivatedThisTurn = false;
+      } else {
+        room.hostSocketId = socket.id;
+      }
 
       await saveRoom(room);
       callback?.({ success: true });
