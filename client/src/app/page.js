@@ -452,6 +452,11 @@ function HomeContent() {
   const [leaderboardOpen, setLeaderboardOpen] = useState(false);
   const [kickOpen, setKickOpen] = useState(false); // #244 — host Kick Player modal
   const inRoomOnline = !!roomCode && gameMode === 'online';
+  // The practice Power-Clinic progress bar is an in-flow 22px band at the very top
+  // of the online table (OnlinePlayerUI). When it's up, nudge the fixed settings
+  // gear down so it clears the bar's right edge instead of covering it.
+  const clinicBarVisible = inRoomOnline
+    && (!!roomState?.tutorialScenario || !!roomState?.tutorialClinicComplete);
   const phase = roomState?.phase;
   const isLobby = phase === 'lobby';
   const isGameOver = phase === 'game_over';
@@ -547,6 +552,7 @@ function HomeContent() {
         onLeaveTable={inRoomOnline ? handleLeaveTable : undefined}
         leaveDisabled={leaveDisabled}
         voice={inRoomOnline ? voice : undefined}
+        topOffset={clinicBarVisible ? 22 : 0}
       />
       {/* Game settings — host edits in the lobby, everyone else sees a summary */}
       {inRoomOnline && gameSettingsOpen && (

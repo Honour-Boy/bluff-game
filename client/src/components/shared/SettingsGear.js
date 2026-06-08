@@ -139,6 +139,10 @@ export function SettingsGear({
   onLeaveTable,
   leaveDisabled = false,
   voice,
+  // Extra top inset (px) pushed under any full-width band that occupies the very
+  // top of the screen — currently the practice Power-Clinic progress bar, whose
+  // right edge the gear button would otherwise overlap.
+  topOffset = 0,
 }) {
   const [open, setOpen] = useState(false);
   const [showProfile, setShowProfile] = useState(false);
@@ -153,8 +157,9 @@ export function SettingsGear({
       <style>{`@media (max-width: 520px){.settings-gear-name{display:none !important;}}`}</style>
       <div style={{
         position: 'fixed',
-        top: 'max(12px, env(safe-area-inset-top, 0px))',
+        top: `calc(max(12px, env(safe-area-inset-top, 0px)) + ${topOffset}px)`,
         right: 'max(12px, env(safe-area-inset-right, 0px))',
+        transition: 'top 0.3s ease',
         // Above the table/header but below the controls modal (9300) so an open
         // modal cleanly covers it (avoids two top-right close targets on mobile).
         zIndex: 9200,

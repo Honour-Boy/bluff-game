@@ -39,6 +39,12 @@ export function useOnlinePlayerUiController({
   const prevStatusRef = useRef(null);
   const pendingEliminatedRef = useRef(false);
   const [justEliminated, setJustEliminated] = useState(false);
+  // Practice hand-off gate: true from the instant the local player is eliminated
+  // until they dismiss the "Eliminated" card. While held, the tutorial layer must
+  // NOT pop the Power Clinic briefing — the learner first watches their spin land,
+  // reads the elimination card, THEN moves on to powers (the server stages the
+  // clinic ~2.6s in, so without this hold the briefing races over the spin/card).
+  const [eliminationHold, setEliminationHold] = useState(false);
   const [peekedCard, setPeekedCard] = useState(null);
   // #139 — manual (click-to-open) power-card activation confirmation. There is
   // NO turn-start auto-prompt: the Activate/Skip modal opens only when the
@@ -148,6 +154,9 @@ export function useOnlinePlayerUiController({
     const currentStatus = myPlayer?.status || null;
     if (prevStatusRef.current === 'alive' && currentStatus === 'eliminated') {
       pendingEliminatedRef.current = true;
+      // Start holding the clinic hand-off at the moment of elimination — before
+      // the spin even completes — so the briefing can't surface mid-animation.
+      setEliminationHold(true);
     }
     prevStatusRef.current = currentStatus;
   }, [myPlayer?.status]);
@@ -326,6 +335,13 @@ export function useOnlinePlayerUiController({
     if (spinData) settleSpin(spinData.spinTargetId);
   }, [settleSpin, spinData]);
 
+  // "Continue Watching" on the Eliminated card → close it AND release the clinic
+  // hand-off hold, so the practice Power Clinic briefing can finally surface.
+  const dismissEliminated = useCallback(() => {
+    setJustEliminated(false);
+    setEliminationHold(false);
+  }, []);
+
   const handleSaboteurPick = useCallback(async (targetId) => {
     if (!saboteurTransfer || saboteurBusy) return;
     setSaboteurBusy(true);
@@ -362,6 +378,8 @@ export function useOnlinePlayerUiController({
     cylinderAnimating,
     justEliminated,
     setJustEliminated,
+    eliminationHold,
+    dismissEliminated,
     peekedCard,
     powerConfirmOpen,
     pendingPowerCardId,

@@ -24,6 +24,7 @@ export function CoreGameOverlays({
   launchCardFlight,
   justEliminated,
   setJustEliminated,
+  onDismissEliminated,
   showHowToPlay,
   setShowHowToPlay,
   showTurnModal,
@@ -231,7 +232,7 @@ export function CoreGameOverlays({
             <div style={{ fontSize: 12, color: 'var(--text-dim)', marginBottom: 24, lineHeight: 1.6 }}>
               You can still watch the game from the spectator view.
             </div>
-            <button className="primary" onClick={() => setJustEliminated(false)} style={{ padding: '10px 32px' }}>
+            <button className="primary" onClick={onDismissEliminated || (() => setJustEliminated(false))} style={{ padding: '10px 32px' }}>
               Continue Watching
             </button>
           </div>

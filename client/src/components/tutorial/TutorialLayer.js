@@ -486,6 +486,7 @@ export function TutorialLayer({
   isMobile = false,
   isMyTurn = false,
   spinActive = false,
+  holdClinic = false,
   reopenSignal = 0,
   lesson = 'basics',
 }) {
@@ -551,7 +552,11 @@ export function TutorialLayer({
   const replayIntro = () => { setIntroStep(0); setIntroReopened(true); setCoachHidden(false); };
 
   // Clinic briefing pop-up (before each staged instance) + resolved explanation.
+  // Held back while a cylinder is still spinning OR the practice loss hand-off is
+  // pending (the player must clear their "Eliminated" card first) — otherwise the
+  // briefing races over the spin / elimination card during the Basics→Powers move.
   const briefing = scenario && scenario.step === 'intro' && briefedIndex !== scenario.index
+    && !spinActive && !holdClinic
     ? clinicBriefingFor(scenario)
     : null;
   // Hold the explanation until any reflected-spin overlay (Mirror/Swap) has
@@ -562,7 +567,9 @@ export function TutorialLayer({
   // intro) owns the screen, and during clinic-complete (its own card shows).
   let coach = null;
   const modalUp = showIntro || showChoice || briefing || showExplanation;
-  if (!modalUp && !isLobby) {
+  // Suppress the coach bar too while the loss hand-off is pending, so the only
+  // thing on screen is the spin result → "Eliminated" card → (then) the clinic.
+  if (!modalUp && !isLobby && !holdClinic) {
     if (clinicComplete) coach = CLINIC_COMPLETE_COACH;
     else if (scenario) coach = clinicCoachFor(scenario, { phase });
     else if (lesson !== 'powers' && (phase === 'game_over' || phase === 'round_end')) {

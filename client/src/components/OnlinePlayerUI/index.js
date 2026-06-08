@@ -140,6 +140,10 @@ export function OnlinePlayerUI({
   // Holds the setTimeout ID for the 80 ms spin-audio start delay so it can be
   // cancelled on unmount or if a second spin_result arrives before the first fires.
   const spinAudioDelayRef = useRef(null);
+  // Set when the server flips to game_over WHILE a terminal spin is still
+  // animating: the victory fanfare is deferred and fired at spinComplete (below)
+  // so it never plays over a live cylinder.
+  const pendingWinRef = useRef(false);
 
   useEffect(() => {
     if (!roomState) return;
@@ -170,14 +174,26 @@ export function OnlinePlayerUI({
     if (la && la !== prevLa && la.type === 'card_played') {
       triggerAudio('card');
     }
-    // Game over — win fanfare
+    // Game over — victory fanfare for the LOCAL winner only, and held until the
+    // terminal spin finishes. Two old bugs are fixed here: playing 'win' the
+    // instant the server flipped to game_over fired it OVER the still-spinning
+    // cylinder, and it sounded a "win" even when the local player had just lost.
+    // The loser's defeat sting now rides the "Eliminated" card instead (below).
     if (phase === 'game_over' && prevPhase !== 'game_over') {
-      triggerAudio('win');
+      const iWon = la?.winnerId === myPlayer?.id;
+      if (iWon) {
+        // Spin-driven game-overs are deferred server-side to the spin-acknowledge,
+        // so by here the cylinder has normally already stopped + been dismissed →
+        // play now. The guard is a safety net: if a cylinder is somehow still
+        // turning, hold the fanfare for the spinComplete handler below.
+        if (ui.spinData && !ui.spinComplete) pendingWinRef.current = true;
+        else triggerAudio('win');
+      }
     }
 
     prevPhaseRef.current = phase;
     prevLastActionRef.current = la;
-  }, [roomState?.phase, roomState?.lastAction, triggerShake, triggerAudio, startSpinAudio]); // eslint-disable-line
+  }, [roomState?.phase, roomState?.lastAction, myPlayer?.id, triggerShake, triggerAudio, startSpinAudio]); // eslint-disable-line
 
   // Fire the result-reveal sound (survive/eliminate) once the cylinder animation
   // completes — not when the server event first arrives. Also stop any remaining
@@ -185,24 +201,44 @@ export function OnlinePlayerUI({
   const prevSpinCompleteRef = useRef(false);
   useEffect(() => {
     if (ui.spinComplete && !prevSpinCompleteRef.current) {
-      // Stop any leftover click timers. (Module 8.2) When the cylinder locks on
-      // a lethal chamber (the server's spin_result reports an elimination), fire
-      // the high-impact gunshot cue right as the result lands.
+      // Stop any leftover click timers. (Module 8.2) When the cylinder locks on a
+      // lethal chamber, fire the high-impact gunshot cue right as the result
+      // lands. Read the spin SNAPSHOT (ui.spinData) rather than roomState.lastAction:
+      // in practice mode the tutorial director restages the room ~2.6s after the
+      // game ends, swapping lastAction out before the 8s cylinder finishes — so by
+      // spinComplete `lastAction` is no longer the spin and the cue would be lost.
       stopSpinAudio();
-      const la = roomState?.lastAction;
-      if (la && la.type === 'spin_result' && la.eliminated) {
+      if (ui.spinData?.eliminated) {
         triggerAudio('gunshot');
+      }
+      // Deferred victory fanfare — held since the server flipped to game_over so it
+      // lands once the cylinder stops, just after the gunshot/clunk.
+      if (pendingWinRef.current) {
+        pendingWinRef.current = false;
+        setTimeout(() => triggerAudio('win'), 400);
       }
       // (Global redeal) a resolved bluff that triggered a reshuffle rides the
       // SAME spin_result lastAction. Don't play the card flight now — the spin
       // overlay is still up. Stash it and let the overlay-close effect play it
       // once the cylinder has been dismissed.
+      const la = roomState?.lastAction;
       if (la && la.type === 'spin_result' && la.globalReshuffle && playedReshuffleRef.current !== la) {
         pendingReshuffleRef.current = la;
       }
     }
     prevSpinCompleteRef.current = ui.spinComplete;
-  }, [ui.spinComplete, stopSpinAudio, triggerAudio, roomState?.lastAction]);
+  }, [ui.spinComplete, stopSpinAudio, triggerAudio, roomState?.lastAction, ui.spinData]);
+
+  // Defeat sting — the mournful cue rides the "Eliminated" card surfacing (after
+  // the cylinder has locked AND been dismissed), never over the live spin. Covers
+  // both an ordinary elimination and the practice loss that hands into the clinic.
+  const prevJustElimRef = useRef(false);
+  useEffect(() => {
+    if (ui.justEliminated && !prevJustElimRef.current) {
+      triggerAudio('eliminate');
+    }
+    prevJustElimRef.current = ui.justEliminated;
+  }, [ui.justEliminated, triggerAudio]);
 
   // Cleanup spin audio timers on unmount
   useEffect(() => () => {
@@ -780,6 +816,7 @@ export function OnlinePlayerUI({
         launchCardFlight={launchCardFlight}
         justEliminated={ui.justEliminated}
         setJustEliminated={ui.setJustEliminated}
+        onDismissEliminated={ui.dismissEliminated}
         showHowToPlay={ui.showHowToPlay}
         setShowHowToPlay={ui.setShowHowToPlay}
         showTurnModal={ui.showTurnModal}
@@ -906,6 +943,7 @@ export function OnlinePlayerUI({
           isMobile={ui.isMobile}
           isMyTurn={isMyTurn}
           spinActive={!!ui.spinData}
+          holdClinic={ui.eliminationHold}
           reopenSignal={guideSignal}
           lesson={roomState?.tutorialLesson || 'basics'}
         />
