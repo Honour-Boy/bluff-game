@@ -268,7 +268,10 @@ function reconnectPlayer(room, playerId, newSocketId) {
 // temporary in-room host while the owner is away.
 function pickReplacementHost(room, leavingPlayerId) {
   const candidates = room.players.filter(
-    p => p.id !== leavingPlayerId && p.status === 'alive',
+    // A bot can never hold the host seat — it has no socket to run host controls.
+    // (In a tutorial room the bot is the only other seat, so this returns null
+    // and the caller tears the room down instead of migrating.)
+    p => p.id !== leavingPlayerId && p.status === 'alive' && !p.isBot,
   );
   if (candidates.length === 0) return null;
   return candidates[Math.floor(Math.random() * candidates.length)];

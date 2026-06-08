@@ -13,7 +13,7 @@
 // highest-risk surface across the responsive/pannable table) — the coach teaches
 // with clear, live copy that references the on-screen controls by name.
 
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { CloseIcon } from '../shared/CloseIcon';
 import { INTRO_SLIDES, coachFor, coachContextFromRoom } from './tutorialContent';
 
@@ -191,27 +191,49 @@ function CoachBar({ coach, isMobile, onHide, onReplayIntro }) {
   );
 }
 
-// Small pill to bring the hidden coach back.
-function ShowGuidePill({ isMobile, onShow }) {
+// ─── Idle "tap a card" nudge — points at the hand when the player stalls ──────
+function CardNudge({ isMobile, canBluff }) {
   return (
-    <button
-      onClick={onShow}
+    <div
+      className="fade-in"
       style={{
-        position: 'fixed', top: isMobile ? 56 : 70, left: '50%', transform: 'translateX(-50%)',
-        zIndex: 3000, padding: '6px 14px', borderRadius: 999,
-        background: 'rgba(26,23,20,0.95)', border: '1px solid var(--accent)',
-        color: 'var(--accent)', cursor: 'pointer',
-        fontFamily: "'Space Mono', monospace", fontSize: 10, letterSpacing: '0.1em', textTransform: 'uppercase',
-        boxShadow: '0 4px 16px rgba(0,0,0,0.5)',
+        position: 'fixed', bottom: isMobile ? 150 : 176, left: '50%', transform: 'translateX(-50%)',
+        zIndex: 2900, width: 'min(90vw, 420px)', pointerEvents: 'none', textAlign: 'center',
       }}
     >
-      ? Show Guide
-    </button>
+      <div style={{
+        display: 'inline-block',
+        background: 'rgba(26,23,20,0.96)', border: '1px solid var(--accent)',
+        borderRadius: 'var(--radius)', padding: '8px 14px',
+        boxShadow: '0 6px 22px rgba(0,0,0,0.55)',
+        fontFamily: "'Crimson Text', serif", fontSize: isMobile ? 13 : 14, color: 'var(--text)',
+        lineHeight: 1.45,
+      }}>
+        <span style={{ color: 'var(--accent)', fontWeight: 700 }}>Tap a card</span> in your hand below to play it
+        {canBluff && (
+          <> — or hit <span style={{ color: 'var(--accent2)', fontWeight: 700 }}>Call Bluff</span> to challenge the bot</>
+        )}
+      </div>
+      <div aria-hidden style={{
+        fontSize: 20, color: 'var(--accent)', marginTop: 2,
+        animation: 'bobDown 1.1s ease-in-out infinite',
+      }}>
+        ▼
+      </div>
+    </div>
   );
 }
 
 // ─── Orchestrator ─────────────────────────────────────────────────────────────
-export function TutorialLayer({ roomState, myPlayerId, isHost = false, startGame, isMobile = false }) {
+export function TutorialLayer({
+  roomState,
+  myPlayerId,
+  isHost = false,
+  startGame,
+  isMobile = false,
+  isMyTurn = false,
+  reopenSignal = 0,
+}) {
   const phase = roomState?.phase;
   const isLobby = phase === 'lobby';
 
@@ -247,6 +269,32 @@ export function TutorialLayer({ roomState, myPlayerId, isHost = false, startGame
 
   const coach = !showIntro && !isLobby ? coachFor(coachContextFromRoom(roomState, myPlayerId)) : null;
 
+  // Header "Guide" button → reopen the walkthrough. Skip the initial mount so it
+  // only fires on an actual press (reopenSignal is bumped by OnlinePlayerUI).
+  const firstReopenRef = useRef(true);
+  useEffect(() => {
+    if (firstReopenRef.current) { firstReopenRef.current = false; return; }
+    setIntroStep(0);
+    setIntroReopened(true);
+    setCoachHidden(false);
+  }, [reopenSignal]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Idle "tap a card" nudge: if the player owes a play and stalls (~3.5s), point
+  // at the hand. Auto-clears the moment they act or the turn moves on.
+  const me = roomState?.players?.find((p) => p.id === myPlayerId) || null;
+  const alive = !me || me.status === 'alive';
+  const canPlay = phase === 'playing' && isMyTurn && !roomState?.cardPlayedThisTurn && alive;
+  const canBluff = canPlay
+    && !roomState?.isFirstTurn
+    && !roomState?.bluffUsedThisTurn
+    && !roomState?.bluffBlockedThisTurn;
+  const [showCardNudge, setShowCardNudge] = useState(false);
+  useEffect(() => {
+    if (!canPlay || showIntro) { setShowCardNudge(false); return undefined; }
+    const t = setTimeout(() => setShowCardNudge(true), 3500);
+    return () => clearTimeout(t);
+  }, [canPlay, showIntro]);
+
   return (
     <>
       {showIntro && (
@@ -272,9 +320,8 @@ export function TutorialLayer({ roomState, myPlayerId, isHost = false, startGame
         />
       )}
 
-      {coach && coachHidden && (
-        <ShowGuidePill isMobile={isMobile} onShow={() => setCoachHidden(false)} />
-      )}
+      {showCardNudge && <CardNudge isMobile={isMobile} canBluff={canBluff} />}
+      <style>{'@keyframes bobDown{0%,100%{transform:translateY(0)}50%{transform:translateY(5px)}}'}</style>
     </>
   );
 }

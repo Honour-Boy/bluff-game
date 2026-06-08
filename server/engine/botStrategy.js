@@ -22,10 +22,10 @@ const { getPreviousTurnPlayerId } = require('./players');
 const BOT_BLUFF_RATE = 0.25;
 
 // How often the bot CHALLENGES the previous player when it's eligible to (it
-// can't see the card, so this is a pure gamble). Kept modest so practice isn't
-// dominated by spins, but high enough that the player learns the cost of an
-// over-aggressive honest table — sometimes the bot calls YOUR bluff.
-const BOT_BLUFF_CALL_RATE = 0.22;
+// can't see the card, so this is a pure gamble). ~1-in-3 eligible turns: frequent
+// enough that a learner reliably SEES the bot call bluff during a short practice
+// round, without spins dominating the game.
+const BOT_BLUFF_CALL_RATE = 0.34;
 
 // Plain = a normal shape card (not a Whot wild). Whot can never be a "lie"
 // (it matches anything) so it's handled separately and only as a fallback.

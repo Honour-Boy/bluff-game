@@ -18,6 +18,7 @@ const {
   _clearRedemptionTimer,
   _clearSpeedModeTimer,
   _clearIdleTurnTimer,
+  _clearBotTimer,
   logRoomDeletion,
 } = require('../lib/state');
 const { socketRateLimit } = require('../lib/rateLimiter');
@@ -350,6 +351,29 @@ function register(io, socket, deps) {
       const player = room.players[idx];
       const wasHost = room.hostUserId === playerId;
       const isMidGame = !['lobby', 'game_over'].includes(room.phase);
+
+      // ─── Tutorial / Practice: leaving ends the whole session ──────────────
+      // A practice room is single-human (host) + a bot. When the human leaves the
+      // table the session is over: destroy the room outright rather than running
+      // the normal mid-game elimination + host migration (which would otherwise
+      // hand the host seat to the bot and leave a ghost room running).
+      if (room.isTutorial) {
+        _clearBettingTimer(code);
+        _clearGhostVoteTimer(code);
+        _clearPreGameTimer(code);
+        _clearSpinPendingTimer(code);
+        _clearGameOverTimer(code);
+        _clearRedemptionTimer(code);
+        _clearSpeedModeTimer(code);
+        _clearIdleTurnTimer(code);
+        _clearBotTimer(code);
+        discardLobbyIdleState(code);
+        socket.leave(code);
+        logRoomDeletion(code, 'tutorial_left', { phase: room.phase });
+        rooms.delete(code);
+        console.log(`[Room ${code}] tutorial — ${player.username} left the table, room destroyed.`);
+        return callback?.({ success: true, roomClosed: true });
+      }
 
       if (isMidGame) {
         resolveLeaverPendingPauses(io, code, room, playerId);
