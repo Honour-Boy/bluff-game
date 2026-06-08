@@ -62,7 +62,12 @@ export function useOnlinePlayerUiController({
     const action = roomState?.lastAction;
     if (action?.type !== 'spin_result') return undefined;
 
-    const actionKey = `${action.spinTargetId}:${JSON.stringify(action.chamber)}`;
+    // Prefer the server's monotonic spinSeq so two spins with an identical target
+    // + pre-spin chamber (e.g. the tutorial bot's empty chamber across drills)
+    // don't collide and skip the second animation. Fall back to the old key.
+    const actionKey = action.spinSeq != null
+      ? `seq:${action.spinSeq}`
+      : `${action.spinTargetId}:${JSON.stringify(action.chamber)}`;
     if (lastSpinKeyRef.current === actionKey) return undefined;
     lastSpinKeyRef.current = actionKey;
 
@@ -146,26 +151,37 @@ export function useOnlinePlayerUiController({
     setTimeout(() => setJustEliminated(true), 300);
   }, [spinData]);
 
+  // Settle a finished spin: clear the overlay LOCALLY and (when it's our spin or
+  // a bot's) notify the server. Self-contained on purpose — the shared
+  // `spinDismissed` flag is reset to false on every `spin_result` room_state
+  // (socketEvents), and the server re-broadcasts with the spin_result still set as
+  // lastAction (e.g. the tutorial director's "resolved" beat), so depending on
+  // that flag to dismiss raced and could strand the overlay (the practice-mode
+  // "spin hangs"). We clear directly instead, then ack for the server's benefit.
+  const settleSpin = useCallback((targetId) => {
+    const amTarget = targetId === myPlayer?.id;
+    const targetIsBot = !!roomState?.players?.find((p) => p.id === targetId)?.isBot;
+    if (amTarget || targetIsBot) acknowledgeSpinResult?.();
+    setSpinData(null);
+    setSpinComplete(false);
+  }, [acknowledgeSpinResult, myPlayer?.id, roomState?.players]);
+
+  const isTutorialRoom = !!roomState?.isTutorial;
   useEffect(() => {
     if (!spinComplete || !spinData) return undefined;
-
-    const amTarget = spinData.spinTargetId === myPlayer?.id;
     // A bot spin target never acknowledges on its own (no socket). In a practice
     // room this client is the only human, so it drives the ack quickly instead of
-    // leaving the overlay (and play) frozen for the full 15s observer fallback —
-    // this is what made the bot "not auto-continue" after surviving a spin. It
-    // also lets the server resolve anything waiting on spin_acknowledged.
+    // leaving the overlay (and play) frozen for the observer fallback — this is
+    // what made the bot "not auto-continue" after surviving a spin. The human's
+    // own spin has a manual Continue button; this is just the safety fallback.
     const targetIsBot = !!roomState?.players?.find((p) => p.id === spinData.spinTargetId)?.isBot;
-    // Long enough to read the "survived — a bullet was added" explainer, short
-    // enough that play resumes promptly instead of the old 15s observer stall.
-    const delay = targetIsBot ? 3500 : 15000;
-    const timer = setTimeout(() => {
-      if (amTarget || targetIsBot) acknowledgeSpinResult?.();
-      else setSpinData(null);
-    }, delay);
+    const delay = targetIsBot ? 3500 : (isTutorialRoom ? 8000 : 15000);
+    const timer = setTimeout(() => settleSpin(spinData.spinTargetId), delay);
     return () => clearTimeout(timer);
-  }, [acknowledgeSpinResult, myPlayer?.id, spinComplete, spinData, roomState?.players]);
+  }, [settleSpin, spinComplete, spinData, roomState?.players, isTutorialRoom]);
 
+  // Secondary path: if some other flow (online cross-client) flips spinDismissed
+  // true, honour it. The primary dismissal is settleSpin above.
   useEffect(() => {
     if (spinDismissed && spinData && spinComplete) {
       setSpinData(null);
@@ -290,6 +306,11 @@ export function useOnlinePlayerUiController({
     }
   }, [sniperRedirect, sniperDeciding]);
 
+  // Continue button on the spin overlay → settle THIS spin (clear + ack).
+  const handleSpinContinue = useCallback(() => {
+    if (spinData) settleSpin(spinData.spinTargetId);
+  }, [settleSpin, spinData]);
+
   const handleSaboteurPick = useCallback(async (targetId) => {
     if (!saboteurTransfer || saboteurBusy) return;
     setSaboteurBusy(true);
@@ -344,6 +365,7 @@ export function useOnlinePlayerUiController({
     setGhostVotingBusy,
     lastStandSpinBusy,
     setLastStandSpinBusy,
+    handleSpinContinue,
     handleCardClick,
     handlePowerCardClick,
     handleSpectatePlayer,

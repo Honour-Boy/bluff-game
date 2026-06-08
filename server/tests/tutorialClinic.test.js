@@ -29,7 +29,17 @@ const {
   _pendingDirectorAction,
   _beginPowerClinic,
   _finishClinic,
+  advanceClinic,
 } = require('../lib/tutorialDirector.js');
+
+// Drive the (drill-0) Shield intercept drill to completion through the real
+// pipeline: arm the shield, resolve the bluff (blocked), settle the phase.
+function completeShieldDrill(room) {
+  const cardId = room.powerCardSlot['human'][0].id;
+  engine.armInterceptCard(room, 'human', cardId);
+  bluffPipeline.resolveBluff(room, 'bot:1');
+  room.phase = 'playing';
+}
 const roomHandler = require('../handlers/room.js');
 const gameHandler = require('../handlers/game.js');
 const { broadcastRoomState } = require('../lib/broadcast.js');
@@ -119,10 +129,10 @@ describe('bot bluff minimum (tutorial Basics)', () => {
 describe('stageScenario', () => {
   it('stages all six powers + the bot demo, each with the right holder + phase', () => {
     const expected = [
-      ['peek', 'player', 'playing'],
-      ['freeze', 'player', 'playing'],
       ['shield', 'player', 'bluff_intercept_pending'],
       ['shield', 'bot', 'playing'],
+      ['peek', 'player', 'playing'],
+      ['freeze', 'player', 'playing'],
       ['mirror', 'player', 'bluff_intercept_pending'],
       ['swap', 'player', 'bluff_intercept_pending'],
       ['assassin', 'player', 'playing'],
@@ -154,9 +164,26 @@ describe('stageScenario', () => {
     expect(stageScenario(room, 99)).toBeNull();
   });
 
-  it('locks Call Bluff on own-turn drills but not the bot-demo', () => {
+  it('locks Call Bluff on own-turn drills but not the intercept/bot drills', () => {
+    // Order: shield, bot-shield, peek, freeze, mirror, swap, assassin.
     const lock = POWER_CLINIC.map((_, i) => stageScenario(clinicRoom(), i).lockBluff);
-    expect(lock).toEqual([true, true, false, false, false, false, true]);
+    expect(lock).toEqual([false, false, true, true, false, false, true]);
+  });
+
+  it('numbers player drills 1..6 and leaves the bot demo un-numbered', () => {
+    const steps = POWER_CLINIC.map((_, i) => {
+      const sc = stageScenario(clinicRoom(), i);
+      return [sc.actor, sc.playerStep, sc.playerTotal];
+    });
+    expect(steps).toEqual([
+      ['player', 1, 6], // shield
+      ['bot', null, 6], // bot demo
+      ['player', 2, 6], // peek
+      ['player', 3, 6], // freeze
+      ['player', 4, 6], // mirror
+      ['player', 5, 6], // swap
+      ['player', 6, 6], // assassin
+    ]);
   });
 });
 
@@ -262,36 +289,45 @@ describe('tutorialDirector', () => {
     expect(_pendingDirectorAction(room)).toEqual({ kind: 'start_clinic' });
   });
 
-  it('_beginPowerClinic stages drill 0 with all powers enabled', () => {
+  it('_beginPowerClinic stages drill 0 (Shield) with all powers enabled', () => {
     const room = clinicRoom();
     room.tutorialLesson = 'basics';
     _beginPowerClinic(room);
     expect(room.tutorialLesson).toBe('powers');
     expect(room.tutorialScenario.index).toBe(0);
-    expect(room.tutorialScenario.power).toBe('peek');
-    expect(room.phase).toBe('playing');
+    expect(room.tutorialScenario.power).toBe('shield');
+    expect(room.phase).toBe('bluff_intercept_pending');
     expect(Object.values(room.config.powerCards.enabled).every(Boolean)).toBe(true);
     expect(room.botBluffCallsThisGame).toBe(0);
   });
 
-  it('resolves a completed drill, then advances to the next', () => {
+  it('resolves a completed drill, then advances only when the player asks', () => {
     const room = clinicRoom();
-    _beginPowerClinic(room); // drill 0 (peek), step intro
-    // not complete yet → no action
-    expect(_pendingDirectorAction(room)).toBeNull();
-    engine.activatePowerCard(room, 'human'); // consume peek → complete
+    _beginPowerClinic(room); // drill 0 (shield), step intro
+    expect(_pendingDirectorAction(room)).toBeNull(); // not complete yet
+    completeShieldDrill(room);
     expect(_pendingDirectorAction(room)).toEqual({ kind: 'resolve', index: 0 });
     room.tutorialScenario.step = 'resolved';
-    expect(_pendingDirectorAction(room)).toEqual({ kind: 'advance', index: 0 });
+    // Advancing past a resolved drill is NO LONGER timed — the director waits.
+    expect(_pendingDirectorAction(room)).toBeNull();
+    expect(advanceClinic(room)).toBe(true);
+    expect(room.tutorialScenario.index).toBe(1);
+    expect(room.tutorialScenario.id).toBe('bot-shield');
   });
 
-  it('finishes after the last drill resolves', () => {
+  it('advanceClinic only fires on a resolved drill', () => {
+    const room = clinicRoom();
+    _beginPowerClinic(room); // step intro
+    expect(advanceClinic(room)).toBe(false); // intro, not resolved
+  });
+
+  it('finishes when the player advances past the last drill', () => {
     const room = clinicRoom();
     const last = POWER_CLINIC.length - 1;
     room.tutorialScenario = stageScenario(room, last);
     room.tutorialScenario.step = 'resolved';
-    expect(_pendingDirectorAction(room)).toEqual({ kind: 'finish', index: last });
-    _finishClinic(room);
+    expect(_pendingDirectorAction(room)).toBeNull(); // not auto-timed
+    expect(advanceClinic(room)).toBe(true);
     expect(room.phase).toBe('game_over');
     expect(room.tutorialClinicComplete).toBe(true);
     expect(room.lastAction.winnerId).toBe('human');
@@ -329,30 +365,36 @@ describe('tutorialDirector — live beats', () => {
 
       expect(room.tutorialLesson).toBe('powers');
       expect(room.tutorialScenario.index).toBe(0);
-      expect(room.tutorialScenario.power).toBe('peek');
-      expect(room.phase).toBe('playing');
+      expect(room.tutorialScenario.power).toBe('shield');
+      expect(room.phase).toBe('bluff_intercept_pending');
     } finally {
       clearAllTimers();
       vi.useRealTimers();
     }
   });
 
-  it('steps a completed drill: resolve → advance to the next drill', async () => {
+  it('times the resolve beat but holds at resolved until the player advances', async () => {
     vi.useFakeTimers();
     try {
       const room = clinicRoom();
-      _beginPowerClinic(room);                 // drill 0 (peek), intro
-      engine.activatePowerCard(room, 'human'); // consume peek → complete
+      _beginPowerClinic(room);     // drill 0 (shield), intro
+      completeShieldDrill(room);   // arm + resolve → complete
       await saveRoom(room);
 
       const io = makeIo();
       await broadcastRoomState(io, room.code);  // arms 'resolve'
       await vi.advanceTimersByTimeAsync(800);   // resolve → step 'resolved'
       expect(room.tutorialScenario.step).toBe('resolved');
-      await vi.advanceTimersByTimeAsync(3000);  // advance → drill 1 (freeze)
+
+      // NOT auto-advanced: more time + another broadcast leaves it resolved.
+      await broadcastRoomState(io, room.code);
+      await vi.advanceTimersByTimeAsync(4000);
+      expect(room.tutorialScenario.index).toBe(0);
+      expect(room.tutorialScenario.step).toBe('resolved');
+
+      // The player's "I Understand" advances it.
+      expect(advanceClinic(room)).toBe(true);
       expect(room.tutorialScenario.index).toBe(1);
-      expect(room.tutorialScenario.power).toBe('freeze');
-      expect(room.tutorialScenario.step).toBe('intro');
     } finally {
       clearAllTimers();
       vi.useRealTimers();

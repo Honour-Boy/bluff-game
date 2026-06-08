@@ -145,8 +145,9 @@ export function clinicCoachFor(scenario) {
   if (!entry) return null;
   const step = scenario.step === 'resolved' ? 'resolved' : 'intro';
   const tip = entry[step];
-  const n = typeof scenario.index === 'number' ? scenario.index + 1 : null;
-  const total = scenario.total || null;
+  // "Power N of M" counts only player-facing drills (the bot demo has no number).
+  const n = scenario.playerStep ?? null;
+  const total = scenario.playerTotal ?? null;
   const counter = n && total ? `Power ${n} of ${total} · ` : '';
   return {
     key: `clinic-${slug}-${step}`,
@@ -154,6 +155,36 @@ export function clinicCoachFor(scenario) {
     title: `${counter}${tip.title}`,
     body: tip.body,
   };
+}
+
+// One-line "what this power does" for the per-drill briefing pop-up shown BEFORE
+// the staged instance (the learner taps "Got it" to enter it).
+const CLINIC_BRIEFING = {
+  shield: `Shield blocks a bluff called against you — completely. No spin, no risk. We'll put you in a spot where ${BOT_NAME} calls your bluff so you can use it.`,
+  peek: `Peek lets you secretly look at ${BOT_NAME}'s last card before you decide. Information wins games.`,
+  freeze: `Freeze skips ${BOT_NAME}'s next turn — arm it, play a card, end your turn, and steal the tempo.`,
+  mirror: `Mirror reflects a spin back onto whoever challenged you. ${BOT_NAME} wanted you on the spot — now it is.`,
+  swap: `Swap switches your played card with one on the table, turning a caught bluff into an honest play.`,
+  assassin: `Assassin punishes a reckless challenge: arm it, play honestly, and a wrong bluff-call eliminates the challenger outright.`,
+};
+
+/**
+ * The briefing pop-up for a drill: { title, body } or null. Player drills are
+ * titled "Power Card N: <Name>"; the bot demo gets a framing title instead.
+ */
+export function clinicBriefingFor(scenario) {
+  if (!scenario || !scenario.power) return null;
+  const label = POWER_LABELS[scenario.power] || 'Power';
+  if ((scenario.actor || 'player') === 'bot') {
+    return {
+      title: 'The bot’s side',
+      body: `Powers aren’t just yours. Challenge ${BOT_NAME} here — and watch it defend itself with a ${label}.`,
+    };
+  }
+  const n = scenario.playerStep;
+  const total = scenario.playerTotal;
+  const num = n ? `Power Card ${n}${total ? ` of ${total}` : ''}: ` : '';
+  return { title: `${num}${label}`, body: CLINIC_BRIEFING[scenario.power] || '' };
 }
 
 // Shown on the felt the moment a Basics practice round ends, just before the bot

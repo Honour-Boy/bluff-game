@@ -70,6 +70,8 @@ function serializeRoom(room, requestingPlayerId = null, opts = {}) {
           lockBluff: !!room.tutorialScenario.lockBluff,
           expect: room.tutorialScenario.expect || null,
           total: room.tutorialScenario.total || null,
+          playerStep: room.tutorialScenario.playerStep ?? null,
+          playerTotal: room.tutorialScenario.playerTotal ?? null,
         }
       : null,
     // True once the clinic's final drill is done (drives the "you've learned the

@@ -18,6 +18,7 @@ const { broadcastRoomState } = require('../lib/broadcast');
 const { socketRateLimit } = require('../lib/rateLimiter');
 const { maybeRecordGroupWinner } = require('../lib/roomBuilders');
 const { runMirrorMatchSpin, resolvePendingGameOver, beginRedemption } = require('../lib/orchestration');
+const { _beginPowerClinic, advanceClinic } = require('../lib/tutorialDirector');
 
 // ─── Pre-game selection orchestration (#116) ─────────────────
 // Pure phase/state logic lives in engine/pregame.js; these helpers
@@ -236,6 +237,58 @@ function register(io, socket, deps) {
       }
     } catch (err) {
       callback({ success: false, error: err.message });
+    }
+  });
+
+  // ─── TUTORIAL: Skip Basics, jump straight to the Power Clinic ──────────────
+  // From the in-room "Go through Basics / Skip to Power Cards" choice. Sets the
+  // room up (startGame) then re-stages it as clinic drill 0. Only the seated
+  // human, only from the lobby.
+  socket.on('tutorial_skip_to_powers', async ({ roomCode } = {}, callback) => {
+    try {
+      if (!socket.userId) return callback?.({ success: false, error: 'Not authenticated' });
+      const code = roomCode?.toUpperCase();
+      const room = await getRoom(code);
+      if (!room) return callback?.({ success: false, error: 'Room not found' });
+      if (!room.isTutorial) return callback?.({ success: false, error: 'Not a tutorial room' });
+      if (!room.players.some(p => p.id === socket.userId && !p.isBot)) {
+        return callback?.({ success: false, error: 'Not in this room' });
+      }
+      if (room.phase !== 'lobby') return callback?.({ success: false, error: 'Already started' });
+
+      engine.startGame(room);   // deal + standard init (tutorial skips pre_game)
+      _beginPowerClinic(room);  // lesson=powers, enable powers, stage drill 0
+
+      await saveRoom(room);
+      await broadcastRoomState(io, code);
+      return callback?.({ success: true });
+    } catch (err) {
+      console.error('[tutorial_skip_to_powers]', err);
+      return callback?.({ success: false, error: err.message });
+    }
+  });
+
+  // ─── TUTORIAL: Advance past a resolved Power-Clinic drill ("I Understand") ──
+  socket.on('tutorial_advance', async ({ roomCode } = {}, callback) => {
+    try {
+      if (!socket.userId) return callback?.({ success: false, error: 'Not authenticated' });
+      const code = roomCode?.toUpperCase();
+      const room = await getRoom(code);
+      if (!room) return callback?.({ success: false, error: 'Room not found' });
+      if (!room.isTutorial) return callback?.({ success: false, error: 'Not a tutorial room' });
+      if (!room.players.some(p => p.id === socket.userId && !p.isBot)) {
+        return callback?.({ success: false, error: 'Not in this room' });
+      }
+
+      const advanced = advanceClinic(room);
+      if (!advanced) return callback?.({ success: false, error: 'No drill to advance' });
+
+      await saveRoom(room);
+      await broadcastRoomState(io, code);
+      return callback?.({ success: true });
+    } catch (err) {
+      console.error('[tutorial_advance]', err);
+      return callback?.({ success: false, error: err.message });
     }
   });
 

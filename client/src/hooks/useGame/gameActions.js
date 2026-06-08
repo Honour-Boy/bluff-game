@@ -59,6 +59,20 @@ export function useGameActions({
     });
   }, [setError, setIsHost, setPlayerId, setRoomCode, socket]);
 
+  // Tutorial — in-room "Skip to Power Cards": server jumps straight to the clinic.
+  const skipToPowers = useCallback(() => {
+    socket.emit('tutorial_skip_to_powers', { roomCode }, (res) => {
+      if (!res?.success) failError(res);
+    });
+  }, [failError, roomCode, socket]);
+
+  // Tutorial — clinic "I Understand": advance past the resolved drill.
+  const advanceTutorial = useCallback(() => {
+    socket.emit('tutorial_advance', { roomCode }, (res) => {
+      if (!res?.success) failError(res);
+    });
+  }, [failError, roomCode, socket]);
+
   const joinRoom = useCallback((code) => {
     socket.emit('join_room', { roomCode: code.toUpperCase() }, (res) => {
       if (res.success) {
@@ -275,6 +289,8 @@ export function useGameActions({
   return {
     createRoom,
     startTutorial,
+    skipToPowers,
+    advanceTutorial,
     joinRoom,
     startGame,
     nextTurn,

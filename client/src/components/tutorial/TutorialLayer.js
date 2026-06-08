@@ -17,7 +17,7 @@ import { useEffect, useRef, useState } from 'react';
 import { CloseIcon } from '../shared/CloseIcon';
 import {
   introSlidesFor, coachFor, coachContextFromRoom,
-  clinicCoachFor, BASICS_HANDOFF_COACH, CLINIC_COMPLETE_COACH,
+  clinicCoachFor, clinicBriefingFor, BASICS_HANDOFF_COACH, CLINIC_COMPLETE_COACH, BOT_NAME,
 } from './tutorialContent';
 
 const TONE_COLORS = {
@@ -304,12 +304,106 @@ function ClinicCompleteCard({ coach, onReplay, onLeave }) {
   );
 }
 
+// ─── In-room path choice: Basics or skip straight to Power Cards ──────────────
+function ChoiceModal({ onBasics, onSkip, onLeave }) {
+  const Btn = ({ title, desc, onClick, primary }) => (
+    <button
+      onClick={onClick}
+      className={primary ? 'primary' : undefined}
+      style={{
+        textAlign: 'left', padding: '16px 18px', borderRadius: 'var(--radius)',
+        background: primary ? undefined : 'var(--surface2)',
+        border: `1px solid ${primary ? 'var(--accent)' : 'var(--border-lit)'}`,
+        cursor: 'pointer', color: 'var(--text)', width: '100%',
+      }}
+    >
+      <div style={{ fontFamily: "'Cinzel', serif", fontSize: 16, color: 'var(--accent)', marginBottom: 4, letterSpacing: '0.06em' }}>
+        {title}
+      </div>
+      <div style={{ fontFamily: "'Crimson Text', serif", fontSize: 13, color: 'var(--text-dim)', lineHeight: 1.5 }}>
+        {desc}
+      </div>
+    </button>
+  );
+  return (
+    <div style={{
+      position: 'fixed', inset: 0, zIndex: 9450, background: 'rgba(0,0,0,0.9)',
+      display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16,
+    }}>
+      <div className="card fade-in" style={{ maxWidth: 440, width: '100%' }}>
+        <div style={{ fontFamily: "'Bebas Neue', sans-serif", fontSize: 28, color: 'var(--accent)', letterSpacing: '0.06em', lineHeight: 1 }}>
+          WELCOME TO PRACTICE
+        </div>
+        <div style={{ fontFamily: "'Crimson Text', serif", fontSize: 14, color: 'var(--text-dim)', margin: '6px 0 16px', lineHeight: 1.6 }}>
+          Learn against {BOT_NAME}. New here? Start with the Basics. Already know the
+          core loop? Skip straight to the Power Cards.
+        </div>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+          <Btn primary title="Go through Basics" desc="Play a card, bluff, call the bot’s bluffs, and survive the gun — then we move on to powers." onClick={onBasics} />
+          <Btn title="Skip to Power Cards" desc="Jump to the power-card clinic: one guided drill for each power." onClick={onSkip} />
+        </div>
+        {typeof onLeave === 'function' && (
+          <button
+            onClick={onLeave}
+            style={{
+              width: '100%', marginTop: 14, fontSize: 11, color: 'var(--text-dim)',
+              background: 'none', border: 'none', cursor: 'pointer',
+              textDecoration: 'underline', letterSpacing: '0.08em',
+            }}
+          >
+            Leave practice
+          </button>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// ─── Generic guided modal (briefing pop-up + resolved explanation) ────────────
+function GuidedModal({ kicker, title, body, cta, onCta, tone = 'info' }) {
+  const color = TONE_COLORS[tone] || 'var(--accent)';
+  return (
+    <div style={{
+      position: 'fixed', inset: 0, zIndex: 9350, background: 'rgba(0,0,0,0.82)',
+      display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16,
+    }}>
+      <div className="card fade-in" style={{ maxWidth: 440, width: '100%', borderTop: `3px solid ${color}` }}>
+        {kicker && (
+          <div style={{
+            fontFamily: "'Space Mono', monospace", fontSize: 10, letterSpacing: '0.18em',
+            textTransform: 'uppercase', color: 'var(--text-dim)', marginBottom: 8,
+          }}>
+            {kicker}
+          </div>
+        )}
+        <div style={{
+          fontFamily: "'Bebas Neue', sans-serif", fontSize: 28, lineHeight: 1.05,
+          letterSpacing: '0.05em', color, marginBottom: 12,
+        }}>
+          {title}
+        </div>
+        <div style={{
+          fontFamily: "'Crimson Text', serif", fontSize: 15, lineHeight: 1.7,
+          color: 'var(--text)', marginBottom: 22,
+        }}>
+          {body}
+        </div>
+        <button onClick={onCta} className="primary" style={{ width: '100%', minHeight: 46, fontSize: 13 }}>
+          {cta}
+        </button>
+      </div>
+    </div>
+  );
+}
+
 // ─── Orchestrator ─────────────────────────────────────────────────────────────
 export function TutorialLayer({
   roomState,
   myPlayerId,
   isHost = false,
   startGame,
+  skipToPowers,
+  advanceTutorial,
   restartRoom,
   leaveGame,
   isMobile = false,
@@ -323,47 +417,64 @@ export function TutorialLayer({
   const clinicComplete = !!roomState?.tutorialClinicComplete;
   const slides = introSlidesFor(lesson);
 
-  const [introDone, setIntroDone] = useState(false); // auto-intro dismissed/began
-  const [introReopened, setIntroReopened] = useState(false); // manual reopen
+  // Lobby path choice (Basics vs skip to Power Cards) now lives in-room.
+  const [path, setPath] = useState(null); // null | 'basics' | 'powers'
+  const [introDone, setIntroDone] = useState(false);
+  const [introReopened, setIntroReopened] = useState(false);
   const [introStep, setIntroStep] = useState(0);
   const [coachHidden, setCoachHidden] = useState(false);
+  // Clinic: which drill index has had its briefing pop-up dismissed.
+  const [briefedIndex, setBriefedIndex] = useState(-1);
 
-  // Once the game leaves the lobby, the auto-intro is finished for good (covers
-  // pressing the lobby's own Start button instead of "Begin practice").
+  // Sticky guards: the Basics match spawns at most ONCE (so reopening + closing
+  // the guide mid-game can't re-deal), and the skip request fires once.
+  const spawnedRef = useRef(false);
+  const skipFiredRef = useRef(false);
+
   useEffect(() => {
     if (!isLobby) setIntroDone(true);
   }, [isLobby]);
 
-  const showIntro = (!introDone && isLobby) || introReopened;
+  // The basics game starts the FIRST time the intro is dismissed — whether via
+  // "Begin practice" OR by closing the pop-up — and never again.
+  const spawnBasics = () => {
+    if (isLobby && !spawnedRef.current && typeof startGame === 'function') {
+      spawnedRef.current = true;
+      startGame();
+    }
+  };
+
+  // Skip → tell the server to jump straight to the clinic (once).
+  useEffect(() => {
+    if (path === 'powers' && isLobby && !skipFiredRef.current && typeof skipToPowers === 'function') {
+      skipFiredRef.current = true;
+      skipToPowers();
+    }
+  }, [path, isLobby, skipToPowers]);
+
+  const showChoice = isLobby && path === null && !scenario && !clinicComplete;
+  const showIntro = (path === 'basics' && isLobby && !introDone) || introReopened;
 
   const closeIntro = () => {
+    spawnBasics(); // first close (in the lobby) deals the Basics game
     setIntroDone(true);
     setIntroReopened(false);
     setIntroStep(0);
   };
+  const handleBegin = () => { spawnBasics(); closeIntro(); };
+  const replayIntro = () => { setIntroStep(0); setIntroReopened(true); setCoachHidden(false); };
 
-  const handleBegin = () => {
-    // The bot hosts the practice table, but the learner paces the first deal:
-    // this layer only mounts in tutorial rooms, so the local human starts the
-    // game (the server's start_game tutorial bypass accepts it). No isHost gate.
-    if (isLobby && typeof startGame === 'function') startGame();
-    closeIntro();
-  };
+  // Clinic briefing pop-up (before each staged instance) + resolved explanation.
+  const briefing = scenario && scenario.step === 'intro' && briefedIndex !== scenario.index
+    ? clinicBriefingFor(scenario)
+    : null;
+  const showExplanation = !!scenario && scenario.step === 'resolved' && !clinicComplete;
 
-  const replayIntro = () => {
-    setIntroStep(0);
-    setIntroReopened(true);
-    setCoachHidden(false);
-  };
-
-  // Coach selection. The clinic + its hand-offs take priority over the generic
-  // state-driven coach, so the guided lesson speaks with one voice:
-  //   • clinic complete → the celebratory end card (with replay/leave);
-  //   • an active drill → its scripted before/after copy;
-  //   • a finished Basics round → the "now let's learn powers" hand-off;
-  //   • otherwise → the normal contextual coach.
+  // Coach bar. Hidden while a guided modal (briefing / explanation / choice /
+  // intro) owns the screen, and during clinic-complete (its own card shows).
   let coach = null;
-  if (!showIntro && !isLobby) {
+  const modalUp = showIntro || showChoice || briefing || showExplanation;
+  if (!modalUp && !isLobby) {
     if (clinicComplete) coach = CLINIC_COMPLETE_COACH;
     else if (scenario) coach = clinicCoachFor(scenario);
     else if (lesson !== 'powers' && (phase === 'game_over' || phase === 'round_end')) {
@@ -371,18 +482,21 @@ export function TutorialLayer({
     } else coach = coachFor(coachContextFromRoom(roomState, myPlayerId));
   }
 
-  // Header "Guide" button → reopen the walkthrough. Skip the initial mount so it
-  // only fires on an actual press (reopenSignal is bumped by OnlinePlayerUI).
+  // Header "Guide" button → re-show the current drill's briefing (clinic) or
+  // reopen the walkthrough (basics). Skip the initial mount.
   const firstReopenRef = useRef(true);
   useEffect(() => {
     if (firstReopenRef.current) { firstReopenRef.current = false; return; }
-    setIntroStep(0);
-    setIntroReopened(true);
     setCoachHidden(false);
+    if (roomState?.tutorialScenario) {
+      setBriefedIndex(-1); // re-brief the active drill
+    } else {
+      setIntroStep(0);
+      setIntroReopened(true);
+    }
   }, [reopenSignal]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Idle "tap a card" nudge: if the player owes a play and stalls (~3.5s), point
-  // at the hand. Auto-clears the moment they act or the turn moves on.
+  // Idle "tap a card" nudge (basics only; suppressed during the clinic + modals).
   const me = roomState?.players?.find((p) => p.id === myPlayerId) || null;
   const alive = !me || me.status === 'alive';
   const canPlay = phase === 'playing' && isMyTurn && !roomState?.cardPlayedThisTurn && alive;
@@ -391,17 +505,25 @@ export function TutorialLayer({
     && !roomState?.bluffUsedThisTurn
     && !roomState?.bluffBlockedThisTurn
     && !scenario?.lockBluff;
-  // The clinic gives explicit, drill-specific guidance, so the generic idle
-  // "tap a card" nudge would only add noise — suppress it during the clinic.
   const [showCardNudge, setShowCardNudge] = useState(false);
   useEffect(() => {
-    if (!canPlay || showIntro || scenario) { setShowCardNudge(false); return undefined; }
+    if (!canPlay || modalUp || scenario) { setShowCardNudge(false); return undefined; }
     const t = setTimeout(() => setShowCardNudge(true), 3500);
     return () => clearTimeout(t);
-  }, [canPlay, showIntro, scenario]);
+  }, [canPlay, modalUp, scenario]);
+
+  const isLastDrill = scenario && scenario.total != null && scenario.index >= scenario.total - 1;
 
   return (
     <>
+      {showChoice && (
+        <ChoiceModal
+          onBasics={() => setPath('basics')}
+          onSkip={() => setPath('powers')}
+          onLeave={typeof leaveGame === 'function' ? leaveGame : undefined}
+        />
+      )}
+
       {showIntro && (
         <IntroModal
           slides={slides}
@@ -416,9 +538,31 @@ export function TutorialLayer({
         />
       )}
 
-      {clinicComplete && coach && (
+      {briefing && !showIntro && !showChoice && (
+        <GuidedModal
+          kicker="Power Clinic"
+          tone="action"
+          title={briefing.title}
+          body={briefing.body}
+          cta="Got it — show me"
+          onCta={() => setBriefedIndex(scenario.index)}
+        />
+      )}
+
+      {showExplanation && coach == null && (
+        <GuidedModal
+          kicker="What just happened"
+          tone={clinicCoachFor(scenario)?.tone || 'win'}
+          title={clinicCoachFor(scenario)?.title || ''}
+          body={clinicCoachFor(scenario)?.body || ''}
+          cta={isLastDrill ? 'Finish' : 'I Understand'}
+          onCta={() => { if (typeof advanceTutorial === 'function') advanceTutorial(); }}
+        />
+      )}
+
+      {clinicComplete && (
         <ClinicCompleteCard
-          coach={coach}
+          coach={CLINIC_COMPLETE_COACH}
           onReplay={typeof restartRoom === 'function' ? restartRoom : undefined}
           onLeave={typeof leaveGame === 'function' ? leaveGame : undefined}
         />
