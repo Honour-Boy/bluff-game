@@ -43,8 +43,8 @@ export function useGameActions({
   // returns the same { roomCode, isHost, playerId } shape); gameMode then derives
   // from the room_state broadcast like any online room, so the player lands in
   // the lobby with the bot already seated.
-  const startTutorial = useCallback(() => {
-    socket.emit('create_tutorial_room', {}, (res) => {
+  const startTutorial = useCallback((lesson = 'basics') => {
+    socket.emit('create_tutorial_room', { lesson }, (res) => {
       if (res?.success) {
         setError(null);
         setRoomCode(res.roomCode);

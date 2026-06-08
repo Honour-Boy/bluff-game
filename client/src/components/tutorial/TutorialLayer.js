@@ -15,7 +15,7 @@
 
 import { useEffect, useRef, useState } from 'react';
 import { CloseIcon } from '../shared/CloseIcon';
-import { INTRO_SLIDES, coachFor, coachContextFromRoom } from './tutorialContent';
+import { introSlidesFor, coachFor, coachContextFromRoom } from './tutorialContent';
 
 const TONE_COLORS = {
   info: 'var(--accent)',
@@ -25,7 +25,8 @@ const TONE_COLORS = {
 };
 
 // ─── Intro walkthrough modal ──────────────────────────────────────────────────
-function IntroModal({ step, total, slide, canBegin, isHost, onBack, onNext, onSkip, onBegin }) {
+function IntroModal({ slides, step, slide, canBegin, isHost, onBack, onNext, onSkip, onBegin }) {
+  const total = slides.length;
   const isLast = step === total - 1;
   return (
     <div
@@ -92,7 +93,7 @@ function IntroModal({ step, total, slide, canBegin, isHost, onBack, onNext, onSk
 
         {/* Progress dots */}
         <div style={{ display: 'flex', justifyContent: 'center', gap: 6, margin: '18px 0' }}>
-          {INTRO_SLIDES.map((s, i) => (
+          {slides.map((s, i) => (
             <span key={s.id} aria-hidden style={{
               width: i === step ? 18 : 6, height: 6, borderRadius: 3,
               background: i === step ? 'var(--accent)' : 'var(--border)',
@@ -233,9 +234,11 @@ export function TutorialLayer({
   isMobile = false,
   isMyTurn = false,
   reopenSignal = 0,
+  lesson = 'basics',
 }) {
   const phase = roomState?.phase;
   const isLobby = phase === 'lobby';
+  const slides = introSlidesFor(lesson);
 
   const [introDone, setIntroDone] = useState(false); // auto-intro dismissed/began
   const [introReopened, setIntroReopened] = useState(false); // manual reopen
@@ -299,13 +302,13 @@ export function TutorialLayer({
     <>
       {showIntro && (
         <IntroModal
-          step={introStep}
-          total={INTRO_SLIDES.length}
-          slide={INTRO_SLIDES[introStep]}
+          slides={slides}
+          step={Math.min(introStep, slides.length - 1)}
+          slide={slides[Math.min(introStep, slides.length - 1)]}
           canBegin={isLobby}
           isHost={isHost}
           onBack={() => setIntroStep((s) => Math.max(0, s - 1))}
-          onNext={() => setIntroStep((s) => Math.min(INTRO_SLIDES.length - 1, s + 1))}
+          onNext={() => setIntroStep((s) => Math.min(slides.length - 1, s + 1))}
           onSkip={closeIntro}
           onBegin={handleBegin}
         />

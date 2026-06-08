@@ -51,9 +51,12 @@ function serializeRoom(room, requestingPlayerId = null, opts = {}) {
     // was supplied, i.e. the per-socket online broadcast).
     hostUserId: room.hostUserId || null,
     amHost: requestingPlayerId != null ? (requestingPlayerId === room.hostUserId) : undefined,
-    // Tutorial / Practice — flag the room so the client can brand it (and a
-    // future guided tour can key off it). Always present (false for normal rooms).
+    // Tutorial / Practice — flag the room so the client can brand it (and the
+    // guided layer can key off it). Always present (false for normal rooms).
     isTutorial: !!room.isTutorial,
+    // Which guided lesson this practice room is running ('basics' | 'powers'),
+    // so the coach + intro can adapt. null outside tutorial rooms.
+    tutorialLesson: room.isTutorial ? (room.tutorialLesson || 'basics') : null,
     players: room.players.map(p => ({
       id: p.id,
       username: p.username,

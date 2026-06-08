@@ -75,17 +75,31 @@ function register(io, socket, deps) {
   // server-side bot driver (lib/bots.js). Powers / modifiers / systems are all
   // OFF (the all-false defaultRoomConfig), and at 2 players no secret roles are
   // assigned, so the room teaches the clean core loop. Works for guests too.
-  socket.on('create_tutorial_room', async (_payload = {}, callback) => {
+  socket.on('create_tutorial_room', async ({ lesson } = {}, callback) => {
     if (!socket.userId) return callback?.({ success: false, error: 'Not authenticated' });
     if (!socketRateLimit(socket, 'create_tutorial_room', 5, 60_000).allowed) {
       return callback?.({ success: false, error: 'Rate limit exceeded' });
     }
 
     try {
-      // null config → normalizeRoomConfig fills in the all-off defaults.
-      const room = await buildAdHocRoom(socket, engine.MODES.ONLINE, null, groupsRepo);
+      // Lesson → house rules. 'basics' is the all-off core loop (null config →
+      // normalizeRoomConfig fills the all-off defaults). 'powers' seeds two
+      // beginner-friendly power cards — Peek (see the last card) and Shield (block
+      // a bluff) — so the player learns to hold, activate, and defend with one.
+      // startGame guarantees each seat at least one power card. Roles/modifiers
+      // stay off (secret roles need 3+ seats AND bot prompt-handling — deferred).
+      const chosenLesson = lesson === 'powers' ? 'powers' : 'basics';
+      let config = null;
+      if (chosenLesson === 'powers') {
+        config = engine.defaultRoomConfig();
+        config.powerCards.enabled.peek = true;
+        config.powerCards.enabled.shield = true;
+      }
+
+      const room = await buildAdHocRoom(socket, engine.MODES.ONLINE, config, groupsRepo);
       room.hostUserId = socket.userId;
       room.isTutorial = true;
+      room.tutorialLesson = chosenLesson;
       room.cardPlayedThisTurn = false;
       room.bluffUsedThisTurn = false;
       room.powerActivatedThisTurn = false;
@@ -102,7 +116,7 @@ function register(io, socket, deps) {
 
       await saveRoom(room);
       socket.join(room.code);
-      console.log(`[Room ${room.code}] Tutorial created by ${socket.username} (vs Dealer Bot)`);
+      console.log(`[Room ${room.code}] Tutorial (${chosenLesson}) created by ${socket.username} (vs Dealer Bot)`);
 
       callback?.({
         success: true,
@@ -111,6 +125,7 @@ function register(io, socket, deps) {
         mode: engine.MODES.ONLINE,
         playerId: socket.userId,
         isTutorial: true,
+        lesson: chosenLesson,
       });
 
       await broadcastRoomState(io, room.code);

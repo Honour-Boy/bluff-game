@@ -73,6 +73,7 @@ export function LandingScreen({
   // First-run nudge: badge the Practice button until the player has tried it
   // once. Read in an effect (not initial state) to avoid an SSR hydration mismatch.
   const [tutorialHint, setTutorialHint] = useState(false);
+  const [practicePickerOpen, setPracticePickerOpen] = useState(false);
 
   useEffect(() => {
     if (initialJoinCode) {
@@ -90,11 +91,12 @@ export function LandingScreen({
     } catch (_) { /* localStorage blocked — just skip the nudge */ }
   }, []);
 
-  const handleStartTutorial = () => {
+  const handleStartTutorial = (lesson = 'basics') => {
     setError(null);
     try { window.localStorage.setItem('bluff_tutorial_seen', '1'); } catch (_) { /* ignore */ }
     setTutorialHint(false);
-    onStartTutorial?.();
+    setPracticePickerOpen(false);
+    onStartTutorial?.(lesson);
   };
 
   const handleJoin = (e) => {
@@ -295,7 +297,7 @@ export function LandingScreen({
                 lowest-friction way in for a first-timer: no code, no second
                 player, the bot autoplays the opposite seat. */}
             {onStartTutorial && (
-              <PlaqueButton onClick={handleStartTutorial} disabled={!connected}>
+              <PlaqueButton onClick={() => { setError(null); setPracticePickerOpen(true); }} disabled={!connected}>
                 {/* Target / practice icon */}
                 <svg width="15" height="15" viewBox="0 0 24 24" fill="none" aria-hidden="true">
                   <circle cx="12" cy="12" r="9" stroke="currentColor" strokeWidth="1.8"/>
@@ -617,6 +619,56 @@ export function LandingScreen({
         <Suspense fallback={null}>
           <HowToPlayModal onClose={() => setShowHowToPlay(false)} />
         </Suspense>
+      )}
+
+      {/* Practice lesson picker — choose what to practise against the bot. */}
+      {practicePickerOpen && (
+        <div
+          style={{
+            position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.88)',
+            display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 9400, padding: 16,
+          }}
+          onClick={() => setPracticePickerOpen(false)}
+        >
+          <div className="card fade-in" style={{ maxWidth: 420, width: '100%' }} onClick={(e) => e.stopPropagation()}>
+            <div style={{ fontFamily: "'Bebas Neue', sans-serif", fontSize: 26, color: 'var(--accent)', letterSpacing: '0.08em', lineHeight: 1 }}>
+              CHOOSE A LESSON
+            </div>
+            <div style={{ fontFamily: "'Crimson Text', serif", fontSize: 13, color: 'var(--text-dim)', margin: '6px 0 16px' }}>
+              Practise solo against Dealer Bot — a guide walks you through each one.
+            </div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+              {[
+                { key: 'basics', title: 'The Basics', desc: 'The core loop: play a card, bluff, call the bot’s bluffs, and survive the gun.' },
+                { key: 'powers', title: 'Power Cards', desc: 'Adds Peek + Shield — learn to hold a power, use it on your turn, and block a bluff.' },
+              ].map(({ key, title, desc }) => (
+                <button
+                  key={key}
+                  onClick={() => handleStartTutorial(key)}
+                  style={{
+                    textAlign: 'left', padding: '14px 16px', background: 'var(--surface2)',
+                    border: '1px solid var(--border-lit)', borderRadius: 'var(--radius)', cursor: 'pointer', color: 'var(--text)',
+                  }}
+                  onMouseEnter={(e) => { e.currentTarget.style.borderColor = 'var(--accent)'; }}
+                  onMouseLeave={(e) => { e.currentTarget.style.borderColor = 'var(--border-lit)'; }}
+                >
+                  <div style={{ fontFamily: "'Cinzel', serif", fontSize: 15, color: 'var(--accent)', marginBottom: 4, letterSpacing: '0.06em' }}>
+                    {title}
+                  </div>
+                  <div style={{ fontFamily: "'Crimson Text', serif", fontSize: 13, color: 'var(--text-dim)', lineHeight: 1.5 }}>
+                    {desc}
+                  </div>
+                </button>
+              ))}
+            </div>
+            <button
+              onClick={() => setPracticePickerOpen(false)}
+              style={{ width: '100%', marginTop: 14, fontSize: 11, color: 'var(--text-dim)', background: 'none', border: 'none', cursor: 'pointer', textDecoration: 'underline', letterSpacing: '0.08em' }}
+            >
+              Cancel
+            </button>
+          </div>
+        </div>
       )}
     </div>
   );
