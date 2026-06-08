@@ -102,8 +102,10 @@ const CLINIC_COACH = {
       body: `${BOT_NAME}'s next turn just got skipped — you stole the tempo. Freeze triggers once, then it's gone.` },
   },
   'shield:player': {
+    play: { tone: 'action', title: 'Your turn — bluff it',
+      body: `None of your cards match the shape, so any play is a bluff. Play one face-down, then End Turn — ${BOT_NAME} is about to challenge you.` },
     intro: { tone: 'danger', title: 'Caught — Shield up!',
-      body: `You played a card that didn't match the shape, and ${BOT_NAME} called your bluff. Tap your Shield to block the challenge completely.` },
+      body: `${BOT_NAME} called your bluff! Tap your Shield (highlighted) to block the challenge completely.` },
     resolved: { tone: 'win', title: 'Blocked!',
       body: `Shield cancelled the bluff outright — no spin, no risk. It blocks one challenge, then it's spent.` },
   },
@@ -114,14 +116,18 @@ const CLINIC_COACH = {
       body: `Even though your call was right, ${BOT_NAME} armed a Shield and blocked it — no spin. Powers work for the bot too, so read the table.` },
   },
   'mirror:player': {
+    play: { tone: 'action', title: 'Your turn — bluff it',
+      body: `None of your cards match the shape, so any play is a bluff. Play one face-down, then End Turn — ${BOT_NAME} is about to challenge you.` },
     intro: { tone: 'danger', title: 'Bounce it back',
-      body: `${BOT_NAME} called your bluff. Tap your Mirror to reflect the spin straight back onto ${BOT_NAME} instead of you.` },
+      body: `${BOT_NAME} called your bluff! Tap your Mirror (highlighted) to reflect the spin straight back onto ${BOT_NAME} instead of you.` },
     resolved: { tone: 'win', title: 'Reflected!',
       body: `Mirror sent the spin to ${BOT_NAME} — they're on the spot now, not you. One use, then it's spent.` },
   },
   'swap:player': {
+    play: { tone: 'action', title: 'Your turn — bluff it',
+      body: `None of your cards match the shape, so any play is a bluff. Play one face-down, then End Turn — ${BOT_NAME} is about to challenge you.` },
     intro: { tone: 'danger', title: 'Swap the evidence',
-      body: `${BOT_NAME} called your bluff. Tap Swap, then pick the matching card from the table to switch with your played card — making your play honest after all.` },
+      body: `${BOT_NAME} called your bluff! Tap Swap (highlighted), then pick the matching card from the table to switch with your played card — making your play honest after all.` },
     resolved: { tone: 'win', title: 'Swapped!',
       body: `Your played card became a match, so the bluff failed — ${BOT_NAME} spins instead. Swap re-faces your card once.` },
   },
@@ -138,19 +144,26 @@ const CLINIC_COACH = {
  * room.tutorialScenario ({ power, actor, step, index, total }); returns
  * { key, tone, title, body } or null.
  */
-export function clinicCoachFor(scenario) {
+export function clinicCoachFor(scenario, ctx = {}) {
   if (!scenario || !scenario.power) return null;
   const slug = `${scenario.power}:${scenario.actor || 'player'}`;
   const entry = CLINIC_COACH[slug] || CLINIC_COACH[`${scenario.power}:player`];
   if (!entry) return null;
-  const step = scenario.step === 'resolved' ? 'resolved' : 'intro';
-  const tip = entry[step];
+  // Defensive full-loop drills speak in two intro beats: a "play a bluff + end
+  // turn" prompt BEFORE the bot challenges, then the "arm your defence" prompt
+  // once the intercept window opens.
+  let stepName;
+  if (scenario.step === 'resolved') stepName = 'resolved';
+  else if (scenario.expect === 'play_then_defend' && entry.play && ctx.phase !== 'bluff_intercept_pending') {
+    stepName = 'play';
+  } else stepName = 'intro';
+  const tip = entry[stepName];
   // "Power N of M" counts only player-facing drills (the bot demo has no number).
   const n = scenario.playerStep ?? null;
   const total = scenario.playerTotal ?? null;
   const counter = n && total ? `Power ${n} of ${total} · ` : '';
   return {
-    key: `clinic-${slug}-${step}`,
+    key: `clinic-${slug}-${stepName}`,
     tone: tip.tone,
     title: `${counter}${tip.title}`,
     body: tip.body,

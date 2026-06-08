@@ -58,65 +58,71 @@ export function useOnlinePlayerUiController({
   const [ghostVotingBusy, setGhostVotingBusy] = useState(false);
   const [lastStandSpinBusy, setLastStandSpinBusy] = useState(false);
 
+  // ── Spin detection: a NEW spin_result → snapshot it into spinData ──
+  // Only sets state; the animation timers live in a SEPARATE effect keyed on the
+  // spin identity (spinData.key) — NOT on lastAction. That decoupling is the fix
+  // for the "spin hangs on every pull" bug: the old effect's cleanup cleared the
+  // 8s completion timer whenever lastAction changed, and in practice mode the bot
+  // plays its next card ~1.1s after a spin, swapping lastAction to `card_played`
+  // and killing the timer before `spinComplete` ever fired → the cylinder spun
+  // forever with no result + no Continue button.
   useEffect(() => {
     const action = roomState?.lastAction;
-    if (action?.type !== 'spin_result') return undefined;
+    if (action?.type !== 'spin_result') return;
 
     // Prefer the server's monotonic spinSeq so two spins with an identical target
     // + pre-spin chamber (e.g. the tutorial bot's empty chamber across drills)
     // don't collide and skip the second animation. Fall back to the old key.
-    const actionKey = action.spinSeq != null
+    const key = action.spinSeq != null
       ? `seq:${action.spinSeq}`
       : `${action.spinTargetId}:${JSON.stringify(action.chamber)}`;
-    if (lastSpinKeyRef.current === actionKey) return undefined;
-    lastSpinKeyRef.current = actionKey;
+    if (lastSpinKeyRef.current === key) return;
+    lastSpinKeyRef.current = key;
 
     const { spinIndex, eliminated, spinTargetName, spinTargetId: targetId, chamber, chamberAfter } = action;
     const landingChamberIndex = spinIndex ?? 0;
-    const finalAngle = 10 * 360 - landingChamberIndex * 60;
     const toBulletSet = (slots) => new Set(
       (slots || []).map((value, index) => (value === 'bullet' ? index : -1)).filter((index) => index !== -1),
     );
-    // Pre-spin chamber drives the cylinder DURING the spin (you watch the bullet
-    // pass). The post-spin chamber (`chamberAfter`) is what survivors actually
-    // carry afterwards — it folds in any bullets a survival adds (always +1, or
-    // +2 under Hot Potato). Surfacing it lets the cylinder reveal the new bullets
-    // the instant the spin lands instead of looking like nothing changed (#238).
-    const bulletChambers = toBulletSet(chamber);
     const bulletChambersAfter = toBulletSet(chamberAfter || chamber);
 
     setCylinderAnimating(false);
     setCylinderRotation(0);
     setSpinComplete(false);
     setSpinData({
+      key,
+      action,
       spinIndex: landingChamberIndex,
       eliminated,
       spinTargetName,
       spinTargetId: targetId,
-      bulletChambers,
+      bulletChambers: toBulletSet(chamber),
       bulletChambersAfter,
       bulletCountAfter: bulletChambersAfter.size,
       landingChamberIndex,
-      finalAngle,
+      finalAngle: 10 * 360 - landingChamberIndex * 60,
     });
+  }, [roomState?.lastAction]);
 
+  // ── Spin animation: drive the cylinder + complete, keyed on the spin IDENTITY
+  // (spinData.key). Cleanup fires only when a NEW spin starts or on unmount, so a
+  // mid-spin lastAction change (the bot's next card) can NEVER cancel completion.
+  useEffect(() => {
+    if (!spinData) return undefined;
     const startTimer = setTimeout(() => {
       setCylinderAnimating(true);
-      setCylinderRotation(finalAngle);
+      setCylinderRotation(spinData.finalAngle);
     }, 80);
-
     const completeTimer = setTimeout(() => {
       setSpinComplete(true);
-      // #185 — only now, once the cylinder has stopped, surface the spin
-      // outcome to the Last Event panel. Until here `displayedLastAction` keeps
-      // showing the pre-spin event so the result isn't readable mid-animation.
-      setDisplayedLastAction(action);
+      // #185 — surface the outcome to the Last Event panel only now, once stopped.
+      setDisplayedLastAction(spinData.action);
     }, 8080);
     return () => {
       clearTimeout(startTimer);
       clearTimeout(completeTimer);
     };
-  }, [roomState?.lastAction]);
+  }, [spinData?.key]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // #185 — keep the Last Event panel showing the event that LED to the spin
   // while the cylinder animates, then reveal the outcome only once it stops.
@@ -151,34 +157,37 @@ export function useOnlinePlayerUiController({
     setTimeout(() => setJustEliminated(true), 300);
   }, [spinData]);
 
-  // Settle a finished spin: clear the overlay LOCALLY and (when it's our spin or
-  // a bot's) notify the server. Self-contained on purpose — the shared
-  // `spinDismissed` flag is reset to false on every `spin_result` room_state
-  // (socketEvents), and the server re-broadcasts with the spin_result still set as
-  // lastAction (e.g. the tutorial director's "resolved" beat), so depending on
-  // that flag to dismiss raced and could strand the overlay (the practice-mode
-  // "spin hangs"). We clear directly instead, then ack for the server's benefit.
+  // Settle a finished spin: clear the overlay LOCALLY and (when it's our spin or a
+  // bot's) notify the server. STABLE (ref-backed) so the auto-dismiss timer below
+  // is never reset by an unrelated re-render. Self-contained on purpose — the
+  // shared `spinDismissed` flag is reset on every `spin_result` re-broadcast
+  // (socketEvents), so depending on it to dismiss raced and stranded the overlay.
+  const ackRef = useRef(acknowledgeSpinResult);
+  ackRef.current = acknowledgeSpinResult;
+  const playersRef = useRef(roomState?.players);
+  playersRef.current = roomState?.players;
+  const myIdRef = useRef(myPlayer?.id);
+  myIdRef.current = myPlayer?.id;
   const settleSpin = useCallback((targetId) => {
-    const amTarget = targetId === myPlayer?.id;
-    const targetIsBot = !!roomState?.players?.find((p) => p.id === targetId)?.isBot;
-    if (amTarget || targetIsBot) acknowledgeSpinResult?.();
+    const amTarget = targetId === myIdRef.current;
+    const targetIsBot = !!playersRef.current?.find((p) => p.id === targetId)?.isBot;
+    if (amTarget || targetIsBot) ackRef.current?.();
     setSpinData(null);
     setSpinComplete(false);
-  }, [acknowledgeSpinResult, myPlayer?.id, roomState?.players]);
+  }, []);
 
   const isTutorialRoom = !!roomState?.isTutorial;
+  // Auto-dismiss fallback. Keyed on the spin identity + completion only, so it is
+  // armed exactly once per spin and never reset by re-renders. A bot/observer spin
+  // has no Continue button, so this is its only exit; the human's own spin also
+  // has a manual Continue button.
   useEffect(() => {
     if (!spinComplete || !spinData) return undefined;
-    // A bot spin target never acknowledges on its own (no socket). In a practice
-    // room this client is the only human, so it drives the ack quickly instead of
-    // leaving the overlay (and play) frozen for the observer fallback — this is
-    // what made the bot "not auto-continue" after surviving a spin. The human's
-    // own spin has a manual Continue button; this is just the safety fallback.
-    const targetIsBot = !!roomState?.players?.find((p) => p.id === spinData.spinTargetId)?.isBot;
+    const targetIsBot = !!playersRef.current?.find((p) => p.id === spinData.spinTargetId)?.isBot;
     const delay = targetIsBot ? 3500 : (isTutorialRoom ? 8000 : 15000);
     const timer = setTimeout(() => settleSpin(spinData.spinTargetId), delay);
     return () => clearTimeout(timer);
-  }, [settleSpin, spinComplete, spinData, roomState?.players, isTutorialRoom]);
+  }, [spinComplete, spinData?.key, isTutorialRoom, settleSpin]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Secondary path: if some other flow (online cross-client) flips spinDismissed
   // true, honour it. The primary dismissal is settleSpin above.
@@ -208,9 +217,11 @@ export function useOnlinePlayerUiController({
 
   useEffect(() => {
     if (!peekedCard) return undefined;
-    const timer = setTimeout(() => setPeekedCard(null), 3000);
+    // Module 4 — the tutorial gives a long, deliberate pause to study the peeked
+    // card before the layout moves on; a real game dismisses it quickly.
+    const timer = setTimeout(() => setPeekedCard(null), isTutorialRoom ? 9000 : 3000);
     return () => clearTimeout(timer);
-  }, [peekedCard]);
+  }, [peekedCard, isTutorialRoom]);
 
   useEffect(() => {
     if (roomState?.phase === 'lobby') setRoleRevealSeen(false);

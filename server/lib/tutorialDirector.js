@@ -18,7 +18,8 @@
 // inside the expiry handler (same trick lib/bots.js / lib/idleTurn.js use).
 
 const engine = require('../gameEngine');
-const { POWER_CLINIC, stageScenario, scenarioComplete } = require('../engine/tutorialScenarios');
+const { POWER_CLINIC, stageScenario, scenarioComplete, BOT_ID } = require('../engine/tutorialScenarios');
+const BOT_NAME = 'Dealer Bot';
 const {
   getRoom,
   saveRoom,
@@ -26,10 +27,12 @@ const {
   _clearTutorialTimer,
 } = require('./state');
 
-// Beat timing (ms): long enough to read, short enough to feel guided.
+// Beat timing (ms). Module 4 slows the clinic down deliberately so each beat is
+// legible — the player should never feel rushed through a power.
 const DELAYS = {
-  start_clinic: 2600,  // "you finished the basics round" → deal the clinic
-  resolve: 650,        // brief beat after the power lands → show the explanation
+  start_clinic: 2600,   // "you finished the basics round" → deal the clinic
+  open_intercept: 1400, // "the bot is challenging you…" beat before the window opens
+  resolve: 1800,        // hold on the live consequence before the explanation
 };
 
 const ALL_POWERS_ON = {
@@ -57,9 +60,24 @@ function _pendingDirectorAction(room) {
     return null;
   }
 
-  // Inside the clinic: only the intro→resolved beat is timed.
+  // Inside the clinic.
   const sc = room.tutorialScenario;
   if (!sc || typeof sc.index !== 'number') return null;
+
+  // Defensive full-loop drill: the player has played + ended their turn → the bot
+  // "challenges" (we open the intercept window) so the player can defend.
+  if (sc.step === 'intro' && sc.expect === 'play_then_defend' && room.phase === 'playing') {
+    const humanId = room.players.find(p => p && !p.isBot)?.id;
+    const onTurnId = room.turnOrder?.[room.currentTurnIndex];
+    if (humanId && onTurnId && onTurnId !== humanId
+      && room.challengeableCard
+      && engine.getPreviousTurnPlayerId(room) === humanId
+      && engine.canInterceptBluff(room, humanId)) {
+      return { kind: 'open_intercept', index: sc.index };
+    }
+  }
+
+  // The intro→resolved (power used) beat is timed.
   if (sc.step === 'intro' && scenarioComplete(room, sc.index)) {
     return { kind: 'resolve', index: sc.index };
   }
@@ -121,6 +139,33 @@ function _beginPowerClinic(room) {
   room.tutorialScenario = stageScenario(room, 0);
 }
 
+// The "bot challenges you" beat of a defensive drill: open the bluff-intercept
+// window against the human's just-played (mismatched) card so they can arm their
+// defence. No server safety timeout — the clinic is guided and the BluffIntercept
+// overlay hides its countdown in tutorial mode.
+function _openInterceptForDefence(room) {
+  const human = room.players.find(p => p && !p.isBot) || null;
+  const humanId = human?.id || null;
+  if (!humanId) return;
+  room.bluffUsedThisTurn = true;
+  room.phase = 'bluff_intercept_pending';
+  room.pendingBluffIntercept = {
+    accuserId: BOT_ID,
+    accuserName: BOT_NAME,
+    accusedId: humanId,
+    accusedName: human?.username || 'You',
+    deadline: Date.now() + 600_000,
+    options: engine.listInterceptCards(room, humanId).map(c => ({ cardId: c.id, power: c.power })),
+  };
+  room.lastAction = {
+    type: 'bluff_intercept_window',
+    accuserId: BOT_ID,
+    accuserName: BOT_NAME,
+    accusedId: humanId,
+    accusedName: human?.username || null,
+  };
+}
+
 function _finishClinic(room) {
   const human = room.players.find(p => p && !p.isBot) || null;
   room.tutorialScenario = null;
@@ -148,6 +193,9 @@ async function _onDirectorExpire(io, code, key) {
   switch (action.kind) {
     case 'start_clinic':
       _beginPowerClinic(room);
+      break;
+    case 'open_intercept':
+      _openInterceptForDefence(room);
       break;
     case 'resolve':
       if (room.tutorialScenario) room.tutorialScenario.step = 'resolved';

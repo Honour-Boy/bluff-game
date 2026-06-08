@@ -213,6 +213,15 @@ describe('clinicCoachFor (Power Clinic drills)', () => {
     expect(clinicCoachFor({})).toBeNull();
   });
 
+  it('shows a "play + end turn" prompt before the defensive window, then "defend"', () => {
+    const sc = { power: 'shield', actor: 'player', step: 'intro', expect: 'play_then_defend', playerStep: 1, playerTotal: 6 };
+    const before = clinicCoachFor(sc, { phase: 'playing' });
+    const during = clinicCoachFor(sc, { phase: 'bluff_intercept_pending' });
+    expect(before.body.toLowerCase()).toContain('end turn');
+    expect(during.title.toLowerCase()).toContain('shield');
+    expect(before.body).not.toBe(during.body);
+  });
+
   it('exposes hand-off + completion copy', () => {
     expect(BASICS_HANDOFF_COACH.body).toContain(BOT_NAME);
     expect(CLINIC_COMPLETE_COACH.tone).toBe('win');

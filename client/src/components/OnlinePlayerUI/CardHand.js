@@ -276,17 +276,41 @@ export function CardHand({
 
   return (
     <div style={{ display: 'flex', gap: 14, alignItems: 'flex-end', flexWrap: 'wrap' }}>
-      {/* Shape cards fan — wooden cardholder trough */}
+      {/* Shape cards fan — wooden cardholder trough.
+          `data-tour-id="my-hand-fan"` anchors the tutorial nudge to the ACTUAL
+          card fan (not the wider hand wrapper, whose centre is pulled right by the
+          power slot — which made the nudge drift right of the cards). */}
       {n > 0 && (
-        <div style={{
-          flex: '1 1 auto',
-          minWidth: 0,
-          background: 'linear-gradient(180deg, rgba(20,15,9,0.0) 0%, rgba(14,10,6,0.7) 100%)',
-          borderTop: '2px solid var(--border-lit)',
-          borderRadius: '0 0 6px 6px',
-          paddingTop: 6,
-          paddingBottom: 4,
-        }}>
+        <div
+          data-tour-id="my-hand-fan"
+          style={{
+            flex: '1 1 auto',
+            minWidth: 0,
+            position: 'relative',
+            background: 'linear-gradient(180deg, rgba(20,15,9,0.0) 0%, rgba(14,10,6,0.7) 100%)',
+            borderTop: '2px solid var(--border-lit)',
+            borderRadius: '0 0 6px 6px',
+            paddingTop: 6,
+            paddingBottom: 4,
+          }}
+        >
+          {/* Swipe affordance — faded chevrons on a multi-card rack hint that the
+              fan can be dragged/swiped left+right to bring side cards to centre. */}
+          {draggable && (
+            <>
+              <div aria-hidden style={{
+                position: 'absolute', left: 2, top: '50%', transform: 'translateY(-50%)',
+                zIndex: 400, pointerEvents: 'none', color: 'var(--accent)', opacity: 0.5,
+                fontSize: 22, lineHeight: 1, animation: 'swipeHintL 1.6s ease-in-out infinite',
+              }}>‹</div>
+              <div aria-hidden style={{
+                position: 'absolute', right: 2, top: '50%', transform: 'translateY(-50%)',
+                zIndex: 400, pointerEvents: 'none', color: 'var(--accent)', opacity: 0.5,
+                fontSize: 22, lineHeight: 1, animation: 'swipeHintR 1.6s ease-in-out infinite',
+              }}>›</div>
+              <style>{'@keyframes swipeHintL{0%,100%{transform:translate(0,-50%);opacity:.35}50%{transform:translate(-3px,-50%);opacity:.65}}@keyframes swipeHintR{0%,100%{transform:translate(0,-50%);opacity:.35}50%{transform:translate(3px,-50%);opacity:.65}}'}</style>
+            </>
+          )}
           <div
             onPointerDown={onPointerDown}
             onPointerMove={onPointerMove}

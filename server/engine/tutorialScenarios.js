@@ -152,10 +152,11 @@ const _DRILL_DEFS = [
     },
   },
 
-  // 2 — SHIELD: staged into the intercept window; arm it to block the bluff.
+  // 2 — SHIELD: full loop — deal mismatches, the player plays + ends turn, the bot
+  //     challenges (director opens the window), the player arms Shield to block.
   {
-    id: 'shield', power: 'shield', actor: 'player',
-    stage(room) { _stageIntercept(room, 'shield'); },
+    id: 'shield', power: 'shield', actor: 'player', expect: 'play_then_defend',
+    stage(room) { _stageDefensiveDrill(room, 'shield'); },
     complete(room) {
       return !_holds(room, _humanId(room), 'shield') && room.phase === 'playing';
     },
@@ -187,20 +188,20 @@ const _DRILL_DEFS = [
     },
   },
 
-  // 4 — MIRROR: intercept window; arm it to bounce the spin onto the bot.
+  // 4 — MIRROR: full loop; arm it to bounce the spin onto the bot.
   {
-    id: 'mirror', power: 'mirror', actor: 'player',
-    stage(room) { _stageIntercept(room, 'mirror'); },
+    id: 'mirror', power: 'mirror', actor: 'player', expect: 'play_then_defend',
+    stage(room) { _stageDefensiveDrill(room, 'mirror'); },
     complete(room) {
       return !_holds(room, _humanId(room), 'mirror') && room.phase === 'playing';
     },
   },
 
-  // 5 — SWAP: intercept window; arm it, then pick the matching card from the
-  //     played pile so the bluff fails and the bot spins instead.
+  // 5 — SWAP: full loop; arm it, then pick the matching card from the played pile
+  //     so the bluff fails and the bot spins instead.
   {
-    id: 'swap', power: 'swap', actor: 'player',
-    stage(room) { _stageIntercept(room, 'swap'); },
+    id: 'swap', power: 'swap', actor: 'player', expect: 'play_then_defend',
+    stage(room) { _stageDefensiveDrill(room, 'swap'); },
     complete(room) {
       return !_holds(room, _humanId(room), 'swap')
         && room.phase !== 'swap_pending'
@@ -240,45 +241,30 @@ const _DRILL_DEFS = [
 const _CLINIC_ORDER = ['shield', 'bot-shield', 'peek', 'freeze', 'mirror', 'swap', 'assassin'];
 const POWER_CLINIC = _CLINIC_ORDER.map(id => _DRILL_DEFS.find(d => d.id === id));
 
-// Stage an intercept drill: the human has "played" a mismatch, the bot has just
-// challenged it, and the human holds an un-armed defensive `power`. For Swap a
-// matching card is seeded into the played pile so the holder has something to
-// swap in.
-function _stageIntercept(room, power) {
+// Stage a DEFENSIVE drill as a full loop (Module 4): the human is on turn with a
+// hand of ALL non-matching cards (so any play is a bluff) and holds an un-armed
+// defensive `power`. The player plays a card + ends their turn; the director then
+// opens the intercept window (the "bot challenges"), and the player arms the
+// defence. For Swap a matching card is pre-seeded into the played pile so the
+// holder has something to swap onto their play.
+function _stageDefensiveDrill(room, power) {
   const hid = _humanId(room);
   _resetForDrill(room);
   room.turnOrder = [hid, BOT_ID];
-  room.currentTurnIndex = 1;               // bot is the accuser (on turn)
-  room.prevTurnPlayerId = hid;             // human is the accused (previous)
-
-  const humanPlay = _mismatch(2);          // the wrong card the human "played"
-  room.challengeableCard = humanPlay;
-  room.challengeableCardType = REQUIRED_SHAPE;
-  room.lastPlayedCard = humanPlay;
-  room.hands.set(hid, [_shape('star', 4), _shape('square', 6)]);
+  room.currentTurnIndex = 0;               // human on turn — they lead with a bluff
+  room.isFirstTurn = true;
+  room.prevTurnPlayerId = null;
+  // Step A — a hand guaranteed to never match the required shape.
+  room.hands.set(hid, [_mismatch(0), _mismatch(1), _mismatch(2)]);
   room.hands.set(BOT_ID, [_shape('triangle', 7), _shape('cross', 5)]);
 
   const card = _power(power);
   if (power === 'swap') {
-    // Swap is gate-free here (both seats have "taken a turn"); seed a matching
-    // card into the pile for the holder to swap onto their play.
-    card.swapPendingPlayerIds = [];
-    const matching = _shape(REQUIRED_SHAPE, 9);
-    room.playedPile = [matching, humanPlay];
-  } else {
-    room.playedPile = [humanPlay];
+    card.swapPendingPlayerIds = []; // gate-free here
+    room.playedPile = [_shape(REQUIRED_SHAPE, 9)]; // a card to swap TO
   }
   room.powerCardSlot[hid] = [card];
-
-  room.phase = 'bluff_intercept_pending';
-  room.pendingBluffIntercept = {
-    accuserId: BOT_ID,
-    accuserName: 'Dealer Bot',
-    accusedId: hid,
-    accusedName: _humanName(room),
-    deadline: Date.now() + 60_000,         // generous — the director owns the safety
-    options: [{ cardId: card.id, power }],
-  };
+  // phase stays 'playing' (set by stageScenario).
 }
 
 /**

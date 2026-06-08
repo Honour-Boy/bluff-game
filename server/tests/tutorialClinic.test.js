@@ -32,12 +32,23 @@ const {
   advanceClinic,
 } = require('../lib/tutorialDirector.js');
 
-// Drive the (drill-0) Shield intercept drill to completion through the real
-// pipeline: arm the shield, resolve the bluff (blocked), settle the phase.
-function completeShieldDrill(room) {
+// Drive a defensive full-loop drill up to the armed defence: the player plays a
+// (mismatched) card, ends their turn, the bot challenges, the player arms their
+// defence. Returns the armed card id.
+function drivePlayThenDefend(room) {
+  const firstCard = room.hands.get('human')[0];
+  engine.validateAndPlayCard(room, 'human', firstCard.id); // play a mismatch
+  engine.advanceTurn(room); // → bot's turn; challengeableCard = mismatch; prev = human
   const cardId = room.powerCardSlot['human'][0].id;
   engine.armInterceptCard(room, 'human', cardId);
-  bluffPipeline.resolveBluff(room, 'bot:1');
+  return cardId;
+}
+
+// Drive the (drill-0) Shield drill to completion: play → end turn → bot challenge
+// → arm Shield → resolve (blocked) → settle the phase.
+function completeShieldDrill(room) {
+  drivePlayThenDefend(room);
+  bluffPipeline.resolveBluff(room, 'bot:1'); // shield blocks
   room.phase = 'playing';
 }
 const roomHandler = require('../handlers/room.js');
@@ -128,13 +139,15 @@ describe('bot bluff minimum (tutorial Basics)', () => {
 // ─── stageScenario ────────────────────────────────────────────────────────────
 describe('stageScenario', () => {
   it('stages all six powers + the bot demo, each with the right holder + phase', () => {
+    // Every drill now stages in `playing` — defensive drills are full loops
+    // (play → end turn → bot challenge) rather than staged into the window.
     const expected = [
-      ['shield', 'player', 'bluff_intercept_pending'],
+      ['shield', 'player', 'playing'],
       ['shield', 'bot', 'playing'],
       ['peek', 'player', 'playing'],
       ['freeze', 'player', 'playing'],
-      ['mirror', 'player', 'bluff_intercept_pending'],
-      ['swap', 'player', 'bluff_intercept_pending'],
+      ['mirror', 'player', 'playing'],
+      ['swap', 'player', 'playing'],
       ['assassin', 'player', 'playing'],
     ];
     expect(POWER_CLINIC).toHaveLength(expected.length);
@@ -203,12 +216,12 @@ describe('scenarioComplete (driven through real resolution)', () => {
     expect(scenarioComplete(room, i)).toBe(true);
   });
 
-  it('SHIELD blocks the bluff and completes', () => {
+  it('SHIELD blocks the bluff and completes (full loop)', () => {
     const room = clinicRoom();
     const i = idxOf('shield', 'player');
     stageScenario(room, i);
-    const cardId = room.powerCardSlot['human'][0].id;
-    expect(engine.armInterceptCard(room, 'human', cardId).ok).toBe(true);
+    expect(scenarioComplete(room, i)).toBe(false);
+    drivePlayThenDefend(room); // play mismatch → end turn → bot challenge → arm Shield
     const { outcome } = bluffPipeline.resolveBluff(room, 'bot:1');
     expect(outcome.kind).toBe('blocked');
     room.phase = 'playing'; // caller settles the phase
@@ -216,12 +229,11 @@ describe('scenarioComplete (driven through real resolution)', () => {
     expect(scenarioComplete(room, i)).toBe(true);
   });
 
-  it('MIRROR reflects the spin onto the bot and completes', () => {
+  it('MIRROR reflects the spin onto the bot and completes (full loop)', () => {
     const room = clinicRoom();
     const i = idxOf('mirror');
     stageScenario(room, i);
-    const cardId = room.powerCardSlot['human'][0].id;
-    expect(engine.armInterceptCard(room, 'human', cardId).ok).toBe(true);
+    drivePlayThenDefend(room);
     const { outcome } = bluffPipeline.resolveBluff(room, 'bot:1');
     expect(outcome.kind).toBe('spin');
     expect(outcome.spinTargetId).toBe('bot:1'); // bounced onto the accuser
@@ -229,12 +241,11 @@ describe('scenarioComplete (driven through real resolution)', () => {
     expect(scenarioComplete(room, i)).toBe(true);
   });
 
-  it('SWAP re-faces the played card so the bluff fails, then completes', () => {
+  it('SWAP re-faces the played card so the bluff fails, then completes (full loop)', () => {
     const room = clinicRoom();
     const i = idxOf('swap');
     stageScenario(room, i);
-    const cardId = room.powerCardSlot['human'][0].id;
-    expect(engine.armInterceptCard(room, 'human', cardId).ok).toBe(true);
+    drivePlayThenDefend(room);
     const { outcome } = bluffPipeline.resolveBluff(room, 'bot:1');
     expect(outcome.kind).toBe('swap_pending');
     // Pick the matching card seeded in the played pile.
@@ -296,7 +307,7 @@ describe('tutorialDirector', () => {
     expect(room.tutorialLesson).toBe('powers');
     expect(room.tutorialScenario.index).toBe(0);
     expect(room.tutorialScenario.power).toBe('shield');
-    expect(room.phase).toBe('bluff_intercept_pending');
+    expect(room.phase).toBe('playing'); // full loop: player plays first
     expect(Object.values(room.config.powerCards.enabled).every(Boolean)).toBe(true);
     expect(room.botBluffCallsThisGame).toBe(0);
   });
@@ -319,6 +330,16 @@ describe('tutorialDirector', () => {
     const room = clinicRoom();
     _beginPowerClinic(room); // step intro
     expect(advanceClinic(room)).toBe(false); // intro, not resolved
+  });
+
+  it('signals open_intercept after the player plays + ends a defensive drill turn', () => {
+    const room = clinicRoom();
+    _beginPowerClinic(room); // drill 0 = shield (full loop), player on turn
+    expect(_pendingDirectorAction(room)).toBeNull(); // player hasn't acted yet
+    const firstCard = room.hands.get('human')[0];
+    engine.validateAndPlayCard(room, 'human', firstCard.id); // play a mismatch
+    engine.advanceTurn(room); // end turn → bot's turn, human is the accused
+    expect(_pendingDirectorAction(room)).toEqual({ kind: 'open_intercept', index: 0 });
   });
 
   it('finishes when the player advances past the last drill', () => {
@@ -366,7 +387,29 @@ describe('tutorialDirector — live beats', () => {
       expect(room.tutorialLesson).toBe('powers');
       expect(room.tutorialScenario.index).toBe(0);
       expect(room.tutorialScenario.power).toBe('shield');
+      expect(room.phase).toBe('playing');
+    } finally {
+      clearAllTimers();
+      vi.useRealTimers();
+    }
+  });
+
+  it('opens the intercept window once the player ends a defensive drill turn', async () => {
+    vi.useFakeTimers();
+    try {
+      const room = clinicRoom();
+      _beginPowerClinic(room); // drill 0 = shield (full loop), phase playing
+      const firstCard = room.hands.get('human')[0];
+      engine.validateAndPlayCard(room, 'human', firstCard.id);
+      engine.advanceTurn(room); // bot's turn; challengeableCard = mismatch
+      await saveRoom(room);
+
+      const io = makeIo();
+      await broadcastRoomState(io, room.code);  // arms open_intercept
+      await vi.advanceTimersByTimeAsync(1600);  // open_intercept (1400ms)
       expect(room.phase).toBe('bluff_intercept_pending');
+      expect(room.pendingBluffIntercept.accusedId).toBe('human');
+      expect(room.pendingBluffIntercept.options[0].power).toBe('shield');
     } finally {
       clearAllTimers();
       vi.useRealTimers();
@@ -383,7 +426,7 @@ describe('tutorialDirector — live beats', () => {
 
       const io = makeIo();
       await broadcastRoomState(io, room.code);  // arms 'resolve'
-      await vi.advanceTimersByTimeAsync(800);   // resolve → step 'resolved'
+      await vi.advanceTimersByTimeAsync(2000);  // resolve (1800ms) → step 'resolved'
       expect(room.tutorialScenario.step).toBe('resolved');
 
       // NOT auto-advanced: more time + another broadcast leaves it resolved.
