@@ -22,6 +22,8 @@ export function PowerFlowOverlays({
   swapHolderId,
   // (Role timing) hold announcements while the spin cylinder is still turning.
   holdForSpin = false,
+  // Tutorial gets a long 10s read floor on banners; real games stay snappy.
+  isTutorial = false,
 }) {
   const event = Array.isArray(powerEventQueue) && powerEventQueue.length > 0 ? powerEventQueue[0] : null;
   const bannerModel = buildAnnouncementBannerProps(event);
@@ -180,6 +182,7 @@ export function PowerFlowOverlays({
           subtitle={bannerModel.subtitle}
           playerName={bannerModel.playerName}
           onComplete={consumePowerEvent}
+          durationMs={isTutorial ? 10000 : 3500}
         />
       )}
 

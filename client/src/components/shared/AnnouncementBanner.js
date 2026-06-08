@@ -249,6 +249,8 @@ export function AnnouncementBanner({
   accentColor,
   playerName,
   onComplete,
+  // Linger duration. The caller (PowerFlowOverlays) passes a long 10s read-time in
+  // the TUTORIAL; real games keep the snappy default so the table isn't slowed.
   durationMs = 3500,
 }) {
   // Hooks run unconditionally and FIRST so the unknown-kind early

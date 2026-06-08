@@ -305,49 +305,7 @@ function CardNudge({ isMobile, canBluff }) {
   );
 }
 
-// ─── Clinic progress bar — a fixed strip pinned to the very top edge ─────────
-// position:fixed at top:0 so it can NEVER shift the gameplay HUD layout. Made
-// clearly visible (taller + glowing + a moving shimmer + a small % tag) so it
-// actually reads as a progress indicator.
-function ClinicProgressBar({ pct, label }) {
-  const w = Math.max(0, Math.min(100, pct));
-  return (
-    <div
-      aria-hidden
-      style={{
-        position: 'fixed', top: 0, left: 0, right: 0, height: 6, zIndex: 9500,
-        background: 'rgba(0,0,0,0.55)', pointerEvents: 'none',
-        boxShadow: '0 1px 6px rgba(0,0,0,0.5)',
-      }}
-    >
-      <div style={{
-        position: 'relative', height: '100%', width: `${w}%`,
-        background: 'linear-gradient(90deg, var(--accent), var(--alive))',
-        boxShadow: '0 0 12px var(--accent), 0 0 4px var(--alive)',
-        transition: 'width 0.6s cubic-bezier(0.22,1,0.36,1)',
-        overflow: 'hidden',
-      }}>
-        <div style={{
-          position: 'absolute', inset: 0,
-          background: 'linear-gradient(90deg, transparent, rgba(255,255,255,0.55), transparent)',
-          animation: 'clinicShimmer 1.8s linear infinite',
-        }} />
-      </div>
-      {label && (
-        <div style={{
-          position: 'absolute', top: 8, right: 10,
-          fontFamily: "'Space Mono', monospace", fontSize: 10, letterSpacing: '0.1em',
-          color: 'var(--accent)', textShadow: '0 1px 3px rgba(0,0,0,0.9)',
-          background: 'rgba(16,12,8,0.82)', border: '1px solid var(--border-lit)',
-          borderRadius: 999, padding: '2px 8px', whiteSpace: 'nowrap',
-        }}>
-          {label} · {w}%
-        </div>
-      )}
-      <style>{'@keyframes clinicShimmer{0%{transform:translateX(-120%)}100%{transform:translateX(120%)}}'}</style>
-    </div>
-  );
-}
+// (The clinic progress bar now lives IN-FLOW at the top of OnlinePlayerUI.)
 
 // ─── Clinic-complete end card — celebrate + replay / leave ───────────────────
 function ClinicCompleteCard({ coach, onReplay, onLeave }) {
@@ -643,18 +601,11 @@ export function TutorialLayer({
   }, [canPlay, modalUp, scenario]);
 
   const isLastDrill = scenario && scenario.total != null && scenario.index >= scenario.total - 1;
-  // Clinic completion %, for the non-intrusive top-edge progress bar.
-  const clinicPct = clinicComplete
-    ? 100
-    : (scenario ? Math.round(((scenario.index + 1) / (scenario.total || 7)) * 100) : null);
-  const clinicLabel = clinicComplete
-    ? 'Complete'
-    : (scenario?.playerStep ? `Power ${scenario.playerStep} of ${scenario.playerTotal || 6}` : 'Power Clinic');
+  // (The clinic progress bar now lives IN-FLOW at the top of OnlinePlayerUI so it
+  // reserves layout height instead of overlaying the HUD.)
 
   return (
     <>
-      {clinicPct != null && <ClinicProgressBar pct={clinicPct} label={clinicLabel} />}
-
       {showChoice && (
         <ChoiceModal
           onBasics={() => setPath('basics')}

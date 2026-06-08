@@ -149,15 +149,15 @@ export function SpinOverlay({
           </div>
           <div style={{ fontSize: 12, color: 'var(--text-dim)', marginBottom: isTutorial && !spinData.eliminated ? 14 : 28 }}>
             Chamber {spinData.landingChamberIndex + 1} · {spinData.eliminated ? 'bullet found' : 'empty'}
-            {/* The tutorial bot's chamber stays empty by design — don't show a
-                bullet count for it. */}
-            {!spinData.eliminated && !spinData.targetIsBot && spinData.bulletCountAfter != null && (
+            {/* Only show a bullet count when the chamber actually carries one — the
+                clinic bot stays empty (bulletCountAfter === 0). */}
+            {!spinData.eliminated && spinData.bulletCountAfter > 0 && (
               <> · now {spinData.bulletCountAfter}/6 loaded</>
             )}
           </div>
-          {/* Tutorial: explain WHY a new bullet appears — but ONLY for the human's
-              own survival. The clinic bot is kept safe (empty chamber), so it gets
-              a plain "safe" line instead of the misleading "bullet added" copy. */}
+          {/* Tutorial: explain the chamber. A CLEAN survival (no bullet — the
+              clinic bot) gets a "still clear" line; a normal survival explains the
+              added bullet. */}
           {isTutorial && !spinData.eliminated && (
             <div style={{
               fontSize: 13,
@@ -167,8 +167,8 @@ export function SpinOverlay({
               maxWidth: 300,
               margin: '0 auto 26px',
             }}>
-              {spinData.targetIsBot
-                ? `${spinData.spinTargetName} survives — its chamber stays clear for this lesson.`
+              {spinData.bulletCountAfter === 0
+                ? `${spinData.spinTargetName} survives — its chamber is still clear.`
                 : 'Survived — so a fresh bullet just clicked into the chamber. Every spin you live through loads the gun a little more.'}
             </div>
           )}
