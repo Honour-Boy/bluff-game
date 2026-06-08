@@ -14,11 +14,18 @@
 // never INITIATES a bluff call itself in v1 (the human is the challenger).
 
 const { SHAPES } = require('./constants');
+const { getPreviousTurnPlayerId } = require('./players');
 
 // How often the bot deliberately plays a card that does NOT match the
 // required shape (a "lie") when it also has a legal honest play. Tuned low
 // so honest play dominates.
 const BOT_BLUFF_RATE = 0.25;
+
+// How often the bot CHALLENGES the previous player when it's eligible to (it
+// can't see the card, so this is a pure gamble). Kept modest so practice isn't
+// dominated by spins, but high enough that the player learns the cost of an
+// over-aggressive honest table — sometimes the bot calls YOUR bluff.
+const BOT_BLUFF_CALL_RATE = 0.22;
 
 // Plain = a normal shape card (not a Whot wild). Whot can never be a "lie"
 // (it matches anything) so it's handled separately and only as a fallback.
@@ -77,7 +84,30 @@ function chooseCardPlay(room, botId, rng = Math.random) {
   return null;
 }
 
+/**
+ * Should the bot CHALLENGE the previous player at the start of its turn?
+ * Eligible only when a real, un-challenged previous play exists to call on:
+ *   • not the round's first turn, no bluff already used this turn, not frozen,
+ *   • there is a snapshotted challengeable card,
+ *   • the accused (previous turn-taker) is a live OTHER player.
+ * When eligible it's a flat probability gamble (the bot can't see the card).
+ *
+ * `rng` is injectable so tests can force or suppress the call deterministically.
+ */
+function shouldCallBluff(room, botId, rng = Math.random) {
+  if (!room) return false;
+  if (room.isFirstTurn || room.bluffUsedThisTurn || room.bluffBlockedThisTurn) return false;
+  if (!room.challengeableCard) return false;
+  const accusedId = getPreviousTurnPlayerId(room);
+  if (!accusedId || accusedId === botId) return false;
+  const accused = (room.players || []).find((p) => p.id === accusedId);
+  if (!accused || accused.status !== 'alive') return false;
+  return rng() < BOT_BLUFF_CALL_RATE;
+}
+
 module.exports = {
   BOT_BLUFF_RATE,
+  BOT_BLUFF_CALL_RATE,
   chooseCardPlay,
+  shouldCallBluff,
 };

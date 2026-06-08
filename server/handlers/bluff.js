@@ -19,6 +19,7 @@ const {
 const { broadcastRoomState, emitPowerCardEvents } = require('../lib/broadcast');
 const { maybeRecordGroupWinner } = require('../lib/roomBuilders');
 const {
+  _resolveOnlineBluff,
   maybeStartSniperPause,
   maybeStartMedicPause,
   finaliseAssassinElimination,
@@ -32,74 +33,10 @@ const {
 } = require('../lib/orchestration');
 
 // ─── Shared online bluff resolution ──────────────────────────
-// The full post-`resolveBluff` flow (Sniper/Medic pauses, Assassin backfire,
-// outcome application, post-elim hooks, betting, broadcast). Shared by the
-// immediate `call_bluff` path and the §1.1 interception resume so both behave
-// identically. Performs its own save + emit + broadcast; the caller only acks.
-async function _resolveOnlineBluff(io, code, room, accuserId, leaderboardRepo) {
-  const { events, outcome } = bluffPipeline.resolveBluff(room, accuserId);
-  const E = engine.GAME_EVENT_TYPES;
-
-  // v2 Phase D — Sniper interception (only a spin can be sniped).
-  if (outcome.type === E.SPIN_CONSEQUENCE && maybeStartSniperPause(io, room, outcome)) {
-    await saveRoom(room);
-    emitPowerCardEvents(io, code, events);
-    await broadcastRoomState(io, code);
-    return;
-  }
-
-  // v2 Phase D — Medic interception (Assassin path).
-  if (outcome.type === E.FORCED_ELIMINATION) {
-    const medicStarted = maybeStartMedicPause(io, room, outcome.eliminatedPlayerId, 'assassin', () => {
-      finaliseAssassinElimination(room, outcome);
-      applyPostElimSystemHooks(io, room);
-    });
-    if (medicStarted) {
-      // #121 — hold the death announcement until the Medic resolves.
-      const deferred = events.filter(e => e?.kind === 'assassin_strike');
-      const immediate = events.filter(e => e?.kind !== 'assassin_strike');
-      if (room.pendingMedicSave) room.pendingMedicSave.deferredBanners = deferred;
-      await saveRoom(room);
-      emitPowerCardEvents(io, code, immediate);
-      await broadcastRoomState(io, code);
-      return;
-    }
-  }
-
-  // #63 — Assassin backfire penalty before applyBluffOutcome.
-  if (outcome.type === E.ASSASSIN_BACKFIRE && outcome.accusedId) {
-    engine.applyAssassinBackfirePenalty(room, outcome.accusedId, outcome.cardsToDrawForAccused || 3);
-  }
-
-  applyBluffOutcome(room, outcome);
-
-  if (outcome.type === E.FORCED_ELIMINATION) {
-    if (outcome.eliminatedPlayerId) _bountyOnElimination(room, outcome.eliminatedPlayerId);
-    applyPostElimSystemHooks(io, room);
-    await maybeRecordGroupWinner(io, room, leaderboardRepo);
-  }
-
-  // Russian Roulette — a failed bluff fires an IMMEDIATE spin: no manual
-  // "pull the trigger" pause, no betting window. Emit the bluff power events
-  // first, then run the spin pipeline (which saves + broadcasts itself).
-  if (engine.shouldImmediateSpin(room)) {
-    const target = room.players.find(p => p.id === room.spinTargetId);
-    await saveRoom(room);
-    emitPowerCardEvents(io, code, events);
-    await applySpinAndBroadcast(io, code, room, target, leaderboardRepo);
-    return;
-  }
-
-  if (room.phase === 'spin_pending') {
-    _maybeOpenBetting(io, room);
-    // Issue 1 — guard against a spin that never gets performed.
-    _scheduleSpinPendingTimeout(io, room.code, leaderboardRepo);
-  }
-
-  await saveRoom(room);
-  emitPowerCardEvents(io, code, events);
-  await broadcastRoomState(io, code);
-}
+// `_resolveOnlineBluff` now lives in lib/orchestration.js (alongside every helper
+// it calls), so the human `call_bluff` path, the §1.1 interception resume, and the
+// server-driven bot opponent (lib/bots.js) all resolve a challenge identically.
+// Imported above; the call sites below are unchanged.
 
 // §1.1 — schedule the interception window's auto-resume. On expiry (no
 // interception arrived) the bluff resolves with whatever the accused had
