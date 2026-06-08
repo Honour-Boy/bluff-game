@@ -27,6 +27,14 @@ describe('INTRO_SLIDES', () => {
   it('the final slide carries a Begin CTA', () => {
     expect(INTRO_SLIDES[INTRO_SLIDES.length - 1].cta).toBeTruthy();
   });
+
+  it('includes a controls tour slide (settings / chat / leaderboard)', () => {
+    const controls = INTRO_SLIDES.find((s) => s.id === 'controls');
+    expect(controls).toBeTruthy();
+    expect(controls.controls.map((c) => c.label)).toEqual(
+      expect.arrayContaining(['Settings', 'Chat', 'Leaderboard']),
+    );
+  });
 });
 
 describe('coachFor', () => {
@@ -46,6 +54,12 @@ describe('coachFor', () => {
     expect(c.key).toBe('play-or-bluff');
     expect(c.tone).toBe('action');
     expect(c.body).toContain(BOT_NAME);
+  });
+
+  it('states the turn-action rule (play/bluff/power; must play to End Turn)', () => {
+    const c = coachFor({ phase: 'playing', isMyTurn: true, cardPlayedThisTurn: false });
+    expect(c.body.toLowerCase()).toContain('end turn');
+    expect(c.body.toLowerCase()).toContain('call a bluff');
   });
 
   it('does NOT offer a bluff on the very first play of the round', () => {

@@ -18,6 +18,17 @@ export const INTRO_SLIDES = [
     body: `Welcome. This is a solo round against ${BOT_NAME} — a safe table where nothing counts. We'll walk you through a real game one beat at a time.`,
   },
   {
+    id: 'controls',
+    title: 'Where Things Live',
+    body: 'First, a quick tour of the table controls — you’ll use these in real games:',
+    // Rendered as a small icon grid by the intro modal (a visual cue, not a bullet list).
+    controls: [
+      { icon: 'gear', label: 'Settings', where: 'Top-right gear — house rules, sound, and Leave Table.' },
+      { icon: 'chat', label: 'Chat', where: 'Header button — talk to the table during a real game.' },
+      { icon: 'trophy', label: 'Leaderboard', where: 'In group games — standings live in the Controls menu.' },
+    ],
+  },
+  {
     id: 'goal',
     title: 'The Goal',
     body: 'Bluff is last-player-standing. Two ways the round moves:',
@@ -281,6 +292,9 @@ export function coachFor(ctx = {}) {
   const powerNote = heldPowerLabel
     ? ` You also hold a ${heldPowerLabel} — tap it beside your hand to use it.`
     : '';
+  // The turn-action rule: all three are optional and order-free, but a card MUST
+  // be played before the turn can end.
+  const turnRules = ' This turn you may play a card, call a bluff, and arm a power — in any order — but you must play a card before you can End Turn.';
 
   if (phase === 'pre_game') {
     return {
@@ -340,7 +354,7 @@ export function coachFor(ctx = {}) {
           key: 'first-play',
           tone: 'action',
           title: 'Your turn — you lead',
-          body: 'You play first this round, so there’s nothing to challenge yet. Tap a card to play it (matching the shape is the safe move).' + powerNote,
+          body: 'You play first this round, so there’s nothing to challenge yet. Tap a card to play it (matching the shape is the safe move).' + powerNote + turnRules,
         };
       }
       if (bluffBlockedThisTurn) {
@@ -355,7 +369,7 @@ export function coachFor(ctx = {}) {
         key: 'play-or-bluff',
         tone: 'action',
         title: 'Your turn',
-        body: `Play a card that matches the shape — or, if you think ${BOT_NAME} just bluffed, hit Call Bluff to flip its card. Right → it spins. Wrong → you do.` + powerNote,
+        body: `Play a card that matches the shape — or, if you think ${BOT_NAME} just bluffed, hit Call Bluff to flip its card. Right → it spins. Wrong → you do.` + powerNote + turnRules,
       };
     }
     // Bot's turn.

@@ -445,6 +445,34 @@ describe('tutorialDirector — live beats', () => {
   });
 });
 
+// ─── Clinic bot keeps an empty chamber (no misleading "bullet added") ─────────
+describe('clinic bot spin', () => {
+  it('does NOT add a survival bullet to the tutorial bot', async () => {
+    const { applySpinAndBroadcast } = require('../lib/orchestration.js');
+    const room = clinicRoom();
+    room.mode = engine.MODES.ONLINE;
+    room.tutorialLesson = 'powers';
+    room.turnOrder = ['human', 'bot:1'];
+    room.currentTurnIndex = 1;
+    room.hands = new Map([['human', []], ['bot:1', []]]);
+    room.deck = [];
+    room.playedPile = [];
+    const bot = room.players.find((p) => p.id === 'bot:1');
+    bot.chamber = [null, null, null, null, null, null]; // empty by design
+    bot.riskLevel = 0;
+    await saveRoom(room);
+
+    const io = { to: () => ({ emit: () => {} }), in: () => ({ fetchSockets: async () => [] }) };
+    const repo = { recordWinner: async () => ({}), recordGameStart: async () => ({}) };
+    await applySpinAndBroadcast(io, room.code, room, bot, repo);
+
+    expect(room.lastAction.type).toBe('spin_result');
+    expect(room.lastAction.eliminated).toBe(false);
+    expect(bot.chamber.filter((s) => s === 'bullet')).toHaveLength(0);
+    expect((room.lastAction.chamberAfter || []).filter((s) => s === 'bullet')).toHaveLength(0);
+  });
+});
+
 // ─── start_game tutorial bypass ───────────────────────────────────────────────
 describe('start_game tutorial bypass', () => {
   const deps = {

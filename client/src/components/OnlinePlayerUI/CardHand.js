@@ -294,21 +294,34 @@ export function CardHand({
             paddingBottom: 4,
           }}
         >
-          {/* Swipe affordance — faded chevrons on a multi-card rack hint that the
+          {/* Swipe affordance — chevrons on the edges + a clear label hint that the
               fan can be dragged/swiped left+right to bring side cards to centre. */}
           {draggable && (
             <>
               <div aria-hidden style={{
-                position: 'absolute', left: 2, top: '50%', transform: 'translateY(-50%)',
-                zIndex: 400, pointerEvents: 'none', color: 'var(--accent)', opacity: 0.5,
-                fontSize: 22, lineHeight: 1, animation: 'swipeHintL 1.6s ease-in-out infinite',
+                position: 'absolute', left: 0, top: '50%', transform: 'translateY(-50%)',
+                zIndex: 400, pointerEvents: 'none', color: 'var(--accent)',
+                fontSize: 30, lineHeight: 1, fontWeight: 700,
+                textShadow: '0 0 8px rgba(0,0,0,0.9)',
+                animation: 'swipeHintL 1.5s ease-in-out infinite',
               }}>‹</div>
               <div aria-hidden style={{
-                position: 'absolute', right: 2, top: '50%', transform: 'translateY(-50%)',
-                zIndex: 400, pointerEvents: 'none', color: 'var(--accent)', opacity: 0.5,
-                fontSize: 22, lineHeight: 1, animation: 'swipeHintR 1.6s ease-in-out infinite',
+                position: 'absolute', right: 0, top: '50%', transform: 'translateY(-50%)',
+                zIndex: 400, pointerEvents: 'none', color: 'var(--accent)',
+                fontSize: 30, lineHeight: 1, fontWeight: 700,
+                textShadow: '0 0 8px rgba(0,0,0,0.9)',
+                animation: 'swipeHintR 1.5s ease-in-out infinite',
               }}>›</div>
-              <style>{'@keyframes swipeHintL{0%,100%{transform:translate(0,-50%);opacity:.35}50%{transform:translate(-3px,-50%);opacity:.65}}@keyframes swipeHintR{0%,100%{transform:translate(0,-50%);opacity:.35}50%{transform:translate(3px,-50%);opacity:.65}}'}</style>
+              {/* A small explicit label (absolute, so it never grows the dock). */}
+              <div aria-hidden style={{
+                position: 'absolute', top: 2, left: '50%', transform: 'translateX(-50%)',
+                zIndex: 400, pointerEvents: 'none', whiteSpace: 'nowrap',
+                fontFamily: "'Space Mono', monospace", fontSize: 9, letterSpacing: '0.12em',
+                textTransform: 'uppercase', color: 'var(--accent)', opacity: 0.85,
+                background: 'rgba(16,12,8,0.72)', borderRadius: 999, padding: '1px 8px',
+                textShadow: '0 1px 2px rgba(0,0,0,0.9)',
+              }}>↔ drag to browse cards</div>
+              <style>{'@keyframes swipeHintL{0%,100%{transform:translate(0,-50%);opacity:.55}50%{transform:translate(-4px,-50%);opacity:1}}@keyframes swipeHintR{0%,100%{transform:translate(0,-50%);opacity:.55}50%{transform:translate(4px,-50%);opacity:1}}'}</style>
             </>
           )}
           <div
