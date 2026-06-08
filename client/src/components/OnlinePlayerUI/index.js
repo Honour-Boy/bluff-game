@@ -528,6 +528,40 @@ export function OnlinePlayerUI({
   // live spin. They surface the instant the cylinder locks (spinComplete).
   const holdForSpin = !!ui.spinData && !ui.spinComplete;
 
+  // Global pacing — only one overlay at a time. While ANY focus-stealing overlay
+  // is up (a spin, a phase prompt, a power/peek/swap modal, the eliminated card),
+  // suppress the lower-priority "your turn" notice and HOLD the announcement queue
+  // so banners surface one after another instead of stacking over each other.
+  const blockingOverlayActive = !!ui.spinData
+    || showPowerModal
+    || !!ui.peekedCard
+    || amSwapHolder
+    || isSwapPending
+    || (phase === 'bluff_intercept_pending' && !!roomState?.pendingBluffIntercept)
+    || phase === 'redemption_pending'
+    || showPreGameSelection
+    || showRoleReveal
+    || amTargetMedic
+    || amTargetSniper
+    || ui.justEliminated;
+  const aBannerShowing = (powerEventQueue?.length || 0) > 0;
+  // Announcements wait behind any blocking overlay (broadens the spin-only hold).
+  const holdAnnouncements = holdForSpin || blockingOverlayActive;
+  // The "your turn" notice is redundant in the guided tutorial (the coach says it)
+  // and must never render over another overlay.
+  const suppressTurnNotice = isTutorial || blockingOverlayActive || aBannerShowing;
+
+  // Clinic progress for the in-flow top band (reserves its own height; the rest
+  // of the HUD sits below it, so nothing is obstructed).
+  const scenarioForBar = roomState?.tutorialScenario || null;
+  const clinicComplete = !!roomState?.tutorialClinicComplete;
+  const clinicProgressPct = clinicComplete
+    ? 100
+    : (scenarioForBar ? Math.round(((scenarioForBar.index + 1) / (scenarioForBar.total || 7)) * 100) : null);
+  const clinicProgressLabel = clinicComplete
+    ? 'Complete'
+    : (scenarioForBar?.playerStep ? `Power ${scenarioForBar.playerStep} of ${scenarioForBar.playerTotal || 6}` : 'Power Clinic');
+
   const isSpinPendingPhase = roomState?.phase === 'spin_pending';
 
   return (
@@ -551,6 +585,35 @@ export function OnlinePlayerUI({
         active={roomState?.phase === 'playing' || isSpinPendingPhase}
         intensity={isSpinPendingPhase ? 'high' : 'low'}
       />
+
+      {/* Clinic progress — an IN-FLOW band at the very top: it reserves its own
+          height so the HUD below is never obstructed (not a fixed overlay). */}
+      {clinicProgressPct != null && (
+        <div style={{
+          flex: '0 0 auto', position: 'relative', height: 22, width: '100%',
+          background: 'linear-gradient(180deg, rgba(8,6,4,0.96), rgba(14,10,6,0.96))',
+          borderBottom: '1px solid var(--border-lit)', overflow: 'hidden',
+        }}>
+          <div style={{
+            position: 'absolute', top: 0, left: 0, bottom: 0,
+            width: `${Math.max(0, Math.min(100, clinicProgressPct))}%`,
+            background: 'linear-gradient(90deg, rgba(240,181,74,0.32), rgba(74,255,128,0.32))',
+            borderRight: '2px solid var(--accent)',
+            boxShadow: '0 0 14px var(--accent)',
+            transition: 'width 0.6s cubic-bezier(0.22,1,0.36,1)',
+          }} />
+          <div style={{
+            position: 'absolute', inset: 0, display: 'flex', alignItems: 'center',
+            justifyContent: 'center', gap: 8, pointerEvents: 'none',
+            fontFamily: "'Space Mono', monospace", fontSize: 10, letterSpacing: '0.14em',
+            textTransform: 'uppercase', color: 'var(--text)', textShadow: '0 1px 3px rgba(0,0,0,0.9)',
+          }}>
+            <span style={{ color: 'var(--accent)' }}>Progress</span>
+            <span>· {clinicProgressLabel} ·</span>
+            <span style={{ color: 'var(--alive)' }}>{Math.max(0, Math.min(100, clinicProgressPct))}%</span>
+          </div>
+        </div>
+      )}
 
       <div style={{ flex: '0 0 auto' }}>
       <RoomHeader
@@ -728,6 +791,7 @@ export function OnlinePlayerUI({
         bluffBlockedThisTurn={bluffBlockedThisTurn}
         setShowTurnModal={ui.setShowTurnModal}
         isTutorial={isTutorial}
+        suppressTurnNotice={suppressTurnNotice}
       />
 
       <PowerFlowOverlays
@@ -746,7 +810,7 @@ export function OnlinePlayerUI({
         isSwapPending={isSwapPending}
         players={players}
         swapHolderId={roomState?.swapHolderId}
-        holdForSpin={holdForSpin}
+        holdForSpin={holdAnnouncements}
       />
 
       {phase === 'redemption_pending' && roomState?.redemption && (

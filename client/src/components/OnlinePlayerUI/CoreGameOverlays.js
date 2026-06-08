@@ -35,6 +35,7 @@ export function CoreGameOverlays({
   bluffBlockedThisTurn,
   setShowTurnModal,
   isTutorial = false,
+  suppressTurnNotice = false,
 }) {
   // Launch a hand→pile card-fly. The hand card element (data-card-id) is still
   // in the DOM at play time; the discard pile is data-flight-target.
@@ -244,7 +245,7 @@ export function CoreGameOverlays({
       )}
 
       <TurnStartNotice
-        visible={showTurnModal && !isEliminated && !showPowerPrompt && !amSwapHolder && !peekedCard}
+        visible={showTurnModal && !isEliminated && !showPowerPrompt && !amSwapHolder && !peekedCard && !suppressTurnNotice}
         isFirstTurn={isFirstTurn}
         bluffBlocked={bluffBlockedThisTurn}
         onAcknowledge={() => setShowTurnModal(false)}

@@ -71,7 +71,7 @@ describe('spin overlay completion', () => {
     const { result } = renderHook((p) => useOnlinePlayerUiController(p), { initialProps: props });
     act(() => { vi.advanceTimersByTime(8100); }); // complete
     expect(result.current.spinComplete).toBe(true);
-    act(() => { vi.advanceTimersByTime(3600); });  // bot auto-ack (3.5s)
+    act(() => { vi.advanceTimersByTime(10100); }); // bot auto-ack (10s read floor)
     expect(result.current.spinData).toBeNull();    // overlay cleared
     expect(props.acknowledgeSpinResult).toHaveBeenCalled();
   });

@@ -185,7 +185,10 @@ export function useOnlinePlayerUiController({
   useEffect(() => {
     if (!spinComplete || !spinData) return undefined;
     const targetIsBot = !!playersRef.current?.find((p) => p.id === spinData.spinTargetId)?.isBot;
-    const delay = targetIsBot ? 3500 : (isTutorialRoom ? 8000 : 15000);
+    // Global pacing: an auto-closing spin (a bot's, or an observer's view) lingers
+    // ≥10s so the result is readable; the human's own spin also has a manual
+    // Continue button, so this is just its fallback.
+    const delay = targetIsBot ? 10000 : (isTutorialRoom ? 12000 : 15000);
     const timer = setTimeout(() => settleSpin(spinData.spinTargetId), delay);
     return () => clearTimeout(timer);
   }, [spinComplete, spinData?.key, isTutorialRoom, settleSpin]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -220,7 +223,7 @@ export function useOnlinePlayerUiController({
     if (!peekedCard) return undefined;
     // Module 4 — the tutorial gives a long, deliberate pause to study the peeked
     // card before the layout moves on; a real game dismisses it quickly.
-    const timer = setTimeout(() => setPeekedCard(null), isTutorialRoom ? 9000 : 3000);
+    const timer = setTimeout(() => setPeekedCard(null), isTutorialRoom ? 10000 : 3000);
     return () => clearTimeout(timer);
   }, [peekedCard, isTutorialRoom]);
 
