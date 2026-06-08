@@ -49,9 +49,9 @@ it('centres the idle nudge over the real hand element', () => {
 
   const outer = screen.getByText(/Tap a card/i).closest('.fade-in');
   expect(outer).toBeTruthy();
-  // centreX = 400 + 300/2 = 550; bottom = innerHeight - top + 6 = 800 - 600 + 6.
+  // centreX = 400 + 300/2 = 550; bottom = innerHeight - top + 8 = 800 - 600 + 8.
   expect(outer.style.left).toBe('550px');
-  expect(outer.style.bottom).toBe('206px');
+  expect(outer.style.bottom).toBe('208px');
   expect(outer.style.transform).toContain('translateX(-50%)');
 });
 

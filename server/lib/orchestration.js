@@ -430,6 +430,18 @@ async function applySpinAndBroadcast(io, code, room, player, leaderboardRepo) {
   const chamberBefore = [...player.chamber];
   const spinResult = engine.spinGun(player, engine.getSpinModifiers(room));
 
+  // Tutorial: the clinic bot has a deliberately EMPTY chamber (it always survives
+  // a reflected/forced spin). Revert the survival-added bullet so the cylinder
+  // shows no bullet at all — the "a bullet was added" reveal is misleading for a
+  // guaranteed-safe practice bot and looked like a wrong result to playtesters.
+  // (Mirrors the Gambler "no risk from surviving" revert in engine/spin.js.)
+  if (room.isTutorial && player.isBot && !spinResult.eliminated) {
+    player.chamber = [...chamberBefore];
+    player.riskLevel = chamberBefore.filter(s => s === 'bullet').length;
+    spinResult.chamber = player.chamber;
+    spinResult.riskLevel = player.riskLevel;
+  }
+
   // v2 Phase E2 — Mirror Match: queue an opposite-player spin.
   if (
     room.mirrorMatchActive

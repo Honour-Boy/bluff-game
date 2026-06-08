@@ -27,6 +27,40 @@ const TONE_COLORS = {
   win: 'var(--accent)',
 };
 
+// ─── Controls tour (intro slide) — small icon cards for chat/settings/board ───
+const CONTROL_ICONS = {
+  gear: <><circle cx="12" cy="12" r="3" /><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z" /></>,
+  chat: <path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z" />,
+  trophy: <><path d="M8 21h8M12 17v4M7 4h10v5a5 5 0 0 1-10 0V4z" /><path d="M5 4H3v2a3 3 0 0 0 3 3M19 4h2v2a3 3 0 0 1-3 3" /></>,
+};
+
+function ControlsGrid({ controls }) {
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 9, margin: '2px 0 8px' }}>
+      {controls.map((c) => (
+        <div key={c.label} style={{
+          display: 'flex', gap: 12, alignItems: 'center', padding: '9px 11px',
+          background: 'var(--surface2)', border: '1px solid var(--border-lit)', borderRadius: 'var(--radius)',
+        }}>
+          <div style={{
+            flex: '0 0 auto', width: 34, height: 34, borderRadius: 8,
+            background: 'var(--surface3)', border: '1px solid var(--border-lit)',
+            display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--accent)',
+          }}>
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+              {CONTROL_ICONS[c.icon] || CONTROL_ICONS.gear}
+            </svg>
+          </div>
+          <div style={{ minWidth: 0 }}>
+            <div style={{ fontFamily: "'Cinzel', serif", fontSize: 13, color: 'var(--accent)', letterSpacing: '0.04em' }}>{c.label}</div>
+            <div style={{ fontFamily: "'Crimson Text', serif", fontSize: 13, color: 'var(--text-dim)', lineHeight: 1.4 }}>{c.where}</div>
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
 // ─── Intro walkthrough modal ──────────────────────────────────────────────────
 function IntroModal({ slides, step, slide, canBegin, isHost, onBack, onNext, onSkip, onBegin }) {
   const total = slides.length;
@@ -75,10 +109,12 @@ function IntroModal({ slides, step, slide, canBegin, isHost, onBack, onNext, onS
 
         <div style={{
           fontFamily: "'Crimson Text', serif", fontSize: 15, lineHeight: 1.7,
-          color: 'var(--text)', marginBottom: slide.points ? 12 : 4,
+          color: 'var(--text)', marginBottom: (slide.points || slide.controls) ? 12 : 4,
         }}>
           {slide.body}
         </div>
+
+        {slide.controls && <ControlsGrid controls={slide.controls} />}
 
         {slide.points && (
           <ul style={{ margin: '0 0 4px', padding: 0, listStyle: 'none', display: 'flex', flexDirection: 'column', gap: 8 }}>
@@ -196,38 +232,41 @@ function CoachBar({ coach, isMobile, onHide, onReplayIntro }) {
 }
 
 // ─── Idle "tap a card" nudge — points at the hand when the player stalls ──────
-// Anchors to the real hand fan (`[data-tour-id="my-hand"]`, set in BottomSeat)
-// so the bubble sits centred just above the cards on ANY viewport — the old
-// fixed `bottom` guess drifted off the hand on wide screens. Falls back to the
-// fixed offset until the anchor is measurable.
+// Centres on the UNION bounding box of the actual rendered card elements
+// (`[data-tour-id="my-hand-fan"] [data-card-id]`) — measuring the real cards,
+// not a container whose centre is pulled right by the power slot / padding, is
+// the only way this lands dead-centre on the deck on every viewport. Re-measured
+// on a short interval so it tracks the fan as it's dragged/rotated.
 function CardNudge({ isMobile, canBluff }) {
-  const [pos, setPos] = useState(null); // { centerX, bottom } | null → fallback
+  const [pos, setPos] = useState(null); // { centerX, bottom } | null → fixed fallback
 
   useEffect(() => {
     if (typeof document === 'undefined') return undefined;
-    // Prefer the actual card FAN; fall back to the wider hand wrapper.
-    const anchorEl = () => document.querySelector('[data-tour-id="my-hand-fan"]')
-      || document.querySelector('[data-tour-id="my-hand"]');
     const measure = () => {
-      const r = anchorEl()?.getBoundingClientRect();
-      if (!r || !r.width || !r.height) { setPos(null); return; }
-      // Sit the bubble's bottom edge (the ▼ arrow) just above the fan's top,
-      // centred on the fan's horizontal middle.
-      setPos({ centerX: r.left + r.width / 2, bottom: window.innerHeight - r.top + 6 });
+      const cards = document.querySelectorAll('[data-tour-id="my-hand-fan"] [data-card-id]');
+      let left = Infinity; let right = -Infinity; let top = Infinity;
+      cards.forEach((el) => {
+        const r = el.getBoundingClientRect();
+        if (!r.width) return;
+        left = Math.min(left, r.left); right = Math.max(right, r.right); top = Math.min(top, r.top);
+      });
+      if (cards.length && right > left) {
+        setPos({ centerX: (left + right) / 2, bottom: window.innerHeight - top + 8 });
+        return;
+      }
+      // Fall back to the fan trough, then the wrapper, then null (fixed offset).
+      const fan = document.querySelector('[data-tour-id="my-hand-fan"]')
+        || document.querySelector('[data-tour-id="my-hand"]');
+      const fr = fan?.getBoundingClientRect();
+      if (fr && fr.width) { setPos({ centerX: fr.left + fr.width / 2, bottom: window.innerHeight - fr.top + 8 }); return; }
+      setPos(null);
     };
     measure();
-    const raf = requestAnimationFrame(measure); // re-measure after layout settles
+    const id = setInterval(measure, 300); // track fan drag / layout settling
     window.addEventListener('resize', measure);
-    let ro;
-    const el = anchorEl();
-    if (el && typeof ResizeObserver !== 'undefined') {
-      ro = new ResizeObserver(measure);
-      ro.observe(el);
-    }
     return () => {
-      cancelAnimationFrame(raf);
+      clearInterval(id);
       window.removeEventListener('resize', measure);
-      if (ro) ro.disconnect();
     };
   }, []);
 
@@ -266,23 +305,46 @@ function CardNudge({ isMobile, canBluff }) {
   );
 }
 
-// ─── Clinic progress bar — a thin fixed strip at the very top edge ───────────
-// position:fixed at top:0 so it can NEVER shift the gameplay HUD layout.
-function ClinicProgressBar({ pct }) {
+// ─── Clinic progress bar — a fixed strip pinned to the very top edge ─────────
+// position:fixed at top:0 so it can NEVER shift the gameplay HUD layout. Made
+// clearly visible (taller + glowing + a moving shimmer + a small % tag) so it
+// actually reads as a progress indicator.
+function ClinicProgressBar({ pct, label }) {
+  const w = Math.max(0, Math.min(100, pct));
   return (
     <div
       aria-hidden
       style={{
-        position: 'fixed', top: 0, left: 0, right: 0, height: 3, zIndex: 9500,
-        background: 'rgba(0,0,0,0.35)', pointerEvents: 'none',
+        position: 'fixed', top: 0, left: 0, right: 0, height: 6, zIndex: 9500,
+        background: 'rgba(0,0,0,0.55)', pointerEvents: 'none',
+        boxShadow: '0 1px 6px rgba(0,0,0,0.5)',
       }}
     >
       <div style={{
-        height: '100%', width: `${Math.max(0, Math.min(100, pct))}%`,
+        position: 'relative', height: '100%', width: `${w}%`,
         background: 'linear-gradient(90deg, var(--accent), var(--alive))',
-        boxShadow: '0 0 8px var(--accent)',
-        transition: 'width 0.5s cubic-bezier(0.22,1,0.36,1)',
-      }} />
+        boxShadow: '0 0 12px var(--accent), 0 0 4px var(--alive)',
+        transition: 'width 0.6s cubic-bezier(0.22,1,0.36,1)',
+        overflow: 'hidden',
+      }}>
+        <div style={{
+          position: 'absolute', inset: 0,
+          background: 'linear-gradient(90deg, transparent, rgba(255,255,255,0.55), transparent)',
+          animation: 'clinicShimmer 1.8s linear infinite',
+        }} />
+      </div>
+      {label && (
+        <div style={{
+          position: 'absolute', top: 8, right: 10,
+          fontFamily: "'Space Mono', monospace", fontSize: 10, letterSpacing: '0.1em',
+          color: 'var(--accent)', textShadow: '0 1px 3px rgba(0,0,0,0.9)',
+          background: 'rgba(16,12,8,0.82)', border: '1px solid var(--border-lit)',
+          borderRadius: 999, padding: '2px 8px', whiteSpace: 'nowrap',
+        }}>
+          {label} · {w}%
+        </div>
+      )}
+      <style>{'@keyframes clinicShimmer{0%{transform:translateX(-120%)}100%{transform:translateX(120%)}}'}</style>
     </div>
   );
 }
@@ -577,10 +639,13 @@ export function TutorialLayer({
   const clinicPct = clinicComplete
     ? 100
     : (scenario ? Math.round(((scenario.index + 1) / (scenario.total || 7)) * 100) : null);
+  const clinicLabel = clinicComplete
+    ? 'Complete'
+    : (scenario?.playerStep ? `Power ${scenario.playerStep} of ${scenario.playerTotal || 6}` : 'Power Clinic');
 
   return (
     <>
-      {clinicPct != null && <ClinicProgressBar pct={clinicPct} />}
+      {clinicPct != null && <ClinicProgressBar pct={clinicPct} label={clinicLabel} />}
 
       {showChoice && (
         <ChoiceModal

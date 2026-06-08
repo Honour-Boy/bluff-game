@@ -96,6 +96,7 @@ export function useOnlinePlayerUiController({
       eliminated,
       spinTargetName,
       spinTargetId: targetId,
+      targetIsBot: !!roomState?.players?.find((p) => p.id === targetId)?.isBot,
       bulletChambers: toBulletSet(chamber),
       bulletChambersAfter,
       bulletCountAfter: bulletChambersAfter.size,
