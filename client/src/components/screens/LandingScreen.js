@@ -73,6 +73,11 @@ export function LandingScreen({
   // First-run nudge: badge the Practice button until the player has tried it
   // once. Read in an effect (not initial state) to avoid an SSR hydration mismatch.
   const [tutorialHint, setTutorialHint] = useState(false);
+  // Once the player has FINISHED the clinic, the button becomes a "replay" entry
+  // with a ✓ chip instead of the NEW badge.
+  const [tutorialDone, setTutorialDone] = useState(false);
+  // Lightweight rollout flag — default ON; build with NEXT_PUBLIC_TUTORIAL_ENABLED=false to hide.
+  const tutorialEnabled = process.env.NEXT_PUBLIC_TUTORIAL_ENABLED !== 'false';
 
   useEffect(() => {
     if (initialJoinCode) {
@@ -84,8 +89,9 @@ export function LandingScreen({
 
   useEffect(() => {
     try {
-      if (typeof window !== 'undefined' && !window.localStorage.getItem('bluff_tutorial_seen')) {
-        setTutorialHint(true);
+      if (typeof window !== 'undefined') {
+        if (!window.localStorage.getItem('bluff_tutorial_seen')) setTutorialHint(true);
+        if (window.localStorage.getItem('bluff_tutorial_completed')) setTutorialDone(true);
       }
     } catch (_) { /* localStorage blocked — just skip the nudge */ }
   }, []);
@@ -296,7 +302,7 @@ export function LandingScreen({
             {/* Learn by playing — a solo practice table against a bot. The single
                 lowest-friction way in for a first-timer: no code, no second
                 player, the bot autoplays the opposite seat. */}
-            {onStartTutorial && (
+            {onStartTutorial && tutorialEnabled && (
               <PlaqueButton onClick={handleStartTutorial} disabled={!connected}>
                 {/* Target / practice icon */}
                 <svg width="15" height="15" viewBox="0 0 24 24" fill="none" aria-hidden="true">
@@ -304,24 +310,31 @@ export function LandingScreen({
                   <circle cx="12" cy="12" r="5" stroke="currentColor" strokeWidth="1.6"/>
                   <circle cx="12" cy="12" r="1.6" fill="currentColor"/>
                 </svg>
-                Practice vs Bot
-                {tutorialHint && (
+                {tutorialDone ? 'Practice vs Bot (replay)' : 'Practice vs Bot'}
+                {tutorialDone ? (
+                  <span
+                    title="You've completed the tutorial — replay any time"
+                    style={{
+                      marginLeft: 8, padding: '2px 7px', borderRadius: 999,
+                      background: 'var(--alive)', color: '#0e1a10',
+                      fontFamily: "'Space Mono', monospace", fontSize: 9,
+                      letterSpacing: '0.1em', fontWeight: 700,
+                    }}
+                  >
+                    ✓ DONE
+                  </span>
+                ) : tutorialHint ? (
                   <span
                     style={{
-                      marginLeft: 8,
-                      padding: '2px 7px',
-                      borderRadius: 999,
-                      background: 'var(--accent)',
-                      color: '#1a1714',
-                      fontFamily: "'Space Mono', monospace",
-                      fontSize: 9,
-                      letterSpacing: '0.1em',
-                      fontWeight: 700,
+                      marginLeft: 8, padding: '2px 7px', borderRadius: 999,
+                      background: 'var(--accent)', color: '#1a1714',
+                      fontFamily: "'Space Mono', monospace", fontSize: 9,
+                      letterSpacing: '0.1em', fontWeight: 700,
                     }}
                   >
                     NEW
                   </span>
-                )}
+                ) : null}
               </PlaqueButton>
             )}
 

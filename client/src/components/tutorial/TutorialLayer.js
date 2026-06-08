@@ -493,6 +493,14 @@ export function TutorialLayer({
     if (!isLobby) setIntroDone(true);
   }, [isLobby]);
 
+  // Persist "tutorial completed" so the landing can stop badging it as NEW and
+  // frame the entry as a replay instead.
+  useEffect(() => {
+    if (clinicComplete && typeof window !== 'undefined') {
+      try { window.localStorage.setItem('bluff_tutorial_completed', '1'); } catch (_) { /* ignore */ }
+    }
+  }, [clinicComplete]);
+
   // The basics game starts the FIRST time the intro is dismissed — whether via
   // "Begin practice" OR by closing the pop-up — and never again.
   const spawnBasics = () => {
