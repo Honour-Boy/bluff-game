@@ -430,17 +430,33 @@ async function applySpinAndBroadcast(io, code, room, player, leaderboardRepo) {
   const chamberBefore = [...player.chamber];
   const spinResult = engine.spinGun(player, engine.getSpinModifiers(room));
 
-  // Tutorial CLINIC bot only: it has a deliberately EMPTY chamber (always survives
-  // a reflected/forced spin). Revert the survival-added bullet so the cylinder
-  // shows no bullet — the "a bullet was added" reveal is misleading for a
-  // guaranteed-safe practice bot. Gated on the chamber having been EMPTY pre-spin
-  // so the BASICS bot (a normal 1-bullet chamber) still accumulates + can die.
-  const botChamberWasEmpty = chamberBefore.every(s => s == null);
-  if (room.isTutorial && player.isBot && !spinResult.eliminated && botChamberWasEmpty) {
-    player.chamber = [...chamberBefore];
-    player.riskLevel = 0;
-    spinResult.chamber = player.chamber;
-    spinResult.riskLevel = 0;
+  // Tutorial CLINIC bot only (lesson 'powers'): the reflected Mirror/Swap spin
+  // must show a LOADED cylinder for drama, yet the bot can NEVER die here — a
+  // stray death would end the round (and the clinic) before the Assassin drill,
+  // the one place the bot is meant to be eliminated. So FORCE a survival that
+  // lands on an empty slot and keep a live round visible in a non-landing slot.
+  // Gated to the clinic so the BASICS bot (a normal chamber) still accumulates +
+  // can die, letting the learner win the Basics round.
+  if (room.isTutorial && room.tutorialLesson === 'powers' && player.isBot) {
+    const emptySlots = chamberBefore.reduce((acc, s, i) => { if (s == null) acc.push(i); return acc; }, []);
+    const landing = emptySlots.length ? emptySlots[Math.floor(Math.random() * emptySlots.length)] : 0;
+    const survived = [...chamberBefore];
+    // Click one more live round into a NON-landing empty slot (mirrors a normal
+    // survival's +1) so the cylinder visibly loads up over the drill AND the
+    // landing slot stays empty — keeping the invariant
+    // (chamber[spinIndex]==='bullet' iff eliminated) intact.
+    const nonLandingEmpties = emptySlots.filter(i => i !== landing);
+    if (nonLandingEmpties.length) {
+      survived[nonLandingEmpties[Math.floor(Math.random() * nonLandingEmpties.length)]] = 'bullet';
+    }
+    player.status = 'alive';
+    player.isSpectator = false;
+    player.chamber = survived;
+    player.riskLevel = survived.filter(s => s === 'bullet').length;
+    spinResult.eliminated = false;
+    spinResult.spinIndex = landing;
+    spinResult.chamber = survived;
+    spinResult.riskLevel = player.riskLevel;
   }
 
   // v2 Phase E2 — Mirror Match: queue an opposite-player spin.

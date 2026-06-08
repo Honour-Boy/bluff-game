@@ -27,7 +27,11 @@ export function useOnlinePlayerUiController({
   const tableCenterRef = useRef(null);
   const [spectatingId, setSpectatingId] = useState(null);
   const [spectatedHand, setSpectatedHand] = useState([]);
-  const lastSpinKeyRef = useRef(null);
+  // Every spin identity already shown this session. A Set (not just the last key)
+  // so a re-broadcast of an OLDER spin_result — after a newer spin moved the
+  // "last" key on — can never replay that older spin a second time ("spin playing
+  // twice"). Each spin animates exactly once.
+  const seenSpinKeysRef = useRef(new Set());
   const [spinData, setSpinData] = useState(null);
   const [spinComplete, setSpinComplete] = useState(false);
   // #185 — what the "Last Event" panel renders. Mirrors roomState.lastAction
@@ -82,8 +86,8 @@ export function useOnlinePlayerUiController({
     const key = action.spinSeq != null
       ? `seq:${action.spinSeq}`
       : `${action.spinTargetId}:${JSON.stringify(action.chamber)}`;
-    if (lastSpinKeyRef.current === key) return;
-    lastSpinKeyRef.current = key;
+    if (seenSpinKeysRef.current.has(key)) return;
+    seenSpinKeysRef.current.add(key);
 
     const { spinIndex, eliminated, spinTargetName, spinTargetId: targetId, chamber, chamberAfter } = action;
     const landingChamberIndex = spinIndex ?? 0;

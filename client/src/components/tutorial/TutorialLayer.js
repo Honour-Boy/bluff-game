@@ -675,7 +675,9 @@ export function TutorialLayer({
         />
       )}
 
-      {showCardNudge && <CardNudge isMobile={isMobile} canBluff={canBluff} />}
+      {/* The "tap a card ▼" nudge is MOBILE-ONLY: on large screens the fixed
+          anchor drifts out of alignment with the hand, so it's dropped there. */}
+      {showCardNudge && isMobile && <CardNudge isMobile={isMobile} canBluff={canBluff} />}
       <style>{'@keyframes bobDown{0%,100%{transform:translateY(0)}50%{transform:translateY(5px)}}'}</style>
     </>
   );

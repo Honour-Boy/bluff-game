@@ -164,9 +164,10 @@ describe('stageScenario', () => {
       // The holder (human for player drills, bot for the demo) has the power.
       const holderId = actor === 'bot' ? 'bot:1' : 'human';
       expect(holds(room, holderId, power)).toBe(true);
-      // The bot always has an empty chamber so a reflected spin can't kill it.
+      // The bot now carries a LOADED 1-bullet chamber (drama); it can't die in the
+      // clinic because the spin pipeline force-survives it (see orchestration).
       const bot = room.players.find((p) => p.isBot);
-      expect(bot.chamber.filter((s) => s === 'bullet')).toHaveLength(0);
+      expect(bot.chamber.filter((s) => s === 'bullet')).toHaveLength(1);
       // Freshly staged → not yet complete.
       expect(scenarioComplete(room, i)).toBe(false);
     });
@@ -447,7 +448,7 @@ describe('tutorialDirector — live beats', () => {
 
 // ─── Clinic bot keeps an empty chamber (no misleading "bullet added") ─────────
 describe('clinic bot spin', () => {
-  it('does NOT add a survival bullet to the tutorial bot', async () => {
+  it('force-survives the clinic bot, keeps a LOADED cylinder, and lands on an empty slot', async () => {
     const { applySpinAndBroadcast } = require('../lib/orchestration.js');
     const room = clinicRoom();
     room.mode = engine.MODES.ONLINE;
@@ -458,18 +459,22 @@ describe('clinic bot spin', () => {
     room.deck = [];
     room.playedPile = [];
     const bot = room.players.find((p) => p.id === 'bot:1');
-    bot.chamber = [null, null, null, null, null, null]; // empty by design
-    bot.riskLevel = 0;
+    bot.chamber = ['bullet', null, null, null, null, null]; // a live round loaded (drama)
+    bot.riskLevel = 1;
     await saveRoom(room);
 
     const io = { to: () => ({ emit: () => {} }), in: () => ({ fetchSockets: async () => [] }) };
     const repo = { recordWinner: async () => ({}), recordGameStart: async () => ({}) };
     await applySpinAndBroadcast(io, room.code, room, bot, repo);
 
-    expect(room.lastAction.type).toBe('spin_result');
-    expect(room.lastAction.eliminated).toBe(false);
-    expect(bot.chamber.filter((s) => s === 'bullet')).toHaveLength(0);
-    expect((room.lastAction.chamberAfter || []).filter((s) => s === 'bullet')).toHaveLength(0);
+    const la = room.lastAction;
+    expect(la.type).toBe('spin_result');
+    expect(la.eliminated).toBe(false);     // the clinic bot can never die here
+    expect(bot.status).toBe('alive');
+    // The cylinder shows live rounds (drama), not an empty barrel…
+    expect((la.chamberAfter || []).filter((s) => s === 'bullet').length).toBeGreaterThanOrEqual(1);
+    // …and the landing slot is always empty (invariant: bullet at spinIndex iff eliminated).
+    expect(la.chamberAfter[la.spinIndex]).not.toBe('bullet');
   });
 });
 

@@ -35,7 +35,7 @@ it('centres the idle nudge over the real hand element', () => {
   const { container } = render(
     <div>
       <div data-tour-id="my-hand" />
-      <TutorialLayer roomState={roomState()} myPlayerId="me" isMyTurn startGame={() => {}} />
+      <TutorialLayer roomState={roomState()} myPlayerId="me" isMyTurn isMobile startGame={() => {}} />
     </div>,
   );
 
@@ -57,11 +57,25 @@ it('centres the idle nudge over the real hand element', () => {
 
 it('falls back to a fixed offset when the hand is not mounted', () => {
   vi.useFakeTimers();
-  render(<TutorialLayer roomState={roomState()} myPlayerId="me" isMyTurn startGame={() => {}} />);
+  render(<TutorialLayer roomState={roomState()} myPlayerId="me" isMyTurn isMobile startGame={() => {}} />);
   act(() => { vi.advanceTimersByTime(3600); });
 
   const outer = screen.getByText(/Tap a card/i).closest('.fade-in');
   expect(outer.style.left).toBe('50%'); // centred fallback, not an anchored px value
+});
+
+// The nudge is MOBILE-ONLY: on large screens its fixed anchor drifts off the
+// hand, so it is suppressed there (mobile keeps it).
+it('does NOT show the idle nudge on large screens (desktop)', () => {
+  vi.useFakeTimers();
+  render(
+    <div>
+      <div data-tour-id="my-hand" />
+      <TutorialLayer roomState={roomState()} myPlayerId="me" isMyTurn isMobile={false} startGame={() => {}} />
+    </div>,
+  );
+  act(() => { vi.advanceTimersByTime(3600); });
+  expect(screen.queryByText(/Tap a card/i)).toBeNull();
 });
 
 it('does NOT show the idle nudge during a clinic drill (the coach guides instead)', () => {

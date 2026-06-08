@@ -63,13 +63,15 @@ function _resetForDrill(room) {
     p.isSpectator = false;
     p.armedPowerCard = null;
     p.role = 'barehand';
-    // The bot gets an EMPTY chamber so a Mirror/Swap reflected spin always lands
-    // on a survival slot — the learner sees the spin drama, but a stray ~15%
-    // bot death can't end the round (and the clinic) before the Assassin drill,
-    // which is the one place the bot is meant to be eliminated. The human keeps a
-    // normal 1-bullet chamber (they're saved by the power in every drill anyway).
-    if (p.isBot) { p.chamber = initChamber(0); p.riskLevel = 0; }
-    else { p.chamber = initChamber(1); p.riskLevel = 1; }
+    // The bot gets a LOADED 1-bullet chamber so a Mirror/Swap reflected spin shows
+    // real drama (a live round in the cylinder, not an empty barrel). The bot can
+    // still never DIE here: the spin pipeline force-survives the clinic bot and
+    // lands the chamber on an empty slot (see applySpinAndBroadcast), so a stray
+    // ~15% death can't end the round (and the clinic) before the Assassin drill —
+    // the one place the bot is meant to be eliminated. The human keeps a normal
+    // 1-bullet chamber (they're saved by the power in every drill anyway).
+    p.chamber = initChamber(1);
+    p.riskLevel = 1;
   }
   room.deck = _fillerDeck();
   room.playedPile = [];
