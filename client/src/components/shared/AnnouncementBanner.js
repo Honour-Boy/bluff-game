@@ -249,9 +249,9 @@ export function AnnouncementBanner({
   accentColor,
   playerName,
   onComplete,
-  // Global pacing: auto-closing notices linger ≥10s so there's time to read, and
-  // the queue shows them one at a time (PowerFlowOverlays).
-  durationMs = 10000,
+  // Linger duration. The caller (PowerFlowOverlays) passes a long 10s read-time in
+  // the TUTORIAL; real games keep the snappy default so the table isn't slowed.
+  durationMs = 3500,
 }) {
   // Hooks run unconditionally and FIRST so the unknown-kind early
   // return below never trips the Rules of Hooks.

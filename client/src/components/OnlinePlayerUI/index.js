@@ -811,6 +811,7 @@ export function OnlinePlayerUI({
         players={players}
         swapHolderId={roomState?.swapHolderId}
         holdForSpin={holdAnnouncements}
+        isTutorial={isTutorial}
       />
 
       {phase === 'redemption_pending' && roomState?.redemption && (
