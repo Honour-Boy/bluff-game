@@ -90,6 +90,8 @@ export function OnlinePlayerUI({
   const panControls = useAnimationControls();
   const [panConstraints, setPanConstraints] = useState({ left: 0, right: 0, top: 0, bottom: 0 });
   const [pannable, setPannable] = useState(false);
+  // Tutorial — bumped by the header "Guide" button to reopen the guided walkthrough.
+  const [guideSignal, setGuideSignal] = useState(0);
   const ready = !!(roomState && myPlayer);
 
   useEffect(() => {
@@ -367,6 +369,7 @@ export function OnlinePlayerUI({
   const isRoundEnd = phase === 'round_end';
   const isGameOver = phase === 'game_over';
   const isLobby = phase === 'lobby';
+  const isTutorial = !!roomState?.isTutorial;
   const isMySpinTurn = isSpinPending && spinTargetId === myPlayer.id;
   // (Module 3) The challenged card is face-up for the whole spin_pending window
   // and reverse-flips the moment the spin result lands (ui.spinData is set when
@@ -558,6 +561,8 @@ export function OnlinePlayerUI({
         voice={voice}
         isMobile={ui.isMobile}
         onShowHowToPlay={() => ui.setShowHowToPlay(true)}
+        isTutorial={isTutorial}
+        onShowGuide={() => setGuideSignal((n) => n + 1)}
       />
 
       {/* Speed Mode — a turn countdown visible to ALL players (#speedMode). */}
@@ -719,6 +724,7 @@ export function OnlinePlayerUI({
         isFirstTurn={isFirstTurn}
         bluffBlockedThisTurn={bluffBlockedThisTurn}
         setShowTurnModal={ui.setShowTurnModal}
+        isTutorial={isTutorial}
       />
 
       <PowerFlowOverlays
@@ -818,13 +824,15 @@ export function OnlinePlayerUI({
       <FlyingCardLayer flights={flights} />
 
       {/* Tutorial / Practice — guided intro + live coach, gated to tutorial rooms. */}
-      {roomState?.isTutorial && (
+      {isTutorial && (
         <TutorialLayer
           roomState={roomState}
           myPlayerId={myPlayer?.id || null}
           isHost={isHost}
           startGame={startGame}
           isMobile={ui.isMobile}
+          isMyTurn={isMyTurn}
+          reopenSignal={guideSignal}
         />
       )}
 

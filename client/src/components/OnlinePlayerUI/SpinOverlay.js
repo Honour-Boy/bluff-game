@@ -88,6 +88,7 @@ export function SpinOverlay({
   cylinderAnimating,
   isSpinTarget,
   acknowledgeSpinResult,
+  isTutorial = false,
 }) {
   if (!spinData) return null;
 
@@ -146,12 +147,26 @@ export function SpinOverlay({
           >
             {spinData.eliminated ? 'ELIMINATED' : 'SURVIVED'}
           </div>
-          <div style={{ fontSize: 12, color: 'var(--text-dim)', marginBottom: 28 }}>
+          <div style={{ fontSize: 12, color: 'var(--text-dim)', marginBottom: isTutorial && !spinData.eliminated ? 14 : 28 }}>
             Chamber {spinData.landingChamberIndex + 1} · {spinData.eliminated ? 'bullet found' : 'empty'}
             {!spinData.eliminated && spinData.bulletCountAfter != null && (
               <> · now {spinData.bulletCountAfter}/6 loaded</>
             )}
           </div>
+          {/* Tutorial: explain WHY a new bullet just appeared in the chamber. */}
+          {isTutorial && !spinData.eliminated && (
+            <div style={{
+              fontSize: 13,
+              color: 'var(--alive)',
+              fontStyle: 'italic',
+              lineHeight: 1.55,
+              maxWidth: 300,
+              margin: '0 auto 26px',
+            }}>
+              Survived — so a fresh bullet just clicked into the chamber. Every spin
+              you live through loads the gun a little more.
+            </div>
+          )}
           {isSpinTarget ? (
             <button className="primary" onClick={acknowledgeSpinResult} style={{ padding: '10px 32px', fontSize: 14 }}>
               Continue

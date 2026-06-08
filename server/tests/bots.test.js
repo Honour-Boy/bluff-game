@@ -505,3 +505,42 @@ describe('tutorial pacing', () => {
     _clearBotTimer(code); // the broadcast may have armed a bot beat — don't leak it
   });
 });
+
+// ─── Leaving a tutorial destroys the room (no bot-host migration) ─────────────
+describe('tutorial teardown on leave', () => {
+  it('pickReplacementHost never hands the seat to a bot', () => {
+    const room = makeTutorialRoom();
+    // The human leaving leaves only the bot — which must be skipped → null,
+    // so the caller tears the room down instead of migrating.
+    expect(engine.pickReplacementHost(room, 'human')).toBeNull();
+  });
+
+  it('leaving a tutorial room destroys it rather than migrating host to the bot', async () => {
+    const io = makeIo();
+    const deps = {
+      groupsRepo: { getActiveGroupByCode: async () => null },
+      groupSettingsRepo: { upsertGroupSettings: vi.fn() },
+      leaderboardRepo: { recordWinner: vi.fn(), recordGameStart: vi.fn() },
+    };
+    const handlers = {};
+    const socket = {
+      id: 'host-sock', userId: 'human', username: 'You', data: {},
+      on: (evt, cb) => { handlers[evt] = cb; }, join: () => {}, leave: () => {},
+    };
+    roomHandler.register(io, socket, deps);
+    gameHandler.register(io, socket, deps);
+
+    const createCb = vi.fn();
+    await handlers['create_tutorial_room']({}, createCb);
+    const code = createCb.mock.calls[0][0].roomCode;
+    await handlers['start_game']({ roomCode: code }, vi.fn());
+    expect(rooms.has(code)).toBe(true);
+
+    const leaveCb = vi.fn();
+    await handlers['leave_room']({ roomCode: code, playerId: 'human' }, leaveCb);
+
+    expect(leaveCb).toHaveBeenCalledWith({ success: true, roomClosed: true });
+    expect(rooms.has(code)).toBe(false);                                  // destroyed
+    expect(io.log.some((e) => e.event === 'host_migrated')).toBe(false);  // never migrated to the bot
+  });
+});

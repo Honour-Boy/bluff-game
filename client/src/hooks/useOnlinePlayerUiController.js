@@ -150,12 +150,21 @@ export function useOnlinePlayerUiController({
     if (!spinComplete || !spinData) return undefined;
 
     const amTarget = spinData.spinTargetId === myPlayer?.id;
+    // A bot spin target never acknowledges on its own (no socket). In a practice
+    // room this client is the only human, so it drives the ack quickly instead of
+    // leaving the overlay (and play) frozen for the full 15s observer fallback —
+    // this is what made the bot "not auto-continue" after surviving a spin. It
+    // also lets the server resolve anything waiting on spin_acknowledged.
+    const targetIsBot = !!roomState?.players?.find((p) => p.id === spinData.spinTargetId)?.isBot;
+    // Long enough to read the "survived — a bullet was added" explainer, short
+    // enough that play resumes promptly instead of the old 15s observer stall.
+    const delay = targetIsBot ? 3500 : 15000;
     const timer = setTimeout(() => {
-      if (amTarget) acknowledgeSpinResult?.();
+      if (amTarget || targetIsBot) acknowledgeSpinResult?.();
       else setSpinData(null);
-    }, 15000);
+    }, delay);
     return () => clearTimeout(timer);
-  }, [acknowledgeSpinResult, myPlayer?.id, spinComplete, spinData]);
+  }, [acknowledgeSpinResult, myPlayer?.id, spinComplete, spinData, roomState?.players]);
 
   useEffect(() => {
     if (spinDismissed && spinData && spinComplete) {

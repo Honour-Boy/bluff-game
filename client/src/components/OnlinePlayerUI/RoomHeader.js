@@ -110,6 +110,8 @@ export function RoomHeader({
   voice,
   isMobile,
   onShowHowToPlay,
+  isTutorial = false,
+  onShowGuide,
 }) {
   return (
     <div style={{
@@ -200,22 +202,44 @@ export function RoomHeader({
             {isEliminated ? 'Eliminated' : 'Alive'}
           </div>
         )}
-        <button
-          onClick={onShowHowToPlay}
-          style={{
-            fontFamily: "'Cinzel', serif",
-            fontSize: 9,
-            color: 'var(--text-dim)',
-            border: '1px solid var(--border)',
-            background: 'none',
-            padding: '4px 10px',
-            borderRadius: 3,
-            cursor: 'pointer',
-            letterSpacing: '0.1em',
-          }}
-        >
-          Rules
-        </button>
+        {/* Practice mode swaps the generic "Rules" book for a "Guide" button that
+            reopens the tutorial walkthrough — and the floating Show-Guide pill is
+            dropped, so the two no longer collide here. */}
+        {isTutorial ? (
+          <button
+            onClick={onShowGuide}
+            style={{
+              fontFamily: "'Cinzel', serif",
+              fontSize: 9,
+              color: 'var(--accent)',
+              border: '1px solid var(--accent-dim)',
+              background: 'rgba(200,146,46,0.06)',
+              padding: '4px 12px',
+              borderRadius: 3,
+              cursor: 'pointer',
+              letterSpacing: '0.1em',
+            }}
+          >
+            ? Guide
+          </button>
+        ) : (
+          <button
+            onClick={onShowHowToPlay}
+            style={{
+              fontFamily: "'Cinzel', serif",
+              fontSize: 9,
+              color: 'var(--text-dim)',
+              border: '1px solid var(--border)',
+              background: 'none',
+              padding: '4px 10px',
+              borderRadius: 3,
+              cursor: 'pointer',
+              letterSpacing: '0.1em',
+            }}
+          >
+            Rules
+          </button>
+        )}
       </div>
 
       {/* Right: spacer reserved for the fixed global settings gear (name + menu) */}

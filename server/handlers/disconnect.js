@@ -18,6 +18,7 @@ const {
   _clearRedemptionTimer,
   _clearSpeedModeTimer,
   _clearIdleTurnTimer,
+  _clearBotTimer,
   logRoomDeletion,
   saveRoom,
 } = require('../lib/state');
@@ -46,6 +47,7 @@ function register(io, socket, deps) {
         _clearRedemptionTimer(code);
         _clearSpeedModeTimer(code);
         _clearIdleTurnTimer(code);
+        _clearBotTimer(code);
         discardLobbyIdleState(code);
         rooms.delete(code);
         console.log(`[Room ${code}] host disconnected — room ended immediately.`);
