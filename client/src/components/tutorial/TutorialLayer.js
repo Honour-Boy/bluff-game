@@ -763,6 +763,18 @@ export function TutorialLayer({
   // Where the coach docks — just above the bottom seat (measured).
   const dockBottom = useDockBottom();
 
+  // Auto-expand policy: on the learner's FIRST practice run the coach pops open
+  // (the focus-gate) at each new instruction so they learn the rhythm — they OK it
+  // back to the collapsed bar, the next beat re-opens, and so on. Once they've
+  // completed practice once (`bluff_tutorial_completed`), repeated runs stay
+  // collapsed by default — the bar still updates, but only expands when tapped.
+  // Re-read on each new game (lobby) so a replay after completing reflects it.
+  const readAutoExpand = () => {
+    try { return typeof window !== 'undefined' ? !window.localStorage.getItem('bluff_tutorial_completed') : true; }
+    catch (_) { return true; }
+  };
+  const [autoExpand, setAutoExpand] = useState(readAutoExpand);
+
   // Sticky guards: the Basics match spawns at most ONCE (so reopening + closing
   // the guide mid-game can't re-deal), and the skip request fires once.
   const spawnedRef = useRef(false);
@@ -784,10 +796,11 @@ export function TutorialLayer({
       setCoachHidden(false);
       ackKeysRef.current.clear();
       setForcedGateKey(null);
+      setAutoExpand(readAutoExpand()); // first run auto-expands; later runs stay collapsed
     } else {
       setIntroDone(true);
     }
-  }, [isLobby]);
+  }, [isLobby]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Persist "tutorial completed" so the landing can stop badging it as NEW and
   // frame the entry as a replay instead.
@@ -882,10 +895,11 @@ export function TutorialLayer({
   // Auto-gate the coach only in BASICS (no scenario): the clinic already gates
   // each drill with its briefing pop-up ("Got it — show me"), so a second backdrop
   // on the live coach would be redundant and re-hide the bot the briefing just
-  // revealed. In the clinic the coach rides as a pill; tapping it (forcedGateKey)
-  // still expands to the full instruction on demand.
+  // revealed. The auto-open only fires on the FIRST practice run (`autoExpand`);
+  // after that the bar stays collapsed and only opens when the learner taps it
+  // (forcedGateKey), which works in every run, clinic included.
   const showCoachGate = !!coach && !coachIsCorrection && !overlayOwnsScreen
-    && (forcedGateKey === coach.key || (coachActionable && !coachAcked && !scenario));
+    && (forcedGateKey === coach.key || (autoExpand && coachActionable && !coachAcked && !scenario));
 
   // Header "Guide" button → re-show the current drill's briefing (clinic) or
   // reopen the walkthrough (basics). Skip the initial mount.
