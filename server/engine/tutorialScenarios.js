@@ -340,11 +340,41 @@ function clinicEndTurnBlock(room) {
   return null;
 }
 
+/**
+ * Power-Clinic *action* gate: refuses an action that isn't the drill's scripted
+ * one, so a stray tap can't break the lesson. The reported failure was the
+ * bot-Shield demo (expect 'call_bluff') — the coach says "Call Bluff", but if the
+ * learner instead plays a card it overwrites the bot's challengeable card, the
+ * call-bluff target is gone, and the drill can never complete (End Turn is also
+ * blocked) → the clinic hangs. We block the off-script `play_card` up front and
+ * surface the same coach line. Pure read; inert outside an active clinic drill.
+ *   call_bluff                  → must Call Bluff; playing a card is off-script.
+ *   use_power / arm_then_play    → must use/arm the power BEFORE playing a card
+ *                                  (peeking after a card play reveals the wrong
+ *                                  card; arming is meant to precede the play).
+ *   play_then_defend             → playing a card IS the step — never blocked.
+ */
+function clinicActionBlock(room, action) {
+  if (!room || !room.isTutorial || (room.tutorialLesson || 'basics') !== 'powers') return null;
+  const sc = room.tutorialScenario;
+  if (!sc || sc.step === 'resolved') return null;
+  if (action === 'play_card') {
+    if (sc.expect === 'call_bluff') {
+      return { reason: "Call the bot's bluff first — that's this drill. Don't play a card yet." };
+    }
+    if ((sc.expect === 'use_power' || sc.expect === 'arm_then_play') && !room.powerActivatedThisTurn) {
+      return { reason: 'Use your power card first — follow the coach before playing a card.' };
+    }
+  }
+  return null;
+}
+
 module.exports = {
   POWER_CLINIC,
   stageScenario,
   scenarioComplete,
   clinicEndTurnBlock,
+  clinicActionBlock,
   REQUIRED_SHAPE,
   BOT_ID,
 };

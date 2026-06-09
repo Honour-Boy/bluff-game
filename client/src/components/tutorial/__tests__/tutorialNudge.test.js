@@ -47,7 +47,10 @@ it('centres the idle nudge over the real hand element', () => {
 
   act(() => { vi.advanceTimersByTime(3600); }); // idle → nudge mounts + measures
 
-  const outer = screen.getByText(/Tap a card/i).closest('.fade-in');
+  // The `.fade-in` now sits on an INNER wrapper (its keyframes animate transform
+  // and would clobber the centring translateX); the positioned wrapper that
+  // carries left/bottom is its parent.
+  const outer = screen.getByText(/Tap a card/i).closest('.fade-in')?.parentElement;
   expect(outer).toBeTruthy();
   // centreX = 400 + 300/2 = 550; bottom = innerHeight - top + 8 = 800 - 600 + 8.
   expect(outer.style.left).toBe('550px');
@@ -60,13 +63,13 @@ it('falls back to a fixed offset when the hand is not mounted', () => {
   render(<TutorialLayer roomState={roomState()} myPlayerId="me" isMyTurn isMobile startGame={() => {}} />);
   act(() => { vi.advanceTimersByTime(3600); });
 
-  const outer = screen.getByText(/Tap a card/i).closest('.fade-in');
+  const outer = screen.getByText(/Tap a card/i).closest('.fade-in')?.parentElement;
   expect(outer.style.left).toBe('50%'); // centred fallback, not an anchored px value
 });
 
-// The nudge is MOBILE-ONLY: on large screens its fixed anchor drifts off the
-// hand, so it is suppressed there (mobile keeps it).
-it('does NOT show the idle nudge on large screens (desktop)', () => {
+// The nudge now anchors to the real hand element on every width (the measure
+// adapts its own width to fit centred), so it is shown on desktop too.
+it('shows the idle nudge on large screens (desktop), anchored to the hand', () => {
   vi.useFakeTimers();
   render(
     <div>
@@ -75,7 +78,7 @@ it('does NOT show the idle nudge on large screens (desktop)', () => {
     </div>,
   );
   act(() => { vi.advanceTimersByTime(3600); });
-  expect(screen.queryByText(/Tap a card/i)).toBeNull();
+  expect(screen.queryByText(/Tap a card/i)).toBeTruthy();
 });
 
 it('does NOT show the idle nudge during a clinic drill (the coach guides instead)', () => {

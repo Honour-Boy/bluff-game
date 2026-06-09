@@ -973,6 +973,7 @@ export function OnlinePlayerUI({
           holdClinic={ui.eliminationHold}
           reopenSignal={guideSignal}
           preArmLockSignal={ui.preArmLockSignal}
+          clinicActionHint={ui.clinicActionHint}
           lesson={roomState?.tutorialLesson || 'basics'}
         />
       )}

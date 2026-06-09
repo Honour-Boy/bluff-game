@@ -7,6 +7,8 @@ import {
   introSlidesFor,
   clinicCoachFor,
   clinicBriefingFor,
+  clinicCardPlayLock,
+  clinicEndTurnLock,
   BASICS_HANDOFF_COACH,
   CLINIC_COMPLETE_COACH,
 } from '../tutorialContent';
@@ -239,6 +241,47 @@ describe('clinicCoachFor (Power Clinic drills)', () => {
   it('exposes hand-off + completion copy', () => {
     expect(BASICS_HANDOFF_COACH.body).toContain(BOT_NAME);
     expect(CLINIC_COMPLETE_COACH.tone).toBe('win');
+  });
+});
+
+describe('clinicCardPlayLock (off-script card play guard)', () => {
+  it('blocks playing a card during the Call-Bluff drill', () => {
+    const msg = clinicCardPlayLock({ power: 'shield', actor: 'bot', step: 'intro', expect: 'call_bluff' });
+    expect(msg).toBeTruthy();
+    expect(msg.toLowerCase()).toContain('bluff');
+  });
+
+  it('blocks playing a card before a use_power / arm_then_play power is used', () => {
+    expect(clinicCardPlayLock({ power: 'peek', step: 'intro', expect: 'use_power' }, {})).toBeTruthy();
+    expect(clinicCardPlayLock({ power: 'freeze', step: 'intro', expect: 'arm_then_play' }, {})).toBeTruthy();
+    // Once the power is used/armed the play is allowed.
+    expect(clinicCardPlayLock({ power: 'peek', step: 'intro', expect: 'use_power' }, { powerActivatedThisTurn: true })).toBeNull();
+  });
+
+  it('never blocks a play_then_defend drill (playing IS the step)', () => {
+    expect(clinicCardPlayLock({ power: 'shield', step: 'intro', expect: 'play_then_defend' })).toBeNull();
+  });
+
+  it('is inert with no scenario or once resolved', () => {
+    expect(clinicCardPlayLock(null)).toBeNull();
+    expect(clinicCardPlayLock({ expect: 'call_bluff', step: 'resolved' })).toBeNull();
+  });
+});
+
+describe('clinicEndTurnLock (scripted-action gate)', () => {
+  it('requires the bluff call before End Turn in the Call-Bluff drill', () => {
+    expect(clinicEndTurnLock({ expect: 'call_bluff', step: 'intro' }, { bluffUsedThisTurn: false })).toBeTruthy();
+    expect(clinicEndTurnLock({ expect: 'call_bluff', step: 'intro' }, { bluffUsedThisTurn: true })).toBeNull();
+  });
+
+  it('requires the power before End Turn in arm_then_play / use_power drills', () => {
+    expect(clinicEndTurnLock({ power: 'freeze', expect: 'arm_then_play', step: 'intro' }, {})).toBeTruthy();
+    expect(clinicEndTurnLock({ power: 'freeze', expect: 'arm_then_play', step: 'intro' }, { powerActivatedThisTurn: true })).toBeNull();
+  });
+
+  it('allows End Turn for play_then_defend and once resolved', () => {
+    expect(clinicEndTurnLock({ expect: 'play_then_defend', step: 'intro' }, {})).toBeNull();
+    expect(clinicEndTurnLock({ expect: 'call_bluff', step: 'resolved' }, {})).toBeNull();
   });
 });
 

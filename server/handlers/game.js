@@ -19,7 +19,7 @@ const { socketRateLimit } = require('../lib/rateLimiter');
 const { maybeRecordGroupWinner } = require('../lib/roomBuilders');
 const { runMirrorMatchSpin, resolvePendingGameOver, beginRedemption } = require('../lib/orchestration');
 const { _beginPowerClinic, advanceClinic } = require('../lib/tutorialDirector');
-const { clinicEndTurnBlock } = require('../engine/tutorialScenarios');
+const { clinicEndTurnBlock, clinicActionBlock } = require('../engine/tutorialScenarios');
 
 // ─── Pre-game selection orchestration (#116) ─────────────────
 // Pure phase/state logic lives in engine/pregame.js; these helpers
@@ -406,6 +406,12 @@ function register(io, socket, deps) {
       if (room.mode !== engine.MODES.ONLINE) return callback({ success: false, error: 'Online mode only' });
       if (room.turnOrder[room.currentTurnIndex] !== playerId) return callback({ success: false, error: 'Not your turn' });
       if (room.phase !== 'playing') return callback({ success: false, error: 'Cannot play card now' });
+
+      // Power Clinic: refuse an off-script card play (e.g. playing a card during
+      // the "Call Bluff" drill, which would strand the lesson). Inert outside the
+      // clinic — no effect on normal online play.
+      const clinicBlock = clinicActionBlock(room, 'play_card');
+      if (clinicBlock) return callback({ success: false, error: clinicBlock.reason, tutorialLocked: true });
 
       const cardPreview = room.hands?.get(playerId)?.find(c => c.id === cardId);
       if (cardPreview?.shape === 'whot') {

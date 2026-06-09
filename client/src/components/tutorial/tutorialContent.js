@@ -182,6 +182,26 @@ export function isDefensivePreArmLocked(scenario, phase) {
  * play_then_defend needs only a card play (the End Turn button already requires
  * that), so it returns null. Inert outside an active (intro-step) clinic drill.
  */
+/**
+ * Power-Clinic play-a-card lock (client mirror of the server `clinicActionBlock`
+ * for `play_card`): returns a coach-hint string to BLOCK a card play that isn't
+ * the drill's scripted action, or null to allow. Keeps the learner from breaking
+ * the lesson by tapping a card when they should Call Bluff / use a power first.
+ * `flags` = { powerActivatedThisTurn }. Inert outside an active clinic drill, so
+ * normal play is never blocked.
+ */
+export function clinicCardPlayLock(scenario, flags = {}) {
+  if (!scenario || scenario.step === 'resolved') return null;
+  const power = scenario.power ? scenario.power[0].toUpperCase() + scenario.power.slice(1) : 'power';
+  if (scenario.expect === 'call_bluff') {
+    return `Call ${BOT_NAME}'s bluff first — that's this drill. Don't play a card yet.`;
+  }
+  if ((scenario.expect === 'use_power' || scenario.expect === 'arm_then_play') && !flags.powerActivatedThisTurn) {
+    return `Use your ${power} first — tap it in the slot beside your hand before playing a card.`;
+  }
+  return null;
+}
+
 export function clinicEndTurnLock(scenario, flags = {}) {
   if (!scenario || scenario.step === 'resolved') return null;
   const power = scenario.power ? scenario.power[0].toUpperCase() + scenario.power.slice(1) : 'power';
