@@ -32,6 +32,10 @@ const {
 const BOT_MOVE_DELAY_MS = 1100; // play a card / end the turn
 const BOT_SPIN_DELAY_MS = 1500; // pause on "<bot> is on the spot" before spinning
 const BOT_INTERCEPT_DELAY_MS = 700; // brief "deciding" beat before auto-passing a bluff intercept
+// (Module 2.1) In the Power Clinic, the bot's spin (e.g. a reflected Mirror/Swap
+// spin) waits much longer so the learner can read the expanded coach before the
+// cylinder turns. Clinic-only (lesson 'powers'); Basics keeps the snappy beat.
+const CLINIC_BOT_SPIN_DELAY_MS = 10000;
 
 // Tutorial rooms are never group rooms (room.groupId is null), so the leaderboard
 // repo handed to the spin pipeline is never actually invoked — every call site
@@ -104,6 +108,9 @@ function _pendingBotAction(room) {
       // bot card can't derail the staged instance. The director owns the flow.
       if (room.tutorialScenario) {
         if (room.tutorialScenario.forceBotBluff && _botCanForceBluff(room, current.id)) {
+          // (Module 4.1) Show a distinct "Dealer Bot calls bluff!" beat before the
+          // Assassin strike resolves, so the challenge reads as its own moment.
+          if (!room._clinicAssassinAnnounced) return { kind: 'force_bluff_announce', botId: current.id };
           return { kind: 'force_bluff', botId: current.id };
         }
         return null;
@@ -156,8 +163,12 @@ function armBotTurn(io, room) {
 
   _clearBotTimer(code);
   room._botActionKey = key;
+  // (Module 2.1) Clinic spins get a long read-the-coach pause; everything else
+  // keeps its normal human-legible beat.
+  const isClinicSpin = action.kind === 'spin'
+    && room.isTutorial && room.tutorialLesson === 'powers';
   const delay = action.kind === 'spin'
-    ? BOT_SPIN_DELAY_MS
+    ? (isClinicSpin ? CLINIC_BOT_SPIN_DELAY_MS : BOT_SPIN_DELAY_MS)
     : action.kind === 'intercept_pass'
       ? BOT_INTERCEPT_DELAY_MS
       : BOT_MOVE_DELAY_MS;
@@ -280,6 +291,24 @@ async function _onBotActExpire(io, code, key) {
       return;
     }
     await _resolveOnlineBluff(io, code, room, accuserId, NOOP_LEADERBOARD_REPO);
+    return;
+  }
+
+  if (action.kind === 'force_bluff_announce') {
+    // (Module 4.1) Beat 1 of the Assassin strike: announce the bot's challenge on
+    // its own, so the table reads "Dealer Bot calls bluff!" before the strike +
+    // elimination land on the next beat.
+    room._clinicAssassinAnnounced = true;
+    const human = room.players.find((p) => p && !p.isBot) || null;
+    room.lastAction = {
+      type: 'tutorial_bot_challenge',
+      accuserId: action.botId,
+      accuserName: room.players.find((p) => p.id === action.botId)?.username || null,
+      accusedId: human?.id || null,
+      accusedName: human?.username || null,
+    };
+    await saveRoom(room);
+    await broadcastRoomState(io, code);
     return;
   }
 

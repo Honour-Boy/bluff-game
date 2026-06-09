@@ -163,7 +163,7 @@ function SectionButton({ children, onClick, ariaLabel }) {
 }
 
 // ─── Section wrapper ──────────────────────────────────────
-function Section({ title, children, footer, onSelectAll, onDeselectAll }) {
+function Section({ title, children, footer, onSelectAll, onDeselectAll, comingSoon = false }) {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
       <div style={{
@@ -177,10 +177,19 @@ function Section({ title, children, footer, onSelectAll, onDeselectAll }) {
           fontSize: 10,
           color: 'var(--text-dim)',
           letterSpacing: '0.18em',
+          display: 'flex', alignItems: 'center', gap: 8,
         }}>
           {title}
+          {comingSoon && (
+            <span style={{
+              padding: '1px 7px', borderRadius: 999, background: 'var(--surface3)',
+              color: 'var(--accent)', fontSize: 8.5, letterSpacing: '0.12em', fontWeight: 700,
+            }}>
+              COMING SOON
+            </span>
+          )}
         </div>
-        {(onSelectAll || onDeselectAll) && (
+        {!comingSoon && (onSelectAll || onDeselectAll) && (
           <div style={{ display: 'flex', gap: 6 }}>
             {onSelectAll && (
               <SectionButton onClick={onSelectAll} ariaLabel={`Enable all in ${title}`}>All</SectionButton>
@@ -251,25 +260,28 @@ function formatSavedMeta(savedMeta) {
 }
 
 // ─── Main component ───────────────────────────────────────
-export function PreGameSettingsPanel({ config, onChange, isGroupRoom = false, savedMeta = null, playerCount = null }) {
+export function PreGameSettingsPanel({ config, onChange, isGroupRoom = false, savedMeta = null, playerCount = null, sandbox = false }) {
   const [open, setOpen] = useState(false);
   const gating = gatingFor(playerCount);
 
   // Render a toggle row, applying player-count gating: hidden rows return
   // null; disabled rows render greyed-out with the reason in place of desc.
+  // (Module 5) In the sandbox, the non-power categories aren't wired for the bot
+  // yet, so every row is force-disabled with a "Coming soon" reason (and the
+  // hide-gating is ignored so they're all visible-but-greyed).
   const renderToggle = (idPrefix, { key, label, desc }, checked, onToggle) => {
     const g = gating[key];
-    if (g?.mode === 'hide') return null;
+    if (g?.mode === 'hide' && !sandbox) return null;
     return (
       <ToggleRow
         key={key}
         id={`${idPrefix}-${key}`}
         label={label}
         desc={desc}
-        checked={checked}
+        checked={sandbox ? false : checked}
         onChange={(v) => onToggle(key, v)}
-        disabled={g?.mode === 'disable'}
-        disabledReason={g?.reason || null}
+        disabled={sandbox || g?.mode === 'disable'}
+        disabledReason={sandbox ? 'Coming soon' : (g?.reason || null)}
       />
     );
   };
@@ -406,7 +418,19 @@ export function PreGameSettingsPanel({ config, onChange, isGroupRoom = false, sa
           maxHeight: '60vh',
           overflowY: 'auto',
         }}>
-          {/* Global Enable/Disable bar */}
+          {/* (Module 5) Sandbox intro note — only power cards are configurable today. */}
+          {sandbox && (
+            <div style={{
+              fontSize: 10, color: 'var(--text-dim)', lineHeight: 1.6,
+              padding: '8px 12px', background: 'var(--surface2)',
+              border: '1px dashed var(--border)', borderRadius: 'var(--radius)',
+            }}>
+              Toggle which power cards go in the deck, then Start. The rest is coming soon.
+            </div>
+          )}
+
+          {/* Global Enable/Disable bar (hidden in sandbox — only powers apply). */}
+          {!sandbox && (
           <div style={{
             display: 'flex',
             alignItems: 'center',
@@ -429,6 +453,7 @@ export function PreGameSettingsPanel({ config, onChange, isGroupRoom = false, sa
               </SectionButton>
             </div>
           </div>
+          )}
 
           {/* Power Cards */}
           <Section
@@ -491,26 +516,21 @@ export function PreGameSettingsPanel({ config, onChange, isGroupRoom = false, sa
           {/* Risk Modifiers */}
           <Section
             title="RISK MODIFIERS"
-            onSelectAll={() => setAllRisk(true)}
-            onDeselectAll={() => setAllRisk(false)}
+            comingSoon={sandbox}
+            onSelectAll={sandbox ? undefined : () => setAllRisk(true)}
+            onDeselectAll={sandbox ? undefined : () => setAllRisk(false)}
           >
-            {RISK_MODS.map(({ key, label, desc }) => (
-              <ToggleRow
-                key={key}
-                id={`risk-${key}`}
-                label={label}
-                desc={desc}
-                checked={config.riskModifiers[key]}
-                onChange={(v) => setRisk(key, v)}
-              />
-            ))}
+            {RISK_MODS.map((item) =>
+              renderToggle('risk', item, config.riskModifiers[item.key], setRisk),
+            )}
           </Section>
 
           {/* Room Modifiers */}
           <Section
             title="ROOM MODIFIERS"
-            onSelectAll={() => setAllRoom(true)}
-            onDeselectAll={() => setAllRoom(false)}
+            comingSoon={sandbox}
+            onSelectAll={sandbox ? undefined : () => setAllRoom(true)}
+            onDeselectAll={sandbox ? undefined : () => setAllRoom(false)}
           >
             {ROOM_MODS.map((item) =>
               renderToggle('room', item, config.roomModifiers[item.key], setRoom),
@@ -520,8 +540,9 @@ export function PreGameSettingsPanel({ config, onChange, isGroupRoom = false, sa
           {/* Special Systems */}
           <Section
             title="SPECIAL SYSTEMS"
-            onSelectAll={() => setAllSystems(true)}
-            onDeselectAll={() => setAllSystems(false)}
+            comingSoon={sandbox}
+            onSelectAll={sandbox ? undefined : () => setAllSystems(true)}
+            onDeselectAll={sandbox ? undefined : () => setAllSystems(false)}
             footer={
               <div style={{
                 fontSize: 10,

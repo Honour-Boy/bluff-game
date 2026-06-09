@@ -365,21 +365,15 @@ function CardNudge() {
   useEffect(() => {
     if (typeof document === 'undefined') return undefined;
     const measure = () => {
-      const cards = document.querySelectorAll('[data-tour-id="my-hand-fan"] [data-card-id]');
-      let left = Infinity; let right = -Infinity;
-      cards.forEach((el) => {
-        const r = el.getBoundingClientRect();
-        if (!r.width) return;
-        left = Math.min(left, r.left); right = Math.max(right, r.right);
-      });
-      let cx = null;
-      if (cards.length && right > left) cx = (left + right) / 2;
-      else {
-        const fan = document.querySelector('[data-tour-id="my-hand-fan"]')
-          || document.querySelector('[data-tour-id="my-hand"]');
-        const fr = fan?.getBoundingClientRect();
-        if (fr && fr.width) cx = fr.left + fr.width / 2;
-      }
+      // (Module 1.3) Anchor to the fan CONTAINER centre, NOT the individual card
+      // bounds. The cards splay by rotating around a shared bottom-centre pivot, so
+      // their left/right bounds shift while the fan is dragged — measuring them made
+      // the nudge drift sideways mid-drag. The container's centre is fixed on the
+      // layout axis, so the nudge now stays completely stationary during a drag.
+      const fan = document.querySelector('[data-tour-id="my-hand-fan"]')
+        || document.querySelector('[data-tour-id="my-hand"]');
+      const fr = fan?.getBoundingClientRect();
+      let cx = (fr && fr.width) ? fr.left + fr.width / 2 : null;
       // Keep the small bubble fully on-screen even if the fan sits near an edge.
       if (cx != null) cx = Math.max(90, Math.min(window.innerWidth - 90, cx));
       setCenterX(cx);
@@ -863,7 +857,12 @@ export function TutorialLayer({
   // thing on screen is the spin result → "Eliminated" card → (then) the clinic.
   if (!modalUp && !isLobby && !holdClinic) {
     if (clinicComplete) coach = CLINIC_COMPLETE_COACH;
-    else if (scenario) coach = clinicCoachFor(scenario, { phase });
+    else if (scenario) coach = clinicCoachFor(scenario, {
+      phase,
+      // (Module 3.1) Freeze double-turn: the freeze has left the slot once spent,
+      // which switches the coach to the "your free turn" beat.
+      freezeConsumed: !(roomState?.myPowerCardSlot || []).some((c) => c?.power === 'freeze'),
+    });
     else if (lesson !== 'powers' && (phase === 'game_over' || phase === 'round_end')) {
       coach = BASICS_HANDOFF_COACH;
     } else coach = coachFor(coachContextFromRoom(roomState, myPlayerId));

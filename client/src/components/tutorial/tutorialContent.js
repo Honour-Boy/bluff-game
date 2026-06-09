@@ -107,14 +107,19 @@ const CLINIC_COACH = {
       body: `You alone saw the real card - now you'd know if a challenge is safe. Peek is spent after one look.` },
   },
   'freeze:player': {
-    intro: { tone: 'action', title: 'Freeze - skip their turn',
-      body: `Freeze is an offensive power, so you arm it BEFORE you play: tap your Freeze card first, then play any card, then End Turn. ${BOT_NAME} loses its very next turn.` },
-    resolved: { tone: 'info', title: 'Frozen out',
-      body: `${BOT_NAME}'s next turn just got skipped - you stole the tempo. Freeze triggers once, then it's gone.` },
+    intro: { tone: 'action', title: 'Freeze - arm it first',
+      body: `Freeze is offensive, so arm it BEFORE you play: tap your Freeze card, play any card, then End Turn. ${BOT_NAME}'s next turn gets skipped - so play comes right back to you.` },
+    // Shown on the bonus turn (freeze already consumed, play bounced back to you).
+    bonus: { tone: 'action', title: 'Your free turn',
+      body: `${BOT_NAME} was frozen out, so you go again - play another card and End Turn. You can't Call Bluff this time: ${BOT_NAME} laid no card to challenge. (With 3+ players, Freeze skips the player right after you, so they can't call your bluff - a great moment to bluff.)` },
+    resolved: { tone: 'info', title: 'Double turn done',
+      body: `Freeze skipped ${BOT_NAME} and handed you two plays in a row - you stole the tempo. It triggers once, then it's gone.` },
   },
   'shield:player': {
     play: { tone: 'action', title: 'Your turn - bluff it',
-      body: `None of your cards match the shape, so any play is a bluff. Play one face-down, then End Turn. Don't arm your Shield yet - defensive powers fire when you're challenged, so you'll use it the moment ${BOT_NAME} calls your bluff.` },
+      body: `None of your cards match the shape, so any play is a bluff. Play one face-down, then End Turn. You CAN arm your Shield now, but it's better to WAIT - defensive powers fire when you're challenged, so save it for the moment ${BOT_NAME} calls your bluff.` },
+    announce: { tone: 'danger', title: `${BOT_NAME} calls bluff!`,
+      body: `${BOT_NAME} is challenging your card. Here it comes - in a second your Shield lights up so you can block it.` },
     intro: { tone: 'danger', title: 'Caught - Shield up!',
       body: `${BOT_NAME} called your bluff! Tap your Shield (highlighted) to block the challenge completely.` },
     resolved: { tone: 'win', title: 'Blocked!',
@@ -128,19 +133,23 @@ const CLINIC_COACH = {
   },
   'mirror:player': {
     play: { tone: 'action', title: 'Your turn - bluff it',
-      body: `None of your cards match the shape, so any play is a bluff. Play one face-down, then End Turn. Don't arm your Mirror yet - defensive powers fire when you're challenged, so you'll use it the moment ${BOT_NAME} calls your bluff.` },
+      body: `None of your cards match the shape, so any play is a bluff. Play one face-down, then End Turn. You CAN arm your Mirror now, but it's better to WAIT - defensive powers fire when you're challenged, so save it for the moment ${BOT_NAME} calls your bluff.` },
+    announce: { tone: 'danger', title: `${BOT_NAME} calls bluff!`,
+      body: `${BOT_NAME} is challenging your card. Here it comes - in a second your Mirror lights up so you can reflect it.` },
     intro: { tone: 'danger', title: 'Bounce it back',
-      body: `${BOT_NAME} called your bluff! Tap your Mirror (highlighted) to reflect the spin straight back onto ${BOT_NAME} instead of you.` },
+      body: `${BOT_NAME} called your bluff! Your card didn't match, so normally YOU'd pull the trigger. Tap your Mirror (highlighted) - it reflects the penalty onto ${BOT_NAME}, so they spin instead of you.` },
     resolved: { tone: 'win', title: 'Reflected!',
-      body: `Mirror sent the spin to ${BOT_NAME} - they're on the spot now, not you. One use, then it's spent.` },
+      body: `Mirror bounced the spin onto ${BOT_NAME} - the bot that challenged you is on the spot now, not you. One use, then it's spent.` },
   },
   'swap:player': {
     play: { tone: 'action', title: 'Your turn - bluff it',
-      body: `None of your cards match the shape, so any play is a bluff. Play one face-down, then End Turn. Don't arm your Swap yet - defensive powers fire when you're challenged, so you'll use it the moment ${BOT_NAME} calls your bluff.` },
-    intro: { tone: 'danger', title: 'Swap the evidence',
-      body: `${BOT_NAME} called your bluff! Tap Swap (highlighted), then pick the matching card from the table to switch with your played card - making your play honest after all.` },
+      body: `None of your cards match the shape, so any play is a bluff. Play one face-down, then End Turn. You CAN arm your Swap now, but it's better to WAIT - defensive powers fire when you're challenged, so save it for the moment ${BOT_NAME} calls your bluff.` },
+    announce: { tone: 'danger', title: `${BOT_NAME} calls bluff!`,
+      body: `${BOT_NAME} is challenging your card. Here it comes - in a second your Swap lights up so you can switch your card.` },
+    intro: { tone: 'danger', title: 'Swap your card',
+      body: `${BOT_NAME} called your bluff! Tap Swap (highlighted), then pick the matching card on the table - it trades places with the card you played, so your play is honest now.` },
     resolved: { tone: 'win', title: 'Swapped!',
-      body: `Your played card became a match, so the bluff failed - ${BOT_NAME} spins instead. Swap re-faces your card once.` },
+      body: `Your card is a match now, so the bluff failed - ${BOT_NAME} spins, not you. Swap works once.` },
   },
   'assassin:player': {
     intro: { tone: 'action', title: 'Assassin - bait the trap',
@@ -197,6 +206,9 @@ export function clinicCardPlayLock(scenario, flags = {}) {
     return `Call ${BOT_NAME}'s bluff first - that's this drill. Don't play a card yet.`;
   }
   if ((scenario.expect === 'use_power' || scenario.expect === 'arm_then_play') && !flags.powerActivatedThisTurn) {
+    // (Module 3.1) Freeze bonus turn: the freeze is already spent, so the free
+    // second play isn't gated on arming a power.
+    if (scenario.power === 'freeze' && flags.freezeConsumed) return null;
     return `Use your ${power} first - tap it in the slot beside your hand before playing a card.`;
   }
   return null;
@@ -212,6 +224,8 @@ export function clinicEndTurnLock(scenario, flags = {}) {
     return `Use your ${power} first.`;
   }
   if (scenario.expect === 'arm_then_play' && !flags.powerActivatedThisTurn) {
+    // (Module 3.1) Freeze bonus turn — already consumed; just play + End Turn.
+    if (scenario.power === 'freeze' && flags.freezeConsumed) return null;
     return `Arm your ${power} first, then play a card and End Turn.`;
   }
   return null;
@@ -227,7 +241,16 @@ export function clinicCoachFor(scenario, ctx = {}) {
   // once the intercept window opens.
   let stepName;
   if (scenario.step === 'resolved') stepName = 'resolved';
-  else if (scenario.expect === 'play_then_defend' && entry.play && ctx.phase !== 'bluff_intercept_pending') {
+  // (Module 3.1) Freeze double-turn: once the freeze is consumed, play bounces
+  // back to the learner for a free second turn — show the "your free turn" beat.
+  else if (scenario.power === 'freeze' && ctx.freezeConsumed && entry.bonus) {
+    stepName = 'bonus';
+  } else if (scenario.expect === 'play_then_defend' && ctx.phase !== 'bluff_intercept_pending'
+    && scenario.challengeAnnounced && entry.announce) {
+    // (Module 4.1) The bot's challenge has been announced but the defend window
+    // isn't open yet — show the "bot calls bluff!" beat before the arm prompt.
+    stepName = 'announce';
+  } else if (scenario.expect === 'play_then_defend' && entry.play && ctx.phase !== 'bluff_intercept_pending') {
     stepName = 'play';
   } else stepName = 'intro';
   const tip = entry[stepName];
@@ -246,11 +269,15 @@ export function clinicCoachFor(scenario, ctx = {}) {
 // One-line "what this power does" for the per-drill briefing pop-up shown BEFORE
 // the staged instance (the learner taps "Got it" to enter it).
 const CLINIC_BRIEFING = {
-  shield: `Shield blocks a bluff called against you - completely. No spin, no risk. We'll put you in a spot where ${BOT_NAME} calls your bluff so you can use it.`,
+  // (Module 4.2) Shield is the first defensive power, so its briefing teaches how
+  // arming works for ALL of them: you CAN arm a power on your own turn (proactive),
+  // but for defensive cards it's better to wait and arm the moment you're
+  // challenged (reactive) - that way you never waste it if no challenge comes.
+  shield: `Two ways to use a power: arm it on your turn (proactive), or wait and arm it the instant you're challenged (reactive). For defence - Shield, Mirror, Swap - REACTIVE is better: don't spend it until ${BOT_NAME} actually calls your bluff. Shield then blocks that challenge completely - no spin, no risk. We'll put you in a spot where ${BOT_NAME} calls your bluff so you can try it.`,
   peek: `Peek lets you secretly look at ${BOT_NAME}'s last card before you decide. Information wins games.`,
-  freeze: `Freeze skips ${BOT_NAME}'s next turn - arm it, play a card, end your turn, and steal the tempo.`,
-  mirror: `Mirror reflects a spin back onto whoever challenged you. ${BOT_NAME} wanted you on the spot - now it is.`,
-  swap: `Swap switches your played card with one on the table, turning a caught bluff into an honest play.`,
+  freeze: `Freeze skips ${BOT_NAME}'s next turn - so play comes right back to you for a free second turn. Arm it, play a card, End Turn.`,
+  mirror: `Mirror reflects a spin back onto whoever challenged you. ${BOT_NAME} wanted you on the spot - now it is. Like Shield, hold it: arm it the moment you're challenged, not before.`,
+  swap: `Swap switches your played card with one on the table, turning a caught bluff into an honest play. Same rule as the other defensive powers - wait until you're challenged to use it.`,
   assassin: `Assassin punishes a reckless challenge: arm it, play honestly, and a wrong bluff-call eliminates the challenger outright.`,
 };
 

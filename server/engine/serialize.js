@@ -61,6 +61,9 @@ function serializeRoom(room, requestingPlayerId = null, opts = {}) {
     // replay (plain game vs the bot); the client suppresses every guide overlay.
     // Defaults true for any tutorial room that never opted out. null outside.
     tutorialCoaching: room.isTutorial ? (room.tutorialCoaching !== false) : undefined,
+    // (Module 5) True for the unguided "Just Practice with Bot" sandbox: an
+    // uncoached room where the human is the LOCAL HOST and can toggle power cards.
+    sandbox: !!room.sandbox,
     // Active scripted Power-Clinic drill (engine/tutorialScenarios.js). The
     // client coach keys off { power, actor, step } to show the before/after copy;
     // `lockBluff` disables the Call-Bluff button during own-turn drills. null
@@ -73,6 +76,10 @@ function serializeRoom(room, requestingPlayerId = null, opts = {}) {
           step: room.tutorialScenario.step || 'intro',
           lockBluff: !!room.tutorialScenario.lockBluff,
           expect: room.tutorialScenario.expect || null,
+          // (Module 4.1) Defensive drills first show a distinct "the bot is calling
+          // your bluff" beat; the client coach keys off this to announce the
+          // challenge BEFORE the defend window opens.
+          challengeAnnounced: !!room.tutorialScenario.challengeAnnounced,
           total: room.tutorialScenario.total || null,
           playerStep: room.tutorialScenario.playerStep ?? null,
           playerTotal: room.tutorialScenario.playerTotal ?? null,

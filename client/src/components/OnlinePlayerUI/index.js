@@ -141,6 +141,11 @@ export function OnlinePlayerUI({
   // Holds the setTimeout ID for the 80 ms spin-audio start delay so it can be
   // cancelled on unmount or if a second spin_result arrives before the first fires.
   const spinAudioDelayRef = useRef(null);
+  // (Module 2.3) Dedup the spin-audio START by the server's monotonic spinSeq, the
+  // same way the cylinder animation dedups (useOnlinePlayerUiController). Without
+  // this, a re-stamped / re-broadcast spin_result — seen during Mirror/Swap clinic
+  // resolution — restarts the cylinder/click SFX a second time in rapid succession.
+  const seenSpinAudioKeysRef = useRef(new Set());
   // Set when the server flips to game_over WHILE a terminal spin is still
   // animating: the victory fanfare is deferred and fired at spinComplete (below)
   // so it never plays over a live cylinder.
@@ -164,11 +169,20 @@ export function OnlinePlayerUI({
     // The old flat spin-whir (`triggerAudio('spin'/'eliminate')`) is intentionally
     // removed here; it now plays only after spinComplete (see effect below).
     if (la && la !== prevLa && la.type === 'spin_result') {
-      triggerShake();
-      const spinIndex = la.spinIndex ?? 0;
-      const finalAngle = 10 * 360 - spinIndex * 60;
-      clearTimeout(spinAudioDelayRef.current);
-      spinAudioDelayRef.current = setTimeout(() => startSpinAudio(finalAngle, 8000), 80);
+      // (Module 2.3) Start the spin SFX exactly once per spin. Key on the server's
+      // monotonic spinSeq (fall back to target+chamber) so a re-stamped/re-broadcast
+      // spin_result can't fire the cylinder/click audio twice (Mirror/Swap bug).
+      const audioKey = la.spinSeq != null
+        ? `seq:${la.spinSeq}`
+        : `${la.spinTargetId}:${JSON.stringify(la.chamber)}`;
+      if (!seenSpinAudioKeysRef.current.has(audioKey)) {
+        seenSpinAudioKeysRef.current.add(audioKey);
+        triggerShake();
+        const spinIndex = la.spinIndex ?? 0;
+        const finalAngle = 10 * 360 - spinIndex * 60;
+        clearTimeout(spinAudioDelayRef.current);
+        spinAudioDelayRef.current = setTimeout(() => startSpinAudio(finalAngle, 8000), 80);
+      }
     }
 
     // Card played — soft knock
@@ -514,6 +528,8 @@ export function OnlinePlayerUI({
         cardPlayedThisTurn,
         bluffUsedThisTurn,
         powerActivatedThisTurn: roomState?.powerActivatedThisTurn,
+        // (Module 3.1) Freeze bonus turn — don't block End Turn once it's spent.
+        freezeConsumed: !(roomState?.myPowerCardSlot || []).some((c) => c?.power === 'freeze'),
       })
     : null;
 

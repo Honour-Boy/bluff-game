@@ -100,6 +100,8 @@ function _resetForDrill(room) {
   room.powerActivatedThisTurn = false;
   room.suddenDeathCounter = 0;
   room.roundNumber = 1;
+  // (Module 4.1) Per-drill reset of the Assassin "bot calls bluff" announce beat.
+  room._clinicAssassinAnnounced = false;
 }
 
 // Does `holderId` still hold a card of `power` in their slot?
@@ -147,10 +149,15 @@ const _DRILL_DEFS = [
       room.hands.set(BOT_ID, [_shape('triangle', 5), _shape('star', 7)]);
       room.powerCardSlot[hid] = [_power('freeze')];
     },
-    // The freeze leaves the slot only when the holder ends their turn with it
-    // armed (consumeFreezeOnTurnEnd) — i.e. the skip has been queued.
+    // (Module 3.1) Double-turn drill. The freeze leaves the slot when the holder
+    // ends their turn with it armed (consumeFreezeOnTurnEnd queues the skip), and
+    // the skip bounces play straight back to the human for a free SECOND turn.
+    // So the drill is NOT done the moment the freeze is consumed — it completes
+    // only after the learner has taken that bonus turn and ended it, which
+    // advances the turn onto the (previously skipped) bot.
     complete(room) {
-      return !_holds(room, _humanId(room), 'freeze');
+      return !_holds(room, _humanId(room), 'freeze')
+        && room.turnOrder[room.currentTurnIndex] === BOT_ID;
     },
   },
 
@@ -332,6 +339,9 @@ function clinicEndTurnBlock(room) {
       break;
     case 'arm_then_play':
     case 'use_power':
+      // (Module 3.1) Freeze double-turn: once the freeze is consumed the learner
+      // takes a free second turn with no power to arm — don't gate End Turn on it.
+      if (sc.power === 'freeze' && !_holds(room, _humanId(room), 'freeze')) break;
       if (!room.powerActivatedThisTurn) return { reason: 'Use your power card first — follow the coach before ending your turn.' };
       break;
     default:
@@ -363,6 +373,9 @@ function clinicActionBlock(room, action) {
       return { reason: "Call the bot's bluff first — that's this drill. Don't play a card yet." };
     }
     if ((sc.expect === 'use_power' || sc.expect === 'arm_then_play') && !room.powerActivatedThisTurn) {
+      // (Module 3.1) Freeze bonus turn: freeze already spent, so the second card
+      // play is free — don't block it.
+      if (sc.power === 'freeze' && !_holds(room, _humanId(room), 'freeze')) return null;
       return { reason: 'Use your power card first — follow the coach before playing a card.' };
     }
   }

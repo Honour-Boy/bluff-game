@@ -286,6 +286,9 @@ export function useOnlinePlayerUiController({
     // the confirm modal — so a stray tap can never break the lesson.
     const playLock = clinicCardPlayLock(roomState?.tutorialScenario, {
       powerActivatedThisTurn: roomState?.powerActivatedThisTurn,
+      // (Module 3.1) Freeze bonus turn — the freeze has left the slot, so the free
+      // second play must not be blocked.
+      freezeConsumed: !(roomState?.myPowerCardSlot || []).some((c) => c?.power === 'freeze'),
     });
     if (playLock) {
       setClinicActionHint((h) => ({ n: h.n + 1, text: playLock }));
@@ -297,6 +300,7 @@ export function useOnlinePlayerUiController({
     isMyTurn, isPlaying, myHand, roomState?.cardPlayedThisTurn,
     roomState?.tutorialScenario?.expect, roomState?.tutorialScenario?.step,
     roomState?.tutorialScenario?.power, roomState?.powerActivatedThisTurn,
+    (roomState?.myPowerCardSlot || []).some((c) => c?.power === 'freeze'),
   ]);
 
   // §3.2 — spectating an opponent's hand is disabled (anti-cheat lockout). This

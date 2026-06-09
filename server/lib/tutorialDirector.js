@@ -31,8 +31,13 @@ const {
 // legible — the player should never feel rushed through a power.
 const DELAYS = {
   start_clinic: 2600,   // "you finished the basics round" → deal the clinic
-  open_intercept: 1400, // "the bot is challenging you…" beat before the window opens
+  announce_challenge: 1600, // (Module 4.1) "Dealer Bot calls bluff!" beat BEFORE the defend window
+  open_intercept: 1400, // beat before the arm/defend window actually opens
   resolve: 1800,        // hold on the live consequence before the explanation
+  // (Module 2.2) The clinic's final beat — the Assassin strike that eliminates the
+  // bot (= you win) — holds longer so the victory coach + Eliminated card are fully
+  // readable before the clinic-complete card / cleanup transitions.
+  resolve_victory: 4200,
 };
 
 const ALL_POWERS_ON = {
@@ -73,6 +78,9 @@ function _pendingDirectorAction(room) {
       && room.challengeableCard
       && engine.getPreviousTurnPlayerId(room) === humanId
       && engine.canInterceptBluff(room, humanId)) {
+      // (Module 4.1) Two beats: first announce the bot's challenge, THEN open the
+      // defend window — so "the bot called your bluff" reads before the arm panel.
+      if (!sc.challengeAnnounced) return { kind: 'announce_challenge', index: sc.index };
       return { kind: 'open_intercept', index: sc.index };
     }
   }
@@ -119,7 +127,14 @@ function armTutorialDirector(io, room) {
 
   _clearTutorialTimer(room.code);
   room._tutorialKey = key;
-  const delay = DELAYS[action.kind] || 1500;
+  let delay = DELAYS[action.kind] || 1500;
+  // (Module 2.2) Extend the hold on the final (Assassin) drill's resolve so the
+  // bot-elimination victory is digestible before the clinic wraps up.
+  if (action.kind === 'resolve'
+    && room.tutorialScenario
+    && room.tutorialScenario.index >= POWER_CLINIC.length - 1) {
+    delay = DELAYS.resolve_victory;
+  }
   const handle = setTimeout(() => {
     _onDirectorExpire(io, room.code, key).catch((err) => {
       console.error('[tutorialDirector] step failed', err);
@@ -196,6 +211,21 @@ async function _onDirectorExpire(io, code, key) {
     case 'start_clinic':
       _beginPowerClinic(room);
       break;
+    case 'announce_challenge': {
+      // (Module 4.1) Distinct "Dealer Bot is calling your bluff" beat shown before
+      // the defend window. Phase stays 'playing'; the client coach surfaces it via
+      // the scenario's challengeAnnounced flag.
+      const human = room.players.find(p => p && !p.isBot) || null;
+      if (room.tutorialScenario) room.tutorialScenario.challengeAnnounced = true;
+      room.lastAction = {
+        type: 'tutorial_bot_challenge',
+        accuserId: BOT_ID,
+        accuserName: BOT_NAME,
+        accusedId: human?.id || null,
+        accusedName: human?.username || null,
+      };
+      break;
+    }
     case 'open_intercept':
       _openInterceptForDefence(room);
       break;

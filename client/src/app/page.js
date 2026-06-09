@@ -95,7 +95,7 @@ function HomeContent() {
     roomCode, isHost, playerId,
     roomState, myPlayer, isMyTurn, currentPlayer,
     gameMode, error, connected, authenticated, notification,
-    createRoom, startTutorial, skipToPowers, advanceTutorial, joinRoom, startGame,
+    createRoom, startTutorial, startSandbox, skipToPowers, advanceTutorial, joinRoom, startGame,
     createGroup, listMyGroups, getGroup,
     inviteToGroup, listMyInvites, respondToInvite,
     revokeInvite, removeMember, transferHost,
@@ -564,6 +564,9 @@ function HomeContent() {
               isGroupRoom={!!roomState?.groupId}
               savedMeta={roomState?.groupSettingsMeta}
               playerCount={aliveCount}
+              // (Module 5) Sandbox: only power cards are configurable today; the
+              // rest render with a "Coming Soon" tag.
+              sandbox={!!roomState?.sandbox}
             />
           ) : roomState?.config ? (
             <LobbyConfigSummary config={roomState.config} />
@@ -669,6 +672,7 @@ function HomeContent() {
         isGuest={isGuest}
         onCreateRoom={createRoom}
         onStartTutorial={startTutorial}
+        onStartSandbox={startSandbox}
         onJoinRoom={joinRoom}
         onOpenGroups={openGroupsHome}
         onSignOut={handleSignOut}
