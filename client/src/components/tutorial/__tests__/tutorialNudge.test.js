@@ -28,7 +28,7 @@ function roomState() {
   };
 }
 
-it('centres the idle nudge over the real hand element', () => {
+it('aligns the idle nudge horizontally to the real hand element', () => {
   vi.useFakeTimers();
   Object.defineProperty(window, 'innerHeight', { value: 800, configurable: true });
 
@@ -39,7 +39,7 @@ it('centres the idle nudge over the real hand element', () => {
     </div>,
   );
 
-  // Hand fan occupies x∈[400,700] with its top at y=600.
+  // Hand fan occupies x∈[400,700].
   const hand = container.querySelector('[data-tour-id="my-hand"]');
   hand.getBoundingClientRect = () => ({
     left: 400, width: 300, top: 600, height: 84, right: 700, bottom: 684, x: 400, y: 600,
@@ -52,10 +52,12 @@ it('centres the idle nudge over the real hand element', () => {
   // carries left/bottom is its parent.
   const outer = screen.getByText(/Tap a card/i).closest('.fade-in')?.parentElement;
   expect(outer).toBeTruthy();
-  // centreX = 400 + 300/2 = 550; bottom = innerHeight - top + 8 = 800 - 600 + 8.
+  // centreX = 400 + 300/2 = 550 (horizontal alignment to the fan).
   expect(outer.style.left).toBe('550px');
-  expect(outer.style.bottom).toBe('208px');
   expect(outer.style.transform).toContain('translateX(-50%)');
+  // The nudge is now pinned to the VERY BOTTOM of the seat (a fixed bottom offset),
+  // not anchored above the cards.
+  expect(outer.style.bottom).toContain('safe-area-inset-bottom');
 });
 
 it('falls back to a fixed offset when the hand is not mounted', () => {
