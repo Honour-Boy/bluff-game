@@ -274,20 +274,20 @@ function CoachGate({ coach, isMobile, dockBottom, onOk, onHide, onReplayIntro })
         <div
           className="fade-in"
           style={{
-            width: 'min(94vw, 440px)', pointerEvents: 'auto',
+            width: 'min(92vw, 420px)', pointerEvents: 'auto',
             background: 'linear-gradient(160deg, rgba(36,31,25,0.98), rgba(22,19,16,0.98))',
             border: `1px solid ${color}`, borderLeft: `3px solid ${color}`,
             borderRadius: 'var(--radius)', boxShadow: '0 12px 38px rgba(0,0,0,0.6)',
-            padding: '14px 16px',
+            padding: '11px 14px',
           }}
         >
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8 }}>
             <div style={{
-              display: 'flex', alignItems: 'center', gap: 8, minWidth: 0,
-              fontFamily: "'Bebas Neue', sans-serif", fontSize: 17, letterSpacing: '0.06em', color,
+              display: 'flex', alignItems: 'center', gap: 7, minWidth: 0,
+              fontFamily: "'Bebas Neue', sans-serif", fontSize: 15, letterSpacing: '0.06em', color,
             }}>
               <span aria-hidden style={{
-                width: 8, height: 8, borderRadius: '50%', background: color,
+                width: 7, height: 7, borderRadius: '50%', background: color,
                 boxShadow: `0 0 8px ${color}`, flex: '0 0 auto',
                 animation: coach.tone === 'danger' || coach.tone === 'action' ? 'pulse 1.3s ease-in-out infinite' : 'none',
               }} />
@@ -297,21 +297,21 @@ function CoachGate({ coach, isMobile, dockBottom, onOk, onHide, onReplayIntro })
               onClick={onHide}
               aria-label="Hide guide"
               style={{
-                minWidth: 30, minHeight: 30, background: 'none', border: 'none',
+                minWidth: 28, minHeight: 28, background: 'none', border: 'none',
                 color: 'var(--text-dim)', cursor: 'pointer', flex: '0 0 auto',
                 display: 'flex', alignItems: 'center', justifyContent: 'center',
               }}
             >
-              <CloseIcon size={13} />
+              <CloseIcon size={12} />
             </button>
           </div>
           <div style={{
-            fontFamily: "'Crimson Text', serif", fontSize: isMobile ? 14 : 15, lineHeight: 1.6,
-            color: 'var(--text)', margin: '6px 0 14px',
+            fontFamily: "'Crimson Text', serif", fontSize: isMobile ? 13 : 14, lineHeight: 1.5,
+            color: 'var(--text)', margin: '5px 0 11px',
           }}>
             {coach.body}
           </div>
-          <button onClick={onOk} className="primary" style={{ width: '100%', minHeight: 44, fontSize: 13 }}>
+          <button onClick={onOk} className="primary" style={{ width: '100%', minHeight: 40, fontSize: 12 }}>
             OK — got it
           </button>
           <button
@@ -349,24 +349,24 @@ function CoachPill({ coach, isMobile, dockBottom, onExpand }) {
         aria-label="Show guide"
         style={{
           display: 'flex', alignItems: 'center', gap: 8, width: '100%',
-          padding: '9px 14px', cursor: 'pointer', pointerEvents: 'auto',
+          padding: '7px 12px', cursor: 'pointer', pointerEvents: 'auto',
           background: 'rgba(20,15,10,0.95)', border: `1px solid ${color}`,
           borderLeft: `3px solid ${color}`, borderRadius: 'var(--radius)',
           boxShadow: '0 6px 20px rgba(0,0,0,0.55)',
         }}
       >
         <span aria-hidden style={{
-          width: 7, height: 7, borderRadius: '50%', background: color,
+          width: 6, height: 6, borderRadius: '50%', background: color,
           boxShadow: `0 0 8px ${color}`, flex: '0 0 auto',
         }} />
         <span style={{
-          fontFamily: "'Bebas Neue', sans-serif", fontSize: 15, letterSpacing: '0.06em', color,
+          fontFamily: "'Bebas Neue', sans-serif", fontSize: 13, letterSpacing: '0.06em', color,
           overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', minWidth: 0, flex: 1, textAlign: 'left',
         }}>
           {coach.title}
         </span>
         <span aria-hidden style={{
-          fontFamily: "'Space Mono', monospace", fontSize: 9, letterSpacing: '0.1em',
+          fontFamily: "'Space Mono', monospace", fontSize: 8, letterSpacing: '0.1em',
           textTransform: 'uppercase', color: 'var(--text-dim)', flex: '0 0 auto',
         }}>
           Tap ›
@@ -429,7 +429,7 @@ function CardNudge() {
     >
       <div className="fade-in" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 1 }}>
         <div aria-hidden style={{
-          fontSize: 13, lineHeight: 1, color: 'var(--accent)',
+          fontSize: 10, lineHeight: 1, color: 'var(--accent)',
           animation: 'bobUp 1.1s ease-in-out infinite',
         }}>
           ▲
@@ -437,9 +437,9 @@ function CardNudge() {
         <div style={{
           display: 'inline-block',
           background: 'rgba(26,23,20,0.95)', border: '1px solid var(--accent)',
-          borderRadius: 999, padding: '2px 10px',
+          borderRadius: 999, padding: '1px 8px',
           boxShadow: '0 4px 14px rgba(0,0,0,0.5)',
-          fontFamily: "'Cinzel', serif", fontSize: 10, letterSpacing: '0.04em',
+          fontFamily: "'Cinzel', serif", fontSize: 8.5, letterSpacing: '0.03em',
           color: 'var(--text)', whiteSpace: 'nowrap',
         }}>
           <span style={{ color: 'var(--accent)', fontWeight: 700 }}>Tap a card</span> to play

@@ -398,7 +398,7 @@ export function coachFor(ctx = {}) {
       return {
         key: 'spectating',
         tone: 'info',
-        title: 'You’re out — watch and learn',
+        title: 'You’re out — spectate',
         body: `Spectate the rest of the round. Notice when ${BOT_NAME} plays honestly vs. bluffs.`,
       };
     }
@@ -407,7 +407,7 @@ export function coachFor(ctx = {}) {
         return {
           key: 'end-turn',
           tone: 'action',
-          title: 'Card played',
+          title: 'End your turn',
           body: `Now press End Turn to pass play to ${BOT_NAME}.`,
         };
       }
@@ -415,7 +415,7 @@ export function coachFor(ctx = {}) {
         return {
           key: 'first-play',
           tone: 'action',
-          title: 'Your turn — you lead',
+          title: 'Your lead — play a card',
           body: 'You play first this round, so there’s nothing to challenge yet. Tap a card to play it (matching the shape is the safe move).' + powerNote + turnRules,
         };
       }
@@ -423,14 +423,14 @@ export function coachFor(ctx = {}) {
         return {
           key: 'play-only',
           tone: 'action',
-          title: 'Your turn',
+          title: 'Your move — play a card',
           body: 'No card to challenge this turn — just play a card from your hand.',
         };
       }
       return {
         key: 'play-or-bluff',
         tone: 'action',
-        title: 'Your turn',
+        title: 'Your move — play or call',
         body: `Play a card that matches the shape — or, if you think ${BOT_NAME} just bluffed, hit Call Bluff to flip its card. Right → it spins. Wrong → you do.` + powerNote + turnRules,
       };
     }
@@ -438,7 +438,7 @@ export function coachFor(ctx = {}) {
     return {
       key: 'bot-turn',
       tone: 'info',
-      title: `${BOT_NAME} is playing`,
+      title: `${BOT_NAME}’s turn — watch`,
       body: `Watch what it puts down. On your next turn you can Call Bluff if you think it didn't match the shape.`,
     };
   }
