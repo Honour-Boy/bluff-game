@@ -259,12 +259,13 @@ function useDockBottom() {
 // the step. The card itself docks just above the bottom seat (expanding in place
 // from the collapsed pill), so it reads as part of the player's own controls.
 // Sits BELOW the briefing/explanation modals (9300+) and the spin overlay.
-function CoachGate({ coach, isMobile, dockBottom, onOk, onHide, onReplayIntro }) {
+function CoachGate({ coach, isMobile, dockBottom, onOk }) {
   const color = TONE_COLORS[coach.tone] || 'var(--accent)';
   const bottom = dockBottom != null ? dockBottom : (isMobile ? 168 : 188);
   return (
     <>
-      {/* Backdrop — dims + blocks all play until the learner taps OK. */}
+      {/* Backdrop — dims + blocks all play until the learner taps OK. No close
+          button: in practice the guide is always present, so OK is the only exit. */}
       <div style={{ position: 'fixed', inset: 0, zIndex: 2950, background: 'rgba(0,0,0,0.66)', pointerEvents: 'auto' }} />
       {/* Card — docked above the bottom seat, grows upward. */}
       <div style={{
@@ -281,29 +282,16 @@ function CoachGate({ coach, isMobile, dockBottom, onOk, onHide, onReplayIntro })
             padding: '11px 14px',
           }}
         >
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8 }}>
-            <div style={{
-              display: 'flex', alignItems: 'center', gap: 7, minWidth: 0,
-              fontFamily: "'Bebas Neue', sans-serif", fontSize: 15, letterSpacing: '0.06em', color,
-            }}>
-              <span aria-hidden style={{
-                width: 7, height: 7, borderRadius: '50%', background: color,
-                boxShadow: `0 0 8px ${color}`, flex: '0 0 auto',
-                animation: coach.tone === 'danger' || coach.tone === 'action' ? 'pulse 1.3s ease-in-out infinite' : 'none',
-              }} />
-              <span>{coach.title}</span>
-            </div>
-            <button
-              onClick={onHide}
-              aria-label="Hide guide"
-              style={{
-                minWidth: 28, minHeight: 28, background: 'none', border: 'none',
-                color: 'var(--text-dim)', cursor: 'pointer', flex: '0 0 auto',
-                display: 'flex', alignItems: 'center', justifyContent: 'center',
-              }}
-            >
-              <CloseIcon size={12} />
-            </button>
+          <div style={{
+            display: 'flex', alignItems: 'center', gap: 7, minWidth: 0,
+            fontFamily: "'Bebas Neue', sans-serif", fontSize: 15, letterSpacing: '0.06em', color,
+          }}>
+            <span aria-hidden style={{
+              width: 7, height: 7, borderRadius: '50%', background: color,
+              boxShadow: `0 0 8px ${color}`, flex: '0 0 auto',
+              animation: coach.tone === 'danger' || coach.tone === 'action' ? 'pulse 1.3s ease-in-out infinite' : 'none',
+            }} />
+            <span>{coach.title}</span>
           </div>
           <div style={{
             fontFamily: "'Crimson Text', serif", fontSize: isMobile ? 13 : 14, lineHeight: 1.5,
@@ -313,16 +301,6 @@ function CoachGate({ coach, isMobile, dockBottom, onOk, onHide, onReplayIntro })
           </div>
           <button onClick={onOk} className="primary" style={{ width: '100%', minHeight: 40, fontSize: 12 }}>
             OK — got it
-          </button>
-          <button
-            onClick={onReplayIntro}
-            style={{
-              background: 'none', border: 'none', padding: '8px 0 0', cursor: 'pointer', width: '100%',
-              fontFamily: "'Space Mono', monospace", fontSize: 10, letterSpacing: '0.1em',
-              textTransform: 'uppercase', color: 'var(--text-dim)', textDecoration: 'underline',
-            }}
-          >
-            Replay intro
           </button>
         </div>
       </div>
@@ -1044,8 +1022,6 @@ export function TutorialLayer({
             isMobile={isMobile}
             dockBottom={dockBottom}
             onOk={() => ackCoach(coach.key)}
-            onHide={() => { ackCoach(coach.key); setCoachHidden(true); }}
-            onReplayIntro={replayIntro}
           />
         ) : (
           // Acknowledged action beat, or a passive info/win beat — slim top-left
