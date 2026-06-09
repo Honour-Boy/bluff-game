@@ -375,6 +375,10 @@ describe('tutorialDirector', () => {
     const firstCard = room.hands.get('human')[0];
     engine.validateAndPlayCard(room, 'human', firstCard.id); // play a mismatch
     engine.advanceTurn(room); // end turn → bot's turn, human is the accused
+    // (Module 4.1) First the director announces the bot's challenge; once that
+    // beat has fired (challengeAnnounced) it opens the defend window.
+    expect(_pendingDirectorAction(room)).toEqual({ kind: 'announce_challenge', index: 0 });
+    room.tutorialScenario.challengeAnnounced = true;
     expect(_pendingDirectorAction(room)).toEqual({ kind: 'open_intercept', index: 0 });
   });
 
@@ -395,7 +399,8 @@ describe('tutorialDirector', () => {
     const firstCard = room.hands.get('human')[0];
     engine.validateAndPlayCard(room, 'human', firstCard.id);
     engine.advanceTurn(room);
-    expect(_pendingDirectorAction(room)).toEqual({ kind: 'open_intercept', index: 0 });
+    // (Module 4.1) The hand-off now begins with the challenge-announce beat.
+    expect(_pendingDirectorAction(room)).toEqual({ kind: 'announce_challenge', index: 0 });
   });
 
   it('finishes when the player advances past the last drill', () => {
@@ -461,8 +466,11 @@ describe('tutorialDirector — live beats', () => {
       await saveRoom(room);
 
       const io = makeIo();
-      await broadcastRoomState(io, room.code);  // arms open_intercept
-      await vi.advanceTimersByTimeAsync(1600);  // open_intercept (1400ms)
+      await broadcastRoomState(io, room.code);  // arms announce_challenge
+      await vi.advanceTimersByTimeAsync(1700);  // (Module 4.1) announce fires → re-broadcast arms open_intercept
+      expect(room.tutorialScenario.challengeAnnounced).toBe(true);
+      expect(room.phase).toBe('playing');       // window not open during the announce beat
+      await vi.advanceTimersByTimeAsync(1500);  // open_intercept (1400ms)
       expect(room.phase).toBe('bluff_intercept_pending');
       expect(room.pendingBluffIntercept.accusedId).toBe('human');
       expect(room.pendingBluffIntercept.options[0].power).toBe('shield');

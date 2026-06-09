@@ -108,6 +108,9 @@ function _pendingBotAction(room) {
       // bot card can't derail the staged instance. The director owns the flow.
       if (room.tutorialScenario) {
         if (room.tutorialScenario.forceBotBluff && _botCanForceBluff(room, current.id)) {
+          // (Module 4.1) Show a distinct "Dealer Bot calls bluff!" beat before the
+          // Assassin strike resolves, so the challenge reads as its own moment.
+          if (!room._clinicAssassinAnnounced) return { kind: 'force_bluff_announce', botId: current.id };
           return { kind: 'force_bluff', botId: current.id };
         }
         return null;
@@ -288,6 +291,24 @@ async function _onBotActExpire(io, code, key) {
       return;
     }
     await _resolveOnlineBluff(io, code, room, accuserId, NOOP_LEADERBOARD_REPO);
+    return;
+  }
+
+  if (action.kind === 'force_bluff_announce') {
+    // (Module 4.1) Beat 1 of the Assassin strike: announce the bot's challenge on
+    // its own, so the table reads "Dealer Bot calls bluff!" before the strike +
+    // elimination land on the next beat.
+    room._clinicAssassinAnnounced = true;
+    const human = room.players.find((p) => p && !p.isBot) || null;
+    room.lastAction = {
+      type: 'tutorial_bot_challenge',
+      accuserId: action.botId,
+      accuserName: room.players.find((p) => p.id === action.botId)?.username || null,
+      accusedId: human?.id || null,
+      accusedName: human?.username || null,
+    };
+    await saveRoom(room);
+    await broadcastRoomState(io, code);
     return;
   }
 

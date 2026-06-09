@@ -100,6 +100,8 @@ function _resetForDrill(room) {
   room.powerActivatedThisTurn = false;
   room.suddenDeathCounter = 0;
   room.roundNumber = 1;
+  // (Module 4.1) Per-drill reset of the Assassin "bot calls bluff" announce beat.
+  room._clinicAssassinAnnounced = false;
 }
 
 // Does `holderId` still hold a card of `power` in their slot?
