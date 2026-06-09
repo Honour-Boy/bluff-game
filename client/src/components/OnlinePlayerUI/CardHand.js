@@ -304,9 +304,9 @@ export function CardHand({
             background: 'linear-gradient(180deg, rgba(20,15,9,0.0) 0%, rgba(14,10,6,0.7) 100%)',
             borderTop: '2px solid var(--border-lit)',
             borderRadius: '0 0 6px 6px',
-            // Extra top room so the "drag to browse" label clears the card tops
-            // (it's absolute, top:2) instead of sitting right on them.
-            paddingTop: 18,
+            // (Module 1.2) Tightened by 6px (18→12): the absolute "drag to browse"
+            // label (top:2) now sits closer to the card rack.
+            paddingTop: 12,
             paddingBottom: 4,
           }}
         >
@@ -349,6 +349,9 @@ export function CardHand({
             style={{
               position: 'relative',
               height: fanHeight,
+              // (Module 1.1) Explicit 4px gap between the "drag to browse" nudge
+              // indicator above and the in-hand card row below.
+              paddingTop: 4,
               touchAction: 'pan-y',
               cursor: draggable ? 'grab' : 'default',
             }}
