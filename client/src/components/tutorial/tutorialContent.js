@@ -174,6 +174,29 @@ export function isDefensivePreArmLocked(scenario, phase) {
     && phase === 'playing';
 }
 
+/**
+ * Power-Clinic End-Turn gate (client mirror of the server `clinicEndTurnBlock`):
+ * the learner must do the drill's scripted action before ending their turn.
+ * Returns a coach-hint string to BLOCK End Turn, or null to allow.
+ * `flags` = { cardPlayedThisTurn, bluffUsedThisTurn, powerActivatedThisTurn }.
+ * play_then_defend needs only a card play (the End Turn button already requires
+ * that), so it returns null. Inert outside an active (intro-step) clinic drill.
+ */
+export function clinicEndTurnLock(scenario, flags = {}) {
+  if (!scenario || scenario.step === 'resolved') return null;
+  const power = scenario.power ? scenario.power[0].toUpperCase() + scenario.power.slice(1) : 'power';
+  if (scenario.expect === 'call_bluff' && !flags.bluffUsedThisTurn) {
+    return `Call ${BOT_NAME}'s bluff first — that's this drill.`;
+  }
+  if (scenario.expect === 'use_power' && !flags.powerActivatedThisTurn) {
+    return `Use your ${power} first.`;
+  }
+  if (scenario.expect === 'arm_then_play' && !flags.powerActivatedThisTurn) {
+    return `Arm your ${power} first, then play a card and End Turn.`;
+  }
+  return null;
+}
+
 export function clinicCoachFor(scenario, ctx = {}) {
   if (!scenario || !scenario.power) return null;
   const slug = `${scenario.power}:${scenario.actor || 'player'}`;
