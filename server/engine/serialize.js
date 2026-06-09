@@ -105,6 +105,10 @@ function serializeRoom(room, requestingPlayerId = null, opts = {}) {
       hasBounty: !!p.hasBounty,
       consecutiveSurvivedSpins: p.consecutiveSurvivedSpins || 0,
       consecutiveCorrectBets: p.consecutiveCorrectBets || 0,
+      // Cosmetic selections — stamped at room-join from the player's profile.
+      // Defaults to the free items when the player hasn't customised yet.
+      gunSkin:  p.gunSkin  || 'gun_default',
+      cardBack: p.cardBack || 'card_default',
     })),
     turnOrder: room.turnOrder,
     currentTurnIndex: room.currentTurnIndex,

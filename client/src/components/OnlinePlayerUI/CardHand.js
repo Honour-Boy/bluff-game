@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { ShapeIcon } from '../shared/ShapeIcon';
 import { POWER_META, POWER_ICONS } from '../shared/PowerCard';
+import { cardBackAccent } from '../../lib/cosmetics';
 
 const CARD_W = 58;
 const CARD_H = 84;
@@ -10,7 +11,7 @@ const CARD_H = 84;
 // the shared-pivot fan. When null (power slot) the card renders upright in flow.
 function renderOneCard({
   card, index, isSelected, isJustPlayed = false, interactive, powerInteractive,
-  onCardClick, onPowerCardClick, arc = null,
+  onCardClick, onPowerCardClick, arc = null, cardBackColor = null,
 }) {
   const isPower = card.type === 'power';
   const isWhot = !isPower && card.shape === 'whot';
@@ -70,7 +71,7 @@ function renderOneCard({
       ? 'var(--accent)'
       : isSelected
         ? 'var(--accent)'
-        : 'var(--border-lit)';
+        : (cardBackColor || 'var(--border-lit)');
 
   const boxShadow = isSelected
     ? '0 16px 32px rgba(0,0,0,0.75), 0 0 18px rgba(240,181,74,0.32)'
@@ -218,7 +219,10 @@ export function CardHand({
   justPlayedCardId = null,
   // (Module 2.2) shorter fan area on compact/mobile docks.
   fanHeight = 128,
+  // Cosmetic — card back accent color from the player's profile.
+  cardBackId = null,
 }) {
+  const cardBackColor = cardBackAccent(cardBackId || 'card_default');
   const shapeCards = hand.filter((c) => c?.type !== 'power');
   const n = shapeCards.length;
 
@@ -354,6 +358,7 @@ export function CardHand({
                   scale: 1 + centredness * 0.06,
                   z: Math.round(centredness * 100) + 1,
                 },
+                cardBackColor,
               });
             })}
           </div>

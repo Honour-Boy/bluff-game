@@ -4,6 +4,7 @@
 
 const engine = require('../gameEngine');
 const { isPersistentUserId } = require('../groupsRepo');
+const { computeAllXpAwards } = require('../engine/xp');
 
 function getGroupAuthError(socket) {
   if (!socket.userId) return 'Not authenticated';
@@ -87,10 +88,45 @@ async function maybeRecordGroupWinner(io, room, leaderboardRepo) {
   }
 }
 
+/**
+ * Award XP to every eligible player at game_over.
+ * - Idempotent via room.xpAwarded flag.
+ * - Skips tutorial rooms, physical mode, and bots/guests.
+ * - `xpRepo` can be omitted; it falls back to the production singleton
+ *   via a deferred require (same lazy-load pattern as lib/bots.js uses for
+ *   broadcast), so deep call chains (orchestration → spin pipeline) don't
+ *   need to thread the repo explicitly. Pass a mock in tests.
+ */
+async function maybeAwardGameXp(room, xpRepo) {
+  if (!room || room.isTutorial) return;
+  if (room.phase !== 'game_over') return;
+  if (room.xpAwarded) return;     // only once per game
+
+  // Resolve the repo: prefer the explicit arg, fall back to the singleton.
+  const repo = xpRepo || (() => {
+    try { return require('./supabaseClient').defaultXpRepo; } catch (_) { return null; }
+  })();
+  if (!repo) return;
+
+  room.xpAwarded = true;          // stamp BEFORE async work to prevent double-award
+
+  const awards = computeAllXpAwards(room);
+  if (awards.length === 0) return;
+
+  await Promise.all(
+    awards.map(({ userId, xpEarned }) =>
+      xpRepo.awardXp(userId, xpEarned).catch(err =>
+        console.error('[xp] failed to award XP to', userId, err)
+      )
+    )
+  );
+}
+
 module.exports = {
   getGroupAuthError,
   buildAdHocRoom,
   buildPersistentGroupRoom,
   getWinnerFromRoom,
   maybeRecordGroupWinner,
+  maybeAwardGameXp,
 };

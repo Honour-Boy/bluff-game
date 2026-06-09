@@ -1,10 +1,13 @@
+import { gunSkinStyle } from '../../lib/cosmetics';
+
 const CYL = 200;
 const CX = 100;
 const CY = 100;
 const ORBIT = 58;
 const CHAM_R = 20;
 
-function CylinderSVG({ bulletChambers, bulletChambersAfter, eliminated, landingChamberIndex, rotation, animating, spinComplete }) {
+function CylinderSVG({ bulletChambers, bulletChambersAfter, eliminated, landingChamberIndex, rotation, animating, spinComplete, gunSkin }) {
+  const skinStyle = gunSkinStyle(gunSkin || 'gun_default');
   // While the cylinder is spinning we show the PRE-spin bullets (you watch the
   // round come up). Once it stops, swap to the POST-spin chamber so any bullets
   // a survival just added (always +1, +2 under Hot Potato) visibly pop in (#238).
@@ -24,7 +27,7 @@ function CylinderSVG({ bulletChambers, bulletChambersAfter, eliminated, landingC
   });
 
   return (
-    <div style={{ position: 'relative', width: CYL, height: CYL }}>
+    <div style={{ position: 'relative', width: CYL, height: CYL, filter: skinStyle.filter || undefined }}>
       <svg width={CYL} height={CYL} style={{ position: 'absolute', top: 0, left: 0, pointerEvents: 'none', zIndex: 2 }}>
         <polygon
           points={`${CX},${CY - ORBIT - CHAM_R + 2} ${CX - 9},${CY - ORBIT - CHAM_R - 14} ${CX + 9},${CY - ORBIT - CHAM_R - 14}`}
@@ -89,6 +92,7 @@ export function SpinOverlay({
   isSpinTarget,
   acknowledgeSpinResult,
   isTutorial = false,
+  gunSkin,
 }) {
   if (!spinData) return null;
 
@@ -128,6 +132,7 @@ export function SpinOverlay({
         rotation={cylinderRotation}
         animating={cylinderAnimating}
         spinComplete={spinComplete}
+        gunSkin={gunSkin}
       />
 
       {spinComplete && (

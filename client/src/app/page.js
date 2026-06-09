@@ -127,6 +127,8 @@ function HomeContent() {
     ghostVote,
     lastStandSpin,
     lastStandEndTurn,
+    getProfileData,
+    setCosmetic,
   } = game;
 
   // ─── Section-based background music (#A) ──────────────────────────
@@ -540,6 +542,8 @@ function HomeContent() {
         onSignOut={handleSignOut}
         onSignOutGuest={handleSignOutGuest}
         onUpdateUsername={updateUsername}
+        getProfileData={!isGuest ? getProfileData : undefined}
+        setCosmetic={!isGuest ? setCosmetic : undefined}
         // ── In-room controls (Module 2) — only inside an online room ──
         inRoom={inRoomOnline}
         chatUnread={chatUnread}

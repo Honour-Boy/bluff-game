@@ -28,12 +28,21 @@ const {
   buildAdHocRoom,
   buildPersistentGroupRoom,
   maybeRecordGroupWinner,
+  maybeAwardGameXp,
 } = require('../lib/roomBuilders');
 const { resolveLeaverPendingPauses } = require('../lib/orchestration');
 const { discardLobbyIdleState } = require('../lib/idleSweep');
 
+// Stamp a player object with the socket's cached cosmetics (set at
+// authenticate time by handlers/auth.js). Falls back to the defaults
+// so the room is always fully populated even if the cache missed.
+function _stampCosmetics(player, socket) {
+  player.gunSkin  = socket.cosmeticsCache?.gunSkin  || 'gun_default';
+  player.cardBack = socket.cosmeticsCache?.cardBack || 'card_default';
+}
+
 function register(io, socket, deps) {
-  const { groupsRepo, groupSettingsRepo, leaderboardRepo } = deps;
+  const { groupsRepo, groupSettingsRepo, leaderboardRepo, xpRepo } = deps;
 
   // ─── HOST: Create a new room ─────────────────────────────
   socket.on('create_room', async ({ mode, config } = {}, callback) => {
@@ -56,6 +65,7 @@ function register(io, socket, deps) {
 
       if (roomMode === engine.MODES.ONLINE) {
         const player = engine.createPlayer(socket.userId, socket.username, socket.id);
+        _stampCosmetics(player, socket);
         room.players.push(player);
         await saveRoom(room);
         callback({ success: true, roomCode: room.code, isHost: true, mode: roomMode, playerId: socket.userId });
@@ -109,6 +119,7 @@ function register(io, socket, deps) {
       // Seat the human as a normal player — NOT the host. A newbie shouldn't hold
       // the room controls; the bot "hosts" the table and the server drives it.
       const human = engine.createPlayer(socket.userId, socket.username, socket.id);
+      _stampCosmetics(human, socket);
       room.players.push(human);
 
       // Seat the practice bot. The id is namespaced so it can never collide with
@@ -204,6 +215,7 @@ function register(io, socket, deps) {
           return callback({ success: false, error: 'That name is already taken in this room.' });
         }
         player = engine.createPlayer(socket.userId, socket.username, socket.id);
+        _stampCosmetics(player, socket);
         room.players.push(player);
         console.log(`[Room ${code}] Joined: ${player.username}`);
       }
@@ -422,6 +434,7 @@ function register(io, socket, deps) {
         if (gameOverWinner) {
           room.phase = 'game_over';
           room.lastAction = { type: 'game_over', winnerId: gameOverWinner.id, winnerName: gameOverWinner.username };
+          await maybeAwardGameXp(room, xpRepo);
           await maybeRecordGroupWinner(io, room, leaderboardRepo);
         }
       } else {
@@ -565,6 +578,7 @@ function register(io, socket, deps) {
         if (gameOverWinner) {
           room.phase = 'game_over';
           room.lastAction = { type: 'game_over', winnerId: gameOverWinner.id, winnerName: gameOverWinner.username };
+          await maybeAwardGameXp(room, xpRepo);
           await maybeRecordGroupWinner(io, room, leaderboardRepo);
         }
       }

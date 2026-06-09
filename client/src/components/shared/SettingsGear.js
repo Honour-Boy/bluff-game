@@ -124,6 +124,9 @@ export function SettingsGear({
   onSignOut,
   onSignOutGuest,
   onUpdateUsername,
+  // ── Profile / cosmetics ───────────────────────────────────────────────────
+  getProfileData,
+  setCosmetic,
   // ── In-room game controls (Module 2) ──────────────────────────────────────
   // Ported here from the old bottom-right FAB. Rendered ONLY when `inRoom` is
   // true (i.e. the client is in a lobby OR an active game). Outside a room every
@@ -391,6 +394,8 @@ export function SettingsGear({
           username={username}
           onUpdateUsername={onUpdateUsername}
           onClose={() => setShowProfile(false)}
+          getProfileData={getProfileData}
+          setCosmetic={setCosmetic}
         />
       )}
     </>

@@ -15,6 +15,7 @@ export function CoreGameOverlays({
   cylinderAnimating,
   isSpinTarget,
   acknowledgeSpinResult,
+  spinTargetGunSkin,
   pendingCard,
   setPendingCard,
   whotPickerCard,
@@ -59,6 +60,7 @@ export function CoreGameOverlays({
         isSpinTarget={isSpinTarget}
         acknowledgeSpinResult={acknowledgeSpinResult}
         isTutorial={isTutorial}
+        gunSkin={spinTargetGunSkin}
       />
 
       {pendingCard && (

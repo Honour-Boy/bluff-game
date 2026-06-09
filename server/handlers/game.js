@@ -16,7 +16,7 @@ const {
 } = require('../lib/state');
 const { broadcastRoomState } = require('../lib/broadcast');
 const { socketRateLimit } = require('../lib/rateLimiter');
-const { maybeRecordGroupWinner } = require('../lib/roomBuilders');
+const { maybeRecordGroupWinner, maybeAwardGameXp } = require('../lib/roomBuilders');
 const { runMirrorMatchSpin, resolvePendingGameOver, beginRedemption } = require('../lib/orchestration');
 const { _beginPowerClinic, advanceClinic } = require('../lib/tutorialDirector');
 
@@ -94,7 +94,7 @@ function schedulePreGameSelectionOpen(io, code) {
 }
 
 function register(io, socket, deps) {
-  const { groupSettingsRepo, leaderboardRepo } = deps;
+  const { groupSettingsRepo, leaderboardRepo, xpRepo } = deps;
 
   // ─── HOST: Start the game ─────────────────────────────────
   socket.on('start_game', async ({ roomCode } = {}, callback) => {
@@ -344,6 +344,7 @@ function register(io, socket, deps) {
       if (gameOverWinner) {
         room.phase = 'game_over';
         room.lastAction = { type: 'game_over', winnerId: gameOverWinner.id, winnerName: gameOverWinner.username };
+        await maybeAwardGameXp(room, xpRepo);
         await maybeRecordGroupWinner(io, room, leaderboardRepo);
       }
 
@@ -494,7 +495,8 @@ function register(io, socket, deps) {
             winnerId: playerId,
             winnerName: winner?.username || null,
           };
-          await maybeRecordGroupWinner(io, room, leaderboardRepo);
+          await maybeAwardGameXp(room, xpRepo);
+        await maybeRecordGroupWinner(io, room, leaderboardRepo);
           await saveRoom(room);
           await broadcastRoomState(io, code);
           return callback({ success: true, gameOver: true });
@@ -521,6 +523,7 @@ function register(io, socket, deps) {
       if (gameOverWinner) {
         room.phase = 'game_over';
         room.lastAction = { type: 'game_over', winnerId: gameOverWinner.id, winnerName: gameOverWinner.username };
+        await maybeAwardGameXp(room, xpRepo);
         await maybeRecordGroupWinner(io, room, leaderboardRepo);
       }
 
@@ -593,4 +596,4 @@ function register(io, socket, deps) {
   });
 }
 
-module.exports = { register };
+module

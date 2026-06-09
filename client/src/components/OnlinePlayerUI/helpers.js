@@ -127,9 +127,10 @@ export const GAME_UI_STYLE = `
     border-radius: 50%;
     background:
       radial-gradient(ellipse 56% 44% at 50% 38%, rgba(220,164,76,0.18) 0%, rgba(220,164,76,0.05) 42%, transparent 72%),
-      radial-gradient(ellipse 82% 72% at 50% 50%, #2f5e3f 0%, #245132 36%, #18391f 64%, #0e2415 84%, #0a1a10 100%);
+      radial-gradient(ellipse 82% 72% at 50% 50%, var(--felt-bg, #2f5e3f) 0%, var(--felt-edge, #245132) 36%, color-mix(in srgb, var(--felt-bg, #2f5e3f) 50%, #000) 64%, color-mix(in srgb, var(--felt-bg, #2f5e3f) 28%, #000) 84%, #0a1a10 100%);
     box-shadow: inset 0 0 56px rgba(0,0,0,0.55), inset 0 7px 24px rgba(0,0,0,0.45);
     pointer-events: none;
+    transition: background 0.5s ease;
   }
   .poker-table-stitch {
     position: absolute;

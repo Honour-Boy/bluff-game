@@ -24,12 +24,12 @@ const {
   saveRoom,
 } = require('../lib/state');
 const { broadcastRoomState, emitPowerCardEvents } = require('../lib/broadcast');
-const { maybeRecordGroupWinner } = require('../lib/roomBuilders');
+const { maybeRecordGroupWinner, maybeAwardGameXp } = require('../lib/roomBuilders');
 const { applyBluffOutcome } = require('../lib/orchestration');
 const { discardLobbyIdleState } = require('../lib/idleSweep');
 
 function register(io, socket, deps) {
-  const { leaderboardRepo } = deps;
+  const { leaderboardRepo, xpRepo } = deps;
 
   socket.on('disconnect', async () => {
     console.log(`[Socket] Disconnected: ${socket.id}`);
@@ -132,7 +132,8 @@ function register(io, socket, deps) {
           if (winner) {
             room.phase = 'game_over';
             room.lastAction = { type: 'game_over', winnerId: winner.id, winnerName: winner.username };
-            await maybeRecordGroupWinner(io, room, leaderboardRepo);
+            await maybeAwardGameXp(room, xpRepo);
+        await maybeRecordGroupWinner(io, room, leaderboardRepo);
           }
           await saveRoom(room);
           await broadcastRoomState(io, code);

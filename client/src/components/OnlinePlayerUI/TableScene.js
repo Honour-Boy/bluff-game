@@ -1,5 +1,6 @@
 import { motion } from 'framer-motion';
 import { CenterTablePanel } from './CenterTablePanel';
+import { feltVars } from '../../lib/cosmetics';
 
 // ─── TableScene — a medium, fixed-size card table on a pannable canvas ────────
 // (Module 1) The whole board — the fixed oval felt, the dealer's tray, and the
@@ -191,7 +192,7 @@ export function TableScene({
               }}
             >
               <div className="poker-table-studs" />
-              <div className="poker-table-felt">
+              <div className="poker-table-felt" style={feltVars(myPlayer?.tableFelt)}>
                 <div className="poker-table-stitch" />
               </div>
             </div>

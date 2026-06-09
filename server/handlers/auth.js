@@ -16,7 +16,8 @@ const {
   GUEST_USERNAME_MAX,
 } = require('../lib/guestAuth');
 
-function register(io, socket) {
+function register(io, socket, ctx) {
+  const cosmeticsRepo = ctx?.cosmeticsRepo || null;
   // ─── AUTHENTICATE socket with Supabase JWT or guest ──────
   // Must be called once after connecting, before any game events.
   socket.on('authenticate', async ({ token, guest } = {}, callback) => {
@@ -70,6 +71,15 @@ function register(io, socket) {
         || data.user.user_metadata?.full_name
         || data.user.email?.split('@')[0]
         || 'Player';
+
+      // Pre-fetch cosmetics so room-join can stamp them onto the player
+      // object without a blocking DB round-trip. Fire-and-forget; cosmetics
+      // fall back to defaults if the load fails.
+      if (cosmeticsRepo) {
+        cosmeticsRepo.getCosmetics(socket.userId)
+          .then(c => { socket.cosmeticsCache = c; })
+          .catch(() => {});
+      }
 
       callback?.({ success: true });
     } catch (err) {

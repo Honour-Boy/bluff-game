@@ -28,7 +28,7 @@ function buildLiveRoom(groupId) {
 }
 
 function register(io, socket, deps) {
-  const { groupsRepo, leaderboardRepo } = deps;
+  const { groupsRepo, leaderboardRepo, xpRepo } = deps;
 
   socket.on('create_group', async ({ name } = {}, callback) => {
     try {
@@ -198,7 +198,8 @@ function register(io, socket, deps) {
         if (winner) {
           room.phase = 'game_over';
           room.lastAction = { type: 'game_over', winnerId: winner.id, winnerName: winner.username };
-          await maybeRecordGroupWinner(io, room, leaderboardRepo);
+          await maybeAwardGameXp(room, xpRepo);
+        await maybeRecordGroupWinner(io, room, leaderboardRepo);
         }
       }
 

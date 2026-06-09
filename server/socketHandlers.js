@@ -14,6 +14,8 @@ const {
   defaultGroupsRepo,
   defaultGroupSettingsRepo,
   defaultLeaderboardRepo,
+  defaultXpRepo,
+  defaultCosmeticsRepo,
 } = require('./lib/supabaseClient');
 const {
   rooms,
@@ -48,12 +50,15 @@ const systemsHandlers = require('./handlers/systems');
 const chatHandlers = require('./handlers/chat');
 const voiceHandlers = require('./handlers/voice');
 const disconnectHandlers = require('./handlers/disconnect');
+const cosmeticsHandlers = require('./handlers/cosmetics');
 
 function registerSocketHandlers(io, socket, deps = {}) {
   const ctx = {
     groupsRepo: deps.groupsRepo || defaultGroupsRepo,
     groupSettingsRepo: deps.groupSettingsRepo || defaultGroupSettingsRepo,
     leaderboardRepo: deps.leaderboardRepo || defaultLeaderboardRepo,
+    xpRepo: deps.xpRepo || defaultXpRepo,
+    cosmeticsRepo: deps.cosmeticsRepo || defaultCosmeticsRepo,
   };
 
   // Idempotent: runs once on first connection, no-ops thereafter.
@@ -81,6 +86,7 @@ function registerSocketHandlers(io, socket, deps = {}) {
   chatHandlers.register(io, socket, ctx);
   voiceHandlers.register(io, socket, ctx);
   disconnectHandlers.register(io, socket, ctx);
+  cosmeticsHandlers.register(io, socket, ctx);
 }
 
 module.exports = {
