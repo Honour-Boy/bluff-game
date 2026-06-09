@@ -528,6 +528,8 @@ export function OnlinePlayerUI({
         cardPlayedThisTurn,
         bluffUsedThisTurn,
         powerActivatedThisTurn: roomState?.powerActivatedThisTurn,
+        // (Module 3.1) Freeze bonus turn — don't block End Turn once it's spent.
+        freezeConsumed: !(roomState?.myPowerCardSlot || []).some((c) => c?.power === 'freeze'),
       })
     : null;
 

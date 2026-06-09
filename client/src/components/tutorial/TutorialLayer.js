@@ -857,7 +857,12 @@ export function TutorialLayer({
   // thing on screen is the spin result → "Eliminated" card → (then) the clinic.
   if (!modalUp && !isLobby && !holdClinic) {
     if (clinicComplete) coach = CLINIC_COMPLETE_COACH;
-    else if (scenario) coach = clinicCoachFor(scenario, { phase });
+    else if (scenario) coach = clinicCoachFor(scenario, {
+      phase,
+      // (Module 3.1) Freeze double-turn: the freeze has left the slot once spent,
+      // which switches the coach to the "your free turn" beat.
+      freezeConsumed: !(roomState?.myPowerCardSlot || []).some((c) => c?.power === 'freeze'),
+    });
     else if (lesson !== 'powers' && (phase === 'game_over' || phase === 'round_end')) {
       coach = BASICS_HANDOFF_COACH;
     } else coach = coachFor(coachContextFromRoom(roomState, myPlayerId));
