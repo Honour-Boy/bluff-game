@@ -492,8 +492,10 @@ body.phase-spin-pending::after {
 /* ─── Dismissal "X" badge (Module 6) ────────────────────────────────────────
    Every modal/dropdown/popup close control renders a raw literal uppercase "X"
    (a plain Latin letter — unlike the ✕/× dingbats it always renders in the
-   display fonts). High-contrast white-on-red so it can never blend into a modal
-   surface, with a darker-red hover. */
+   display fonts). High-contrast white-on-crimson so it can never blend into a
+   modal surface. Uses the Smoke & Amber danger tokens (deep crimson base,
+   lighting up to warm ember on hover) rather than an off-palette flat red, so
+   the badge belongs to the tavern UI instead of reading as a foreign chip. */
 .bluff-close-x {
   display: inline-flex;
   align-items: center;
@@ -501,7 +503,7 @@ body.phase-spin-pending::after {
   width: 24px;
   height: 24px;
   border-radius: 6px;
-  background: #c0392b;
+  background: var(--accent2);
   color: #ffffff;
   font-family: ui-sans-serif, system-ui, -apple-system, sans-serif;
   font-weight: 800;
@@ -510,7 +512,7 @@ body.phase-spin-pending::after {
   user-select: none;
   transition: background 0.15s ease;
 }
-.bluff-close-x:hover { background: #a93226; }
+.bluff-close-x:hover { background: var(--ember); }
 
 /* ─── Reduced-motion safety ─────────────────────────────────────────────────── */
 @media (prefers-reduced-motion: reduce) {

@@ -14,3 +14,6 @@ supabase/.env
 
 # Playwright MCP snapshot artifacts (runtime-only)
 .playwright-mcp/
+
+# Local-only working docs (roadmap + engineering notes; not version-controlled)
+docs/
