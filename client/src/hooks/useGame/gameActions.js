@@ -43,14 +43,15 @@ export function useGameActions({
   // returns the same { roomCode, isHost, playerId } shape); gameMode then derives
   // from the room_state broadcast like any online room, so the player lands in
   // the lobby with the bot already seated.
-  const startTutorial = useCallback((lesson = 'basics') => {
-    socket.emit('create_tutorial_room', { lesson }, (res) => {
+  const startTutorial = useCallback((lesson = 'basics', opts = {}) => {
+    // (Module 5) `sandbox:true` → the unguided "Just Practice with Bot" room: an
+    // uncoached game vs the bot where the human is the LOCAL HOST (so isHost is
+    // true and they get the host controls + config). Coached basics/powers keep
+    // the human as a non-host player (the bot hosts the guided table).
+    socket.emit('create_tutorial_room', { lesson, sandbox: !!opts.sandbox }, (res) => {
       if (res?.success) {
         setError(null);
         setRoomCode(res.roomCode);
-        // The bot "hosts" a practice table — the human is a non-host player, so
-        // they get no host controls. They still start their own game via the
-        // tutorial "Begin practice" button (server-side start_game bypass).
         setIsHost(!!res.isHost);
         if (res.playerId) setPlayerId(res.playerId);
       } else {
@@ -58,6 +59,9 @@ export function useGameActions({
       }
     });
   }, [setError, setIsHost, setPlayerId, setRoomCode, socket]);
+
+  // (Module 5) Convenience wrapper for the landing "Just Practice with Bot" entry.
+  const startSandbox = useCallback(() => startTutorial('basics', { sandbox: true }), [startTutorial]);
 
   // Tutorial — in-room "Skip to Power Cards": server jumps straight to the clinic.
   const skipToPowers = useCallback(() => {
@@ -293,6 +297,7 @@ export function useGameActions({
   return {
     createRoom,
     startTutorial,
+    startSandbox,
     skipToPowers,
     advanceTutorial,
     joinRoom,

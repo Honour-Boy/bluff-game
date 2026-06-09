@@ -53,6 +53,7 @@ export function LandingScreen({
   isGuest = false,
   onCreateRoom,
   onStartTutorial,
+  onStartSandbox,
   onJoinRoom,
   onOpenGroups,
   onSignOut,
@@ -351,6 +352,37 @@ export function LandingScreen({
                     NEW
                   </span>
                 ) : null}
+              </PlaqueButton>
+            )}
+
+            {/* (Module 5) Unguided sandbox — only once the coached tutorial is done.
+                A plain game vs the bot with local-host controls (toggle power cards),
+                no coaching. */}
+            {onStartSandbox && tutorialEnabled && tutorialDone && (
+              <PlaqueButton
+                onClick={() => { setError(null); onStartSandbox?.(); }}
+                disabled={!connected}
+                style={{ flexWrap: 'nowrap', whiteSpace: 'nowrap' }}
+              >
+                {/* Bot / chip icon */}
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" aria-hidden="true" style={{ flexShrink: 0 }}>
+                  <rect x="4" y="8" width="16" height="11" rx="2" stroke="currentColor" strokeWidth="1.8"/>
+                  <path d="M12 4v4M9 13h.01M15 13h.01" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"/>
+                </svg>
+                <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', minWidth: 0 }}>
+                  Just Practice with Bot
+                </span>
+                <span
+                  title="A free, unguided game vs the bot - your rules"
+                  style={{
+                    flexShrink: 0, padding: '2px 7px', borderRadius: 999,
+                    background: 'var(--surface3)', color: 'var(--accent)',
+                    fontFamily: "'Space Mono', monospace", fontSize: 9,
+                    letterSpacing: '0.1em', fontWeight: 700,
+                  }}
+                >
+                  SANDBOX
+                </span>
               </PlaqueButton>
             )}
 
