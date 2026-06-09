@@ -32,6 +32,10 @@ const {
 const BOT_MOVE_DELAY_MS = 1100; // play a card / end the turn
 const BOT_SPIN_DELAY_MS = 1500; // pause on "<bot> is on the spot" before spinning
 const BOT_INTERCEPT_DELAY_MS = 700; // brief "deciding" beat before auto-passing a bluff intercept
+// (Module 2.1) In the Power Clinic, the bot's spin (e.g. a reflected Mirror/Swap
+// spin) waits much longer so the learner can read the expanded coach before the
+// cylinder turns. Clinic-only (lesson 'powers'); Basics keeps the snappy beat.
+const CLINIC_BOT_SPIN_DELAY_MS = 10000;
 
 // Tutorial rooms are never group rooms (room.groupId is null), so the leaderboard
 // repo handed to the spin pipeline is never actually invoked — every call site
@@ -156,8 +160,12 @@ function armBotTurn(io, room) {
 
   _clearBotTimer(code);
   room._botActionKey = key;
+  // (Module 2.1) Clinic spins get a long read-the-coach pause; everything else
+  // keeps its normal human-legible beat.
+  const isClinicSpin = action.kind === 'spin'
+    && room.isTutorial && room.tutorialLesson === 'powers';
   const delay = action.kind === 'spin'
-    ? BOT_SPIN_DELAY_MS
+    ? (isClinicSpin ? CLINIC_BOT_SPIN_DELAY_MS : BOT_SPIN_DELAY_MS)
     : action.kind === 'intercept_pass'
       ? BOT_INTERCEPT_DELAY_MS
       : BOT_MOVE_DELAY_MS;

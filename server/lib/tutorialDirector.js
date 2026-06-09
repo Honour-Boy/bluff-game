@@ -33,6 +33,10 @@ const DELAYS = {
   start_clinic: 2600,   // "you finished the basics round" → deal the clinic
   open_intercept: 1400, // "the bot is challenging you…" beat before the window opens
   resolve: 1800,        // hold on the live consequence before the explanation
+  // (Module 2.2) The clinic's final beat — the Assassin strike that eliminates the
+  // bot (= you win) — holds longer so the victory coach + Eliminated card are fully
+  // readable before the clinic-complete card / cleanup transitions.
+  resolve_victory: 4200,
 };
 
 const ALL_POWERS_ON = {
@@ -119,7 +123,14 @@ function armTutorialDirector(io, room) {
 
   _clearTutorialTimer(room.code);
   room._tutorialKey = key;
-  const delay = DELAYS[action.kind] || 1500;
+  let delay = DELAYS[action.kind] || 1500;
+  // (Module 2.2) Extend the hold on the final (Assassin) drill's resolve so the
+  // bot-elimination victory is digestible before the clinic wraps up.
+  if (action.kind === 'resolve'
+    && room.tutorialScenario
+    && room.tutorialScenario.index >= POWER_CLINIC.length - 1) {
+    delay = DELAYS.resolve_victory;
+  }
   const handle = setTimeout(() => {
     _onDirectorExpire(io, room.code, key).catch((err) => {
       console.error('[tutorialDirector] step failed', err);
