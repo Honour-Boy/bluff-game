@@ -76,7 +76,7 @@ function register(io, socket, deps) {
   // server-side bot driver (lib/bots.js). Powers / modifiers / systems are all
   // OFF (the all-false defaultRoomConfig), and at 2 players no secret roles are
   // assigned, so the room teaches the clean core loop. Works for guests too.
-  socket.on('create_tutorial_room', async ({ lesson } = {}, callback) => {
+  socket.on('create_tutorial_room', async ({ lesson, sandbox } = {}, callback) => {
     if (!socket.userId) return callback?.({ success: false, error: 'Not authenticated' });
     if (!socketRateLimit(socket, 'create_tutorial_room', 5, 60_000).allowed) {
       return callback?.({ success: false, error: 'Rate limit exceeded' });
@@ -89,17 +89,25 @@ function register(io, socket, deps) {
       // a bluff) — so the player learns to hold, activate, and defend with one.
       // startGame guarantees each seat at least one power card. Roles/modifiers
       // stay off (secret roles need 3+ seats AND bot prompt-handling — deferred).
+      const isSandbox = sandbox === true;
       const chosenLesson = lesson === 'powers' ? 'powers' : 'basics';
       let config = null;
-      if (chosenLesson === 'powers') {
+      if (!isSandbox && chosenLesson === 'powers') {
         config = engine.defaultRoomConfig();
         config.powerCards.enabled.peek = true;
         config.powerCards.enabled.shield = true;
       }
+      // (Module 5) Sandbox = unguided free play vs the bot. Powers start OFF (the
+      // local-host learner toggles them in the lobby). NOTE: the practice bot has
+      // no power-play logic outside the scripted clinic, so a powers-on free game
+      // can stall on a bot left holding only power cards — see handoff follow-up.
 
       const room = await buildAdHocRoom(socket, engine.MODES.ONLINE, config, groupsRepo);
       room.isTutorial = true;
       room.tutorialLesson = chosenLesson;
+      // (Module 5) Sandbox is uncoached — the client suppresses every guide overlay
+      // (the existing `coachingOff` path in TutorialLayer).
+      if (isSandbox) { room.tutorialCoaching = false; room.sandbox = true; }
       room.cardPlayedThisTurn = false;
       room.bluffUsedThisTurn = false;
       room.powerActivatedThisTurn = false;
@@ -122,21 +130,29 @@ function register(io, socket, deps) {
       // and routes every host-gated event away from the human. The learner can
       // still start the game via the tutorial bypass in `start_game`, and the
       // human dropping is torn down by the tutorial paths in leave_room/disconnect.
-      room.hostUserId = bot.id;
-      room.hostSocketId = null;
+      if (isSandbox) {
+        // (Module 5) Local host privileges: the learner owns config + Start in the
+        // sandbox (so they can toggle power cards into the deck).
+        room.hostUserId = socket.userId;
+        room.hostSocketId = socket.id;
+      } else {
+        room.hostUserId = bot.id;
+        room.hostSocketId = null;
+      }
 
       await saveRoom(room);
       socket.join(room.code);
-      console.log(`[Room ${room.code}] Tutorial (${chosenLesson}) created by ${socket.username} (vs Dealer Bot)`);
+      console.log(`[Room ${room.code}] ${isSandbox ? 'Sandbox' : `Tutorial (${chosenLesson})`} created by ${socket.username} (vs Dealer Bot)`);
 
       callback?.({
         success: true,
         roomCode: room.code,
-        isHost: false, // the bot hosts the practice table; the human is a player
+        isHost: isSandbox, // sandbox: the human is local host; basics/powers: the bot hosts
         mode: engine.MODES.ONLINE,
         playerId: socket.userId,
         isTutorial: true,
         lesson: chosenLesson,
+        sandbox: isSandbox,
       });
 
       await broadcastRoomState(io, room.code);
