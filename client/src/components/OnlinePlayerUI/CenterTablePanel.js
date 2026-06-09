@@ -18,7 +18,7 @@ function FaceDownStack({ count, label, warning = false }) {
             fontFamily: "'Cinzel', serif", fontSize: 10, color: 'var(--text-dim)',
             opacity: 0.5,
           }}>
-            —
+            -
           </div>
         ) : (
           Array.from({ length: layers }).map((_, index) => (
@@ -194,7 +194,7 @@ export function CenterTablePanel({
     >
       {/* ── Active game: deck / required card / played pile ──
            (Module 1) The deck, required suit, and played pile now sit DIRECTLY
-           on the felt — the old semi-transparent "dealer's tray" panel (its
+           on the felt - the old semi-transparent "dealer's tray" panel (its
            background / brass hairline / inner shadow) is removed so there is no
            opacity box layered behind the table content. */}
       {(isPlaying || isRoundEnd) && (
@@ -210,7 +210,7 @@ export function CenterTablePanel({
             <FaceDownStack count={deckSize} label="Draw" warning={deckSize < 5 && deckSize > 0} />
           </div>
 
-          {/* Required suit — the table's bright focal point (dealer's tray) */}
+          {/* Required suit - the table's bright focal point (dealer's tray) */}
           <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8 }}>
             <div style={{
               fontFamily: "'Cinzel', serif",
@@ -250,7 +250,7 @@ export function CenterTablePanel({
         </div>
       )}
 
-      {/* ── Lobby — written on the felt, no panel box ── */}
+      {/* ── Lobby - written on the felt, no panel box ── */}
       {isLobby && (
         <div style={{ textAlign: 'center', display: 'flex', flexDirection: 'column', gap: 14, padding: '6px 8px', textShadow: '0 1px 4px rgba(0,0,0,0.85)' }}>
           <div style={{
@@ -320,7 +320,7 @@ export function CenterTablePanel({
            every client at once; it reverse-flips when the trigger is pulled
            (driven by `revealFlipped`). The high-contrast Pull Trigger now lives
            above the liable player's seat (index.js) and per-player status ("On
-           the spot") lives on the avatar popup (ChipPopup) — no felt narration. */}
+           the spot") lives on the avatar popup (ChipPopup) - no felt narration. */}
       {isSpinPending && (
         <div className="fade-in" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 12, padding: '4px 2px', textShadow: '0 1px 4px rgba(0,0,0,0.85)' }}>
           <div style={{
@@ -389,7 +389,7 @@ export function CenterTablePanel({
         </div>
       )}
 
-      {/* ── Game over — written on the felt, no panel box ──
+      {/* ── Game over - written on the felt, no panel box ──
            (Module 7) The victory declaration now floats ABOVE the table
            (rendered in OnlinePlayerUI) and the "view standings" hint is a
            detached strip at the very bottom of the layout. The felt keeps only
@@ -433,7 +433,7 @@ export function CenterTablePanel({
       )}
 
       {/* (Module 1.3) The floating "Last Event" label has been removed from the
-          canvas entirely — per-player turn / spin status now lives in the
+          canvas entirely - per-player turn / spin status now lives in the
           contextual avatar popups (ChipPopup, see OnlinePlayerUI), keeping the
           felt clean. */}
     </div>

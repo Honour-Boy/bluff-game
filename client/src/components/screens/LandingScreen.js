@@ -93,7 +93,7 @@ export function LandingScreen({
         if (!window.localStorage.getItem('bluff_tutorial_seen')) setTutorialHint(true);
         if (window.localStorage.getItem('bluff_tutorial_completed')) setTutorialDone(true);
       }
-    } catch (_) { /* localStorage blocked — just skip the nudge */ }
+    } catch (_) { /* localStorage blocked - just skip the nudge */ }
   }, []);
 
   // Enter the practice room directly — the "Go through Basics / Skip to Power
@@ -170,7 +170,7 @@ export function LandingScreen({
       }} />
 
       {/* Wrought-iron corner brackets. The TOP-RIGHT corner is intentionally
-          omitted — the global settings gear (app/page.js) lives there, and the
+          omitted - the global settings gear (app/page.js) lives there, and the
           bracket sat directly under it, so its lines poked out around the gear
           button ("settings blocks the design at the right corner"). */}
       {[
@@ -186,12 +186,12 @@ export function LandingScreen({
         }} />
       ))}
 
-      {/* ── Main content — tilted notice board ── */}
+      {/* ── Main content - tilted notice board ── */}
       <div
         className="fade-in tilt-panel"
         style={{ width: '100%', maxWidth: 480, position: 'relative', zIndex: 1 }}
       >
-        {/* Tavern sign — a carved board hung from chains, gently swaying */}
+        {/* Tavern sign - a carved board hung from chains, gently swaying */}
         <div style={{ textAlign: 'center', marginBottom: 36, paddingTop: 20 }}>
           <div className="hanging-sign" style={{ display: 'inline-block', position: 'relative', maxWidth: '100%' }}>
             {/* Iron chains */}
@@ -246,7 +246,7 @@ export function LandingScreen({
           </div>
         </div>
 
-        {/* Connection status — candlelight indicator */}
+        {/* Connection status - candlelight indicator */}
         <div style={{
           display: 'flex', alignItems: 'center', gap: 7, justifyContent: 'center',
           marginBottom: 26,
@@ -306,7 +306,7 @@ export function LandingScreen({
               Enter a Room (Player)
             </PlaqueButton>
 
-            {/* Learn by playing — a solo practice table against a bot. The single
+            {/* Learn by playing - a solo practice table against a bot. The single
                 lowest-friction way in for a first-timer: no code, no second
                 player, the bot autoplays the opposite seat. */}
             {onStartTutorial && tutorialEnabled && (
@@ -329,7 +329,7 @@ export function LandingScreen({
                 </span>
                 {tutorialDone ? (
                   <span
-                    title="You've completed the tutorial — replay any time"
+                    title="You've completed the tutorial - replay any time"
                     style={{
                       flexShrink: 0, padding: '2px 7px', borderRadius: 999,
                       background: 'var(--alive)', color: '#0e1a10',
@@ -415,7 +415,7 @@ export function LandingScreen({
               Choose Your Table
             </div>
 
-            {/* Mode cards — two physical game boards */}
+            {/* Mode cards - two physical game boards */}
             <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
               {[
                 {
@@ -501,7 +501,7 @@ export function LandingScreen({
                 borderRadius: 'var(--radius)',
                 textTransform: 'uppercase',
               }}>
-                Host Mode — You are the Game Master, not a player
+                Host Mode - You are the Game Master, not a player
               </div>
             )}
 
@@ -530,7 +530,7 @@ export function LandingScreen({
                   lineHeight: 1.6,
                   fontStyle: 'italic',
                 }}>
-                  Powers, modifiers and house rules are set inside the room lobby once it opens — seat your guests first.
+                  Powers, modifiers and house rules are set inside the room lobby once it opens - seat your guests first.
                 </div>
               </>
             )}

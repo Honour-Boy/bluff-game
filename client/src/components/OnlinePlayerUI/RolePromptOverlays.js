@@ -63,7 +63,7 @@ export function RolePromptOverlays({
             boxShadow: `0 0 12px ${ROLE_META.saboteur.color}33`,
             zIndex: 8200,
           }}
-          title="Saboteur — silently move a random card from your hand into another player's hand. Once per game."
+          title="Saboteur - silently move a random card from your hand into another player's hand. Once per game."
         >
           🕶 SABOTAGE
         </button>
@@ -145,13 +145,13 @@ export function RolePromptOverlays({
         >
           <div className="card fade-in" style={{ maxWidth: 380, width: '100%', textAlign: 'center', padding: '28px 24px', border: `1px solid ${ROLE_META.medic.color}` }}>
             <div style={{ fontSize: 10, color: ROLE_META.medic.color, letterSpacing: '0.18em', marginBottom: 12 }}>
-              MEDIC — SAVE THEM?
+              MEDIC - SAVE THEM?
             </div>
             <div style={{ fontFamily: "'Bebas Neue', sans-serif", fontSize: 26, color: 'var(--text)', marginBottom: 8, letterSpacing: '0.05em' }}>
               {medicPending.eliminatedPlayerName || 'A player'} is about to be eliminated.
             </div>
             <div style={{ fontSize: 12, color: 'var(--text-dim)', marginBottom: 22, lineHeight: 1.55 }}>
-              Save them? You&apos;ll take +2 cards as the cost. This is your only Medic save — once per game.
+              Save them? You&apos;ll take +2 cards as the cost. This is your only Medic save - once per game.
             </div>
             <div style={{ display: 'flex', gap: 10 }}>
               <button className="primary" disabled={medicDeciding} onClick={() => handleMedicDecide(true)} style={{ flex: 1, padding: '12px', minHeight: 44 }}>
@@ -219,11 +219,11 @@ export function RolePromptOverlays({
         >
           <div className="card fade-in" style={{ maxWidth: 420, width: '100%', textAlign: 'center', padding: '24px 20px', border: `1px solid ${ROLE_META.sniper.color}` }}>
             <div style={{ fontFamily: "'Bebas Neue', sans-serif", fontSize: 22, letterSpacing: '0.12em', color: ROLE_META.sniper.color, marginBottom: 6 }}>
-              SNIPER — REDIRECT THE SHOT?
+              SNIPER - REDIRECT THE SHOT?
             </div>
             <div style={{ fontSize: 12, color: 'var(--text-dim)', marginBottom: 18, lineHeight: 1.5 }}>
               Currently aimed at <strong style={{ color: 'var(--text)' }}>{sniperPending.originalSpinTargetName || 'someone'}</strong>.
-              Pick a new target — Mirror holders are off-limits — or pass.
+              Pick a new target - Mirror holders are off-limits - or pass.
             </div>
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(110px, 1fr))', gap: 8, marginBottom: 14 }}>
               {alivePlayersForSniper.map((player) => {
@@ -245,7 +245,7 @@ export function RolePromptOverlays({
                       letterSpacing: '0.04em',
                       opacity: eligible ? 1 : 0.45,
                     }}
-                    title={!eligible ? 'Cannot redirect — Mirror holder or self.' : undefined}
+                    title={!eligible ? 'Cannot redirect - Mirror holder or self.' : undefined}
                   >
                     {player.username}
                     {player.id === sniperPending.originalSpinTargetId && (
@@ -267,7 +267,7 @@ export function RolePromptOverlays({
                 textDecoration: 'underline',
               }}
             >
-              Pass — let the original target spin
+              Pass - let the original target spin
             </button>
           </div>
         </div>

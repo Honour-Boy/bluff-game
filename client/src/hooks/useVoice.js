@@ -129,7 +129,7 @@ export function useVoice({ roomCode, isAuthenticated, autoJoin = false }) {
       if (!lp) return;
       try {
         setMuted(!lp.isMicrophoneEnabled);
-      } catch (_) { /* getter throws while mid-publish — ignore */ }
+      } catch (_) { /* getter throws while mid-publish - ignore */ }
     };
     room.on(RoomEvent.TrackMuted, (_pub, participant) => {
       if (participant?.identity === room.localParticipant?.identity) {
@@ -255,7 +255,7 @@ export function useVoice({ roomCode, isAuthenticated, autoJoin = false }) {
     status,             // 'idle' | 'connecting' | 'connected' | 'error'
     error,
     muted,
-    speakingIds,        // Set<userId> — currently speaking participants
+    speakingIds,        // Set<userId> - currently speaking participants
     isConnected: status === 'connected',
     connect,
     disconnect,

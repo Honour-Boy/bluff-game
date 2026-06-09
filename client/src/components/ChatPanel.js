@@ -73,13 +73,13 @@ export function ChatPanel({
 
   return (
     <>
-      {/* Floating button — suppressed on mobile when the FAB sheet
+      {/* Floating button - suppressed on mobile when the FAB sheet
           owns the chat trigger (issue #102). */}
       {!open && !hideTrigger && (
         <button
           type="button"
           onClick={onOpen}
-          aria-label={unread > 0 ? `Open chat — ${unread} new` : 'Open chat'}
+          aria-label={unread > 0 ? `Open chat - ${unread} new` : 'Open chat'}
           style={{
             position: 'fixed',
             right: 'max(16px, env(safe-area-inset-right))',
@@ -129,7 +129,7 @@ export function ChatPanel({
         </button>
       )}
 
-      {/* Mobile backdrop — taps outside the panel close it. Hidden on
+      {/* Mobile backdrop - taps outside the panel close it. Hidden on
           desktop where the dock layout doesn't need it. */}
       {open && (
         <div
@@ -147,7 +147,7 @@ export function ChatPanel({
         />
       )}
 
-      {/* Panel — full width on mobile, 380px dock on desktop */}
+      {/* Panel - full width on mobile, 380px dock on desktop */}
       {open && (
         <div
           aria-modal="true"
@@ -170,7 +170,7 @@ export function ChatPanel({
             boxShadow: '-12px 0 40px rgba(0,0,0,0.5)',
           }}
         >
-          {/* Header — safe-area aware so it sits below iOS notch */}
+          {/* Header - safe-area aware so it sits below iOS notch */}
           <div style={{
             padding: '14px 14px 12px',
             paddingTop: 'calc(14px + env(safe-area-inset-top))',
@@ -305,7 +305,7 @@ export function ChatPanel({
             })}
           </div>
 
-          {/* Composer — sticks to bottom, safe-area padded.
+          {/* Composer - sticks to bottom, safe-area padded.
               fontSize 16px on the textarea is non-negotiable: anything
               smaller triggers iOS Safari's auto-zoom on focus. */}
           <form

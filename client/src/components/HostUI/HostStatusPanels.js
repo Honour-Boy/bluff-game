@@ -44,9 +44,9 @@ export function HostPhaseBanner({
 
   const label = isLobby ? 'Waiting for patrons'
     : isPlaying ? 'Game in progress'
-    : isBluffResolution ? 'Bluff called — reveal the last card'
+    : isBluffResolution ? 'Bluff called - reveal the last card'
     : isSpinPending ? `Awaiting ${spinTargetPlayer?.username ?? '...'} to spin`
-    : isRoundEnd ? 'Round ended — patrons reshuffle'
+    : isRoundEnd ? 'Round ended - patrons reshuffle'
     : isGameOver ? 'The game concludes'
     : '';
 
@@ -179,7 +179,7 @@ export function HostGameSummary({
                 </div>
               </>
             ) : (
-              <div style={{ color: 'var(--text-dim)', fontStyle: 'italic' }}>—</div>
+              <div style={{ color: 'var(--text-dim)', fontStyle: 'italic' }}>-</div>
             )}
           </div>
         </div>

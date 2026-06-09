@@ -705,7 +705,7 @@ function _setSection(name) {
 // Progressive in-game escalation is retired in favour of the single continuous
 // playlist (escalating would restart tracks). Kept as a no-op so existing callers
 // (page.js still feeds it gameMusicStage) need no change.
-function _setGameStage() { /* no-op — continuous playlist mode */ }
+function _setGameStage() { /* no-op - continuous playlist mode */ }
 
 // Step to the next (dir=1) or previous (dir=-1) track in the playlist.
 function _musicSkip(dir) {
@@ -806,7 +806,7 @@ export function gameMusicStage(roomState, stageCount = (MUSIC_SECTIONS.game ? MU
   if (maxStage === 0) return 0;
   const total = roomState.players.length || 1;
   const alive = roomState.players.filter((p) => p && p.status === 'alive').length;
-  if (alive <= 2) return maxStage;                 // final two — the peak track
+  if (alive <= 2) return maxStage;                 // final two - the peak track
   // Fraction of the way from a full field to the final two, mapped across the
   // available stages. Monotonic; _setGameStage never steps back down.
   const denom = Math.max(1, total - 2);            // eliminations from full field → final two

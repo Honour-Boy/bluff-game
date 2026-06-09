@@ -123,7 +123,7 @@ export function GroupsScreen({
         zIndex: 1,
       }}
     >
-      {/* Header — inn noticeboard heading */}
+      {/* Header - inn noticeboard heading */}
       <div
         className="groups-screen__header"
         style={{ display: 'flex', justifyContent: 'space-between', gap: 16, flexWrap: 'wrap' }}
@@ -210,7 +210,7 @@ export function GroupsScreen({
           gap: 20,
         }}
       >
-        {/* Left — group list: the bulletin notices */}
+        {/* Left - group list: the bulletin notices */}
         <section
           className="groups-screen__panel"
           style={{ ...panelStyle, transform: 'perspective(1000px) rotateY(-1.5deg)' }}
@@ -356,7 +356,7 @@ export function GroupsScreen({
 
         </section>
 
-        {/* Right column — create + invites */}
+        {/* Right column - create + invites */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
           {/* Found a guild */}
           <section className="groups-screen__panel" style={panelStyle}>

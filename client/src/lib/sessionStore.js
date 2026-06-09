@@ -20,7 +20,7 @@
 
 const SESSION_KEY  = 'bluff_session';
 const RECOVERY_KEY = 'bluff_session_recovery';
-const RECOVERY_TTL_MS = 120_000; // 2 minutes — long enough for a reconnect, short enough to stay fresh
+const RECOVERY_TTL_MS = 120_000; // 2 minutes - long enough for a reconnect, short enough to stay fresh
 
 export function saveRoomSession(session) {
   if (typeof window === 'undefined' || !session?.roomCode) return;

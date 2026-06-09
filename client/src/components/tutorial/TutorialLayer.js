@@ -264,10 +264,10 @@ function CoachGate({ coach, isMobile, dockBottom, onOk }) {
   const bottom = dockBottom != null ? dockBottom : (isMobile ? 168 : 188);
   return (
     <>
-      {/* Backdrop — dims + blocks all play until the learner taps OK. No close
+      {/* Backdrop - dims + blocks all play until the learner taps OK. No close
           button: in practice the guide is always present, so OK is the only exit. */}
       <div style={{ position: 'fixed', inset: 0, zIndex: 2950, background: 'rgba(0,0,0,0.66)', pointerEvents: 'auto' }} />
-      {/* Card — docked above the bottom seat, grows upward. */}
+      {/* Card - docked above the bottom seat, grows upward. */}
       <div style={{
         position: 'fixed', left: 0, right: 0, bottom, zIndex: 2960,
         display: 'flex', justifyContent: 'center', padding: '0 12px', pointerEvents: 'none',
@@ -300,7 +300,7 @@ function CoachGate({ coach, isMobile, dockBottom, onOk }) {
             {coach.body}
           </div>
           <button onClick={onOk} className="primary" style={{ width: '100%', minHeight: 40, fontSize: 12 }}>
-            OK — got it
+            OK - got it
           </button>
         </div>
       </div>
@@ -482,7 +482,7 @@ function ChoiceModal({ onBasics, onSkip, onLeave }) {
         cursor: 'pointer', color: 'var(--text)', width: '100%',
       }}
     >
-      {/* On the gold (primary) option the accent/dim tones vanish — force a flat,
+      {/* On the gold (primary) option the accent/dim tones vanish - force a flat,
           deeply bold dark tone so the text stays legible on the bright background. */}
       <div style={{
         fontFamily: "'Cinzel', serif", fontSize: 16, marginBottom: 4, letterSpacing: '0.06em',
@@ -514,7 +514,7 @@ function ChoiceModal({ onBasics, onSkip, onLeave }) {
           core loop? Skip straight to the Power Cards.
         </div>
         <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-          <Btn primary title="Go through Basics" desc="Play a card, bluff, call the bot’s bluffs, and survive the gun — then we move on to powers." onClick={onBasics} />
+          <Btn primary title="Go through Basics" desc="Play a card, bluff, call the bot’s bluffs, and survive the gun - then we move on to powers." onClick={onBasics} />
           <Btn title="Skip to Power Cards" desc="Jump to the power-card clinic: one guided drill for each power." onClick={onSkip} />
         </div>
         {typeof onLeave === 'function' && (
@@ -576,7 +576,7 @@ function ReplayChoiceModal({ onCoached, onUncoached, onBack }) {
           Run it back with the guide, or just play {BOT_NAME} for fun.
         </div>
         <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-          <Btn title={`Just play ${BOT_NAME}`} desc="A plain practice game — no tips, no pop-ups. Just you against the bot." onClick={onUncoached} />
+          <Btn title={`Just play ${BOT_NAME}`} desc="A plain practice game - no tips, no pop-ups. Just you against the bot." onClick={onUncoached} />
           <Btn title="Coaching again" desc="Start over from the Basics with the full walkthrough, like your first time." onClick={onCoached} />
         </div>
         {typeof onBack === 'function' && (
@@ -986,7 +986,7 @@ export function TutorialLayer({
           tone="action"
           title={briefing.title}
           body={briefing.body}
-          cta="Got it — show me"
+          cta="Got it - show me"
           onCta={() => setBriefedIndex(scenario.index)}
         />
       )}
@@ -1050,7 +1050,7 @@ export function TutorialLayer({
       )}
 
       {/* The "tap a card ▼" nudge now anchors to the fan CONTAINER (see CardNudge
-          measure), so it stays aligned on every width — shown on all screens. */}
+          measure), so it stays aligned on every width - shown on all screens. */}
       {showCardNudge && <CardNudge />}
       <style>{'@keyframes bobUp{0%,100%{transform:translateY(0)}50%{transform:translateY(-5px)}}'}</style>
     </>

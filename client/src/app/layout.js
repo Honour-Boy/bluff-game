@@ -6,7 +6,7 @@ export const metadata = {
   ),
   title: "BLUFF - Real-Time Multiplayer Card Game",
   description:
-    "Challenge your friends in BLUFF — a fast-paced real-time multiplayer card game of deception, strategy, and nerve.",
+    "Challenge your friends in BLUFF - a fast-paced real-time multiplayer card game of deception, strategy, and nerve.",
 
   // Favicon
   icons: {

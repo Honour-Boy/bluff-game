@@ -101,10 +101,10 @@ export function PlayerList({ players, turnOrder, currentPlayerId, isHost, phase,
                   ? <RiskMeter riskLevel={player.riskLevel} size="sm" />
                   : <span style={{ fontSize: 10, color: 'var(--accent2)', letterSpacing: '0.1em' }}>ELIMINATED</span>
                 }
-                {/* v2 Phase F — Bounty chip + bet streak indicator */}
+                {/* v2 Phase F - Bounty chip + bet streak indicator */}
                 {isAlive && player.hasBounty && (
                   <span
-                    title="Bounty placed — collect by calling a successful bluff"
+                    title="Bounty placed - collect by calling a successful bluff"
                     style={{
                       fontSize: 10,
                       color: '#ff3552',

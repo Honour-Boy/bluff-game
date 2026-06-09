@@ -95,7 +95,7 @@ export function TableScene({
         }}
         whileTap={{ cursor: 'grabbing' }}
       >
-        {/* Top band of seats — a single centred row above the table. On mobile
+        {/* Top band of seats - a single centred row above the table. On mobile
             this is the whole "horseshoe"; on desktop it's the far-rail row. */}
         <div
           className="topdown-top"

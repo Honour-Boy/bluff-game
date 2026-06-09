@@ -98,7 +98,7 @@ export function PlayerChip({
         boxShadow: '0 3px 10px rgba(0,0,0,0.5), inset 0 1px 0 rgba(255,255,255,0.04)',
       }}
     >
-      {/* Bounty marker — tiny crimson badge */}
+      {/* Bounty marker - tiny crimson badge */}
       {alive && player.hasBounty && (
         <span
           title="Bounty placed"

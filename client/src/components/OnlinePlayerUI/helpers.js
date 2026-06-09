@@ -230,7 +230,7 @@ const ANNOUNCEMENT_MAP = {
   last_stand_entered: { preset: 'last_stand_entered', title: 'LAST STAND', subtitle: () => 'two finalists remain' },
   system_notice: { preset: 'system_notice', title: 'NOTICE', subtitle: (e) => e.message || '' },
   // #6 — highlight callouts (first_blood removed per design — survival only)
-  survival_streak: { preset: 'survival_streak', title: 'NERVES OF STEEL', subtitle: (e) => `${e.holderName || 'Survivor'} — ${e.streak || 3} spins survived in a row` },
+  survival_streak: { preset: 'survival_streak', title: 'NERVES OF STEEL', subtitle: (e) => `${e.holderName || 'Survivor'} - ${e.streak || 3} spins survived in a row` },
 };
 
 export function buildAnnouncementBannerProps(evt) {

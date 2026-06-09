@@ -237,7 +237,7 @@ export function SettingsGear({
                 </div>
               </div>
 
-              {/* ── In-room game controls (Module 2) — only inside a room ── */}
+              {/* ── In-room game controls (Module 2) - only inside a room ── */}
               {inRoom && (
                 <>
                   <div style={{

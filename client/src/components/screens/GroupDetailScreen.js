@@ -177,7 +177,7 @@ export function GroupDetailScreen({
     setResetting(false);
     setConfirmReset(false);
     setResetMsg(res?.success
-      ? 'Room reset — everyone was returned to the lobby.'
+      ? 'Room reset - everyone was returned to the lobby.'
       : (res?.error || 'Could not reset the room.'));
     setTimeout(() => setResetMsg(''), 4000);
   };
@@ -316,7 +316,7 @@ export function GroupDetailScreen({
           gap: 20,
         }}
       >
-        {/* Members — the guild roll */}
+        {/* Members - the guild roll */}
         <section
           className="group-detail__panel"
           style={{ ...panelStyle, transform: 'perspective(1000px) rotateY(-1.5deg)' }}
@@ -439,7 +439,7 @@ export function GroupDetailScreen({
 
         {/* Right column */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
-          {/* Room cipher — wax seal panel */}
+          {/* Room cipher - wax seal panel */}
           <section className="group-detail__panel" style={panelStyle}>
             <div style={{
               fontFamily: "'Cinzel', serif",
@@ -487,7 +487,7 @@ export function GroupDetailScreen({
                   className="danger"
                   onClick={() => { setResetMsg(''); setConfirmReset(true); }}
                   disabled={resetting}
-                  title="Boot everyone and start the room fresh — the cipher stays the same"
+                  title="Boot everyone and start the room fresh - the cipher stays the same"
                 >
                   Reset Room
                 </button>
@@ -518,7 +518,7 @@ export function GroupDetailScreen({
                 {resetMsg
                   || (confirmReset
                     ? 'This boots every player back to the lobby and clears the table. The cipher stays the same.'
-                    : 'Reset boots everyone and starts a fresh table — same cipher.')}
+                    : 'Reset boots everyone and starts a fresh table - same cipher.')}
               </div>
             )}
           </section>

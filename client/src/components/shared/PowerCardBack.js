@@ -85,7 +85,7 @@ export function PowerCardBack({ size = "md", style }) {
         }}
       />
 
-      {/* Center mark — stylised "?" inside a metallic ring */}
+      {/* Center mark - stylised "?" inside a metallic ring */}
       <div
         style={{
           position: "absolute",
@@ -125,7 +125,7 @@ export function PowerCardBack({ size = "md", style }) {
             strokeWidth="2"
             opacity="0.85"
           />
-          {/* Question glyph — drawn in Bebas-style stroke, not text */}
+          {/* Question glyph - drawn in Bebas-style stroke, not text */}
           <path
             d="M38 36 Q38 26 50 26 Q62 26 62 36 Q62 44 54 48 Q50 50 50 56 L50 60"
             fill="none"

@@ -130,7 +130,7 @@ export function PreGameSelectionModal({
 
   const handlePick = async (optionId) => {
     if (busy || confirmed) return;
-    setLocalPickId(optionId); // optimistic — flip to the locked-in view
+    setLocalPickId(optionId); // optimistic - flip to the locked-in view
     const res = await onSelect?.(optionId);
     // Revert if the server rejected the pick (e.g. window already closed).
     if (res && res.success === false) {
@@ -179,7 +179,7 @@ export function PreGameSelectionModal({
               Claim your edge
             </div>
             <div style={{ fontSize: 12, color: "var(--text-dim)", lineHeight: 1.5, marginBottom: 16 }}>
-              One card is yours to keep — face-down. Pick on instinct.
+              One card is yours to keep - face-down. Pick on instinct.
             </div>
 
             <div
@@ -235,7 +235,7 @@ export function PreGameSelectionModal({
             {reviewUntil ? (
               <>
                 <div style={{ fontSize: 13, color: "var(--text-dim)", lineHeight: 1.5 }}>
-                  Picked late — here&apos;s a private look before you join. You sit
+                  Picked late - here&apos;s a private look before you join. You sit
                   out the opening turn.
                 </div>
                 {reviewSecondsLeft != null && (
@@ -249,14 +249,14 @@ export function PreGameSelectionModal({
                 <div style={{ fontSize: 13, color: "var(--text-dim)", lineHeight: 1.5 }}>
                   {pendingCount > 0
                     ? `Waiting for ${pendingCount} ${pendingCount === 1 ? "player" : "players"} to choose…`
-                    : "All players ready — dealing in…"}
+                    : "All players ready - dealing in…"}
                 </div>
                 {totalCount > 0 && (
                   <div style={{ fontFamily: "'Space Mono', monospace", fontSize: 11, color: "var(--text-dim)", letterSpacing: "0.08em", marginTop: 6, opacity: 0.7 }}>
                     {totalCount - pendingCount}/{totalCount} ready
                   </div>
                 )}
-                {/* §3.1 — the shared 15s selection countdown stays visible AFTER
+                {/* §3.1 - the shared 15s selection countdown stays visible AFTER
                     a player locks in, so they always see how long the window has
                     left instead of the timer vanishing on confirm. */}
                 {secondsLeft != null && (

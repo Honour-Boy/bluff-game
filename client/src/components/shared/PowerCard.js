@@ -34,7 +34,7 @@ export const POWER_META = {
   },
   peek: {
     label: "Peek",
-    color: "#4affdb", // teal cyan — matches --accent3
+    color: "#4affdb", // teal cyan - matches --accent3
     flavor: "See the last card played before making your decision.",
   },
   freeze: {
