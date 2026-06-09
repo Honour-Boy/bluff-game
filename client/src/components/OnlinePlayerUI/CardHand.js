@@ -10,7 +10,7 @@ const CARD_H = 84;
 // the shared-pivot fan. When null (power slot) the card renders upright in flow.
 function renderOneCard({
   card, index, isSelected, isJustPlayed = false, interactive, powerInteractive,
-  onCardClick, onPowerCardClick, arc = null,
+  powerLocked = false, onCardClick, onPowerCardClick, arc = null,
 }) {
   const isPower = card.type === 'power';
   const isWhot = !isPower && card.shape === 'whot';
@@ -18,11 +18,15 @@ function renderOneCard({
   const powerColor = powerMeta?.color || 'var(--accent)';
   const drawPowerIcon = isPower ? (POWER_ICONS[card.power] || POWER_ICONS.shield) : null;
   const isArmed = card.armed === true;
+  // Tutorial pre-arm lock: a defensive clinic card that can't be armed yet. Stays
+  // tappable (the tap shows a "not yet" hint) but reads as disabled — dimmed.
+  const isLocked = isPower && powerLocked && !isArmed;
   const effectiveInteractive = isPower
     ? (powerInteractive === undefined ? interactive : powerInteractive)
     : interactive;
   const cardInteractive = effectiveInteractive && !isArmed;
   const armedLabel = 'Activated — awaiting trigger';
+  const lockedLabel = 'Not yet — you defend after the bot challenges you';
 
   const handleClick = () => {
     if (!cardInteractive) return;
@@ -58,9 +62,16 @@ function renderOneCard({
       height: CARD_H,
       flexShrink: 0,
       transform: isSelected ? 'translateY(-10px) scale(1.06)' : undefined,
-      transition: 'transform 0.2s cubic-bezier(0.22,1,0.36,1)',
-      cursor: cardInteractive ? 'pointer' : 'default',
+      // Only animate opacity while a tutorial pre-arm lock is in play, so normal
+      // (non-tutorial) power cards keep the exact original transition.
+      transition: isLocked
+        ? 'transform 0.2s cubic-bezier(0.22,1,0.36,1), opacity 0.2s'
+        : 'transform 0.2s cubic-bezier(0.22,1,0.36,1)',
+      cursor: isLocked ? 'help' : (cardInteractive ? 'pointer' : 'default'),
       pointerEvents: isArmed ? 'none' : 'auto',
+      // Pre-arm lock: read as disabled (dimmed + desaturated) while still tappable.
+      opacity: isLocked ? 0.4 : 1,
+      filter: isLocked ? 'grayscale(0.5)' : undefined,
     };
   }
 
@@ -85,7 +96,7 @@ function renderOneCard({
       key={card.id}
       data-card-id={card.id}
       onClick={handleClick}
-      title={isArmed ? armedLabel : (isPower && powerMeta ? `${powerMeta.label} — ${powerMeta.flavor}` : undefined)}
+      title={isLocked ? lockedLabel : (isArmed ? armedLabel : (isPower && powerMeta ? `${powerMeta.label} — ${powerMeta.flavor}` : undefined))}
       aria-label={isPower && powerMeta ? `Power card: ${powerMeta.label}` : undefined}
       data-armed={isArmed ? 'true' : undefined}
       className={isJustPlayed ? 'card-play-physics' : undefined}
@@ -215,6 +226,9 @@ export function CardHand({
   onPowerCardClick,
   interactive = true,
   powerInteractive = undefined,
+  // Tutorial: dim the power card(s) but keep them tappable, so a tap surfaces a
+  // "not yet" coach hint instead of arming early (the defensive clinic drill).
+  powerLocked = false,
   justPlayedCardId = null,
   // (Module 2.2) shorter fan area on compact/mobile docks.
   fanHeight = 128,
@@ -386,6 +400,7 @@ export function CardHand({
               isSelected: selectedCardId === card.id,
               interactive,
               powerInteractive,
+              powerLocked,
               onCardClick: guardedCardClick,
               onPowerCardClick: guardedPowerClick,
               arc: null,

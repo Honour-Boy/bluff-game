@@ -250,9 +250,13 @@ export function useGameActions({
     clearSession();
   }, [clearSession, playerId, roomCode, socket]);
 
-  const restartRoom = useCallback(() => {
+  // `coached` only matters for practice (tutorial) rooms: false replays as a
+  // plain game vs the bot with no guide. Defaults true; note existing callers
+  // wire this straight to onClick, so a MouseEvent arg (truthy, !== false) is
+  // correctly treated as a coached replay — only an explicit `false` opts out.
+  const restartRoom = useCallback((coached = true) => {
     if (!roomCode) return;
-    socket.emit('restart_room', { roomCode }, (res) => {
+    socket.emit('restart_room', { roomCode, coached: coached !== false }, (res) => {
       if (!res?.success) failError(res);
     });
   }, [failError, roomCode, socket]);

@@ -42,6 +42,7 @@ export function BottomSeat({
   handleSpectatePlayer,
   myHand,
   myPowerCardSlot = [],
+  powerLocked = false,
   selectedCardId,
   handleCardClick,
   handlePowerCardClick,
@@ -421,6 +422,7 @@ export function BottomSeat({
                 <CardHand
                   hand={myHand}
                   powerCardSlot={myPowerCardSlot}
+                  powerLocked={powerLocked}
                   selectedCardId={isMyTurn && isPlaying && !cardPlayedThisTurn ? selectedCardId : null}
                   onCardClick={handleCardClick}
                   onPowerCardClick={handlePowerCardClick}

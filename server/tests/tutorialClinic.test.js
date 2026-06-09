@@ -343,6 +343,26 @@ describe('tutorialDirector', () => {
     expect(_pendingDirectorAction(room)).toEqual({ kind: 'open_intercept', index: 0 });
   });
 
+  it('refuses to pre-arm the defensive card on the player\'s own turn (clinic would stall otherwise)', () => {
+    const room = clinicRoom();
+    _beginPowerClinic(room); // drill 0 = shield (full loop), player on turn, holds Shield
+    const shieldId = room.powerCardSlot['human'][0].id;
+
+    // Arming the Shield BEFORE ending the turn used to set armedPowerCard, which
+    // makes canInterceptBluff() false → the director never opens the challenge
+    // window → the bot sits idle forever. The engine now refuses it.
+    const res = engine.activatePowerCard(room, 'human', shieldId);
+    expect(res.ok).toBe(false);
+    expect(res.tutorialLocked).toBe(true);
+    expect(room.players.find((p) => p.id === 'human').armedPowerCard).toBeFalsy();
+
+    // With the early arm refused, the scripted loop still hands off correctly.
+    const firstCard = room.hands.get('human')[0];
+    engine.validateAndPlayCard(room, 'human', firstCard.id);
+    engine.advanceTurn(room);
+    expect(_pendingDirectorAction(room)).toEqual({ kind: 'open_intercept', index: 0 });
+  });
+
   it('finishes when the player advances past the last drill', () => {
     const room = clinicRoom();
     const last = POWER_CLINIC.length - 1;

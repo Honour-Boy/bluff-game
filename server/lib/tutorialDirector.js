@@ -103,7 +103,9 @@ function _directorKey(action, room) {
  */
 function armTutorialDirector(io, room) {
   if (!room || !room.code) return;
-  if (!room.isTutorial) { _clearTutorialTimer(room.code); return; }
+  // Inert for non-tutorial rooms AND for an uncoached practice replay (a plain
+  // game vs the bot, opted out of the guided progression — no clinic hand-off).
+  if (!room.isTutorial || room.tutorialCoaching === false) { _clearTutorialTimer(room.code); return; }
 
   const action = _pendingDirectorAction(room);
   if (!action) {

@@ -579,7 +579,7 @@ function register(io, socket, deps) {
   });
 
   // ─── HOST: Restart a finished room for another game ──────
-  socket.on('restart_room', async ({ roomCode } = {}, callback) => {
+  socket.on('restart_room', async ({ roomCode, coached = true } = {}, callback) => {
     if (!socket.userId) return callback?.({ success: false, error: 'Not authenticated' });
     try {
       const code = roomCode?.toUpperCase();
@@ -609,6 +609,17 @@ function register(io, socket, deps) {
         room.cardPlayedThisTurn = false;
         room.bluffUsedThisTurn = false;
         room.powerActivatedThisTurn = false;
+        // Replay flavour:
+        //   coached   → re-run the guided journey (Basics → Power Clinic) from the
+        //               lobby, exactly like a first-timer (client re-shows intro).
+        //   uncoached → a plain practice game vs the bot, NO guide overlays and no
+        //               clinic. Powers stay OFF: engine/botStrategy.js has no
+        //               power-play logic outside the scripted clinic, so a
+        //               powers-on free game would stall on a bot left holding only
+        //               power cards. Deal straight in (no lobby/intro to surface,
+        //               since the client renders no coaching when coaching is off).
+        room.tutorialCoaching = coached !== false;
+        if (!room.tutorialCoaching) engine.startGame(room);
       } else {
         room.hostSocketId = socket.id;
       }

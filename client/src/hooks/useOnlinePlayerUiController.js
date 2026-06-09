@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useIsMobile } from './useIsMobile';
+import { isDefensivePreArmLocked } from '../components/tutorial/tutorialContent';
 
 export function useOnlinePlayerUiController({
   roomState,
@@ -27,6 +28,9 @@ export function useOnlinePlayerUiController({
   const tableCenterRef = useRef(null);
   const [spectatingId, setSpectatingId] = useState(null);
   const [spectatedHand, setSpectatedHand] = useState([]);
+  // Bumped each time the learner taps the dimmed defensive power card too early
+  // in a clinic drill; the TutorialLayer watches it to flash a "not yet" hint.
+  const [preArmLockSignal, setPreArmLockSignal] = useState(0);
   // Every spin identity already shown this session. A Set (not just the last key)
   // so a re-broadcast of an OLDER spin_result — after a newer spin moved the
   // "last" key on — can never replay that older spin a second time ("spin playing
@@ -171,6 +175,23 @@ export function useOnlinePlayerUiController({
     setTimeout(() => setJustEliminated(true), 300);
   }, [spinData]);
 
+  // Basics → Power Clinic hand-off works for a WIN and a LOSS alike. When the
+  // learner LOSES Basics (the bot wins) they're eliminated, which latches
+  // `eliminationHold` (+ the "Eliminated" card). The clinic still stages
+  // server-side, but those gates would keep its briefing/coach hidden behind a
+  // manual "Continue Watching" tap — so a loss never visibly progressed to
+  // powers (only a win did). Once the clinic actually stages (lesson 'powers' +
+  // a scenario), drop the stale Basics-elimination hold so the clinic surfaces
+  // automatically, exactly like the win path. The death spin still animates
+  // first (the briefing is independently gated on `spinActive`).
+  useEffect(() => {
+    if (roomState?.tutorialLesson === 'powers' && roomState?.tutorialScenario) {
+      pendingEliminatedRef.current = false;
+      setEliminationHold(false);
+      setJustEliminated(false);
+    }
+  }, [roomState?.tutorialLesson, roomState?.tutorialScenario]);
+
   // Settle a finished spin: clear the overlay LOCALLY and (when it's our spin or a
   // bot's) notify the server. STABLE (ref-backed) so the auto-dismiss timer below
   // is never reset by an unrelated re-render. Self-contained on purpose — the
@@ -273,6 +294,15 @@ export function useOnlinePlayerUiController({
   // called. The only block is being already armed (one activation per turn).
   const handlePowerCardClick = useCallback((cardId = null) => {
     if (!isMyTurn || !isPlaying) return;
+    // Tutorial defensive drill: the Shield/Mirror/Swap is dimmed and can't be
+    // pre-armed on your own turn (it would stall the clinic — see the server
+    // block in activatePowerCard). Tapping it surfaces a "not yet" coach hint
+    // instead of opening the activate modal. Bump a signal the TutorialLayer
+    // watches (mirrors the reopenSignal pattern).
+    if (isDefensivePreArmLocked(roomState?.tutorialScenario, roomState?.phase)) {
+      setPreArmLockSignal((n) => n + 1);
+      return;
+    }
     if (myPlayer?.armedPowerCard) return;
     // §1.1 — one power activation per turn. `armedPowerCard` misses a consumed
     // Peek (it leaves no armed marker), so also honour the server's ledger flag
@@ -282,7 +312,9 @@ export function useOnlinePlayerUiController({
     // its held cards, not just slot[0].
     setPendingPowerCardId(typeof cardId === 'string' ? cardId : null);
     setPowerConfirmOpen(true);
-  }, [isMyTurn, isPlaying, myPlayer?.armedPowerCard, roomState?.powerActivatedThisTurn]);
+    // Depend on the scenario PRIMITIVES the lock reads (not the whole object,
+    // which is a fresh reference every broadcast) so the callback is stable.
+  }, [isMyTurn, isPlaying, myPlayer?.armedPowerCard, roomState?.powerActivatedThisTurn, roomState?.tutorialScenario?.expect, roomState?.tutorialScenario?.step, roomState?.phase]);
 
   const handleActivatePower = useCallback(async () => {
     if (!activatePowerCard || activating) return;
@@ -405,6 +437,7 @@ export function useOnlinePlayerUiController({
     handleSpinContinue,
     handleCardClick,
     handlePowerCardClick,
+    preArmLockSignal,
     handleSpectatePlayer,
     handleActivatePower,
     handleSkipPower,

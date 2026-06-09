@@ -268,6 +268,21 @@ function activatePowerCard(room, playerId, cardId = null) {
   const powerCard = (cardId ? slot.find(c => c?.id === cardId) : slot[0]) ?? null;
   if (!powerCard) return { ok: false, error: 'No power card in hand' };
 
+  // Tutorial defensive drill (Shield/Mirror/Swap clinic): the staged defensive
+  // card must be armed REACTIVELY in the bot's challenge window — never pre-armed
+  // on the learner's own turn. Pre-arming sets `armedPowerCard`, which makes
+  // `canInterceptBluff` false, so the director can never open that window: the
+  // bot sits idle and the clinic hangs ("bot deciding forever"). Refuse it here
+  // (authoritative — the client lock can't be bypassed); the coach explains that
+  // you defend only once the challenge lands. Own-turn powers (Peek/Freeze/
+  // Assassin drills) aren't `play_then_defend`, so they're untouched.
+  if (room.tutorialScenario
+      && room.tutorialScenario.expect === 'play_then_defend'
+      && room.tutorialScenario.step !== 'resolved'
+      && INTERCEPTABLE_POWERS.includes(powerCard.power)) {
+    return { ok: false, error: 'Wait for the challenge — you defend after the bot calls your bluff', tutorialLocked: true };
+  }
+
   if (powerCard.power === 'swap' && !isSwapActivatable(powerCard)) {
     return { ok: false, error: 'Swap not yet activatable — every alive player must take a turn first' };
   }

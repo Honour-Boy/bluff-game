@@ -18,6 +18,7 @@ import { CloseIcon } from '../shared/CloseIcon';
 import {
   introSlidesFor, coachFor, coachContextFromRoom,
   clinicCoachFor, clinicBriefingFor, BASICS_HANDOFF_COACH, CLINIC_COMPLETE_COACH, BOT_NAME,
+  DEFENSE_PREARM_HINT,
 } from './tutorialContent';
 
 const TONE_COLORS = {
@@ -242,6 +243,22 @@ function CardNudge({ isMobile, canBluff }) {
 
   useEffect(() => {
     if (typeof document === 'undefined') return undefined;
+    // Anchor the bubble's CENTRE on the cards, but keep it fully on-screen. The
+    // fan isn't always screen-centred (a narrow phone can sit it well off to one
+    // side), and a wide bubble centred over off-centre cards would spill past the
+    // edge → it reads as "shoved"/cut-off (the reported misalignment). So we
+    // ADAPT the width: shrink it to the widest box that still fits centred on the
+    // cards (text just wraps to another line). Only in the extreme case where even
+    // the minimum width can't fit do we nudge the centre in off the cards.
+    const fit = (centerX) => {
+      const winW = window.innerWidth;
+      const cap = Math.min(winW * 0.9, 420);          // normal max width
+      const fitW = 2 * Math.min(centerX, winW - centerX) - 16; // width that fits centred here
+      const width = Math.max(180, Math.min(cap, fitW));
+      const half = width / 2 + 8;
+      const cx = Math.max(half, Math.min(winW - half, centerX)); // only moves if width hit its floor
+      return { centerX: cx, width };
+    };
     const measure = () => {
       const cards = document.querySelectorAll('[data-tour-id="my-hand-fan"] [data-card-id]');
       let left = Infinity; let right = -Infinity; let top = Infinity;
@@ -251,14 +268,14 @@ function CardNudge({ isMobile, canBluff }) {
         left = Math.min(left, r.left); right = Math.max(right, r.right); top = Math.min(top, r.top);
       });
       if (cards.length && right > left) {
-        setPos({ centerX: (left + right) / 2, bottom: window.innerHeight - top + 8 });
+        setPos({ ...fit((left + right) / 2), bottom: window.innerHeight - top + 8 });
         return;
       }
       // Fall back to the fan trough, then the wrapper, then null (fixed offset).
       const fan = document.querySelector('[data-tour-id="my-hand-fan"]')
         || document.querySelector('[data-tour-id="my-hand"]');
       const fr = fan?.getBoundingClientRect();
-      if (fr && fr.width) { setPos({ centerX: fr.left + fr.width / 2, bottom: window.innerHeight - fr.top + 8 }); return; }
+      if (fr && fr.width) { setPos({ ...fit(fr.left + fr.width / 2), bottom: window.innerHeight - fr.top + 8 }); return; }
       setPos(null);
     };
     measure();
@@ -271,35 +288,43 @@ function CardNudge({ isMobile, canBluff }) {
   }, []);
 
   const anchored = pos != null;
+  // NOTE: the centering `translateX(-50%)` lives on THIS positioned wrapper, which
+  // must NOT carry the `.fade-in` class — `.fade-in`'s keyframes animate
+  // `transform: translateY(...)` with `forwards`, which would override the inline
+  // transform and drop the horizontal centering, leaving the bubble's LEFT edge
+  // (not its centre) on the anchor → a ~half-width rightward drift on every
+  // screen (the reported misalignment). The fade-in now sits on an inner wrapper.
   return (
     <div
-      className="fade-in"
       style={{
         position: 'fixed',
         ...(anchored
-          ? { left: pos.centerX, bottom: pos.bottom, transform: 'translateX(-50%)' }
-          : { left: '50%', bottom: isMobile ? 150 : 176, transform: 'translateX(-50%)' }),
-        zIndex: 2900, width: 'min(90vw, 420px)', pointerEvents: 'none', textAlign: 'center',
+          ? { left: pos.centerX, bottom: pos.bottom, width: pos.width }
+          : { left: '50%', bottom: isMobile ? 150 : 176, width: 'min(90vw, 420px)' }),
+        transform: 'translateX(-50%)',
+        zIndex: 2900, pointerEvents: 'none', textAlign: 'center',
       }}
     >
-      <div style={{
-        display: 'inline-block',
-        background: 'rgba(26,23,20,0.96)', border: '1px solid var(--accent)',
-        borderRadius: 'var(--radius)', padding: '8px 14px',
-        boxShadow: '0 6px 22px rgba(0,0,0,0.55)',
-        fontFamily: "'Crimson Text', serif", fontSize: isMobile ? 13 : 14, color: 'var(--text)',
-        lineHeight: 1.45,
-      }}>
-        <span style={{ color: 'var(--accent)', fontWeight: 700 }}>Tap a card</span> in your hand below to play it
-        {canBluff && (
-          <> — or hit <span style={{ color: 'var(--accent2)', fontWeight: 700 }}>Call Bluff</span> to challenge the bot</>
-        )}
-      </div>
-      <div aria-hidden style={{
-        fontSize: 20, color: 'var(--accent)', marginTop: 2,
-        animation: 'bobDown 1.1s ease-in-out infinite',
-      }}>
-        ▼
+      <div className="fade-in">
+        <div style={{
+          display: 'inline-block',
+          background: 'rgba(26,23,20,0.96)', border: '1px solid var(--accent)',
+          borderRadius: 'var(--radius)', padding: '8px 14px',
+          boxShadow: '0 6px 22px rgba(0,0,0,0.55)',
+          fontFamily: "'Crimson Text', serif", fontSize: isMobile ? 13 : 14, color: 'var(--text)',
+          lineHeight: 1.45,
+        }}>
+          <span style={{ color: 'var(--accent)', fontWeight: 700 }}>Tap a card</span> in your hand below to play it
+          {canBluff && (
+            <> — or hit <span style={{ color: 'var(--accent2)', fontWeight: 700 }}>Call Bluff</span> to challenge the bot</>
+          )}
+        </div>
+        <div aria-hidden style={{
+          fontSize: 20, color: 'var(--accent)', marginTop: 2,
+          animation: 'bobDown 1.1s ease-in-out infinite',
+        }}>
+          ▼
+        </div>
       </div>
     </div>
   );
@@ -412,6 +437,99 @@ function ChoiceModal({ onBasics, onSkip, onLeave }) {
   );
 }
 
+// ─── Replay choice: coached re-run vs plain game vs the bot ───────────────────
+// Shown when the learner taps "Play again" on a finished practice run (clinic
+// complete OR an uncoached game's end card). Mirrors the lobby ChoiceModal style.
+function ReplayChoiceModal({ onCoached, onUncoached, onBack }) {
+  const Btn = ({ title, desc, onClick, primary }) => (
+    <button
+      onClick={onClick}
+      className={primary ? 'primary' : undefined}
+      style={{
+        textAlign: 'left', padding: '16px 18px', borderRadius: 'var(--radius)',
+        background: primary ? undefined : 'var(--surface2)',
+        border: `1px solid ${primary ? 'var(--accent)' : 'var(--border-lit)'}`,
+        cursor: 'pointer', color: 'var(--text)', width: '100%',
+      }}
+    >
+      <div style={{
+        fontFamily: "'Cinzel', serif", fontSize: 16, marginBottom: 4, letterSpacing: '0.06em',
+        color: primary ? '#140f08' : 'var(--accent)', fontWeight: primary ? 800 : 600,
+      }}>
+        {title}
+      </div>
+      <div style={{
+        fontFamily: "'Crimson Text', serif", fontSize: 13, lineHeight: 1.5,
+        color: primary ? 'rgba(20,15,8,0.85)' : 'var(--text-dim)', fontWeight: primary ? 600 : 400,
+      }}>
+        {desc}
+      </div>
+    </button>
+  );
+  return (
+    <div style={{
+      position: 'fixed', inset: 0, zIndex: 9460, background: 'rgba(0,0,0,0.9)',
+      display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16,
+    }}>
+      <div className="card fade-in" style={{ maxWidth: 440, width: '100%' }}>
+        <div style={{ fontFamily: "'Bebas Neue', sans-serif", fontSize: 28, color: 'var(--accent)', letterSpacing: '0.06em', lineHeight: 1 }}>
+          PLAY AGAIN
+        </div>
+        <div style={{ fontFamily: "'Crimson Text', serif", fontSize: 14, color: 'var(--text-dim)', margin: '6px 0 16px', lineHeight: 1.6 }}>
+          Run it back with the guide, or just play {BOT_NAME} for fun.
+        </div>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+          <Btn title={`Just play ${BOT_NAME}`} desc="A plain practice game — no tips, no pop-ups. Just you against the bot." onClick={onUncoached} />
+          <Btn title="Coaching again" desc="Start over from the Basics with the full walkthrough, like your first time." onClick={onCoached} />
+        </div>
+        {typeof onBack === 'function' && (
+          <button
+            onClick={onBack}
+            style={{
+              width: '100%', marginTop: 14, fontSize: 11, color: 'var(--text-dim)',
+              background: 'none', border: 'none', cursor: 'pointer',
+              textDecoration: 'underline', letterSpacing: '0.08em',
+            }}
+          >
+            Back
+          </button>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// ─── Free-play (uncoached) end card — minimal "play again / leave" at game over ─
+function FreePlayEndCard({ onPlayAgain, onLeave }) {
+  return (
+    <div style={{
+      position: 'fixed', inset: 0, zIndex: 9400, background: 'rgba(0,0,0,0.86)',
+      display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16,
+    }}>
+      <div className="card fade-in" style={{ maxWidth: 420, width: '100%', textAlign: 'center' }}>
+        <div style={{
+          fontFamily: "'Bebas Neue', sans-serif", fontSize: 30, lineHeight: 1.05,
+          letterSpacing: '0.05em', color: 'var(--accent)', marginBottom: 18,
+        }}>
+          Game over
+        </div>
+        <div style={{ display: 'flex', gap: 10 }}>
+          {typeof onPlayAgain === 'function' && (
+            <button onClick={onPlayAgain} className="primary" style={{ flex: 1, minHeight: 46, fontSize: 13 }}>
+              Play again
+            </button>
+          )}
+          {typeof onLeave === 'function' && (
+            <button onClick={onLeave} style={{ flex: 1, minHeight: 46, fontSize: 13 }}>
+              Leave practice
+            </button>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ─── Generic guided modal (briefing pop-up + resolved explanation) ────────────
 // `gateMs` holds the CTA disabled for that long (a countdown) so the info has
 // time to settle — Module 4 mandates a 5s pause before the "I understand now"
@@ -488,6 +606,7 @@ export function TutorialLayer({
   spinActive = false,
   holdClinic = false,
   reopenSignal = 0,
+  preArmLockSignal = 0,
   lesson = 'basics',
 }) {
   const phase = roomState?.phase;
@@ -495,6 +614,14 @@ export function TutorialLayer({
   const scenario = roomState?.tutorialScenario || null;
   const clinicComplete = !!roomState?.tutorialClinicComplete;
   const slides = introSlidesFor(lesson);
+  // Uncoached replay: a plain game vs the bot. The server suppresses the clinic
+  // director; the client suppresses every guide overlay (see the early return).
+  const coachingOff = roomState?.tutorialCoaching === false;
+  // "Play again" → choose coached re-run vs a plain game (used by both the clinic
+  // -complete card and the uncoached end card).
+  const [showReplayChoice, setShowReplayChoice] = useState(false);
+  const startCoachedReplay = () => { setShowReplayChoice(false); if (typeof restartRoom === 'function') restartRoom(true); };
+  const startUncoachedReplay = () => { setShowReplayChoice(false); if (typeof restartRoom === 'function') restartRoom(false); };
 
   // Lobby path choice (Basics vs skip to Power Cards) now lives in-room.
   const [path, setPath] = useState(null); // null | 'basics' | 'powers'
@@ -504,14 +631,39 @@ export function TutorialLayer({
   const [coachHidden, setCoachHidden] = useState(false);
   // Clinic: which drill index has had its briefing pop-up dismissed.
   const [briefedIndex, setBriefedIndex] = useState(-1);
+  // Flashes a "not yet" coach hint when the learner taps the dimmed defensive
+  // power card too early (the parent bumps preArmLockSignal on each such tap).
+  const [preArmHint, setPreArmHint] = useState(false);
+  useEffect(() => {
+    if (!preArmLockSignal) return undefined;
+    setPreArmHint(true);
+    setCoachHidden(false);
+    const t = setTimeout(() => setPreArmHint(false), 4200);
+    return () => clearTimeout(t);
+  }, [preArmLockSignal]);
 
   // Sticky guards: the Basics match spawns at most ONCE (so reopening + closing
   // the guide mid-game can't re-deal), and the skip request fires once.
   const spawnedRef = useRef(false);
   const skipFiredRef = useRef(false);
 
+  // Re-entering the lobby means a fresh COACHED replay ("start again as if new"):
+  // wipe the sticky guards so the intro/choice re-shows and Basics re-deals.
+  // Leaving the lobby latches introDone (so reopening the guide mid-game can't
+  // re-trigger the intro flow). Uncoached replays never touch the lobby.
   useEffect(() => {
-    if (!isLobby) setIntroDone(true);
+    if (isLobby) {
+      spawnedRef.current = false;
+      skipFiredRef.current = false;
+      setPath(null);
+      setIntroDone(false);
+      setIntroReopened(false);
+      setIntroStep(0);
+      setBriefedIndex(-1);
+      setCoachHidden(false);
+    } else {
+      setIntroDone(true);
+    }
   }, [isLobby]);
 
   // Persist "tutorial completed" so the landing can stop badging it as NEW and
@@ -575,6 +727,11 @@ export function TutorialLayer({
     else if (lesson !== 'powers' && (phase === 'game_over' || phase === 'round_end')) {
       coach = BASICS_HANDOFF_COACH;
     } else coach = coachFor(coachContextFromRoom(roomState, myPlayerId));
+    // A too-early tap on the locked defensive card overrides the coach with a
+    // pointed "not yet" hint for a few seconds (see preArmLockSignal above).
+    if (preArmHint && coach) {
+      coach = { key: 'prearm-lock', tone: 'danger', title: 'Not yet', body: DEFENSE_PREARM_HINT };
+    }
   }
 
   // Header "Guide" button → re-show the current drill's briefing (clinic) or
@@ -610,6 +767,28 @@ export function TutorialLayer({
   const isLastDrill = scenario && scenario.total != null && scenario.index >= scenario.total - 1;
   // (The clinic progress bar now lives IN-FLOW at the top of OnlinePlayerUI so it
   // reserves layout height instead of overlaying the HUD.)
+
+  // Uncoached free play: no guide overlays whatsoever. Only surface a minimal
+  // "play again / leave" card once the game ends so the learner can loop or exit.
+  if (coachingOff) {
+    return (
+      <>
+        {phase === 'game_over' && (
+          <FreePlayEndCard
+            onPlayAgain={() => setShowReplayChoice(true)}
+            onLeave={typeof leaveGame === 'function' ? leaveGame : undefined}
+          />
+        )}
+        {showReplayChoice && (
+          <ReplayChoiceModal
+            onCoached={startCoachedReplay}
+            onUncoached={startUncoachedReplay}
+            onBack={() => setShowReplayChoice(false)}
+          />
+        )}
+      </>
+    );
+  }
 
   return (
     <>
@@ -658,11 +837,19 @@ export function TutorialLayer({
         />
       )}
 
-      {clinicComplete && (
+      {clinicComplete && !showReplayChoice && (
         <ClinicCompleteCard
           coach={CLINIC_COMPLETE_COACH}
-          onReplay={typeof restartRoom === 'function' ? restartRoom : undefined}
+          onReplay={typeof restartRoom === 'function' ? () => setShowReplayChoice(true) : undefined}
           onLeave={typeof leaveGame === 'function' ? leaveGame : undefined}
+        />
+      )}
+
+      {showReplayChoice && (
+        <ReplayChoiceModal
+          onCoached={startCoachedReplay}
+          onUncoached={startUncoachedReplay}
+          onBack={() => setShowReplayChoice(false)}
         />
       )}
 
@@ -675,9 +862,9 @@ export function TutorialLayer({
         />
       )}
 
-      {/* The "tap a card ▼" nudge is MOBILE-ONLY: on large screens the fixed
-          anchor drifts out of alignment with the hand, so it's dropped there. */}
-      {showCardNudge && isMobile && <CardNudge isMobile={isMobile} canBluff={canBluff} />}
+      {/* The "tap a card ▼" nudge now anchors to the fan CONTAINER (see CardNudge
+          measure), so it stays aligned on every width — shown on all screens. */}
+      {showCardNudge && <CardNudge isMobile={isMobile} canBluff={canBluff} />}
       <style>{'@keyframes bobDown{0%,100%{transform:translateY(0)}50%{transform:translateY(5px)}}'}</style>
     </>
   );

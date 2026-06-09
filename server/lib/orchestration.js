@@ -441,10 +441,16 @@ async function applySpinAndBroadcast(io, code, room, player, leaderboardRepo) {
     const emptySlots = chamberBefore.reduce((acc, s, i) => { if (s == null) acc.push(i); return acc; }, []);
     const landing = emptySlots.length ? emptySlots[Math.floor(Math.random() * emptySlots.length)] : 0;
     const survived = [...chamberBefore];
+    // Safety belt: force the landing slot empty no matter what. emptySlots is
+    // never empty today (_resetForDrill reloads a single bullet each drill), but
+    // this function makes no such guarantee — if the chamber were ever full,
+    // landing would fall back to slot 0 which could hold a live round, breaking
+    // the invariant (chamber[spinIndex]==='bullet' iff eliminated). Clearing it
+    // here keeps "survived" honest regardless of chamber state.
+    survived[landing] = null;
     // Click one more live round into a NON-landing empty slot (mirrors a normal
     // survival's +1) so the cylinder visibly loads up over the drill AND the
-    // landing slot stays empty — keeping the invariant
-    // (chamber[spinIndex]==='bullet' iff eliminated) intact.
+    // landing slot stays empty — keeping the invariant intact.
     const nonLandingEmpties = emptySlots.filter(i => i !== landing);
     if (nonLandingEmpties.length) {
       survived[nonLandingEmpties[Math.floor(Math.random() * nonLandingEmpties.length)]] = 'bullet';
