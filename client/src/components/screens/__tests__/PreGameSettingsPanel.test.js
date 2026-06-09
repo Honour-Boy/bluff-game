@@ -185,3 +185,27 @@ describe('PreGameSettingsPanel - player-count gating', () => {
     expect(document.getElementById('room-rouletteRotation')).not.toBeDisabled();
   });
 });
+
+describe('PreGameSettingsPanel - sandbox mode (Module 5)', () => {
+  function expandSandbox() {
+    const onChange = vi.fn();
+    render(<PreGameSettingsPanel config={DEFAULT_V2_CONFIG} onChange={onChange} sandbox />);
+    fireEvent.click(screen.getByText(/V2 GAME SETTINGS/i));
+    return { onChange };
+  }
+
+  it('keeps power cards togglable in the sandbox', () => {
+    const { onChange } = expandSandbox();
+    fireEvent.click(document.getElementById('pc-shield'));
+    expect(onChange).toHaveBeenCalled();
+    expect(onChange.mock.calls.at(-1)[0].powerCards.enabled.shield).toBe(true);
+  });
+
+  it('disables the non-power categories with a Coming Soon tag', () => {
+    expandSandbox();
+    expect(document.getElementById('risk-doubleBarrel')).toBeDisabled();
+    expect(document.getElementById('room-speedMode')).toBeDisabled();
+    expect(document.getElementById('sys-bounty')).toBeDisabled();
+    expect(screen.getAllByText(/coming soon/i).length).toBeGreaterThan(0);
+  });
+});
