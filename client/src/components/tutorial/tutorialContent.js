@@ -108,13 +108,13 @@ const CLINIC_COACH = {
   },
   'freeze:player': {
     intro: { tone: 'action', title: 'Freeze — skip their turn',
-      body: `Tap your Freeze card, play any card, then End Turn. Freeze makes ${BOT_NAME} lose its very next turn.` },
+      body: `Freeze is an offensive power, so you arm it BEFORE you play: tap your Freeze card first, then play any card, then End Turn. ${BOT_NAME} loses its very next turn.` },
     resolved: { tone: 'info', title: 'Frozen out',
       body: `${BOT_NAME}'s next turn just got skipped — you stole the tempo. Freeze triggers once, then it's gone.` },
   },
   'shield:player': {
     play: { tone: 'action', title: 'Your turn — bluff it',
-      body: `None of your cards match the shape, so any play is a bluff. Play one face-down, then End Turn — ${BOT_NAME} is about to challenge you.` },
+      body: `None of your cards match the shape, so any play is a bluff. Play one face-down, then End Turn. Don't arm your Shield yet — defensive powers fire when you're challenged, so you'll use it the moment ${BOT_NAME} calls your bluff.` },
     intro: { tone: 'danger', title: 'Caught — Shield up!',
       body: `${BOT_NAME} called your bluff! Tap your Shield (highlighted) to block the challenge completely.` },
     resolved: { tone: 'win', title: 'Blocked!',
@@ -128,7 +128,7 @@ const CLINIC_COACH = {
   },
   'mirror:player': {
     play: { tone: 'action', title: 'Your turn — bluff it',
-      body: `None of your cards match the shape, so any play is a bluff. Play one face-down, then End Turn — ${BOT_NAME} is about to challenge you.` },
+      body: `None of your cards match the shape, so any play is a bluff. Play one face-down, then End Turn. Don't arm your Mirror yet — defensive powers fire when you're challenged, so you'll use it the moment ${BOT_NAME} calls your bluff.` },
     intro: { tone: 'danger', title: 'Bounce it back',
       body: `${BOT_NAME} called your bluff! Tap your Mirror (highlighted) to reflect the spin straight back onto ${BOT_NAME} instead of you.` },
     resolved: { tone: 'win', title: 'Reflected!',
@@ -136,7 +136,7 @@ const CLINIC_COACH = {
   },
   'swap:player': {
     play: { tone: 'action', title: 'Your turn — bluff it',
-      body: `None of your cards match the shape, so any play is a bluff. Play one face-down, then End Turn — ${BOT_NAME} is about to challenge you.` },
+      body: `None of your cards match the shape, so any play is a bluff. Play one face-down, then End Turn. Don't arm your Swap yet — defensive powers fire when you're challenged, so you'll use it the moment ${BOT_NAME} calls your bluff.` },
     intro: { tone: 'danger', title: 'Swap the evidence',
       body: `${BOT_NAME} called your bluff! Tap Swap (highlighted), then pick the matching card from the table to switch with your played card — making your play honest after all.` },
     resolved: { tone: 'win', title: 'Swapped!',
@@ -155,6 +155,25 @@ const CLINIC_COACH = {
  * room.tutorialScenario ({ power, actor, step, index, total }); returns
  * { key, tone, title, body } or null.
  */
+// Shown when the learner taps their (dimmed) defensive power card too early — i.e.
+// during the "play a bluff + end turn" step of a Shield/Mirror/Swap drill, before
+// the bot's challenge opens the defence window. Mirrors the server block in
+// `activatePowerCard` so pre-arming can never stall the clinic.
+export const DEFENSE_PREARM_HINT = `Not yet — defensive powers fire when you're challenged. Play a card and End Turn first; the instant ${BOT_NAME} calls your bluff, that's when you defend.`;
+
+/**
+ * True while a defensive drill is waiting on the learner to play + end their turn
+ * (BEFORE the bot's challenge opens the intercept window). In this window the
+ * staged Shield/Mirror/Swap must not be armed yet — the client dims it and the
+ * server refuses early activation. Pure read of the serialized scenario + phase.
+ */
+export function isDefensivePreArmLocked(scenario, phase) {
+  return !!scenario
+    && scenario.expect === 'play_then_defend'
+    && scenario.step !== 'resolved'
+    && phase === 'playing';
+}
+
 export function clinicCoachFor(scenario, ctx = {}) {
   if (!scenario || !scenario.power) return null;
   const slug = `${scenario.power}:${scenario.actor || 'player'}`;

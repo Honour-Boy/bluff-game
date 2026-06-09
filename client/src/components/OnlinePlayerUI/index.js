@@ -17,6 +17,7 @@ import SpeedModeTimer from './SpeedModeTimer';
 import { PreGameSelectionModal } from '../PreGameSelectionModal';
 import { SmokeLayer } from '../shared/SmokeLayer';
 import { TutorialLayer } from '../tutorial/TutorialLayer';
+import { isDefensivePreArmLocked } from '../tutorial/tutorialContent';
 import {
   arcPlayers,
   distributePlayers,
@@ -493,6 +494,18 @@ export function OnlinePlayerUI({
   // ui.powerConfirmOpen). Eligibility still gates whether that tap is honoured.
   const showPowerModal = powerModalEligible && ui.powerConfirmOpen;
 
+  // Tutorial defensive drill: dim the held Shield/Mirror/Swap during the "play a
+  // bluff + end turn" step so the learner doesn't pre-arm it (which would stall
+  // the clinic — the server refuses it too). It becomes armable only once the
+  // bot's challenge opens the intercept window.
+  const powerPreArmLocked = (
+    isTutorial
+    && isMyTurn
+    && !!heldPowerCard
+    && !armedPowerCard
+    && isDefensivePreArmLocked(roomState?.tutorialScenario, phase)
+  );
+
   const isSwapPending = roomState?.phase === 'swap_pending';
   const amSwapHolder = isSwapPending && roomState?.swapHolderId === myPlayer?.id;
   const swapPickOptions = roomState?.swapPickOptions || [];
@@ -774,6 +787,7 @@ export function OnlinePlayerUI({
         handleSpectatePlayer={ui.handleSpectatePlayer}
         myHand={myHand}
         myPowerCardSlot={myPowerCardSlot}
+        powerLocked={powerPreArmLocked}
         selectedCardId={ui.selectedCardId}
         handleCardClick={ui.handleCardClick}
         handlePowerCardClick={ui.handlePowerCardClick}
@@ -945,6 +959,7 @@ export function OnlinePlayerUI({
           spinActive={!!ui.spinData}
           holdClinic={ui.eliminationHold}
           reopenSignal={guideSignal}
+          preArmLockSignal={ui.preArmLockSignal}
           lesson={roomState?.tutorialLesson || 'basics'}
         />
       )}

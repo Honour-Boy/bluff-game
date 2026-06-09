@@ -57,6 +57,10 @@ function serializeRoom(room, requestingPlayerId = null, opts = {}) {
     // Which guided lesson this practice room is running ('basics' | 'powers'),
     // so the coach + intro can adapt. null outside tutorial rooms.
     tutorialLesson: room.isTutorial ? (room.tutorialLesson || 'basics') : null,
+    // Whether the guided coaching layer is active. False = an uncoached practice
+    // replay (plain game vs the bot); the client suppresses every guide overlay.
+    // Defaults true for any tutorial room that never opted out. null outside.
+    tutorialCoaching: room.isTutorial ? (room.tutorialCoaching !== false) : undefined,
     // Active scripted Power-Clinic drill (engine/tutorialScenarios.js). The
     // client coach keys off { power, actor, step } to show the before/after copy;
     // `lockBluff` disables the Call-Bluff button during own-turn drills. null
