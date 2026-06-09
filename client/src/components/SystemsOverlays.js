@@ -292,10 +292,10 @@ export function LastStandCinematic({
         LAST STAND
       </div>
       <div style={{ color: 'var(--text-dim)', letterSpacing: '0.2em', fontSize: 11, textTransform: 'uppercase' }}>
-        Two finalists. One gun. Spin and pass — until it goes off.
+        Two finalists. One gun. Spin and pass - until it goes off.
       </div>
 
-      {/* #243 — the single SHARED gun, centred so it's unmistakably ONE chamber
+      {/* #243 - the single SHARED gun, centred so it's unmistakably ONE chamber
           both finalists take turns spinning. It escalates every survival. */}
       <div style={{
         display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 12,

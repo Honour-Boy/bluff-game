@@ -23,6 +23,7 @@ const {
   POWER_CLINIC,
   stageScenario,
   scenarioComplete,
+  clinicActionBlock,
   REQUIRED_SHAPE,
 } = require('../engine/tutorialScenarios.js');
 const {
@@ -289,6 +290,40 @@ describe('scenarioComplete (driven through real resolution)', () => {
     expect(outcome.kind).toBe('blocked');
     room.phase = 'playing';
     expect(scenarioComplete(room, i)).toBe(true);
+  });
+});
+
+// ─── Off-script action guard ──────────────────────────────────────────────────
+describe('clinicActionBlock (play_card guard)', () => {
+  const idxOf = (power, actor = 'player') =>
+    POWER_CLINIC.findIndex((s) => s.power === power && (s.actor || 'player') === actor);
+
+  // The director stamps room.tutorialScenario from the stageScenario descriptor;
+  // mirror that here so the guard (which reads room.tutorialScenario) has context.
+  const stage = (room, i) => { room.tutorialScenario = stageScenario(room, i); };
+
+  it('blocks a card play during the Call-Bluff (bot-Shield) drill', () => {
+    const room = clinicRoom();
+    stage(room, idxOf('shield', 'bot')); // expect: call_bluff
+    const block = clinicActionBlock(room, 'play_card');
+    expect(block).toBeTruthy();
+    expect(block.reason.toLowerCase()).toContain('bluff');
+  });
+
+  it('blocks a card play before the power is used in a use_power drill (Peek)', () => {
+    const room = clinicRoom();
+    stage(room, idxOf('peek')); // expect: use_power
+    expect(clinicActionBlock(room, 'play_card')).toBeTruthy();
+    room.powerActivatedThisTurn = true; // after peeking
+    expect(clinicActionBlock(room, 'play_card')).toBeNull();
+  });
+
+  it('never blocks a play_then_defend drill, and is inert in normal rooms', () => {
+    const room = clinicRoom();
+    stage(room, idxOf('shield', 'player')); // expect: play_then_defend
+    expect(clinicActionBlock(room, 'play_card')).toBeNull();
+    const normal = engine.createRoom('s', engine.MODES.ONLINE, null);
+    expect(clinicActionBlock(normal, 'play_card')).toBeNull();
   });
 });
 

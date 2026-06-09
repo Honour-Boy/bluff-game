@@ -18,7 +18,7 @@ describe('LeaderboardPanel', () => {
     );
 
     await waitFor(() => {
-      expect(screen.getByText(/No games played yet — start one to begin tracking\./i)).toBeInTheDocument();
+      expect(screen.getByText(/No games played yet - start one to begin tracking\./i)).toBeInTheDocument();
     });
   });
 

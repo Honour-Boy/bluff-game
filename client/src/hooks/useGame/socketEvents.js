@@ -87,7 +87,7 @@ export function useGameSocketEvents({
     // of INBOUND traffic (on top of the engine-level pong), helping free-tier
     // hosts keep the instance awake during a live game. Pure liveness; no state.
     const onServerKeepalive = () => {
-      try { socket.emit('client_keepalive'); } catch (_) { /* transport hiccup — non-fatal */ }
+      try { socket.emit('client_keepalive'); } catch (_) { /* transport hiccup - non-fatal */ }
     };
 
     const onBluffCalled = () => notify('Bluff called! Host: reveal the last card.', 'warning');

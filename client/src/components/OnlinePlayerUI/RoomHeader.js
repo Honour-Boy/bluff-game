@@ -141,7 +141,7 @@ export function RoomHeader({
         }}>
           BLUFF
         </h1>
-        {/* Room code — wax seal style */}
+        {/* Room code - wax seal style */}
         <div
           title="Tap to copy cipher"
           onClick={() => navigator.clipboard?.writeText(roomCode)}
@@ -203,7 +203,7 @@ export function RoomHeader({
           </div>
         )}
         {/* Practice mode swaps the generic "Rules" book for a "Guide" button that
-            reopens the tutorial walkthrough — and the floating Show-Guide pill is
+            reopens the tutorial walkthrough - and the floating Show-Guide pill is
             dropped, so the two no longer collide here. */}
         {isTutorial ? (
           <button

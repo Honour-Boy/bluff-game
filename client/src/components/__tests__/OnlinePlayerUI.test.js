@@ -159,7 +159,7 @@ describe('CardHand — armed power-card visual state (issue #64)', () => {
   it('does NOT mark a normal (un-armed) card with the lock badge', () => {
     const onCardClick = vi.fn();
     render(<CardHand hand={[card('c1')]} onCardClick={onCardClick} />);
-    expect(screen.queryByLabelText(/Activated — awaiting trigger/i)).toBeNull();
+    expect(screen.queryByLabelText(/Activated - awaiting trigger/i)).toBeNull();
     // Clicks on a normal card go through.
     fireEvent.click(screen.getByText('5'));
     expect(onCardClick).toHaveBeenCalledWith('c1');
@@ -169,7 +169,7 @@ describe('CardHand — armed power-card visual state (issue #64)', () => {
     render(
       <CardHand hand={[]} powerCardSlot={[card('p1', { type: 'power', power: 'assassin', armed: true })]} />,
     );
-    expect(screen.getByLabelText(/Activated — awaiting trigger/i)).toBeInTheDocument();
+    expect(screen.getByLabelText(/Activated - awaiting trigger/i)).toBeInTheDocument();
   });
 
   it('halves the inner-card opacity when armed', () => {
@@ -179,7 +179,7 @@ describe('CardHand — armed power-card visual state (issue #64)', () => {
         powerCardSlot={[card('armed-card', { type: 'power', power: 'shield', armed: true })]}
       />,
     );
-    const lock = screen.getByLabelText(/Activated — awaiting trigger/i);
+    const lock = screen.getByLabelText(/Activated - awaiting trigger/i);
     // The lock badge is a sibling of the dimmed inner. The dimmed
     // inner is its previousElementSibling — assert it's dimmed to the
     // shipped 0.48 (CardHand.js sets opacity: isArmed ? 0.48 : 1).
@@ -198,7 +198,7 @@ describe('CardHand — armed power-card visual state (issue #64)', () => {
         interactive
       />,
     );
-    const lock = screen.getByLabelText(/Activated — awaiting trigger/i);
+    const lock = screen.getByLabelText(/Activated - awaiting trigger/i);
     const outer = lock.parentElement; // the per-card wrapper
     expect(outer.style.pointerEvents).toBe('none');
 
@@ -212,9 +212,9 @@ describe('CardHand — armed power-card visual state (issue #64)', () => {
     render(
       <CardHand hand={[]} powerCardSlot={[card('p1', { type: 'power', power: 'shield', armed: true })]} />,
     );
-    const lock = screen.getByLabelText(/Activated — awaiting trigger/i);
+    const lock = screen.getByLabelText(/Activated - awaiting trigger/i);
     const outer = lock.parentElement;
-    expect(outer.getAttribute('title')).toBe('Activated — awaiting trigger');
+    expect(outer.getAttribute('title')).toBe('Activated - awaiting trigger');
   });
 
   it('non-armed cards in the same hand stay clickable when one card is armed', () => {

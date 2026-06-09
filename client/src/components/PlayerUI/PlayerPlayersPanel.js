@@ -79,7 +79,7 @@ export function PlayerPlayersPanel({
                 background: isCurrentPlayer && alive ? 'var(--accent)' : 'transparent',
                 border: `1px solid ${alive ? 'var(--border)' : 'transparent'}`,
               }}>
-                {alive ? turnPos + 1 : '—'}
+                {alive ? turnPos + 1 : '-'}
               </div>
 
               {/* Name + labels */}

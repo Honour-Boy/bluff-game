@@ -80,7 +80,7 @@ describe('CardHand — power-card / shape-card click decoupling (#139)', () => {
     // The crude text label is gone...
     expect(screen.queryByText('LOCK')).toBeNull();
     // ...replaced by an accessible armed badge.
-    expect(screen.getByLabelText('Activated — awaiting trigger')).toBeInTheDocument();
+    expect(screen.getByLabelText('Activated - awaiting trigger')).toBeInTheDocument();
   });
 
   it('does not invoke onPowerCardClick for an armed (locked) power card', () => {

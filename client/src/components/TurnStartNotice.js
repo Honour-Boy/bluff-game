@@ -29,7 +29,7 @@ export function TurnStartNotice({
     ? "The previous turn was frozen, so there's nothing to challenge. Play a card or activate a power card."
     : isFirstTurn
       ? "Play a card or activate a power card. (No bluff on the first turn.)"
-      : "Play a card, call the previous player's bluff, or activate a power card — in any order.";
+      : "Play a card, call the previous player's bluff, or activate a power card - in any order.";
 
   return (
     <div

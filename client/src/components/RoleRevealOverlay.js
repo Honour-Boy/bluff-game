@@ -27,7 +27,7 @@ export const ROLE_META = {
   barehand: {
     label: "Barehand",
     color: "#8a8f99", // neutral steel grey
-    flavor: "No special abilities. Read the room and trust your instincts — the basics are all you need to win.",
+    flavor: "No special abilities. Read the room and trust your instincts - the basics are all you need to win.",
   },
   // Shown to Barehand players on small tables (#116) — the literal
   // "Barehand" label is hidden below the role threshold so the reveal
@@ -40,7 +40,7 @@ export const ROLE_META = {
   gambler: {
     label: "The Gambler",
     color: "#e5a23c", // amber
-    flavor: "Your risk doesn't grow on surviving spins — but get caught bluffing and your chamber jumps to four bullets.",
+    flavor: "Your risk doesn't grow on surviving spins - but get caught bluffing and your chamber jumps to four bullets.",
   },
   sheriff: {
     label: "The Sheriff",
@@ -50,7 +50,7 @@ export const ROLE_META = {
   medic: {
     label: "The Medic",
     color: "#7cd5ff", // ice blue
-    flavor: "Once per game, save a player from elimination — yourself or anyone else. The save costs you two extra cards.",
+    flavor: "Once per game, save a player from elimination - yourself or anyone else. The save costs you two extra cards.",
   },
   saboteur: {
     label: "The Saboteur",
@@ -271,7 +271,7 @@ export function RoleRevealOverlay({ role, onComplete, durationMs = 9000, barehan
           {meta.flavor}
         </div>
 
-        {/* Footer hint — privacy message */}
+        {/* Footer hint - privacy message */}
         <div
           style={{
             fontFamily: "'Space Mono', monospace",

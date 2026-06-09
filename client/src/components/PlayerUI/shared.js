@@ -37,7 +37,7 @@ export function CylinderSVG({ bulletChambers, landingChamberIndex, rotation, ani
           transition: animating ? 'transform 8s cubic-bezier(0.1, 0, 0.2, 1)' : 'none',
         }}
       >
-        {/* Cylinder body — dark iron/copper with tavern patina */}
+        {/* Cylinder body - dark iron/copper with tavern patina */}
         <circle cx={CX} cy={CY} r={ORBIT + CHAM_R + 8} fill="#1a1208" stroke="#4a3520" strokeWidth={2} />
         {chambers.map((chamber, index) => (
           <g key={index}>
@@ -70,7 +70,7 @@ export function CylinderSVG({ bulletChambers, landingChamberIndex, rotation, ani
             )}
           </g>
         ))}
-        {/* Centre pin — tarnished brass */}
+        {/* Centre pin - tarnished brass */}
         <circle cx={CX} cy={CY} r={9} fill="#2a1e0e" stroke="#5a4020" strokeWidth={1.5} />
       </svg>
     </div>

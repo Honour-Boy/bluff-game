@@ -6,20 +6,20 @@ export function ActionLog({ lastAction }) {
   const messages = {
     spin: ({ targetName, eliminated, roll, riskLevel }) =>
       eliminated
-        ? `💀 ${targetName} rolled ${roll} (risk ${riskLevel - 1}) — ELIMINATED`
-        : `😮‍💨 ${targetName} rolled ${roll} (risk ${riskLevel - 1}) — SURVIVED. Risk now ${riskLevel}/6`,
+        ? `💀 ${targetName} rolled ${roll} (risk ${riskLevel - 1}) - ELIMINATED`
+        : `😮‍💨 ${targetName} rolled ${roll} (risk ${riskLevel - 1}) - SURVIVED. Risk now ${riskLevel}/6`,
     bluff_resolved: ({ bluffCorrect, spinTargetName, eliminated, roll }) =>
       bluffCorrect
-        ? `✅ Bluff was CORRECT — ${spinTargetName} spun, rolled ${roll}, ${eliminated ? 'ELIMINATED' : 'survived'}`
-        : `❌ Bluff was WRONG — ${spinTargetName} (accuser) spun, rolled ${roll}, ${eliminated ? 'ELIMINATED' : 'survived'}`,
+        ? `✅ Bluff was CORRECT - ${spinTargetName} spun, rolled ${roll}, ${eliminated ? 'ELIMINATED' : 'survived'}`
+        : `❌ Bluff was WRONG - ${spinTargetName} (accuser) spun, rolled ${roll}, ${eliminated ? 'ELIMINATED' : 'survived'}`,
     bluff_called: ({ callerName, callerId }) => callerName
       ? `⚠️ ${callerName} called bluff! Host: reveal the last card played.`
       : `⚠️ Bluff called! Host: reveal the last card played.`,
     spin_result: ({ spinTargetName, eliminated, roll, riskLevelBefore, redemption }) => {
-      const tag = redemption ? '🎲 REDEMPTION — ' : '';
+      const tag = redemption ? '🎲 REDEMPTION - ' : '';
       return eliminated
-        ? `${tag}💀 ${spinTargetName} rolled ${roll} (risk ${riskLevelBefore}/6) — ${redemption ? 'STAYS OUT' : 'ELIMINATED'}`
-        : `${tag}😮‍💨 ${spinTargetName} rolled ${roll} (risk ${riskLevelBefore}/6) — ${redemption ? 'REJOINS' : 'SURVIVED'}`;
+        ? `${tag}💀 ${spinTargetName} rolled ${roll} (risk ${riskLevelBefore}/6) - ${redemption ? 'STAYS OUT' : 'ELIMINATED'}`
+        : `${tag}😮‍💨 ${spinTargetName} rolled ${roll} (risk ${riskLevelBefore}/6) - ${redemption ? 'REJOINS' : 'SURVIVED'}`;
     },
     card_played_online: ({ card, playerName }) => {
       const who = playerName ? `${playerName} played` : 'Card played';
@@ -30,27 +30,27 @@ export function ActionLog({ lastAction }) {
     card_played: ({ playerName }) =>
       playerName ? `🃏 ${playerName} played a card face-down.` : '🃏 Card played face-down.',
     round_win: ({ winnerName }) => `🏆 ${winnerName} won the round! All players redealt.`,
-    game_over: ({ winnerName }) => `🎉 GAME OVER — ${winnerName} is the last player standing!`,
+    game_over: ({ winnerName }) => `🎉 GAME OVER - ${winnerName} is the last player standing!`,
     continued: ({ playerId }) => `→ Player continued their turn.`,
-    disconnected: ({ playerName }) => `🔌 ${playerName} disconnected — eliminated.`,
+    disconnected: ({ playerName }) => `🔌 ${playerName} disconnected - eliminated.`,
     // v2 Phase C — power-card outcome lines.
     bluff_blocked: () => `🛡 Shield blocked the bluff.`,
     assassin_strike: ({ eliminatedName, assassinHolderName }) => {
       if (eliminatedName && assassinHolderName) {
-        return `🗡 ${assassinHolderName}'s Assassin struck — ${eliminatedName} eliminated.`;
+        return `🗡 ${assassinHolderName}'s Assassin struck - ${eliminatedName} eliminated.`;
       }
       return `🗡 Assassin struck.`;
     },
-    swap_pending: () => `🔄 Swap activated — holder is choosing a card.`,
+    swap_pending: () => `🔄 Swap activated - holder is choosing a card.`,
     speed_timeout: ({ playerName }) =>
       playerName
-        ? `⏱ ${playerName} ran out of time — turn auto-ended.`
-        : `⏱ Turn timed out — auto-ended.`,
+        ? `⏱ ${playerName} ran out of time - turn auto-ended.`
+        : `⏱ Turn timed out - auto-ended.`,
     idle_timeout: ({ playerName, autoPlayed }) => {
       const who = playerName || 'A player';
       return autoPlayed
-        ? `💤 ${who} was idle — a card was auto-played and their turn ended.`
-        : `💤 ${who} was idle — their turn was auto-ended.`;
+        ? `💤 ${who} was idle - a card was auto-played and their turn ended.`
+        : `💤 ${who} was idle - their turn was auto-ended.`;
     },
   };
 

@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react';
 
 function formatWinRate(wins, gamesPlayed) {
-  if (!gamesPlayed) return '—';
+  if (!gamesPlayed) return '-';
   return `${Math.round((wins / gamesPlayed) * 100)}%`;
 }
 
@@ -69,7 +69,7 @@ export function LeaderboardPanel({
         <div style={{ fontSize: 12, color: 'var(--accent2)' }}>{loadError}</div>
       ) : leaderboard.length === 0 ? (
         <div style={{ fontSize: 12, color: 'var(--text-dim)' }}>
-          No games played yet — start one to begin tracking.
+          No games played yet - start one to begin tracking.
         </div>
       ) : (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>

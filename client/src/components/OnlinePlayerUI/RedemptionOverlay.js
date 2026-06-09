@@ -72,7 +72,7 @@ export default function RedemptionOverlay({ redemption, isMine, onSpin, busy }) 
         {isMine ? (
           <>
             <p style={{ fontSize: 15, lineHeight: 1.5, margin: '0 0 18px' }}>
-              You were eliminated — but the table grants you one last spin.
+              You were eliminated - but the table grants you one last spin.
               Survive and you rejoin with a fresh chamber and hand. Miss, and
               you&apos;re out for good.
             </p>

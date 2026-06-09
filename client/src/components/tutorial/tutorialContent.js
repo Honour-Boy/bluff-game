@@ -15,17 +15,17 @@ export const INTRO_SLIDES = [
   {
     id: 'welcome',
     title: 'The Practice Table',
-    body: `Welcome. This is a solo round against ${BOT_NAME} — a safe table where nothing counts. We'll walk you through a real game one beat at a time.`,
+    body: `Welcome. This is a solo round against ${BOT_NAME} - a safe table where nothing counts. We'll walk you through a real game one beat at a time.`,
   },
   {
     id: 'controls',
     title: 'Where Things Live',
-    body: 'First, a quick tour of the table controls — you’ll use these in real games:',
+    body: 'First, a quick tour of the table controls - you’ll use these in real games:',
     // Rendered as a small icon grid by the intro modal (a visual cue, not a bullet list).
     controls: [
-      { icon: 'gear', label: 'Settings', where: 'Top-right gear — house rules, sound, and Leave Table.' },
-      { icon: 'chat', label: 'Chat', where: 'Header button — talk to the table during a real game.' },
-      { icon: 'trophy', label: 'Leaderboard', where: 'In group games — standings live in the Controls menu.' },
+      { icon: 'gear', label: 'Settings', where: 'Top-right gear - house rules, sound, and Leave Table.' },
+      { icon: 'chat', label: 'Chat', where: 'Header button - talk to the table during a real game.' },
+      { icon: 'trophy', label: 'Leaderboard', where: 'In group games - standings live in the Controls menu.' },
     ],
   },
   {
@@ -34,7 +34,7 @@ export const INTRO_SLIDES = [
     body: 'Bluff is last-player-standing. Two ways the round moves:',
     points: [
       'Empty your hand to win the round.',
-      'Survive the gun — a wrong move can put you on the spot.',
+      'Survive the gun - a wrong move can put you on the spot.',
     ],
   },
   {
@@ -42,8 +42,8 @@ export const INTRO_SLIDES = [
     title: 'Each Turn',
     body: 'A required shape sits on the table. On your turn you play one card:',
     points: [
-      'Play a card that MATCHES the shape — an honest play.',
-      "Or play one that doesn't and hope nobody notices — a bluff.",
+      'Play a card that MATCHES the shape - an honest play.',
+      "Or play one that doesn't and hope nobody notices - a bluff.",
       'Nobody sees your card unless someone calls your bluff.',
     ],
   },
@@ -81,8 +81,8 @@ const POWERS_SLIDE = {
   title: 'Power Cards',
   body: 'This round mixes two power cards into the deck. You start holding one in a slot beside your hand:',
   points: [
-    'Peek — privately see the last card played before you decide.',
-    'Shield — block the next bluff called against you.',
+    'Peek - privately see the last card played before you decide.',
+    'Shield - block the next bluff called against you.',
     'Tap your power card on your turn to use it (you hold one at a time).',
   ],
 };
@@ -101,52 +101,52 @@ const POWER_LABELS = {
 // bot uses one). Pure copy, keyed by a `${power}:${actor}` slug.
 const CLINIC_COACH = {
   'peek:player': {
-    intro: { tone: 'action', title: 'Peek — look before you leap',
+    intro: { tone: 'action', title: 'Peek - look before you leap',
       body: `It's your turn, but did ${BOT_NAME} play honestly? Tap your Peek card in the Power slot beside your hand to secretly see its last card.` },
     resolved: { tone: 'info', title: "That's Peek",
-      body: `You alone saw the real card — now you'd know if a challenge is safe. Peek is spent after one look.` },
+      body: `You alone saw the real card - now you'd know if a challenge is safe. Peek is spent after one look.` },
   },
   'freeze:player': {
-    intro: { tone: 'action', title: 'Freeze — skip their turn',
+    intro: { tone: 'action', title: 'Freeze - skip their turn',
       body: `Freeze is an offensive power, so you arm it BEFORE you play: tap your Freeze card first, then play any card, then End Turn. ${BOT_NAME} loses its very next turn.` },
     resolved: { tone: 'info', title: 'Frozen out',
-      body: `${BOT_NAME}'s next turn just got skipped — you stole the tempo. Freeze triggers once, then it's gone.` },
+      body: `${BOT_NAME}'s next turn just got skipped - you stole the tempo. Freeze triggers once, then it's gone.` },
   },
   'shield:player': {
-    play: { tone: 'action', title: 'Your turn — bluff it',
-      body: `None of your cards match the shape, so any play is a bluff. Play one face-down, then End Turn. Don't arm your Shield yet — defensive powers fire when you're challenged, so you'll use it the moment ${BOT_NAME} calls your bluff.` },
-    intro: { tone: 'danger', title: 'Caught — Shield up!',
+    play: { tone: 'action', title: 'Your turn - bluff it',
+      body: `None of your cards match the shape, so any play is a bluff. Play one face-down, then End Turn. Don't arm your Shield yet - defensive powers fire when you're challenged, so you'll use it the moment ${BOT_NAME} calls your bluff.` },
+    intro: { tone: 'danger', title: 'Caught - Shield up!',
       body: `${BOT_NAME} called your bluff! Tap your Shield (highlighted) to block the challenge completely.` },
     resolved: { tone: 'win', title: 'Blocked!',
-      body: `Shield cancelled the bluff outright — no spin, no risk. It blocks one challenge, then it's spent.` },
+      body: `Shield cancelled the bluff outright - no spin, no risk. It blocks one challenge, then it's spent.` },
   },
   'shield:bot': {
     intro: { tone: 'action', title: 'Now challenge the bot',
-      body: `${BOT_NAME} just played. Hit Call Bluff — then watch how it defends itself.` },
+      body: `${BOT_NAME} just played. Hit Call Bluff - then watch how it defends itself.` },
     resolved: { tone: 'info', title: 'The bot shielded',
-      body: `Even though your call was right, ${BOT_NAME} armed a Shield and blocked it — no spin. Powers work for the bot too, so read the table.` },
+      body: `Even though your call was right, ${BOT_NAME} armed a Shield and blocked it - no spin. Powers work for the bot too, so read the table.` },
   },
   'mirror:player': {
-    play: { tone: 'action', title: 'Your turn — bluff it',
-      body: `None of your cards match the shape, so any play is a bluff. Play one face-down, then End Turn. Don't arm your Mirror yet — defensive powers fire when you're challenged, so you'll use it the moment ${BOT_NAME} calls your bluff.` },
+    play: { tone: 'action', title: 'Your turn - bluff it',
+      body: `None of your cards match the shape, so any play is a bluff. Play one face-down, then End Turn. Don't arm your Mirror yet - defensive powers fire when you're challenged, so you'll use it the moment ${BOT_NAME} calls your bluff.` },
     intro: { tone: 'danger', title: 'Bounce it back',
       body: `${BOT_NAME} called your bluff! Tap your Mirror (highlighted) to reflect the spin straight back onto ${BOT_NAME} instead of you.` },
     resolved: { tone: 'win', title: 'Reflected!',
-      body: `Mirror sent the spin to ${BOT_NAME} — they're on the spot now, not you. One use, then it's spent.` },
+      body: `Mirror sent the spin to ${BOT_NAME} - they're on the spot now, not you. One use, then it's spent.` },
   },
   'swap:player': {
-    play: { tone: 'action', title: 'Your turn — bluff it',
-      body: `None of your cards match the shape, so any play is a bluff. Play one face-down, then End Turn. Don't arm your Swap yet — defensive powers fire when you're challenged, so you'll use it the moment ${BOT_NAME} calls your bluff.` },
+    play: { tone: 'action', title: 'Your turn - bluff it',
+      body: `None of your cards match the shape, so any play is a bluff. Play one face-down, then End Turn. Don't arm your Swap yet - defensive powers fire when you're challenged, so you'll use it the moment ${BOT_NAME} calls your bluff.` },
     intro: { tone: 'danger', title: 'Swap the evidence',
-      body: `${BOT_NAME} called your bluff! Tap Swap (highlighted), then pick the matching card from the table to switch with your played card — making your play honest after all.` },
+      body: `${BOT_NAME} called your bluff! Tap Swap (highlighted), then pick the matching card from the table to switch with your played card - making your play honest after all.` },
     resolved: { tone: 'win', title: 'Swapped!',
-      body: `Your played card became a match, so the bluff failed — ${BOT_NAME} spins instead. Swap re-faces your card once.` },
+      body: `Your played card became a match, so the bluff failed - ${BOT_NAME} spins instead. Swap re-faces your card once.` },
   },
   'assassin:player': {
-    intro: { tone: 'action', title: 'Assassin — bait the trap',
+    intro: { tone: 'action', title: 'Assassin - bait the trap',
       body: `Tap your Assassin to arm it, play a card that MATCHES the shape (an honest play), then End Turn. If ${BOT_NAME} recklessly challenges you…` },
     resolved: { tone: 'win', title: 'Struck!',
-      body: `${BOT_NAME} challenged your honest play — and your Assassin eliminated it on the spot. A wrong challenge against an armed Assassin is fatal. That's every power — clinic complete!` },
+      body: `${BOT_NAME} challenged your honest play - and your Assassin eliminated it on the spot. A wrong challenge against an armed Assassin is fatal. That's every power - clinic complete!` },
   },
 };
 
@@ -159,7 +159,7 @@ const CLINIC_COACH = {
 // during the "play a bluff + end turn" step of a Shield/Mirror/Swap drill, before
 // the bot's challenge opens the defence window. Mirrors the server block in
 // `activatePowerCard` so pre-arming can never stall the clinic.
-export const DEFENSE_PREARM_HINT = `Not yet — defensive powers fire when you're challenged. Play a card and End Turn first; the instant ${BOT_NAME} calls your bluff, that's when you defend.`;
+export const DEFENSE_PREARM_HINT = `Not yet - defensive powers fire when you're challenged. Play a card and End Turn first; the instant ${BOT_NAME} calls your bluff, that's when you defend.`;
 
 /**
  * True while a defensive drill is waiting on the learner to play + end their turn
@@ -182,11 +182,31 @@ export function isDefensivePreArmLocked(scenario, phase) {
  * play_then_defend needs only a card play (the End Turn button already requires
  * that), so it returns null. Inert outside an active (intro-step) clinic drill.
  */
+/**
+ * Power-Clinic play-a-card lock (client mirror of the server `clinicActionBlock`
+ * for `play_card`): returns a coach-hint string to BLOCK a card play that isn't
+ * the drill's scripted action, or null to allow. Keeps the learner from breaking
+ * the lesson by tapping a card when they should Call Bluff / use a power first.
+ * `flags` = { powerActivatedThisTurn }. Inert outside an active clinic drill, so
+ * normal play is never blocked.
+ */
+export function clinicCardPlayLock(scenario, flags = {}) {
+  if (!scenario || scenario.step === 'resolved') return null;
+  const power = scenario.power ? scenario.power[0].toUpperCase() + scenario.power.slice(1) : 'power';
+  if (scenario.expect === 'call_bluff') {
+    return `Call ${BOT_NAME}'s bluff first - that's this drill. Don't play a card yet.`;
+  }
+  if ((scenario.expect === 'use_power' || scenario.expect === 'arm_then_play') && !flags.powerActivatedThisTurn) {
+    return `Use your ${power} first - tap it in the slot beside your hand before playing a card.`;
+  }
+  return null;
+}
+
 export function clinicEndTurnLock(scenario, flags = {}) {
   if (!scenario || scenario.step === 'resolved') return null;
   const power = scenario.power ? scenario.power[0].toUpperCase() + scenario.power.slice(1) : 'power';
   if (scenario.expect === 'call_bluff' && !flags.bluffUsedThisTurn) {
-    return `Call ${BOT_NAME}'s bluff first — that's this drill.`;
+    return `Call ${BOT_NAME}'s bluff first - that's this drill.`;
   }
   if (scenario.expect === 'use_power' && !flags.powerActivatedThisTurn) {
     return `Use your ${power} first.`;
@@ -226,10 +246,10 @@ export function clinicCoachFor(scenario, ctx = {}) {
 // One-line "what this power does" for the per-drill briefing pop-up shown BEFORE
 // the staged instance (the learner taps "Got it" to enter it).
 const CLINIC_BRIEFING = {
-  shield: `Shield blocks a bluff called against you — completely. No spin, no risk. We'll put you in a spot where ${BOT_NAME} calls your bluff so you can use it.`,
+  shield: `Shield blocks a bluff called against you - completely. No spin, no risk. We'll put you in a spot where ${BOT_NAME} calls your bluff so you can use it.`,
   peek: `Peek lets you secretly look at ${BOT_NAME}'s last card before you decide. Information wins games.`,
-  freeze: `Freeze skips ${BOT_NAME}'s next turn — arm it, play a card, end your turn, and steal the tempo.`,
-  mirror: `Mirror reflects a spin back onto whoever challenged you. ${BOT_NAME} wanted you on the spot — now it is.`,
+  freeze: `Freeze skips ${BOT_NAME}'s next turn - arm it, play a card, end your turn, and steal the tempo.`,
+  mirror: `Mirror reflects a spin back onto whoever challenged you. ${BOT_NAME} wanted you on the spot - now it is.`,
   swap: `Swap switches your played card with one on the table, turning a caught bluff into an honest play.`,
   assassin: `Assassin punishes a reckless challenge: arm it, play honestly, and a wrong bluff-call eliminates the challenger outright.`,
 };
@@ -244,7 +264,7 @@ export function clinicBriefingFor(scenario) {
   if ((scenario.actor || 'player') === 'bot') {
     return {
       title: 'The bot’s side',
-      body: `Powers aren’t just yours. Challenge ${BOT_NAME} here — and watch it defend itself with a ${label}.`,
+      body: `Powers aren’t just yours. Challenge ${BOT_NAME} here - and watch it defend itself with a ${label}.`,
     };
   }
   const n = scenario.playerStep;
@@ -258,7 +278,7 @@ export function clinicBriefingFor(scenario) {
 export const BASICS_HANDOFF_COACH = {
   key: 'basics-handoff',
   tone: 'win',
-  title: 'Nice — that’s the core loop',
+  title: 'Nice - that’s the core loop',
   body: `Play, bluff, spin, survive. Now ${BOT_NAME} will deal you into the Power Cards lesson…`,
 };
 
@@ -267,7 +287,7 @@ export const CLINIC_COMPLETE_COACH = {
   key: 'clinic-complete',
   tone: 'win',
   title: 'You’ve learned the powers! 🎉',
-  body: 'Peek, Freeze, Shield, Mirror, Swap, Assassin — you’ve used them all. Play again to practise, or jump into a real game.',
+  body: 'Peek, Freeze, Shield, Mirror, Swap, Assassin - you’ve used them all. Play again to practise, or jump into a real game.',
 };
 
 // The intro deck for a given lesson. 'powers' splices the Power Cards slide in
@@ -319,7 +339,7 @@ export function coachFor(ctx = {}) {
         key: 'intercept-defend',
         tone: 'danger',
         title: 'Block it!',
-        body: `${BOT_NAME} called bluff on your card. Arm your ${heldPowerLabel || 'defence'} to block it — or pass to let the bluff resolve.`,
+        body: `${BOT_NAME} called bluff on your card. Arm your ${heldPowerLabel || 'defence'} to block it - or pass to let the bluff resolve.`,
       };
     }
     return {
@@ -332,18 +352,18 @@ export function coachFor(ctx = {}) {
 
   // Appended to the on-turn tips when the player is holding a power card.
   const powerNote = heldPowerLabel
-    ? ` You also hold a ${heldPowerLabel} — tap it beside your hand to use it.`
+    ? ` You also hold a ${heldPowerLabel} - tap it beside your hand to use it.`
     : '';
   // The turn-action rule: all three are optional and order-free, but a card MUST
   // be played before the turn can end.
-  const turnRules = ' This turn you may play a card, call a bluff, and arm a power — in any order — but you must play a card before you can End Turn.';
+  const turnRules = ' This turn you may play a card, call a bluff, and arm a power - in any order - but you must play a card before you can End Turn.';
 
   if (phase === 'pre_game') {
     return {
       key: 'dealing',
       tone: 'info',
       title: 'Dealing you in…',
-      body: `You're being dealt 6 cards. Watch for the required shape on the table — that's what an honest play has to match.`,
+      body: `You're being dealt 6 cards. Watch for the required shape on the table - that's what an honest play has to match.`,
     };
   }
 
@@ -353,7 +373,7 @@ export function coachFor(ctx = {}) {
         key: 'spin-me',
         tone: 'danger',
         title: "You're on the spot",
-        body: 'Pull the trigger below to spin the chamber. Survive and you play on — a fresh bullet just gets added.',
+        body: 'Pull the trigger below to spin the chamber. Survive and you play on - a fresh bullet just gets added.',
       };
     }
     return {
@@ -378,7 +398,7 @@ export function coachFor(ctx = {}) {
       return {
         key: 'spectating',
         tone: 'info',
-        title: 'You’re out — watch and learn',
+        title: 'You’re out - spectate',
         body: `Spectate the rest of the round. Notice when ${BOT_NAME} plays honestly vs. bluffs.`,
       };
     }
@@ -387,7 +407,7 @@ export function coachFor(ctx = {}) {
         return {
           key: 'end-turn',
           tone: 'action',
-          title: 'Card played',
+          title: 'End your turn',
           body: `Now press End Turn to pass play to ${BOT_NAME}.`,
         };
       }
@@ -395,7 +415,7 @@ export function coachFor(ctx = {}) {
         return {
           key: 'first-play',
           tone: 'action',
-          title: 'Your turn — you lead',
+          title: 'Your lead - play a card',
           body: 'You play first this round, so there’s nothing to challenge yet. Tap a card to play it (matching the shape is the safe move).' + powerNote + turnRules,
         };
       }
@@ -403,22 +423,22 @@ export function coachFor(ctx = {}) {
         return {
           key: 'play-only',
           tone: 'action',
-          title: 'Your turn',
-          body: 'No card to challenge this turn — just play a card from your hand.',
+          title: 'Your move - play a card',
+          body: 'No card to challenge this turn - just play a card from your hand.',
         };
       }
       return {
         key: 'play-or-bluff',
         tone: 'action',
-        title: 'Your turn',
-        body: `Play a card that matches the shape — or, if you think ${BOT_NAME} just bluffed, hit Call Bluff to flip its card. Right → it spins. Wrong → you do.` + powerNote + turnRules,
+        title: 'Your move - play or call',
+        body: `Play a card that matches the shape - or, if you think ${BOT_NAME} just bluffed, hit Call Bluff to flip its card. Right → it spins. Wrong → you do.` + powerNote + turnRules,
       };
     }
     // Bot's turn.
     return {
       key: 'bot-turn',
       tone: 'info',
-      title: `${BOT_NAME} is playing`,
+      title: `${BOT_NAME}’s turn - watch`,
       body: `Watch what it puts down. On your next turn you can Call Bluff if you think it didn't match the shape.`,
     };
   }
@@ -430,7 +450,7 @@ export function coachFor(ctx = {}) {
       title: amWinner ? 'You win! 🎉' : `${winnerName || BOT_NAME} takes it`,
       body: amWinner
         ? 'You carried a full practice round. Play again to try the bluff calls, or jump into a real game.'
-        : `That's the loop: play, bluff, spin, survive. Play again — you'll read ${BOT_NAME} better next time.`,
+        : `That's the loop: play, bluff, spin, survive. Play again - you'll read ${BOT_NAME} better next time.`,
     };
   }
 

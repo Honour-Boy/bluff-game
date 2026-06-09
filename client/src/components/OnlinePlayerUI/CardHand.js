@@ -25,8 +25,8 @@ function renderOneCard({
     ? (powerInteractive === undefined ? interactive : powerInteractive)
     : interactive;
   const cardInteractive = effectiveInteractive && !isArmed;
-  const armedLabel = 'Activated — awaiting trigger';
-  const lockedLabel = 'Not yet — you defend after the bot challenges you';
+  const armedLabel = 'Activated - awaiting trigger';
+  const lockedLabel = 'Not yet - you defend after the bot challenges you';
 
   const handleClick = () => {
     if (!cardInteractive) return;
@@ -96,7 +96,7 @@ function renderOneCard({
       key={card.id}
       data-card-id={card.id}
       onClick={handleClick}
-      title={isLocked ? lockedLabel : (isArmed ? armedLabel : (isPower && powerMeta ? `${powerMeta.label} — ${powerMeta.flavor}` : undefined))}
+      title={isLocked ? lockedLabel : (isArmed ? armedLabel : (isPower && powerMeta ? `${powerMeta.label} - ${powerMeta.flavor}` : undefined))}
       aria-label={isPower && powerMeta ? `Power card: ${powerMeta.label}` : undefined}
       data-armed={isArmed ? 'true' : undefined}
       className={isJustPlayed ? 'card-play-physics' : undefined}
@@ -290,10 +290,10 @@ export function CardHand({
 
   return (
     <div style={{ display: 'flex', gap: 14, alignItems: 'flex-end', flexWrap: 'wrap' }}>
-      {/* Shape cards fan — wooden cardholder trough.
+      {/* Shape cards fan - wooden cardholder trough.
           `data-tour-id="my-hand-fan"` anchors the tutorial nudge to the ACTUAL
           card fan (not the wider hand wrapper, whose centre is pulled right by the
-          power slot — which made the nudge drift right of the cards). */}
+          power slot - which made the nudge drift right of the cards). */}
       {n > 0 && (
         <div
           data-tour-id="my-hand-fan"
@@ -304,11 +304,13 @@ export function CardHand({
             background: 'linear-gradient(180deg, rgba(20,15,9,0.0) 0%, rgba(14,10,6,0.7) 100%)',
             borderTop: '2px solid var(--border-lit)',
             borderRadius: '0 0 6px 6px',
-            paddingTop: 6,
+            // Extra top room so the "drag to browse" label clears the card tops
+            // (it's absolute, top:2) instead of sitting right on them.
+            paddingTop: 18,
             paddingBottom: 4,
           }}
         >
-          {/* Swipe affordance — chevrons on the edges + a clear label hint that the
+          {/* Swipe affordance - chevrons on the edges + a clear label hint that the
               fan can be dragged/swiped left+right to bring side cards to centre. */}
           {draggable && (
             <>
@@ -330,9 +332,9 @@ export function CardHand({
               <div aria-hidden style={{
                 position: 'absolute', top: 2, left: '50%', transform: 'translateX(-50%)',
                 zIndex: 400, pointerEvents: 'none', whiteSpace: 'nowrap',
-                fontFamily: "'Space Mono', monospace", fontSize: 9, letterSpacing: '0.12em',
-                textTransform: 'uppercase', color: 'var(--accent)', opacity: 0.85,
-                background: 'rgba(16,12,8,0.72)', borderRadius: 999, padding: '1px 8px',
+                fontFamily: "'Space Mono', monospace", fontSize: 7.5, letterSpacing: '0.1em',
+                textTransform: 'uppercase', color: 'var(--accent)', opacity: 0.8,
+                background: 'rgba(16,12,8,0.72)', borderRadius: 999, padding: '1px 7px',
                 textShadow: '0 1px 2px rgba(0,0,0,0.9)',
               }}>↔ drag to browse cards</div>
               <style>{'@keyframes swipeHintL{0%,100%{transform:translate(0,-50%);opacity:.55}50%{transform:translate(-4px,-50%);opacity:1}}@keyframes swipeHintR{0%,100%{transform:translate(0,-50%);opacity:.55}50%{transform:translate(4px,-50%);opacity:1}}'}</style>
@@ -374,7 +376,7 @@ export function CardHand({
         </div>
       )}
 
-      {/* Power card slot — separate brass bracket */}
+      {/* Power card slot - separate brass bracket */}
       {powerCardSlot.length > 0 && (
         <div style={{
           flexShrink: 0,

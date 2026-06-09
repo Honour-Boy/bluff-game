@@ -232,51 +232,157 @@ function CoachBar({ coach, isMobile, onHide, onReplayIntro }) {
   );
 }
 
-// ─── Idle "tap a card" nudge — points at the hand when the player stalls ──────
-// Centres on the UNION bounding box of the actual rendered card elements
-// (`[data-tour-id="my-hand-fan"] [data-card-id]`) — measuring the real cards,
-// not a container whose centre is pulled right by the power slot / padding, is
-// the only way this lands dead-centre on the deck on every viewport. Re-measured
-// on a short interval so it tracks the fan as it's dragged/rotated.
-function CardNudge({ isMobile, canBluff }) {
-  const [pos, setPos] = useState(null); // { centerX, bottom } | null → fixed fallback
+// Where the coach docks: directly ABOVE the bottom seat (the hand dock). We
+// measure the seat's top edge so the coach sits just above it on any viewport,
+// with a sensible fixed fallback before the seat has mounted/measured.
+function useDockBottom() {
+  const [dockBottom, setDockBottom] = useState(null);
+  useEffect(() => {
+    if (typeof document === 'undefined') return undefined;
+    const measure = () => {
+      const seat = document.querySelector('.topdown-bottom');
+      const r = seat?.getBoundingClientRect();
+      if (r && r.height) setDockBottom(Math.max(0, Math.round(window.innerHeight - r.top + 8)));
+      else setDockBottom(null);
+    };
+    measure();
+    const id = setInterval(measure, 500); // track the dock as it morphs/resizes
+    window.addEventListener('resize', measure);
+    return () => { clearInterval(id); window.removeEventListener('resize', measure); };
+  }, []);
+  return dockBottom;
+}
+
+// ─── Coach focus-gate — a dimmed backdrop that blocks play until acknowledged ──
+// For an action-required beat the table is dimmed and non-interactive so the
+// learner can't misclick while reading; an OK button reveals the table to perform
+// the step. The card itself docks just above the bottom seat (expanding in place
+// from the collapsed pill), so it reads as part of the player's own controls.
+// Sits BELOW the briefing/explanation modals (9300+) and the spin overlay.
+function CoachGate({ coach, isMobile, dockBottom, onOk }) {
+  const color = TONE_COLORS[coach.tone] || 'var(--accent)';
+  const bottom = dockBottom != null ? dockBottom : (isMobile ? 168 : 188);
+  return (
+    <>
+      {/* Backdrop - dims + blocks all play until the learner taps OK. No close
+          button: in practice the guide is always present, so OK is the only exit. */}
+      <div style={{ position: 'fixed', inset: 0, zIndex: 2950, background: 'rgba(0,0,0,0.66)', pointerEvents: 'auto' }} />
+      {/* Card - docked above the bottom seat, grows upward. */}
+      <div style={{
+        position: 'fixed', left: 0, right: 0, bottom, zIndex: 2960,
+        display: 'flex', justifyContent: 'center', padding: '0 12px', pointerEvents: 'none',
+      }}>
+        <div
+          className="fade-in"
+          style={{
+            width: 'min(92vw, 420px)', pointerEvents: 'auto',
+            background: 'linear-gradient(160deg, rgba(36,31,25,0.98), rgba(22,19,16,0.98))',
+            border: `1px solid ${color}`, borderLeft: `3px solid ${color}`,
+            borderRadius: 'var(--radius)', boxShadow: '0 12px 38px rgba(0,0,0,0.6)',
+            padding: '11px 14px',
+          }}
+        >
+          <div style={{
+            display: 'flex', alignItems: 'center', gap: 7, minWidth: 0,
+            fontFamily: "'Bebas Neue', sans-serif", fontSize: 15, letterSpacing: '0.06em', color,
+          }}>
+            <span aria-hidden style={{
+              width: 7, height: 7, borderRadius: '50%', background: color,
+              boxShadow: `0 0 8px ${color}`, flex: '0 0 auto',
+              animation: coach.tone === 'danger' || coach.tone === 'action' ? 'pulse 1.3s ease-in-out infinite' : 'none',
+            }} />
+            <span>{coach.title}</span>
+          </div>
+          <div style={{
+            fontFamily: "'Crimson Text', serif", fontSize: isMobile ? 13 : 14, lineHeight: 1.5,
+            color: 'var(--text)', margin: '5px 0 11px',
+          }}>
+            {coach.body}
+          </div>
+          <button onClick={onOk} className="primary" style={{ width: '100%', minHeight: 40, fontSize: 12 }}>
+            OK - got it
+          </button>
+        </div>
+      </div>
+    </>
+  );
+}
+
+// ─── Collapsed coach bar — a slim reminder docked above the bottom seat ────────
+// After the gate is acknowledged (or for a non-actionable info beat) the coach
+// collapses to a slim bar sitting directly above the hand dock — within the
+// player's natural line of sight, clear of the dealer bot up top. Tapping it
+// re-expands to the full backdrop-gated card (blocking other inputs).
+function CoachPill({ coach, isMobile, dockBottom, onExpand }) {
+  const color = TONE_COLORS[coach.tone] || 'var(--accent)';
+  const bottom = dockBottom != null ? dockBottom : (isMobile ? 168 : 188);
+  return (
+    <div style={{
+      position: 'fixed', left: 0, right: 0, bottom, zIndex: 2900,
+      display: 'flex', justifyContent: 'center', padding: '0 12px', pointerEvents: 'none',
+    }}>
+      <button
+        onClick={onExpand}
+        className="fade-in"
+        aria-label="Show guide"
+        style={{
+          display: 'flex', alignItems: 'center', gap: 8, width: '100%',
+          padding: '7px 12px', cursor: 'pointer', pointerEvents: 'auto',
+          background: 'rgba(20,15,10,0.95)', border: `1px solid ${color}`,
+          borderLeft: `3px solid ${color}`, borderRadius: 'var(--radius)',
+          boxShadow: '0 6px 20px rgba(0,0,0,0.55)',
+        }}
+      >
+        <span aria-hidden style={{
+          width: 6, height: 6, borderRadius: '50%', background: color,
+          boxShadow: `0 0 8px ${color}`, flex: '0 0 auto',
+        }} />
+        <span style={{
+          fontFamily: "'Bebas Neue', sans-serif", fontSize: 13, letterSpacing: '0.06em', color,
+          overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', minWidth: 0, flex: 1, textAlign: 'left',
+        }}>
+          {coach.title}
+        </span>
+        <span aria-hidden style={{
+          fontFamily: "'Space Mono', monospace", fontSize: 8, letterSpacing: '0.1em',
+          textTransform: 'uppercase', color: 'var(--text-dim)', flex: '0 0 auto',
+        }}>
+          Tap ›
+        </span>
+      </button>
+    </div>
+  );
+}
+
+// ─── Idle "tap a card" nudge — a small caret at the very bottom of the seat ────
+// Pinned to the very bottom of the bottom seat and pointing UP (▲) at the hand,
+// so it never overlaps the table / play area ("event place"). It stays
+// horizontally aligned to the actual card fan (measures the rendered cards' centre
+// each tick) and is deliberately small so it claims no vertical space above.
+function CardNudge() {
+  const [centerX, setCenterX] = useState(null); // px | null → centred fallback
 
   useEffect(() => {
     if (typeof document === 'undefined') return undefined;
-    // Anchor the bubble's CENTRE on the cards, but keep it fully on-screen. The
-    // fan isn't always screen-centred (a narrow phone can sit it well off to one
-    // side), and a wide bubble centred over off-centre cards would spill past the
-    // edge → it reads as "shoved"/cut-off (the reported misalignment). So we
-    // ADAPT the width: shrink it to the widest box that still fits centred on the
-    // cards (text just wraps to another line). Only in the extreme case where even
-    // the minimum width can't fit do we nudge the centre in off the cards.
-    const fit = (centerX) => {
-      const winW = window.innerWidth;
-      const cap = Math.min(winW * 0.9, 420);          // normal max width
-      const fitW = 2 * Math.min(centerX, winW - centerX) - 16; // width that fits centred here
-      const width = Math.max(180, Math.min(cap, fitW));
-      const half = width / 2 + 8;
-      const cx = Math.max(half, Math.min(winW - half, centerX)); // only moves if width hit its floor
-      return { centerX: cx, width };
-    };
     const measure = () => {
       const cards = document.querySelectorAll('[data-tour-id="my-hand-fan"] [data-card-id]');
-      let left = Infinity; let right = -Infinity; let top = Infinity;
+      let left = Infinity; let right = -Infinity;
       cards.forEach((el) => {
         const r = el.getBoundingClientRect();
         if (!r.width) return;
-        left = Math.min(left, r.left); right = Math.max(right, r.right); top = Math.min(top, r.top);
+        left = Math.min(left, r.left); right = Math.max(right, r.right);
       });
-      if (cards.length && right > left) {
-        setPos({ ...fit((left + right) / 2), bottom: window.innerHeight - top + 8 });
-        return;
+      let cx = null;
+      if (cards.length && right > left) cx = (left + right) / 2;
+      else {
+        const fan = document.querySelector('[data-tour-id="my-hand-fan"]')
+          || document.querySelector('[data-tour-id="my-hand"]');
+        const fr = fan?.getBoundingClientRect();
+        if (fr && fr.width) cx = fr.left + fr.width / 2;
       }
-      // Fall back to the fan trough, then the wrapper, then null (fixed offset).
-      const fan = document.querySelector('[data-tour-id="my-hand-fan"]')
-        || document.querySelector('[data-tour-id="my-hand"]');
-      const fr = fan?.getBoundingClientRect();
-      if (fr && fr.width) { setPos({ ...fit(fr.left + fr.width / 2), bottom: window.innerHeight - fr.top + 8 }); return; }
-      setPos(null);
+      // Keep the small bubble fully on-screen even if the fan sits near an edge.
+      if (cx != null) cx = Math.max(90, Math.min(window.innerWidth - 90, cx));
+      setCenterX(cx);
     };
     measure();
     const id = setInterval(measure, 300); // track fan drag / layout settling
@@ -287,43 +393,34 @@ function CardNudge({ isMobile, canBluff }) {
     };
   }, []);
 
-  const anchored = pos != null;
-  // NOTE: the centering `translateX(-50%)` lives on THIS positioned wrapper, which
-  // must NOT carry the `.fade-in` class — `.fade-in`'s keyframes animate
-  // `transform: translateY(...)` with `forwards`, which would override the inline
-  // transform and drop the horizontal centering, leaving the bubble's LEFT edge
-  // (not its centre) on the anchor → a ~half-width rightward drift on every
-  // screen (the reported misalignment). The fade-in now sits on an inner wrapper.
+  // The centering translateX(-50%) lives on the positioned wrapper (NOT on the
+  // .fade-in inner, whose keyframes animate transform and would drop the centring).
   return (
     <div
       style={{
         position: 'fixed',
-        ...(anchored
-          ? { left: pos.centerX, bottom: pos.bottom, width: pos.width }
-          : { left: '50%', bottom: isMobile ? 150 : 176, width: 'min(90vw, 420px)' }),
+        left: centerX != null ? centerX : '50%',
+        bottom: 'calc(env(safe-area-inset-bottom, 0px) + 4px)',
         transform: 'translateX(-50%)',
         zIndex: 2900, pointerEvents: 'none', textAlign: 'center',
       }}
     >
-      <div className="fade-in">
+      <div className="fade-in" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 1 }}>
+        <div aria-hidden style={{
+          fontSize: 10, lineHeight: 1, color: 'var(--accent)',
+          animation: 'bobUp 1.1s ease-in-out infinite',
+        }}>
+          ▲
+        </div>
         <div style={{
           display: 'inline-block',
-          background: 'rgba(26,23,20,0.96)', border: '1px solid var(--accent)',
-          borderRadius: 'var(--radius)', padding: '8px 14px',
-          boxShadow: '0 6px 22px rgba(0,0,0,0.55)',
-          fontFamily: "'Crimson Text', serif", fontSize: isMobile ? 13 : 14, color: 'var(--text)',
-          lineHeight: 1.45,
+          background: 'rgba(26,23,20,0.95)', border: '1px solid var(--accent)',
+          borderRadius: 999, padding: '1px 8px',
+          boxShadow: '0 4px 14px rgba(0,0,0,0.5)',
+          fontFamily: "'Cinzel', serif", fontSize: 8.5, letterSpacing: '0.03em',
+          color: 'var(--text)', whiteSpace: 'nowrap',
         }}>
-          <span style={{ color: 'var(--accent)', fontWeight: 700 }}>Tap a card</span> in your hand below to play it
-          {canBluff && (
-            <> — or hit <span style={{ color: 'var(--accent2)', fontWeight: 700 }}>Call Bluff</span> to challenge the bot</>
-          )}
-        </div>
-        <div aria-hidden style={{
-          fontSize: 20, color: 'var(--accent)', marginTop: 2,
-          animation: 'bobDown 1.1s ease-in-out infinite',
-        }}>
-          ▼
+          <span style={{ color: 'var(--accent)', fontWeight: 700 }}>Tap a card</span> to play
         </div>
       </div>
     </div>
@@ -385,7 +482,7 @@ function ChoiceModal({ onBasics, onSkip, onLeave }) {
         cursor: 'pointer', color: 'var(--text)', width: '100%',
       }}
     >
-      {/* On the gold (primary) option the accent/dim tones vanish — force a flat,
+      {/* On the gold (primary) option the accent/dim tones vanish - force a flat,
           deeply bold dark tone so the text stays legible on the bright background. */}
       <div style={{
         fontFamily: "'Cinzel', serif", fontSize: 16, marginBottom: 4, letterSpacing: '0.06em',
@@ -417,7 +514,7 @@ function ChoiceModal({ onBasics, onSkip, onLeave }) {
           core loop? Skip straight to the Power Cards.
         </div>
         <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-          <Btn primary title="Go through Basics" desc="Play a card, bluff, call the bot’s bluffs, and survive the gun — then we move on to powers." onClick={onBasics} />
+          <Btn primary title="Go through Basics" desc="Play a card, bluff, call the bot’s bluffs, and survive the gun - then we move on to powers." onClick={onBasics} />
           <Btn title="Skip to Power Cards" desc="Jump to the power-card clinic: one guided drill for each power." onClick={onSkip} />
         </div>
         {typeof onLeave === 'function' && (
@@ -479,7 +576,7 @@ function ReplayChoiceModal({ onCoached, onUncoached, onBack }) {
           Run it back with the guide, or just play {BOT_NAME} for fun.
         </div>
         <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-          <Btn title={`Just play ${BOT_NAME}`} desc="A plain practice game — no tips, no pop-ups. Just you against the bot." onClick={onUncoached} />
+          <Btn title={`Just play ${BOT_NAME}`} desc="A plain practice game - no tips, no pop-ups. Just you against the bot." onClick={onUncoached} />
           <Btn title="Coaching again" desc="Start over from the Basics with the full walkthrough, like your first time." onClick={onCoached} />
         </div>
         {typeof onBack === 'function' && (
@@ -607,6 +704,7 @@ export function TutorialLayer({
   holdClinic = false,
   reopenSignal = 0,
   preArmLockSignal = 0,
+  clinicActionHint = null,
   lesson = 'basics',
 }) {
   const phase = roomState?.phase;
@@ -642,6 +740,41 @@ export function TutorialLayer({
     return () => clearTimeout(t);
   }, [preArmLockSignal]);
 
+  // Corrective flash when the learner attempts an off-script card play in a clinic
+  // drill (e.g. plays a card when they should Call Bluff). Shown as a transient
+  // coach bar — NOT a focus-gate — so it reads as an in-the-moment "hold on".
+  const [actionHintText, setActionHintText] = useState(null);
+  useEffect(() => {
+    if (!clinicActionHint?.n) return undefined;
+    setActionHintText(clinicActionHint.text || null);
+    setCoachHidden(false);
+    const t = setTimeout(() => setActionHintText(null), 4600);
+    return () => clearTimeout(t);
+  }, [clinicActionHint?.n]);
+
+  // Per-instruction acknowledgement for the coach focus-gate: each distinct coach
+  // beat dims the table once (backdrop + OK); once acknowledged it collapses to a
+  // slim pill. A ref-backed Set + version counter so re-renders don't lose it.
+  const ackKeysRef = useRef(new Set());
+  const [, bumpAck] = useState(0);
+  const [forcedGateKey, setForcedGateKey] = useState(null);
+  const ackCoach = (key) => { if (key) ackKeysRef.current.add(key); setForcedGateKey(null); bumpAck((v) => v + 1); };
+
+  // Where the coach docks — just above the bottom seat (measured).
+  const dockBottom = useDockBottom();
+
+  // Auto-expand policy: on the learner's FIRST practice run the coach pops open
+  // (the focus-gate) at each new instruction so they learn the rhythm — they OK it
+  // back to the collapsed bar, the next beat re-opens, and so on. Once they've
+  // completed practice once (`bluff_tutorial_completed`), repeated runs stay
+  // collapsed by default — the bar still updates, but only expands when tapped.
+  // Re-read on each new game (lobby) so a replay after completing reflects it.
+  const readAutoExpand = () => {
+    try { return typeof window !== 'undefined' ? !window.localStorage.getItem('bluff_tutorial_completed') : true; }
+    catch (_) { return true; }
+  };
+  const [autoExpand, setAutoExpand] = useState(readAutoExpand);
+
   // Sticky guards: the Basics match spawns at most ONCE (so reopening + closing
   // the guide mid-game can't re-deal), and the skip request fires once.
   const spawnedRef = useRef(false);
@@ -661,10 +794,13 @@ export function TutorialLayer({
       setIntroStep(0);
       setBriefedIndex(-1);
       setCoachHidden(false);
+      ackKeysRef.current.clear();
+      setForcedGateKey(null);
+      setAutoExpand(readAutoExpand()); // first run auto-expands; later runs stay collapsed
     } else {
       setIntroDone(true);
     }
-  }, [isLobby]);
+  }, [isLobby]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Persist "tutorial completed" so the landing can stop badging it as NEW and
   // frame the entry as a replay instead.
@@ -718,6 +854,10 @@ export function TutorialLayer({
   // Coach bar. Hidden while a guided modal (briefing / explanation / choice /
   // intro) owns the screen, and during clinic-complete (its own card shows).
   let coach = null;
+  // A "correction" coach is a transient in-the-moment flash (a wrong tap), shown
+  // as a plain bar — never as a focus-gate (it would be jarring to backdrop every
+  // mis-tap, and these auto-dismiss).
+  let coachIsCorrection = false;
   const modalUp = showIntro || showChoice || briefing || showExplanation;
   // Suppress the coach bar too while the loss hand-off is pending, so the only
   // thing on screen is the spin result → "Eliminated" card → (then) the clinic.
@@ -731,8 +871,35 @@ export function TutorialLayer({
     // pointed "not yet" hint for a few seconds (see preArmLockSignal above).
     if (preArmHint && coach) {
       coach = { key: 'prearm-lock', tone: 'danger', title: 'Not yet', body: DEFENSE_PREARM_HINT };
+      coachIsCorrection = true;
+    }
+    // An off-script card-play attempt flashes its corrective line over the coach.
+    if (actionHintText) {
+      coach = { key: 'clinic-action-lock', tone: 'danger', title: 'Hold on', body: actionHintText };
+      coachIsCorrection = true;
     }
   }
+
+  // Focus-gate decision: an actionable instruction dims the table until OK'd; once
+  // acknowledged (or for an info/win beat) it collapses to the slim pill. Never
+  // gate a correction flash. Also never gate while a dedicated overlay or dock
+  // control owns the screen — a spin (cylinder/Pull-Trigger), the bluff-intercept
+  // arm UI, or a redemption — so the gate backdrop can't bury the very control the
+  // player needs (it would dead-end the lesson). The pill still carries the tip.
+  const overlayOwnsScreen = spinActive
+    || phase === 'spin_pending'
+    || phase === 'bluff_intercept_pending'
+    || phase === 'redemption_pending';
+  const coachActionable = !!coach && (coach.tone === 'action' || coach.tone === 'danger');
+  const coachAcked = !!coach && ackKeysRef.current.has(coach.key);
+  // Auto-gate the coach only in BASICS (no scenario): the clinic already gates
+  // each drill with its briefing pop-up ("Got it — show me"), so a second backdrop
+  // on the live coach would be redundant and re-hide the bot the briefing just
+  // revealed. The auto-open only fires on the FIRST practice run (`autoExpand`);
+  // after that the bar stays collapsed and only opens when the learner taps it
+  // (forcedGateKey), which works in every run, clinic included.
+  const showCoachGate = !!coach && !coachIsCorrection && !overlayOwnsScreen
+    && (forcedGateKey === coach.key || (autoExpand && coachActionable && !coachAcked && !scenario));
 
   // Header "Guide" button → re-show the current drill's briefing (clinic) or
   // reopen the walkthrough (basics). Skip the initial mount.
@@ -740,6 +907,10 @@ export function TutorialLayer({
   useEffect(() => {
     if (firstReopenRef.current) { firstReopenRef.current = false; return; }
     setCoachHidden(false);
+    // Reopening the guide should re-show the current instruction in full, so drop
+    // its acknowledgement and let the focus-gate fire again.
+    ackKeysRef.current.clear();
+    setForcedGateKey(null);
     if (roomState?.tutorialScenario) {
       setBriefedIndex(-1); // re-brief the active drill
     } else {
@@ -752,11 +923,6 @@ export function TutorialLayer({
   const me = roomState?.players?.find((p) => p.id === myPlayerId) || null;
   const alive = !me || me.status === 'alive';
   const canPlay = phase === 'playing' && isMyTurn && !roomState?.cardPlayedThisTurn && alive;
-  const canBluff = canPlay
-    && !roomState?.isFirstTurn
-    && !roomState?.bluffUsedThisTurn
-    && !roomState?.bluffBlockedThisTurn
-    && !scenario?.lockBluff;
   const [showCardNudge, setShowCardNudge] = useState(false);
   useEffect(() => {
     if (!canPlay || modalUp || scenario) { setShowCardNudge(false); return undefined; }
@@ -820,7 +986,7 @@ export function TutorialLayer({
           tone="action"
           title={briefing.title}
           body={briefing.body}
-          cta="Got it — show me"
+          cta="Got it - show me"
           onCta={() => setBriefedIndex(scenario.index)}
         />
       )}
@@ -854,18 +1020,39 @@ export function TutorialLayer({
       )}
 
       {coach && !clinicComplete && !coachHidden && (
-        <CoachBar
-          coach={coach}
-          isMobile={isMobile}
-          onHide={() => setCoachHidden(true)}
-          onReplayIntro={replayIntro}
-        />
+        coachIsCorrection ? (
+          // Transient "hold on / not yet" flash — plain bar, no backdrop.
+          <CoachBar
+            coach={coach}
+            isMobile={isMobile}
+            onHide={() => setCoachHidden(true)}
+            onReplayIntro={replayIntro}
+          />
+        ) : showCoachGate ? (
+          // Action-required beat — dim the table until the learner taps OK, so
+          // they can't misclick and the coach never hides the dealer bot mid-read.
+          <CoachGate
+            coach={coach}
+            isMobile={isMobile}
+            dockBottom={dockBottom}
+            onOk={() => ackCoach(coach.key)}
+          />
+        ) : (
+          // Acknowledged action beat, or a passive info/win beat — slim top-left
+          // pill, clear of the centred bot. Tap to re-open the full instruction.
+          <CoachPill
+            coach={coach}
+            isMobile={isMobile}
+            dockBottom={dockBottom}
+            onExpand={() => setForcedGateKey(coach.key)}
+          />
+        )
       )}
 
       {/* The "tap a card ▼" nudge now anchors to the fan CONTAINER (see CardNudge
-          measure), so it stays aligned on every width — shown on all screens. */}
-      {showCardNudge && <CardNudge isMobile={isMobile} canBluff={canBluff} />}
-      <style>{'@keyframes bobDown{0%,100%{transform:translateY(0)}50%{transform:translateY(5px)}}'}</style>
+          measure), so it stays aligned on every width - shown on all screens. */}
+      {showCardNudge && <CardNudge />}
+      <style>{'@keyframes bobUp{0%,100%{transform:translateY(0)}50%{transform:translateY(-5px)}}'}</style>
     </>
   );
 }

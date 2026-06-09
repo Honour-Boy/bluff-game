@@ -149,13 +149,13 @@ export function SpinOverlay({
           </div>
           <div style={{ fontSize: 12, color: 'var(--text-dim)', marginBottom: isTutorial && !spinData.eliminated ? 14 : 28 }}>
             Chamber {spinData.landingChamberIndex + 1} · {spinData.eliminated ? 'bullet found' : 'empty'}
-            {/* Only show a bullet count when the chamber actually carries one — the
+            {/* Only show a bullet count when the chamber actually carries one - the
                 clinic bot stays empty (bulletCountAfter === 0). */}
             {!spinData.eliminated && spinData.bulletCountAfter > 0 && (
               <> · now {spinData.bulletCountAfter}/6 loaded</>
             )}
           </div>
-          {/* Tutorial: explain the chamber. A CLEAN survival (no bullet — the
+          {/* Tutorial: explain the chamber. A CLEAN survival (no bullet - the
               clinic bot) gets a "still clear" line; a normal survival explains the
               added bullet. */}
           {isTutorial && !spinData.eliminated && (
@@ -168,8 +168,8 @@ export function SpinOverlay({
               margin: '0 auto 26px',
             }}>
               {spinData.bulletCountAfter === 0
-                ? `${spinData.spinTargetName} survives — its chamber is still clear.`
-                : 'Survived — so a fresh bullet just clicked into the chamber. Every spin you live through loads the gun a little more.'}
+                ? `${spinData.spinTargetName} survives - its chamber is still clear.`
+                : 'Survived - so a fresh bullet just clicked into the chamber. Every spin you live through loads the gun a little more.'}
             </div>
           )}
           {isSpinTarget ? (

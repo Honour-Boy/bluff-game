@@ -450,7 +450,7 @@ function HomeContent() {
   // untouched.
   const [gameSettingsOpen, setGameSettingsOpen] = useState(false);
   const [leaderboardOpen, setLeaderboardOpen] = useState(false);
-  const [kickOpen, setKickOpen] = useState(false); // #244 — host Kick Player modal
+  const [kickOpen, setKickOpen] = useState(false); // #244 - host Kick Player modal
   const inRoomOnline = !!roomCode && gameMode === 'online';
   // The practice Power-Clinic progress bar is an in-flow 22px band at the very top
   // of the online table (OnlinePlayerUI). When it's up, nudge the fixed settings
@@ -520,12 +520,12 @@ function HomeContent() {
       ? { height: '100dvh', overflow: 'hidden', position: 'relative' }
       : { minHeight: '100vh', padding: '24px 16px' }}>
       <Notification notification={notification} />
-      {/* §M4 — in-room reconnect indicator. While the socket is down but we're
+      {/* §M4 - in-room reconnect indicator. While the socket is down but we're
           still in a room, show a non-blocking banner instead of freezing or
           bouncing to the landing screen; useGame's resilient rejoin recovers us. */}
       {roomCode && !connected && <ReconnectingBanner />}
       {children}
-      {/* Global identity / settings gear — present on every signed-in screen
+      {/* Global identity / settings gear - present on every signed-in screen
           (landing, groups, in-game). Holds username, music toggle, profile,
           and sign-out so the "main settings" are reachable everywhere. */}
       <SettingsGear
@@ -554,7 +554,7 @@ function HomeContent() {
         voice={inRoomOnline ? voice : undefined}
         topOffset={clinicBarVisible ? 22 : 0}
       />
-      {/* Game settings — host edits in the lobby, everyone else sees a summary */}
+      {/* Game settings - host edits in the lobby, everyone else sees a summary */}
       {inRoomOnline && gameSettingsOpen && (
         <ControlsModal title="Game Settings" onClose={() => setGameSettingsOpen(false)}>
           {isHost && isLobby && roomState?.config ? (
@@ -585,7 +585,7 @@ function HomeContent() {
           />
         </ControlsModal>
       )}
-      {/* #244 — host-only Kick Player roster */}
+      {/* #244 - host-only Kick Player roster */}
       {inRoomOnline && isHost && kickOpen && (
         <ControlsModal title="Kick Player" onClose={() => setKickOpen(false)}>
           <KickPlayerPanel

@@ -93,7 +93,7 @@ export function LandingScreen({
         if (!window.localStorage.getItem('bluff_tutorial_seen')) setTutorialHint(true);
         if (window.localStorage.getItem('bluff_tutorial_completed')) setTutorialDone(true);
       }
-    } catch (_) { /* localStorage blocked — just skip the nudge */ }
+    } catch (_) { /* localStorage blocked - just skip the nudge */ }
   }, []);
 
   // Enter the practice room directly — the "Go through Basics / Skip to Power
@@ -127,7 +127,12 @@ export function LandingScreen({
 
   return (
     <div style={{
-      minHeight: '100vh',
+      // The page shell (app/page.js `wrap`) already gives this screen `24px 16px`
+      // padding + a 100vh min-height. Matching 100vh here too stacked a second
+      // viewport-height inside the first, so the body always scrolled ~48px on
+      // mobile. Subtract the shell's vertical padding so we fill exactly one
+      // viewport with no overflow, while keeping the centred layout.
+      minHeight: 'calc(100vh - 48px)',
       display: 'flex',
       flexDirection: 'column',
       alignItems: 'center',
@@ -164,10 +169,12 @@ export function LandingScreen({
         background: 'radial-gradient(ellipse 80% 100% at 50% -10%, rgba(200,146,46,0.11) 0%, transparent 70%)',
       }} />
 
-      {/* Wrought-iron corner brackets */}
+      {/* Wrought-iron corner brackets. The TOP-RIGHT corner is intentionally
+          omitted - the global settings gear (app/page.js) lives there, and the
+          bracket sat directly under it, so its lines poked out around the gear
+          button ("settings blocks the design at the right corner"). */}
       {[
         { top: 18, left: 18, borderTop: '2px solid', borderLeft: '2px solid' },
-        { top: 18, right: 18, borderTop: '2px solid', borderRight: '2px solid' },
         { bottom: 18, left: 18, borderBottom: '2px solid', borderLeft: '2px solid' },
         { bottom: 18, right: 18, borderBottom: '2px solid', borderRight: '2px solid' },
       ].map((s, i) => (
@@ -179,12 +186,12 @@ export function LandingScreen({
         }} />
       ))}
 
-      {/* ── Main content — tilted notice board ── */}
+      {/* ── Main content - tilted notice board ── */}
       <div
         className="fade-in tilt-panel"
         style={{ width: '100%', maxWidth: 480, position: 'relative', zIndex: 1 }}
       >
-        {/* Tavern sign — a carved board hung from chains, gently swaying */}
+        {/* Tavern sign - a carved board hung from chains, gently swaying */}
         <div style={{ textAlign: 'center', marginBottom: 36, paddingTop: 20 }}>
           <div className="hanging-sign" style={{ display: 'inline-block', position: 'relative', maxWidth: '100%' }}>
             {/* Iron chains */}
@@ -239,7 +246,7 @@ export function LandingScreen({
           </div>
         </div>
 
-        {/* Connection status — candlelight indicator */}
+        {/* Connection status - candlelight indicator */}
         <div style={{
           display: 'flex', alignItems: 'center', gap: 7, justifyContent: 'center',
           marginBottom: 26,
@@ -299,34 +306,43 @@ export function LandingScreen({
               Enter a Room (Player)
             </PlaqueButton>
 
-            {/* Learn by playing — a solo practice table against a bot. The single
+            {/* Learn by playing - a solo practice table against a bot. The single
                 lowest-friction way in for a first-timer: no code, no second
                 player, the bot autoplays the opposite seat. */}
             {onStartTutorial && tutorialEnabled && (
-              <PlaqueButton onClick={handleStartTutorial} disabled={!connected}>
+              <PlaqueButton
+                onClick={handleStartTutorial}
+                disabled={!connected}
+                // Keep the icon · label · badge on a single line: a long label +
+                // a "DONE" badge wrapped on narrow phones (and the bare "DONE"
+                // looked stray). nowrap + an ellipsised label is robust at any width.
+                style={{ flexWrap: 'nowrap', whiteSpace: 'nowrap' }}
+              >
                 {/* Target / practice icon */}
-                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" aria-hidden="true" style={{ flexShrink: 0 }}>
                   <circle cx="12" cy="12" r="9" stroke="currentColor" strokeWidth="1.8"/>
                   <circle cx="12" cy="12" r="5" stroke="currentColor" strokeWidth="1.6"/>
                   <circle cx="12" cy="12" r="1.6" fill="currentColor"/>
                 </svg>
-                {tutorialDone ? 'Practice vs Bot (replay)' : 'Practice vs Bot'}
+                <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', minWidth: 0 }}>
+                  Practice vs Bot
+                </span>
                 {tutorialDone ? (
                   <span
-                    title="You've completed the tutorial — replay any time"
+                    title="You've completed the tutorial - replay any time"
                     style={{
-                      marginLeft: 8, padding: '2px 7px', borderRadius: 999,
+                      flexShrink: 0, padding: '2px 7px', borderRadius: 999,
                       background: 'var(--alive)', color: '#0e1a10',
                       fontFamily: "'Space Mono', monospace", fontSize: 9,
                       letterSpacing: '0.1em', fontWeight: 700,
                     }}
                   >
-                    ✓ DONE
+                    ✓ REPLAY
                   </span>
                 ) : tutorialHint ? (
                   <span
                     style={{
-                      marginLeft: 8, padding: '2px 7px', borderRadius: 999,
+                      flexShrink: 0, padding: '2px 7px', borderRadius: 999,
                       background: 'var(--accent)', color: '#1a1714',
                       fontFamily: "'Space Mono', monospace", fontSize: 9,
                       letterSpacing: '0.1em', fontWeight: 700,
@@ -399,7 +415,7 @@ export function LandingScreen({
               Choose Your Table
             </div>
 
-            {/* Mode cards — two physical game boards */}
+            {/* Mode cards - two physical game boards */}
             <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
               {[
                 {
@@ -485,7 +501,7 @@ export function LandingScreen({
                 borderRadius: 'var(--radius)',
                 textTransform: 'uppercase',
               }}>
-                Host Mode — You are the Game Master, not a player
+                Host Mode - You are the Game Master, not a player
               </div>
             )}
 
@@ -514,7 +530,7 @@ export function LandingScreen({
                   lineHeight: 1.6,
                   fontStyle: 'italic',
                 }}>
-                  Powers, modifiers and house rules are set inside the room lobby once it opens — seat your guests first.
+                  Powers, modifiers and house rules are set inside the room lobby once it opens - seat your guests first.
                 </div>
               </>
             )}

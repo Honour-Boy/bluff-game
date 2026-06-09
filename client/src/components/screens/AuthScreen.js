@@ -99,7 +99,7 @@ export function AuthScreen({ onSendEmailOtp, onGoogleSignIn, onGuestSignIn, erro
         position: 'relative',
       }}
     >
-      {/* Tavern floor — diagonal planks */}
+      {/* Tavern floor - diagonal planks */}
       <div style={{
         position: 'fixed', inset: 0, pointerEvents: 'none',
         background: `
@@ -157,7 +157,7 @@ export function AuthScreen({ onSendEmailOtp, onGoogleSignIn, onGuestSignIn, erro
           </div>
         </div>
 
-        {/* Main card — the inn registry */}
+        {/* Main card - the inn registry */}
         <div
           className="card tilt-panel"
           style={{
@@ -223,7 +223,7 @@ export function AuthScreen({ onSendEmailOtp, onGoogleSignIn, onGuestSignIn, erro
                   lineHeight: 1.6,
                   fontStyle: 'italic',
                 }}>
-                  A sign-in scroll will be dispatched to your address — no passphrase required.
+                  A sign-in scroll will be dispatched to your address - no passphrase required.
                 </div>
               </div>
               <button
@@ -287,7 +287,7 @@ export function AuthScreen({ onSendEmailOtp, onGoogleSignIn, onGuestSignIn, erro
                   lineHeight: 1.6,
                   fontStyle: 'italic',
                 }}>
-                  4–20 characters. Your name and deeds survive only this session — sign in to preserve your legacy.
+                  4–20 characters. Your name and deeds survive only this session - sign in to preserve your legacy.
                 </div>
               </div>
               <button
@@ -312,7 +312,7 @@ export function AuthScreen({ onSendEmailOtp, onGoogleSignIn, onGuestSignIn, erro
           {/* ── Sent stage ── */}
           {stage === 'sent' && (
             <div style={{ display: 'flex', flexDirection: 'column', gap: 16, textAlign: 'center' }}>
-              {/* Envelope icon — SVG, no emoji */}
+              {/* Envelope icon - SVG, no emoji */}
               <svg width="38" height="38" viewBox="0 0 24 24" fill="none" aria-hidden="true" style={{ margin: '4px auto 0' }}>
                 <rect x="2" y="4" width="20" height="16" rx="2" stroke="var(--accent)" strokeWidth="1.5"/>
                 <path d="M2 7l10 7 10-7" stroke="var(--accent)" strokeWidth="1.5" strokeLinecap="round"/>

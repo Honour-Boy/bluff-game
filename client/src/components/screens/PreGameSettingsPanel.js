@@ -63,7 +63,7 @@ const RISK_MODS = [
 ];
 
 const ROOM_MODS = [
-  { key: 'speedMode',        label: 'Speed Mode',        desc: '25s turn timer — run out and your turn is auto-ended' },
+  { key: 'speedMode',        label: 'Speed Mode',        desc: '25s turn timer - run out and your turn is auto-ended' },
   { key: 'suddenDeath',      label: 'Sudden Death',      desc: 'Risk bumps every 4 elimination-free turns' },
   { key: 'mirrorMatch',      label: 'Mirror Match',      desc: 'Spin lands on the player opposite the table' },
   { key: 'rouletteRotation', label: 'Roulette Rotation', desc: 'Turn order reshuffles every cycle (3+ players)' },
@@ -378,7 +378,7 @@ export function PreGameSettingsPanel({ config, onChange, isGroupRoom = false, sa
           </span>
           <span style={{ fontSize: 11, color: 'var(--text-dim)', letterSpacing: '0.05em' }}>
             {activeCount === 0
-              ? 'Defaults — all extras off'
+              ? 'Defaults - all extras off'
               : `${activeCount} ${activeCount === 1 ? 'option' : 'options'} enabled`}
           </span>
           {savedMetaText && (
@@ -533,7 +533,7 @@ export function PreGameSettingsPanel({ config, onChange, isGroupRoom = false, sa
                 borderRadius: 'var(--radius)',
                 marginTop: 4,
               }}>
-                Secret roles activate automatically when 3+ players are alive — not host-toggleable.
+                Secret roles activate automatically when 3+ players are alive - not host-toggleable.
               </div>
             }
           >

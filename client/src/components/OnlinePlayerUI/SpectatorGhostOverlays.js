@@ -39,7 +39,7 @@ export function SpectatorGhostOverlays({
                   👁 SPECTATING · {targetPlayer?.username || 'Player'}
                 </div>
                 <div style={{ fontSize: 10, color: ROLE_META.medic.color, letterSpacing: '0.18em', marginBottom: 12 }}>
-                  MEDIC — SAVE THEM?
+                  MEDIC - SAVE THEM?
                 </div>
                 <div style={{ fontFamily: "'Bebas Neue', sans-serif", fontSize: 22, color: 'var(--text)', marginBottom: 8, letterSpacing: '0.05em' }}>
                   {medicPending.eliminatedPlayerName || 'A player'} is about to be eliminated.
@@ -58,7 +58,7 @@ export function SpectatorGhostOverlays({
                   👁 SPECTATING · {targetPlayer?.username || 'Player'}
                 </div>
                 <div style={{ fontFamily: "'Bebas Neue', sans-serif", fontSize: 20, letterSpacing: '0.12em', color: ROLE_META.sniper.color, marginBottom: 6 }}>
-                  SNIPER — REDIRECT THE SHOT?
+                  SNIPER - REDIRECT THE SHOT?
                 </div>
                 <div style={{ fontSize: 11, color: 'var(--text-dim)' }}>
                   Aimed at <strong style={{ color: 'var(--text)' }}>{sniperPending.originalSpinTargetName || 'someone'}</strong>. They are picking a new target.
@@ -70,7 +70,7 @@ export function SpectatorGhostOverlays({
 
         return null;
       })()}
-      {/* §3.2 — the hand-derived "activate power card?" ghost overlay was
+      {/* §3.2 - the hand-derived "activate power card?" ghost overlay was
           removed: it inferred a living opponent's held power card from their
           hand, which eliminated players may no longer see. */}
     </>

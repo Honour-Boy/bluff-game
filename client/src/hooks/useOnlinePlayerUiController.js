@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useIsMobile } from './useIsMobile';
-import { isDefensivePreArmLocked } from '../components/tutorial/tutorialContent';
+import { isDefensivePreArmLocked, clinicCardPlayLock } from '../components/tutorial/tutorialContent';
 
 export function useOnlinePlayerUiController({
   roomState,
@@ -31,6 +31,10 @@ export function useOnlinePlayerUiController({
   // Bumped each time the learner taps the dimmed defensive power card too early
   // in a clinic drill; the TutorialLayer watches it to flash a "not yet" hint.
   const [preArmLockSignal, setPreArmLockSignal] = useState(0);
+  // Flashes a corrective coach hint when the learner tries an off-script card
+  // play during a clinic drill (e.g. plays a card when they should Call Bluff).
+  // { n, text } — n is a monotonic counter the TutorialLayer reacts to.
+  const [clinicActionHint, setClinicActionHint] = useState({ n: 0, text: '' });
   // Every spin identity already shown this session. A Set (not just the last key)
   // so a re-broadcast of an OLDER spin_result — after a newer spin moved the
   // "last" key on — can never replay that older spin a second time ("spin playing
@@ -277,9 +281,23 @@ export function useOnlinePlayerUiController({
     if (!isMyTurn || !isPlaying || roomState?.cardPlayedThisTurn) return;
     const card = myHand.find((entry) => entry.id === cardId);
     if (!card) return;
+    // Power Clinic: refuse an off-script card play (mirrors the server
+    // clinicActionBlock) and flash the corrective coach line instead of opening
+    // the confirm modal — so a stray tap can never break the lesson.
+    const playLock = clinicCardPlayLock(roomState?.tutorialScenario, {
+      powerActivatedThisTurn: roomState?.powerActivatedThisTurn,
+    });
+    if (playLock) {
+      setClinicActionHint((h) => ({ n: h.n + 1, text: playLock }));
+      return;
+    }
     setSelectedCardId(cardId);
     setPendingCard(card);
-  }, [isMyTurn, isPlaying, myHand, roomState?.cardPlayedThisTurn]);
+  }, [
+    isMyTurn, isPlaying, myHand, roomState?.cardPlayedThisTurn,
+    roomState?.tutorialScenario?.expect, roomState?.tutorialScenario?.step,
+    roomState?.tutorialScenario?.power, roomState?.powerActivatedThisTurn,
+  ]);
 
   // §3.2 — spectating an opponent's hand is disabled (anti-cheat lockout). This
   // is intentionally a no-op: eliminated / dead players can watch the table but
@@ -438,6 +456,7 @@ export function useOnlinePlayerUiController({
     handleCardClick,
     handlePowerCardClick,
     preArmLockSignal,
+    clinicActionHint,
     handleSpectatePlayer,
     handleActivatePower,
     handleSkipPower,

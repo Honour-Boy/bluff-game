@@ -438,7 +438,7 @@ export function OnlinePlayerUI({
   if (isMyTurn && isPlaying) {
     if (!bluffUsedThisTurn && !cardPlayedThisTurn) {
       if (bluffBlockedThisTurn) {
-        actionHint = 'Last turn was frozen — no card to challenge. Play a card from your hand.';
+        actionHint = 'Last turn was frozen - no card to challenge. Play a card from your hand.';
       } else {
         actionHint = isFirstTurn
           ? 'Play a card from your hand. (No bluff on the first turn.)'
@@ -646,7 +646,7 @@ export function OnlinePlayerUI({
         intensity={isSpinPendingPhase ? 'high' : 'low'}
       />
 
-      {/* Clinic progress — an IN-FLOW band at the very top: it reserves its own
+      {/* Clinic progress - an IN-FLOW band at the very top: it reserves its own
           height so the HUD below is never obstructed (not a fixed overlay). */}
       {clinicProgressPct != null && (
         <div style={{
@@ -690,7 +690,7 @@ export function OnlinePlayerUI({
         onShowGuide={() => setGuideSignal((n) => n + 1)}
       />
 
-      {/* Speed Mode — a turn countdown visible to ALL players (#speedMode). */}
+      {/* Speed Mode - a turn countdown visible to ALL players (#speedMode). */}
       {roomState?.config?.roomModifiers?.speedMode
         && isPlaying
         && typeof roomState?.speedModeMsRemaining === 'number' && (
@@ -810,7 +810,7 @@ export function OnlinePlayerUI({
       />
       </div>
 
-      {/* (Module 7) Detached standings hint — a standalone strip at the absolute
+      {/* (Module 7) Detached standings hint - a standalone strip at the absolute
           bottom of the layout, OUTSIDE the table, shown only at game over. */}
       {isGameOver && roomState?.groupId && (
         <div style={{
@@ -931,7 +931,7 @@ export function OnlinePlayerUI({
         holdForSpin={holdForSpin}
       />
 
-      {/* §1.1 — bluff interception window (accused arms a defence in response). */}
+      {/* §1.1 - bluff interception window (accused arms a defence in response). */}
       {phase === 'bluff_intercept_pending' && roomState?.pendingBluffIntercept && (
         <BluffInterceptOverlay
           pending={roomState.pendingBluffIntercept}
@@ -956,7 +956,7 @@ export function OnlinePlayerUI({
 
       <FlyingCardLayer flights={flights} />
 
-      {/* Tutorial / Practice — guided intro + live coach, gated to tutorial rooms. */}
+      {/* Tutorial / Practice - guided intro + live coach, gated to tutorial rooms. */}
       {isTutorial && (
         <TutorialLayer
           roomState={roomState}
@@ -973,6 +973,7 @@ export function OnlinePlayerUI({
           holdClinic={ui.eliminationHold}
           reopenSignal={guideSignal}
           preArmLockSignal={ui.preArmLockSignal}
+          clinicActionHint={ui.clinicActionHint}
           lesson={roomState?.tutorialLesson || 'basics'}
         />
       )}

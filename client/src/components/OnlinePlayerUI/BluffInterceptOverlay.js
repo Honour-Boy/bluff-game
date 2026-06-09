@@ -104,7 +104,7 @@ export function BluffInterceptOverlay({ pending, bluffIntercept, tutorial = fals
       >
         <div className="card" style={{ maxWidth: 340, textAlign: 'center', padding: '14px 18px', border: `1px solid ${ACCENT}`, background: 'rgba(20,16,4,0.96)' }}>
           <div style={{ fontFamily: "'Bebas Neue', sans-serif", fontSize: 18, color: ACCENT, marginBottom: 4 }}>
-            BLUFF CALLED — DEFENDING?
+            BLUFF CALLED - DEFENDING?
           </div>
           <div style={{ fontSize: 11, color: 'var(--text-dim)' }}>
             {pending.accuserName || 'Someone'} challenged {pending.accusedName || 'a player'}, who may play a defence…
@@ -137,8 +137,8 @@ export function BluffInterceptOverlay({ pending, bluffIntercept, tutorial = fals
         </div>
         <div style={{ fontSize: 12, color: 'var(--text-dim)', marginBottom: 18, lineHeight: 1.55 }}>
           {tutorial
-            ? 'Tap your power card below to defend — take your time, the coach has you.'
-            : 'Play a defensive card to respond before it resolves — or pass and let the call stand.'}
+            ? 'Tap your power card below to defend - take your time, the coach has you.'
+            : 'Play a defensive card to respond before it resolves - or pass and let the call stand.'}
         </div>
 
         <div style={{ display: 'flex', gap: 12, justifyContent: 'center', flexWrap: 'wrap', marginBottom: 18 }}>
@@ -148,7 +148,7 @@ export function BluffInterceptOverlay({ pending, bluffIntercept, tutorial = fals
         </div>
 
         {/* In the clinic there's no auto-timeout and passing would skip the
-            lesson, so hide both — the learner must use the power. */}
+            lesson, so hide both - the learner must use the power. */}
         {!tutorial && (
           <button
             onClick={() => respond(null)}
@@ -163,7 +163,7 @@ export function BluffInterceptOverlay({ pending, bluffIntercept, tutorial = fals
               marginBottom: 8,
             }}
           >
-            Pass — let the call resolve
+            Pass - let the call resolve
           </button>
         )}
 

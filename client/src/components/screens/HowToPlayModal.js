@@ -21,11 +21,11 @@ import { CloseIcon } from "../shared/CloseIcon";
 const POWER_ORDER = ["shield", "mirror", "swap", "peek", "freeze", "assassin"];
 
 const POWER_TRIGGERS = {
-  shield: "Activates at turn start. The next bluff call against you is blocked outright — never officially registers.",
+  shield: "Activates at turn start. The next bluff call against you is blocked outright - never officially registers.",
   mirror: "Activates at turn start. The next bluff consequence aimed at you bounces back to whoever caused it.",
   swap: "Activates at turn start, but only after a full round has passed since you drew it. Trade your played card with one from the round's pile, then re-judge the bluff.",
   peek: "Activates at turn start. You privately see the previous player's card before deciding to call bluff.",
-  freeze: "Activates at turn start. Pick a player — their next turn is skipped entirely.",
+  freeze: "Activates at turn start. Pick a player - their next turn is skipped entirely.",
   assassin: "Activates at turn start; stays armed until a bluff lands on you. Wrong bluff call → the caller is eliminated. Correct bluff call → no spin, but you draw +3 penalty cards. Sheriff is immune.",
 };
 
@@ -46,7 +46,7 @@ const RISK_MODS = [
   },
   {
     label: "Russian Roulette",
-    desc: "A failed bluff fires immediately — no pause to pull the trigger yourself.",
+    desc: "A failed bluff fires immediately - no pause to pull the trigger yourself.",
   },
   {
     label: "Hot Potato",
@@ -61,7 +61,7 @@ const RISK_MODS = [
 const ROOM_MODS = [
   {
     label: "Speed Mode",
-    desc: "25-second turn timer, visible to everyone. Run the clock out and your turn is automatically ended (you forfeit the rest of it) — no spin.",
+    desc: "25-second turn timer, visible to everyone. Run the clock out and your turn is automatically ended (you forfeit the rest of it) - no spin.",
   },
   {
     label: "Sudden Death",
@@ -99,11 +99,11 @@ const SYSTEMS = [
 const BASICS_SECTIONS = [
   {
     title: "THE TABLE",
-    body: "2–15 players per room. The host is a regular player. Cards deal automatically — 6 in your hand. The required shape (Circle, Triangle, Cross, Square, or Star) is shown on screen.",
+    body: "2–15 players per room. The host is a regular player. Cards deal automatically - 6 in your hand. The required shape (Circle, Triangle, Cross, Square, or Star) is shown on screen.",
   },
   {
     title: "EACH TURN",
-    body: "Play one card from your hand that matches the required shape — or play a Whot/20 card, which matches anything. You can lie. Nobody sees your card unless someone calls bluff.",
+    body: "Play one card from your hand that matches the required shape - or play a Whot/20 card, which matches anything. You can lie. Nobody sees your card unless someone calls bluff.",
   },
   {
     title: "CALLING A BLUFF",
@@ -350,7 +350,7 @@ function RolesContent() {
         }}
       >
         Auto-assigned in any room with 3+ players. Roles are{" "}
-        <strong style={{ color: "var(--text)" }}>private</strong> — only you
+        <strong style={{ color: "var(--text)" }}>private</strong> - only you
         ever see your own. Revealed once, at game start.
       </div>
       {ROLE_ORDER.map((roleKey) => (
@@ -375,7 +375,7 @@ function RiskModsContent() {
         }}
       >
         Host enables these from the pre-game settings panel. They change how
-        the gun behaves — stack them at your peril.
+        the gun behaves - stack them at your peril.
       </div>
       {RISK_MODS.map((m) => (
         <BulletRow key={m.label} label={m.label} desc={m.desc} />
@@ -437,11 +437,11 @@ function OnlineVsPhysicalContent() {
     <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
       <CopyBlock
         title="ONLINE MODE"
-        body="The default v2 experience. Cards deal automatically. Bluff resolution is automatic. Power cards, secret roles, modifiers, and special systems — all of it lives here."
+        body="The default v2 experience. Cards deal automatically. Bluff resolution is automatic. Power cards, secret roles, modifiers, and special systems - all of it lives here."
       />
       <CopyBlock
         title="PHYSICAL MODE"
-        body="The original ruleset. Players hold real Whot cards. One person plays Game Master and runs the app — they don't play.\n\nv2 features (power cards, roles, modifiers, systems) are online-only. Physical mode is the base game and nothing else."
+        body="The original ruleset. Players hold real Whot cards. One person plays Game Master and runs the app - they don't play.\n\nv2 features (power cards, roles, modifiers, systems) are online-only. Physical mode is the base game and nothing else."
       />
     </div>
   );

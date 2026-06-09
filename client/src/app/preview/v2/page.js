@@ -77,7 +77,7 @@ export default function PreviewV2Page() {
           BLUFF · v2 visual preview
         </h1>
         <p style={SECTION_SUB}>
-          Phase G2 + G3 — power cards, power back, announcement banner, whot refresh.
+          Phase G2 + G3 - power cards, power back, announcement banner, whot refresh.
         </p>
       </header>
 
@@ -128,7 +128,7 @@ export default function PreviewV2Page() {
       <section style={{ marginBottom: 48 }}>
         <h2 style={SECTION_TITLE}>Power card back · face-down treatment</h2>
         <div style={SECTION_SUB}>
-          Distinct from the regular shape-card back — reads as &ldquo;something special, but unknown&rdquo;.
+          Distinct from the regular shape-card back - reads as &ldquo;something special, but unknown&rdquo;.
         </div>
         <div style={{ display: "flex", gap: 24, alignItems: "flex-end" }}>
           {["sm", "md", "lg"].map((size) => (
@@ -162,7 +162,7 @@ export default function PreviewV2Page() {
       <section style={{ marginBottom: 48 }}>
         <h2 style={SECTION_TITLE}>Whot card refresh (CardShape)</h2>
         <div style={SECTION_SUB}>
-          Subtle premium polish — gradient backplate, gold/silver edge accents,
+          Subtle premium polish - gradient backplate, gold/silver edge accents,
           refined typography. Sits visually between regular shapes and power cards.
         </div>
         <div style={{ display: "flex", gap: 24, alignItems: "flex-end", flexWrap: "wrap" }}>

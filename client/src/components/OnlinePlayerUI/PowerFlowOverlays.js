@@ -211,10 +211,10 @@ export function PowerFlowOverlays({
             }}
           >
             <div style={{ fontFamily: "'Bebas Neue', sans-serif", fontSize: 22, letterSpacing: '0.12em', color: POWER_META.swap.color, marginBottom: 6 }}>
-              SWAP — PICK A CARD
+              SWAP - PICK A CARD
             </div>
             <div style={{ fontSize: 12, color: 'var(--text-dim)', marginBottom: 18, lineHeight: 1.5 }}>
-              Choose blindly. The cards below are ALL face-down — no shapes, no names. Your played card will be swapped with the one you pick, then both reveal face-up.
+              Choose blindly. The cards below are ALL face-down - no shapes, no names. Your played card will be swapped with the one you pick, then both reveal face-up.
             </div>
             <div
               style={{

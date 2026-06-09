@@ -168,7 +168,7 @@ export function BottomSeat({
           )}
         </div>
 
-        {/* Chamber status — 6-slot revolver display */}
+        {/* Chamber status - 6-slot revolver display */}
         {!isEliminated && !isLobby && (
           <div style={{
             display: 'flex',
@@ -370,7 +370,7 @@ export function BottomSeat({
             </div>
 
             <div style={{ display: 'flex', alignItems: 'flex-end', gap: 10 }}>
-              {/* LEFT column — the unified Call Bluff target (Module 4). Same
+              {/* LEFT column - the unified Call Bluff target (Module 4). Same
                   card-style control on desktop and mobile; no floating overhead
                   button above the rail. */}
               {!isFirstTurn && (() => {
@@ -382,7 +382,7 @@ export function BottomSeat({
                     onClick={callBluff}
                     disabled={bluffDisabled}
                     title={bluffBlockedThisTurn
-                      ? 'No card to challenge — last turn was frozen'
+                      ? 'No card to challenge - last turn was frozen'
                       : 'Call bluff on the previous player'}
                     style={{
                       flexShrink: 0,
@@ -395,7 +395,7 @@ export function BottomSeat({
                       cursor: bluffDisabled ? 'not-allowed' : 'pointer',
                     }}
                   >
-                    {/* Crosshair / target — "take aim and call it" */}
+                    {/* Crosshair / target - "take aim and call it" */}
                     <svg width="26" height="26" viewBox="0 0 24 24" fill="none" aria-hidden="true">
                       <circle cx="12" cy="12" r="7" stroke="currentColor" strokeWidth="1.8" />
                       <path d="M12 2v4M12 18v4M2 12h4M18 12h4" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
@@ -406,7 +406,7 @@ export function BottomSeat({
                 );
               })()}
 
-              {/* CENTER (played cards) + RIGHT (power cards) — CardHand lays out
+              {/* CENTER (played cards) + RIGHT (power cards) - CardHand lays out
                   the shape fan and the power-card bracket side by side.
                   No Y-lift: the old desktop translateY(-12px) dragged the card-
                   holder's top border up into the "Your Hand / N cards" label row,
