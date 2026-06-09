@@ -17,7 +17,7 @@ import SpeedModeTimer from './SpeedModeTimer';
 import { PreGameSelectionModal } from '../PreGameSelectionModal';
 import { SmokeLayer } from '../shared/SmokeLayer';
 import { TutorialLayer } from '../tutorial/TutorialLayer';
-import { isDefensivePreArmLocked } from '../tutorial/tutorialContent';
+import { isDefensivePreArmLocked, clinicEndTurnLock } from '../tutorial/tutorialContent';
 import {
   arcPlayers,
   distributePlayers,
@@ -506,6 +506,17 @@ export function OnlinePlayerUI({
     && isDefensivePreArmLocked(roomState?.tutorialScenario, phase)
   );
 
+  // Power Clinic: block End Turn until the drill's scripted action is done (e.g.
+  // Call Bluff in the bot-Shield demo, arm the power in Freeze/Assassin). Returns
+  // a coach hint to disable the button; null in normal play / once satisfied.
+  const endTurnClinicHint = (isTutorial && isMyTurn)
+    ? clinicEndTurnLock(roomState?.tutorialScenario, {
+        cardPlayedThisTurn,
+        bluffUsedThisTurn,
+        powerActivatedThisTurn: roomState?.powerActivatedThisTurn,
+      })
+    : null;
+
   const isSwapPending = roomState?.phase === 'swap_pending';
   const amSwapHolder = isSwapPending && roomState?.swapHolderId === myPlayer?.id;
   const swapPickOptions = roomState?.swapPickOptions || [];
@@ -768,6 +779,8 @@ export function OnlinePlayerUI({
         isGameOver={isGameOver}
         callBluff={callBluff}
         endTurn={endTurn}
+        endTurnLocked={!!endTurnClinicHint}
+        endTurnLockHint={endTurnClinicHint || ''}
         isFirstTurn={isFirstTurn}
         bluffUsedThisTurn={bluffUsedThisTurn}
         cardPlayedThisTurn={cardPlayedThisTurn}

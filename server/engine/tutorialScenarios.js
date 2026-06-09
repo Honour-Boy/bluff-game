@@ -111,7 +111,7 @@ function _holds(room, holderId, power) {
 const _DRILL_DEFS = [
   // 0 — PEEK: own-turn, reveals the previous play.
   {
-    id: 'peek', power: 'peek', actor: 'player', lockBluff: true,
+    id: 'peek', power: 'peek', actor: 'player', lockBluff: true, expect: 'use_power',
     stage(room) {
       const hid = _humanId(room);
       _resetForDrill(room);
@@ -135,7 +135,7 @@ const _DRILL_DEFS = [
 
   // 1 — FREEZE: own-turn, arm + play + end → skip the bot's next turn.
   {
-    id: 'freeze', power: 'freeze', actor: 'player', lockBluff: true,
+    id: 'freeze', power: 'freeze', actor: 'player', lockBluff: true, expect: 'arm_then_play',
     stage(room) {
       const hid = _humanId(room);
       _resetForDrill(room);
@@ -311,10 +311,40 @@ function scenarioComplete(room, index) {
   return !!spec.complete(room);
 }
 
+/**
+ * Power-Clinic turn gate: a learner must perform the drill's scripted action
+ * BEFORE they can End Turn, so they can't skip a lesson by ending early. Returns
+ * { reason } to refuse, or null to allow. Pure read; inert outside an active
+ * (intro-step) clinic drill, so it never touches normal gameplay.
+ *   call_bluff       (bot-Shield demo)   → must Call Bluff first
+ *   arm_then_play    (Freeze, Assassin)  → must arm the power first
+ *   use_power        (Peek)              → must use the power first
+ *   play_then_defend (Shield/Mirror/Swap)→ only needs a card play, which the
+ *                    end_turn handler already requires — no extra gate here.
+ */
+function clinicEndTurnBlock(room) {
+  if (!room || !room.isTutorial || (room.tutorialLesson || 'basics') !== 'powers') return null;
+  const sc = room.tutorialScenario;
+  if (!sc || sc.step === 'resolved') return null;
+  switch (sc.expect) {
+    case 'call_bluff':
+      if (!room.bluffUsedThisTurn) return { reason: "Call the bot's bluff first — that's this drill." };
+      break;
+    case 'arm_then_play':
+    case 'use_power':
+      if (!room.powerActivatedThisTurn) return { reason: 'Use your power card first — follow the coach before ending your turn.' };
+      break;
+    default:
+      break;
+  }
+  return null;
+}
+
 module.exports = {
   POWER_CLINIC,
   stageScenario,
   scenarioComplete,
+  clinicEndTurnBlock,
   REQUIRED_SHAPE,
   BOT_ID,
 };

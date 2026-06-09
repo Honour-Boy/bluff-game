@@ -17,6 +17,8 @@ export function BottomSeat({
   isGameOver,
   callBluff,
   endTurn,
+  endTurnLocked = false,
+  endTurnLockHint = '',
   isFirstTurn,
   bluffUsedThisTurn,
   cardPlayedThisTurn,
@@ -246,9 +248,15 @@ export function BottomSeat({
             <button
               className="primary"
               onClick={endTurn}
+              // Power Clinic: disabled until the drill's scripted action is done
+              // (the server refuses it too). Tooltip explains what's still needed.
+              disabled={endTurnLocked}
+              title={endTurnLocked ? endTurnLockHint : undefined}
               style={{
                 flexShrink: 0, padding: '10px 16px', letterSpacing: '0.14em',
                 display: 'flex', alignItems: 'center', gap: 8,
+                opacity: endTurnLocked ? 0.45 : 1,
+                cursor: endTurnLocked ? 'not-allowed' : 'pointer',
               }}
             >
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" aria-hidden="true">
