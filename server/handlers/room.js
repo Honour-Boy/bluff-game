@@ -31,6 +31,7 @@ const {
 } = require('../lib/roomBuilders');
 const { resolveLeaverPendingPauses } = require('../lib/orchestration');
 const { discardLobbyIdleState } = require('../lib/idleSweep');
+const { rollBotCallRate } = require('../engine/botStrategy');
 
 function register(io, socket, deps) {
   const { groupsRepo, groupSettingsRepo, leaderboardRepo } = deps;
@@ -97,10 +98,17 @@ function register(io, socket, deps) {
         config.powerCards.enabled.peek = true;
         config.powerCards.enabled.shield = true;
       }
-      // (Module 5) Sandbox = unguided free play vs the bot. Powers start OFF (the
-      // local-host learner toggles them in the lobby). NOTE: the practice bot has
-      // no power-play logic outside the scripted clinic, so a powers-on free game
-      // can stall on a bot left holding only power cards — see handoff follow-up.
+      // (Module 5) Sandbox = unguided free play vs the bot. Powers now default ON:
+      // the practice bot holds / activates / defends with power cards in free play
+      // (engine/botStrategy.js + lib/bots.js), so a powers-on game plays to
+      // completion without stalling. The local-host learner can still toggle any
+      // power off in the lobby (PreGameSettingsPanel). Risk/Room/Systems stay off.
+      if (isSandbox) {
+        config = engine.defaultRoomConfig();
+        for (const k of Object.keys(config.powerCards.enabled)) {
+          config.powerCards.enabled[k] = true;
+        }
+      }
 
       const room = await buildAdHocRoom(socket, engine.MODES.ONLINE, config, groupsRepo);
       room.isTutorial = true;
@@ -613,7 +621,19 @@ function register(io, socket, deps) {
       }
 
       engine.resetRoomForReplay(room);
-      if (room.isTutorial) {
+      if (room.sandbox) {
+        // Sandbox replay: keep the learner's chosen config (incl. powers) AND
+        // local-host privileges; just clear the per-turn ledger, reseed the bot's
+        // spontaneous bluff personality, and deal straight back in (no coaching).
+        room.botBluffCallsThisGame = 0;
+        room.tutorialScenario = null;
+        room.tutorialStage = null;
+        room.cardPlayedThisTurn = false;
+        room.bluffUsedThisTurn = false;
+        room.powerActivatedThisTurn = false;
+        room.botCallRate = rollBotCallRate();
+        engine.startGame(room);
+      } else if (room.isTutorial) {
         // Replay the whole journey from Basics: all-off config, fresh counters,
         // no staged clinic. The bot stays host-of-record (no socket) so the
         // learner never inherits host controls on a replay.

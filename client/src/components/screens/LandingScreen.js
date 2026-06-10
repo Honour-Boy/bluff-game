@@ -307,16 +307,14 @@ export function LandingScreen({
               Enter a Room (Player)
             </PlaqueButton>
 
-            {/* Learn by playing - a solo practice table against a bot. The single
-                lowest-friction way in for a first-timer: no code, no second
-                player, the bot autoplays the opposite seat. */}
-            {onStartTutorial && tutorialEnabled && (
+            {/* Learn by playing - a solo practice table against a bot. ONE entry
+                point: tapping it opens a choice of Coaching (guided) or Sandbox
+                (free) mode, so both live behind a single "Practice" button. */}
+            {(onStartTutorial || onStartSandbox) && tutorialEnabled && (
               <PlaqueButton
-                onClick={handleStartTutorial}
+                onClick={() => { setError(null); setMode('practice'); }}
                 disabled={!connected}
-                // Keep the icon · label · badge on a single line: a long label +
-                // a "DONE" badge wrapped on narrow phones (and the bare "DONE"
-                // looked stray). nowrap + an ellipsised label is robust at any width.
+                // Keep the icon · label · badge on a single line at any width.
                 style={{ flexWrap: 'nowrap', whiteSpace: 'nowrap' }}
               >
                 {/* Target / practice icon */}
@@ -326,11 +324,11 @@ export function LandingScreen({
                   <circle cx="12" cy="12" r="1.6" fill="currentColor"/>
                 </svg>
                 <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', minWidth: 0 }}>
-                  Practice vs Bot
+                  Practice
                 </span>
                 {tutorialDone ? (
                   <span
-                    title="You've completed the tutorial - replay any time"
+                    title="You've completed the coaching - replay or jump into sandbox any time"
                     style={{
                       flexShrink: 0, padding: '2px 7px', borderRadius: 999,
                       background: 'var(--alive)', color: '#0e1a10',
@@ -338,7 +336,7 @@ export function LandingScreen({
                       letterSpacing: '0.1em', fontWeight: 700,
                     }}
                   >
-                    ✓ REPLAY
+                    ✓
                   </span>
                 ) : tutorialHint ? (
                   <span
@@ -352,37 +350,6 @@ export function LandingScreen({
                     NEW
                   </span>
                 ) : null}
-              </PlaqueButton>
-            )}
-
-            {/* (Module 5) Unguided sandbox — only once the coached tutorial is done.
-                A plain game vs the bot with local-host controls (toggle power cards),
-                no coaching. */}
-            {onStartSandbox && tutorialEnabled && tutorialDone && (
-              <PlaqueButton
-                onClick={() => { setError(null); onStartSandbox?.(); }}
-                disabled={!connected}
-                style={{ flexWrap: 'nowrap', whiteSpace: 'nowrap' }}
-              >
-                {/* Bot / chip icon */}
-                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" aria-hidden="true" style={{ flexShrink: 0 }}>
-                  <rect x="4" y="8" width="16" height="11" rx="2" stroke="currentColor" strokeWidth="1.8"/>
-                  <path d="M12 4v4M9 13h.01M15 13h.01" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"/>
-                </svg>
-                <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', minWidth: 0 }}>
-                  Just Practice with Bot
-                </span>
-                <span
-                  title="A free, unguided game vs the bot - your rules"
-                  style={{
-                    flexShrink: 0, padding: '2px 7px', borderRadius: 999,
-                    background: 'var(--surface3)', color: 'var(--accent)',
-                    fontFamily: "'Space Mono', monospace", fontSize: 9,
-                    letterSpacing: '0.1em', fontWeight: 700,
-                  }}
-                >
-                  SANDBOX
-                </span>
               </PlaqueButton>
             )}
 
@@ -431,6 +398,99 @@ export function LandingScreen({
         )}
 
         {/* ── Host: game mode selection ── */}
+        {/* ── Practice: choose Coaching or Sandbox ── */}
+        {mode === 'practice' && (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+            <div style={{
+              fontFamily: "'Cinzel', serif",
+              fontSize: 9,
+              color: 'var(--text-dim)',
+              letterSpacing: '0.22em',
+              textTransform: 'uppercase',
+              marginBottom: 2,
+            }}>
+              Practice vs Bot
+            </div>
+
+            <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
+              {[
+                {
+                  key: 'coaching',
+                  icon: (
+                    <svg width="28" height="28" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                      <circle cx="12" cy="12" r="9" stroke="currentColor" strokeWidth="1.8"/>
+                      <circle cx="12" cy="12" r="5" stroke="currentColor" strokeWidth="1.6"/>
+                      <circle cx="12" cy="12" r="1.6" fill="currentColor"/>
+                    </svg>
+                  ),
+                  title: 'Coaching',
+                  desc: 'Guided lessons — learn the core loop, then a power-card clinic. Best for a first-timer.',
+                  onPick: handleStartTutorial,
+                },
+                {
+                  key: 'sandbox',
+                  icon: (
+                    <svg width="28" height="28" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                      <rect x="4" y="8" width="16" height="11" rx="2" stroke="currentColor" strokeWidth="1.8"/>
+                      <path d="M12 4v4M9 13h.01M15 13h.01" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"/>
+                    </svg>
+                  ),
+                  title: 'Sandbox',
+                  desc: 'A free, unguided game vs the bot — your rules. Toggle power cards and just play.',
+                  onPick: () => { setError(null); onStartSandbox?.(); },
+                },
+              ]
+                .filter(({ key }) => (key === 'coaching' ? !!onStartTutorial : !!onStartSandbox))
+                .map(({ key, icon, title, desc, onPick }) => (
+                  <div
+                    key={key}
+                    role="button"
+                    tabIndex={0}
+                    onClick={() => { if (connected) onPick(); }}
+                    onKeyDown={(e) => { if ((e.key === 'Enter' || e.key === ' ') && connected) onPick(); }}
+                    style={{
+                      flex: '1 1 180px',
+                      padding: '16px',
+                      background: 'linear-gradient(160deg, var(--surface2) 0%, var(--surface) 100%)',
+                      border: '2px solid var(--border-lit)',
+                      borderRadius: 'var(--radius)',
+                      cursor: connected ? 'pointer' : 'not-allowed',
+                      opacity: connected ? 0.92 : 0.5,
+                      transition: 'border-color 0.18s, background 0.18s, box-shadow 0.18s, opacity 0.18s',
+                      outline: 'none',
+                    }}
+                  >
+                    <div style={{ color: 'var(--accent)', marginBottom: 8 }}>{icon}</div>
+                    <div style={{
+                      fontFamily: "'Cinzel', serif",
+                      fontSize: 16,
+                      color: 'var(--text)',
+                      marginBottom: 6,
+                    }}>
+                      {title}
+                    </div>
+                    <div style={{
+                      fontFamily: "'Crimson Text', serif",
+                      fontSize: 13,
+                      color: 'var(--text-dim)',
+                      lineHeight: 1.5,
+                    }}>
+                      {desc}
+                    </div>
+                  </div>
+                ))}
+            </div>
+
+            <button
+              type="button"
+              style={{ fontSize: 11 }}
+              onClick={() => { setMode(null); setError(null); }}
+            >
+              ← Back to the Bar
+            </button>
+          </div>
+        )}
+
         {mode === 'host' && (
           <form
             onSubmit={handleCreate}
