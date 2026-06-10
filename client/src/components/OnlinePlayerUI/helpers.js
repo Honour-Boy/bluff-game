@@ -252,6 +252,17 @@ export function buildAnnouncementBannerProps(evt) {
   };
 }
 
+// Whether the guided COACHING layer should be active for this room. The
+// "Just Practice with Bot" SANDBOX carries `room.isTutorial` server-side (it
+// reuses the tutorial room's start/restart host-bypass + leave/disconnect
+// teardown), but it is otherwise a plain online game vs the bot — no coach
+// hints, no clinic gates, no end-of-game replay POP-UP, and the header shows
+// "Rules" rather than "? Guide". So coaching is active only for a tutorial that
+// is NOT a sandbox. Drives the local `isTutorial` flag in OnlinePlayerUI.
+export function coachingActive(roomState) {
+  return !!roomState?.isTutorial && !roomState?.sandbox;
+}
+
 export function orderClockwiseFromLocal(others, turnOrder, localId) {
   const list = Array.isArray(others) ? others : [];
   if (list.length === 0) return list;

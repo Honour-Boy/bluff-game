@@ -223,4 +223,43 @@ describe('resetRoomForReplay', () => {
     expect('suddenDeathCounter' in room).toBe(false);
     expect('swapHolderId' in room).toBe(false);
   });
+
+  it('keeps the spinSeq counter climbing across a replay (so client spin-dedup never collides)', () => {
+    // The client dedups spin animations by `seq:<spinSeq>` in a Set that survives
+    // a same-room replay. Resetting the counter would make the next game reuse
+    // already-seen keys → no spin animations on "Play Again".
+    const room = buildFinishedRoom();
+    room.spinSeq = 7;
+    resetRoomForReplay(room);
+    expect(room.spinSeq).toBe(7);
+  });
+
+  it('defaults spinSeq to 0 when the finished game never spun', () => {
+    const room = buildFinishedRoom();
+    delete room.spinSeq;
+    resetRoomForReplay(room);
+    expect(room.spinSeq).toBe(0);
+  });
+
+  it('preserves sandbox + tutorialCoaching flags across replay', () => {
+    // Sandbox replay must stay a plain online game: if these flags were dropped,
+    // restart_room can't take the sandbox branch and degrades to a coached
+    // Basics reset (powers wiped, spins broken).
+    const room = buildFinishedRoom();
+    room.isTutorial = true;
+    room.sandbox = true;
+    room.tutorialCoaching = false;
+    resetRoomForReplay(room);
+    expect(room.isTutorial).toBe(true);
+    expect(room.sandbox).toBe(true);
+    expect(room.tutorialCoaching).toBe(false);
+  });
+
+  it('does not stamp sandbox onto a non-sandbox tutorial replay', () => {
+    const room = buildFinishedRoom();
+    room.isTutorial = true; // coached Basics/clinic room — never sandbox
+    resetRoomForReplay(room);
+    expect(room.isTutorial).toBe(true);
+    expect('sandbox' in room).toBe(false);
+  });
 });

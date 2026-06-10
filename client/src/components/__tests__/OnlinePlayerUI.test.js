@@ -1,6 +1,6 @@
 import { describe, it, expect, vi } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
-import { distributePlayers, orderClockwiseFromLocal, CardHand } from '../OnlinePlayerUI';
+import { distributePlayers, orderClockwiseFromLocal, CardHand, coachingActive } from '../OnlinePlayerUI';
 
 // Compact fixture helper — only the fields seating cares about.
 const mkPlayers = (...ids) => ids.map((id) => ({ id, username: id.toUpperCase(), status: 'alive' }));
@@ -11,6 +11,27 @@ const card = (id, overrides = {}) => ({
   shape: overrides.shape ?? 'circle',
   number: overrides.number ?? 5,
   ...overrides,
+});
+
+describe('coachingActive — sandbox is a plain online game (no coaching layer)', () => {
+  it('is true for a coached tutorial room (Basics / Power Clinic)', () => {
+    expect(coachingActive({ isTutorial: true })).toBe(true);
+    expect(coachingActive({ isTutorial: true, sandbox: false })).toBe(true);
+  });
+
+  it('is FALSE for a sandbox room even though it is flagged isTutorial', () => {
+    // Sandbox carries isTutorial server-side (start/restart bypass + teardown)
+    // but must NOT mount TutorialLayer / coach hints — and the header must show
+    // "Rules", not "? Guide". This gate is what turns all of that off.
+    expect(coachingActive({ isTutorial: true, sandbox: true })).toBe(false);
+  });
+
+  it('is false for a normal online room and for missing state', () => {
+    expect(coachingActive({ isTutorial: false })).toBe(false);
+    expect(coachingActive({})).toBe(false);
+    expect(coachingActive(null)).toBe(false);
+    expect(coachingActive(undefined)).toBe(false);
+  });
 });
 
 describe('orderClockwiseFromLocal — issue #82', () => {

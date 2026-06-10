@@ -590,3 +590,60 @@ describe('start_game tutorial bypass', () => {
     expect(reject).toHaveBeenCalledWith({ success: false, error: 'Not the host' });
   });
 });
+
+describe('restart_room — sandbox replay returns to the lobby', () => {
+  const deps = {
+    groupsRepo: { getActiveGroupByCode: async () => null },
+    groupSettingsRepo: { upsertGroupSettings: vi.fn() },
+    leaderboardRepo: { recordWinner: vi.fn(), recordGameStart: vi.fn() },
+  };
+  function makeIo() {
+    return { to: () => ({ emit: () => {} }), in: () => ({ fetchSockets: async () => [] }) };
+  }
+  function capture(handlerMod, io, socket) {
+    const handlers = {};
+    socket.on = (evt, cb) => { handlers[evt] = cb; };
+    handlerMod.register(io, socket, deps);
+    return handlers;
+  }
+  const ALL_POWERS = ['shield', 'mirror', 'swap', 'peek', 'freeze', 'assassin'];
+
+  it('replays the SAME room back to lobby with sandbox + powers config preserved (no deal)', async () => {
+    const io = makeIo();
+    const socket = { id: 'host-sock', userId: 'human', username: 'You', data: {}, join: () => {}, leave: () => {} };
+    const roomHandlers = capture(roomHandler, io, socket);
+    await roomHandlers['create_tutorial_room']({ sandbox: true }, () => {});
+    const room = [...rooms.values()][0];
+    const code = room.code;
+    expect(room.sandbox).toBe(true);
+    expect(room.hostSocketId).toBe('host-sock'); // local host (not the bot)
+    for (const p of ALL_POWERS) expect(room.config.powerCards.enabled[p]).toBe(true);
+
+    // Deal + drive to game over.
+    const gameHandlers = capture(gameHandler, io, socket);
+    await gameHandlers['start_game']({ roomCode: code }, () => {});
+    expect(room.phase).toBe('playing');
+    room.phase = 'game_over';
+
+    // "Deal Again" → restart_room.
+    const cb = vi.fn();
+    await roomHandlers['restart_room']({ roomCode: code }, cb);
+    expect(cb).toHaveBeenCalledWith(expect.objectContaining({ success: true }));
+
+    // Same room object, back in the LOBBY — NOT dealt (player can tweak settings).
+    expect(rooms.get(code)).toBe(room);
+    expect(room.phase).toBe('lobby');
+    expect(room.hands).toBeNull();
+
+    // Sandbox identity survived — NOT degraded to a coached all-off Basics reset.
+    expect(room.sandbox).toBe(true);
+    expect(room.tutorialCoaching).toBe(false);
+    for (const p of ALL_POWERS) expect(room.config.powerCards.enabled[p]).toBe(true);
+
+    // Local-host seat restored, bot personality reseeded, bot seat intact.
+    expect(room.hostSocketId).toBe('host-sock');
+    expect(typeof room.botCallRate).toBe('number');
+    expect(room.players).toHaveLength(2);
+    expect(room.players.some(p => p.isBot)).toBe(true);
+  });
+});
