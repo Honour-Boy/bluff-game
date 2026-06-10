@@ -923,6 +923,44 @@ describe('sandbox bot — power beats', () => {
     expect(room.lastAction.type).toBe('bluff_blocked');
   });
 
+  it('defends a bluff by arming a held Mirror (intercept_arm) → reflects the spin onto the accuser', async () => {
+    const room = makeSandboxRoom();
+    // Same window as the Shield case, but the bot holds a Mirror instead. Mirror
+    // (scenario "incoming") reflects the spin onto the accuser regardless of
+    // correctness — so a correct bluff on a lying bot lands on the HUMAN.
+    room.turnOrder = ['bot:1', 'human'];
+    room.currentTurnIndex = 1;
+    room.isFirstTurn = false;
+    room.prevTurnPlayerId = 'bot:1';
+    const card = { id: 'c1', type: 'shape', shape: 'square', number: 3 };
+    room.lastPlayedCard = card;
+    room.challengeableCard = card;
+    room.challengeableCardType = 'circle'; // square ≠ circle → the bot lied
+    room.playedPile = [card];
+    room.powerCardSlot = { human: [], 'bot:1': [{ id: 'mi', type: 'power', power: 'mirror' }] };
+    room.bluffUsedThisTurn = true;
+    room.phase = 'bluff_intercept_pending';
+    room.pendingBluffIntercept = {
+      accuserId: 'human', accuserName: 'You',
+      accusedId: 'bot:1', accusedName: 'Dealer Bot',
+      deadline: Date.now() + 8000,
+      options: [{ cardId: 'mi', power: 'mirror' }],
+    };
+    await saveRoom(room);
+    const io = makeIo();
+
+    expect(_pendingBotAction(room)).toEqual({ kind: 'intercept_arm', botId: 'bot:1' });
+    await broadcastRoomState(io, room.code);
+    await vi.advanceTimersByTimeAsync(1300); // BOT_MOVE_DELAY_MS arm beat
+
+    // The bluff's spin is reflected onto the HUMAN accuser, not the bot.
+    expect(room.pendingBluffIntercept).toBeNull();
+    expect(room.phase).toBe('spin_pending');
+    expect(room.spinTargetId).toBe('human');
+    expect(io.log.some((e) => e.payload?.kind === 'mirror_reflected')).toBe(true);
+    _clearSpinPendingTimer(room.code);
+  });
+
   it('passes a bluff when it played HONESTLY (no wasted Shield)', async () => {
     const room = makeSandboxRoom();
     room.turnOrder = ['bot:1', 'human'];
