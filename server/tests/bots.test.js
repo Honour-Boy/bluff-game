@@ -17,7 +17,17 @@ import { createRequire } from 'module';
 const require = createRequire(import.meta.url);
 
 const engine = require('../gameEngine.js');
-const { chooseCardPlay, shouldCallBluff } = require('../engine/botStrategy.js');
+const {
+  chooseCardPlay,
+  shouldCallBluff,
+  chooseBotPowerActivation,
+  shouldBotInterceptBluff,
+  chooseInterceptCard,
+  chooseSwapPick,
+  rollBotCallRate,
+  BOT_CALL_RATE_MIN,
+  BOT_CALL_RATE_MAX,
+} = require('../engine/botStrategy.js');
 const {
   armBotTurn,
   _pendingBotAction,
@@ -260,28 +270,35 @@ describe('bot turn driver — beats', () => {
     const botHandBefore = handLen(room, 'bot:1');
     const pileBefore = room.playedPile.length;
 
-    // Broadcast arms beat 1 (play).
-    await broadcastRoomState(io, room.code);
-    expect(botTimers.has(room.code)).toBe(true);
+    // Pin Math.random so the randomized think delay is deterministic (0.5 →
+    // 8000ms) and we can observe the play beat BEFORE the end beat.
+    const rng = vi.spyOn(Math, 'random').mockReturnValue(0.5);
+    try {
+      // Broadcast arms beat 1 (play).
+      await broadcastRoomState(io, room.code);
+      expect(botTimers.has(room.code)).toBe(true);
 
-    // Beat 1 — bot plays a card.
-    await vi.advanceTimersByTimeAsync(1200);
-    expect(handLen(room, 'bot:1')).toBe(botHandBefore - 1);
-    expect(room.playedPile.length).toBe(pileBefore + 1);
-    expect(room.cardPlayedThisTurn).toBe(true);
-    expect(room.lastAction.type).toBe('card_played_online');
-    expect(room.lastAction.playerId).toBe('bot:1');
-    expect(room.currentTurnIndex).toBe(1); // still the bot's turn
+      // Beat 1 — bot plays a card (after its ~8s "thinking" pause).
+      await vi.advanceTimersByTimeAsync(8000);
+      expect(handLen(room, 'bot:1')).toBe(botHandBefore - 1);
+      expect(room.playedPile.length).toBe(pileBefore + 1);
+      expect(room.cardPlayedThisTurn).toBe(true);
+      expect(room.lastAction.type).toBe('card_played_online');
+      expect(room.lastAction.playerId).toBe('bot:1');
+      expect(room.currentTurnIndex).toBe(1); // still the bot's turn
 
-    // Beat 2 — bot ends its turn → control passes back to the human.
-    await vi.advanceTimersByTimeAsync(1200);
-    expect(room.currentTurnIndex).toBe(0);
-    expect(room.phase).toBe('playing');
-    expect(room.cardPlayedThisTurn).toBe(false);
+      // Beat 2 — bot ends its turn → control passes back to the human.
+      await vi.advanceTimersByTimeAsync(1200);
+      expect(room.currentTurnIndex).toBe(0);
+      expect(room.phase).toBe('playing');
+      expect(room.cardPlayedThisTurn).toBe(false);
 
-    // On the human's turn the driver stops arming.
-    expect(_pendingBotAction(room)).toBeNull();
-    expect(botTimers.has(room.code)).toBe(false);
+      // On the human's turn the driver stops arming.
+      expect(_pendingBotAction(room)).toBeNull();
+      expect(botTimers.has(room.code)).toBe(false);
+    } finally {
+      rng.mockRestore();
+    }
   });
 
   it('takes a spin when the bot is the bluff-called target', async () => {
@@ -319,15 +336,21 @@ describe('bot turn driver — beats', () => {
     await saveRoom(room);
     const io = makeIo();
 
-    await broadcastRoomState(io, room.code);
-    // Beat 1 (play last card) + Beat 2 (end turn → empty hand wins).
-    await vi.advanceTimersByTimeAsync(1200);
-    await vi.advanceTimersByTimeAsync(1200);
+    // Pin Math.random so the think delay is deterministic (0.5 → 8000ms).
+    const rng = vi.spyOn(Math, 'random').mockReturnValue(0.5);
+    try {
+      await broadcastRoomState(io, room.code);
+      // Beat 1 (play last card, after the ~8s think pause) + Beat 2 (end → win).
+      await vi.advanceTimersByTimeAsync(8000);
+      await vi.advanceTimersByTimeAsync(1200);
 
-    expect(room.phase).toBe('game_over');
-    expect(room.lastAction.type).toBe('game_over');
-    expect(room.lastAction.winnerId).toBe('bot:1');
-    expect(bot.isBot).toBe(true);
+      expect(room.phase).toBe('game_over');
+      expect(room.lastAction.type).toBe('game_over');
+      expect(room.lastAction.winnerId).toBe('bot:1');
+      expect(bot.isBot).toBe(true);
+    } finally {
+      rng.mockRestore();
+    }
   });
 
   it('opens its turn by challenging the human when the bluff roll fires', async () => {
@@ -347,7 +370,9 @@ describe('bot turn driver — beats', () => {
     const rng = vi.spyOn(Math, 'random').mockReturnValue(0);
     try {
       await broadcastRoomState(io, room.code); // arms the bot's pre-card beat
-      await vi.advanceTimersByTimeAsync(1200);  // bot challenges the human
+      // rng 0 → think delay = 4000ms; advance just past it (stop before the 1.5s
+      // spin beat so we observe the spin_pending the challenge produced).
+      await vi.advanceTimersByTimeAsync(4100); // bot challenges the human
 
       // The bot called bluff → it resolved into a pending spin on someone.
       expect(room.bluffUsedThisTurn).toBe(true);
@@ -408,7 +433,7 @@ describe('bot turn driver — beats', () => {
     try {
       const botHandBefore = handLen(room, 'bot:1');
       await broadcastRoomState(io, room.code);
-      await vi.advanceTimersByTimeAsync(1200);
+      await vi.advanceTimersByTimeAsync(12000);
 
       expect(room.bluffUsedThisTurn).toBe(false);
       expect(room.phase).toBe('playing');
@@ -644,5 +669,309 @@ describe('power-cards lesson', () => {
     expect((room.powerCardSlot.human || []).length).toBeGreaterThanOrEqual(1);
     expect((room.powerCardSlot['bot:1'] || []).length).toBeGreaterThanOrEqual(1);
     _clearBotTimer(res.roomCode);
+  });
+});
+
+// ─── Free-play power-card strategy (sandbox, powers ON) ───────────────────────
+describe('botStrategy — free-play power activation', () => {
+  function playingRoom(slot, extra = {}) {
+    return {
+      phase: 'playing',
+      turnOrder: ['human', 'bot:1'],
+      currentTurnIndex: 1,
+      powerActivatedThisTurn: false,
+      currentCardType: 'circle',
+      isFirstTurn: false,
+      bluffUsedThisTurn: false,
+      bluffBlockedThisTurn: false,
+      challengeableCard: { id: 'ch', type: 'shape', shape: 'square', number: 4 },
+      challengeableCardType: 'circle',
+      prevTurnPlayerId: 'human',
+      players: [
+        { id: 'human', status: 'alive' },
+        { id: 'bot:1', status: 'alive' },
+      ],
+      hands: new Map([
+        ['human', [{ id: 'h1', type: 'shape', shape: 'circle', number: 2 }]],
+        ['bot:1', [{ id: 'b1', type: 'shape', shape: 'circle', number: 5 }]],
+      ]),
+      powerCardSlot: { 'bot:1': slot, human: [] },
+      ...extra,
+    };
+  }
+
+  it('never returns a power the bot was not dealt', () => {
+    // Slot holds ONLY a freeze — the strategy must never reach for shield/peek/etc.
+    const room = playingRoom([{ id: 'f1', type: 'power', power: 'freeze' }]);
+    const choice = chooseBotPowerActivation(room, 'bot:1', () => 0); // 0 → would arm freeze if ahead
+    // bot hand (1) <= human hand (1) → ahead; rng 0 < freeze rate → arms the held freeze
+    expect(choice).toEqual({ cardId: 'f1', power: 'freeze' });
+    expect(['f1']).toContain(choice.cardId); // only the assigned card id
+  });
+
+  it('returns null when the slot is empty (nothing to activate)', () => {
+    expect(chooseBotPowerActivation(playingRoom([]), 'bot:1', () => 0)).toBeNull();
+  });
+
+  it('activates a held Peek when there is a previous play to challenge', () => {
+    const room = playingRoom([{ id: 'pk', type: 'power', power: 'peek' }]);
+    expect(chooseBotPowerActivation(room, 'bot:1', () => 0.99)).toEqual({ cardId: 'pk', power: 'peek' });
+  });
+
+  it('respects the one-power-per-turn ledger and the armed marker', () => {
+    const slot = [{ id: 'pk', type: 'power', power: 'peek' }];
+    expect(chooseBotPowerActivation(playingRoom(slot, { powerActivatedThisTurn: true }), 'bot:1', () => 0)).toBeNull();
+    const armedRoom = playingRoom(slot);
+    armedRoom.players.find((p) => p.id === 'bot:1').armedPowerCard = { power: 'freeze' };
+    expect(chooseBotPowerActivation(armedRoom, 'bot:1', () => 0)).toBeNull();
+  });
+
+  it('only the on-turn bot activates offensively', () => {
+    const room = playingRoom([{ id: 'pk', type: 'power', power: 'peek' }], { currentTurnIndex: 0 });
+    expect(chooseBotPowerActivation(room, 'bot:1', () => 0)).toBeNull();
+  });
+});
+
+describe('botStrategy — free-play reactive defence', () => {
+  function interceptRoom(slot, { lied = true } = {}) {
+    return {
+      challengeableCard: { id: 'ch', type: 'shape', shape: lied ? 'square' : 'circle', number: 4 },
+      challengeableCardType: 'circle',
+      powerCardSlot: { 'bot:1': slot },
+    };
+  }
+
+  it('defends only when the bot actually lied', () => {
+    const slot = [{ id: 'sh', type: 'power', power: 'shield' }];
+    expect(shouldBotInterceptBluff(interceptRoom(slot, { lied: true }), 'bot:1')).toBe(true);
+    expect(shouldBotInterceptBluff(interceptRoom(slot, { lied: false }), 'bot:1')).toBe(false);
+  });
+
+  it('does not defend without a held interceptable card', () => {
+    const slot = [{ id: 'pk', type: 'power', power: 'peek' }]; // peek is not defensive
+    expect(shouldBotInterceptBluff(interceptRoom(slot), 'bot:1')).toBe(false);
+  });
+
+  it('picks Shield > Mirror > Swap from the held cards (never an unheld one)', () => {
+    const room = interceptRoom([
+      { id: 'mi', type: 'power', power: 'mirror' },
+      { id: 'sh', type: 'power', power: 'shield' },
+    ]);
+    expect(chooseInterceptCard(room, 'bot:1')).toBe('sh');
+    const onlyMirror = interceptRoom([{ id: 'mi', type: 'power', power: 'mirror' }]);
+    expect(chooseInterceptCard(onlyMirror, 'bot:1')).toBe('mi');
+    const onlyOffensive = interceptRoom([{ id: 'pk', type: 'power', power: 'peek' }]);
+    expect(chooseInterceptCard(onlyOffensive, 'bot:1')).toBeNull();
+  });
+});
+
+describe('botStrategy — free-play swap pick', () => {
+  it('prefers a pile card that makes the played card honest', () => {
+    const room = {
+      challengeableCard: { id: 'ch', type: 'shape', shape: 'square' },
+      challengeableCardType: 'circle',
+      playedPile: [
+        { id: 'p1', type: 'shape', shape: 'triangle' },
+        { id: 'p2', type: 'shape', shape: 'circle' }, // matches required → honest swap
+        { id: 'ch', type: 'shape', shape: 'square' },
+      ],
+    };
+    expect(chooseSwapPick(room)).toBe('p2');
+  });
+
+  it('falls back to any other pile card, else a no-op on its own', () => {
+    const room = {
+      challengeableCard: { id: 'ch', type: 'shape', shape: 'square' },
+      challengeableCardType: 'circle',
+      playedPile: [
+        { id: 'p1', type: 'shape', shape: 'triangle' },
+        { id: 'ch', type: 'shape', shape: 'square' },
+      ],
+    };
+    expect(chooseSwapPick(room)).toBe('p1');
+    const lone = { challengeableCard: { id: 'ch', shape: 'square' }, challengeableCardType: 'circle', playedPile: [{ id: 'ch', shape: 'square' }] };
+    expect(chooseSwapPick(lone)).toBe('ch');
+  });
+});
+
+describe('botStrategy — sandbox bluff calling is spontaneous (no card knowledge)', () => {
+  function sandboxRoom(extra = {}) {
+    return {
+      sandbox: true,
+      isTutorial: true,
+      isFirstTurn: false,
+      bluffUsedThisTurn: false,
+      bluffBlockedThisTurn: false,
+      challengeableCard: { id: 'c', type: 'shape', shape: 'circle' },
+      challengeableCardType: 'circle',
+      prevTurnPlayerId: 'human',
+      currentCardType: 'circle',
+      turnOrder: ['human', 'bot:1'],
+      currentTurnIndex: 1,
+      botCallRate: 0.3,
+      players: [
+        { id: 'human', status: 'alive' },
+        { id: 'bot:1', status: 'alive' },
+      ],
+      hands: new Map([['bot:1', [{ id: 'b', type: 'shape', shape: 'circle' }]]]),
+      ...extra,
+    };
+  }
+
+  it('is a pure gamble at the per-game rate, regardless of the opponent card', () => {
+    // The challengeable card is HONEST (matches required) yet the bot still
+    // gambles — it cannot "see" that, proving no card-knowledge cheat.
+    expect(shouldCallBluff(sandboxRoom(), 'bot:1', () => 0.1)).toBe(true);  // 0.1 < 0.3
+    expect(shouldCallBluff(sandboxRoom(), 'bot:1', () => 0.5)).toBe(false); // 0.5 > 0.3
+  });
+
+  it('does NOT use the coached ≥2-call guarantee in sandbox', () => {
+    // botBluffCallsThisGame=0 would force calls in coached Basics; in sandbox the
+    // low per-game rate still applies (no forced 0.85 lean).
+    const room = sandboxRoom({ botBluffCallsThisGame: 0, botCallRate: 0.2 });
+    expect(shouldCallBluff(room, 'bot:1', () => 0.5)).toBe(false);
+  });
+
+  it('leans toward calling when stuck (no honest play → wants a global re-deal)', () => {
+    // Bot hand has no card matching the required shape and no whot → stuck.
+    const room = sandboxRoom({
+      currentCardType: 'triangle',
+      botCallRate: 0.1,
+      hands: new Map([['bot:1', [{ id: 'b', type: 'shape', shape: 'circle' }]]]),
+    });
+    // 0.5 is above the 0.1 base rate but below the 0.7 stuck rate → calls.
+    expect(shouldCallBluff(room, 'bot:1', () => 0.5)).toBe(true);
+  });
+
+  it('rollBotCallRate stays within the configured band', () => {
+    expect(rollBotCallRate(() => 0)).toBeCloseTo(BOT_CALL_RATE_MIN);
+    expect(rollBotCallRate(() => 0.999999)).toBeLessThan(BOT_CALL_RATE_MAX);
+    expect(rollBotCallRate(() => 0.5)).toBeGreaterThan(BOT_CALL_RATE_MIN);
+  });
+});
+
+// ─── Free-play power beats driven through the real broadcast path ─────────────
+describe('sandbox bot — power beats', () => {
+  beforeEach(() => vi.useFakeTimers());
+  afterEach(() => vi.useRealTimers());
+
+  // A started sandbox room: powers ON, human as local host, bot second.
+  function makeSandboxRoom() {
+    const room = makeTutorialRoom();
+    room.sandbox = true;
+    room.tutorialScenario = null;
+    return room;
+  }
+
+  it('activates a held offensive power (Freeze) at turn start, then plays', async () => {
+    const room = makeSandboxRoom();
+    room.currentTurnIndex = 1; // bot's turn
+    // Bot holds a Freeze and is ahead (hands are equal at deal → "ahead").
+    room.powerCardSlot = { human: [], 'bot:1': [{ id: 'fz', type: 'power', power: 'freeze' }] };
+    await saveRoom(room);
+    const io = makeIo();
+
+    const rng = vi.spyOn(Math, 'random').mockReturnValue(0); // arm freeze + min think delay
+    try {
+      await broadcastRoomState(io, room.code);
+      // Beat 1 — activate (BOT_MOVE_DELAY_MS).
+      await vi.advanceTimersByTimeAsync(1200);
+      const bot = room.players.find((p) => p.id === 'bot:1');
+      expect(bot.armedPowerCard?.power).toBe('freeze');
+      expect(room.powerActivatedThisTurn).toBe(true);
+      expect(io.log.some((e) => e.payload?.kind === 'bot_power_activated')).toBe(true);
+      // Beat 2 — play a card (after the ~4s think pause).
+      await vi.advanceTimersByTimeAsync(4500);
+      expect(room.cardPlayedThisTurn).toBe(true);
+    } finally {
+      rng.mockRestore();
+    }
+  });
+
+  it('defends a bluff by arming a held Shield (intercept_arm) → bluff blocked', async () => {
+    const room = makeSandboxRoom();
+    // Stage a window: the bot was the previous player, LIED (square ≠ circle),
+    // holds an un-armed Shield, and the human (on turn) called bluff on it.
+    room.turnOrder = ['bot:1', 'human'];
+    room.currentTurnIndex = 1;
+    room.isFirstTurn = false;
+    room.prevTurnPlayerId = 'bot:1';
+    const card = { id: 'c1', type: 'shape', shape: 'square', number: 3 };
+    room.lastPlayedCard = card;
+    room.challengeableCard = card;
+    room.challengeableCardType = 'circle'; // square ≠ circle → the bot lied
+    room.playedPile = [card];
+    room.powerCardSlot = { human: [], 'bot:1': [{ id: 'sh', type: 'power', power: 'shield' }] };
+    room.bluffUsedThisTurn = true;
+    room.phase = 'bluff_intercept_pending';
+    room.pendingBluffIntercept = {
+      accuserId: 'human', accuserName: 'You',
+      accusedId: 'bot:1', accusedName: 'Dealer Bot',
+      deadline: Date.now() + 8000,
+      options: [{ cardId: 'sh', power: 'shield' }],
+    };
+    await saveRoom(room);
+    const io = makeIo();
+
+    expect(_pendingBotAction(room)).toEqual({ kind: 'intercept_arm', botId: 'bot:1' });
+    await broadcastRoomState(io, room.code);
+    await vi.advanceTimersByTimeAsync(1300); // BOT_MOVE_DELAY_MS arm beat
+
+    // Window closed; the Shield blocked the (correct) bluff → no spin on the bot.
+    expect(room.pendingBluffIntercept).toBeNull();
+    expect(room.phase).toBe('playing');
+    expect(room.lastAction.type).toBe('bluff_blocked');
+  });
+
+  it('passes a bluff when it played HONESTLY (no wasted Shield)', async () => {
+    const room = makeSandboxRoom();
+    room.turnOrder = ['bot:1', 'human'];
+    room.currentTurnIndex = 1;
+    room.isFirstTurn = false;
+    const card = { id: 'c1', type: 'shape', shape: 'circle', number: 3 };
+    room.lastPlayedCard = card;
+    room.challengeableCard = card;
+    room.challengeableCardType = 'circle'; // circle === circle → the bot was honest
+    room.playedPile = [card];
+    room.powerCardSlot = { human: [], 'bot:1': [{ id: 'sh', type: 'power', power: 'shield' }] };
+    room.bluffUsedThisTurn = true;
+    room.phase = 'bluff_intercept_pending';
+    room.pendingBluffIntercept = {
+      accuserId: 'human', accusedId: 'bot:1',
+      deadline: Date.now() + 8000, options: [{ cardId: 'sh', power: 'shield' }],
+    };
+    await saveRoom(room);
+
+    // Honest play → don't burn the Shield; pass and let the wrong call spin the human.
+    expect(_pendingBotAction(room)).toEqual({ kind: 'intercept_pass', botId: 'bot:1' });
+  });
+
+  it('resolves a swap_pending pause when the bot is the Swap holder', async () => {
+    const room = makeSandboxRoom();
+    room.phase = 'swap_pending';
+    room.swapHolderId = 'bot:1';
+    // The accused (bot) lied with a square; a circle sits in the pile to swap in.
+    const lied = { id: 'lie', type: 'shape', shape: 'square', number: 2 };
+    const honest = { id: 'hon', type: 'shape', shape: 'circle', number: 9 };
+    room.playedPile = [honest, lied];
+    room.challengeableCard = lied;
+    room.challengeableCardType = 'circle';
+    room.lastAction = { type: 'swap_pending', accuserId: 'human', accusedId: 'bot:1' };
+    room.powerCardSlot = { human: [], 'bot:1': [{ id: 'sw', type: 'power', power: 'swap', armed: true }] };
+    const botPlayer = room.players.find((p) => p.id === 'bot:1');
+    botPlayer.armedPowerCard = { power: 'swap', cardId: 'sw' };
+    await saveRoom(room);
+    const io = makeIo();
+
+    expect(_pendingBotAction(room)).toEqual({ kind: 'swap_pick', botId: 'bot:1' });
+    await broadcastRoomState(io, room.code);
+    await vi.advanceTimersByTimeAsync(1300);
+
+    // Swap consumed and the bluff resolved off the swapped-in (honest) card → the
+    // wrong call now spins the HUMAN accuser, not the bot.
+    expect(room.swapHolderId).toBeNull();
+    expect(room.phase).toBe('spin_pending');
+    expect(room.spinTargetId).toBe('human');
+    _clearSpinPendingTimer(room.code);
   });
 });

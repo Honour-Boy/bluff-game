@@ -18,7 +18,16 @@
 // DEFERRED requires inside the expiry handler (same trick idleTurn.js uses).
 
 const engine = require('../gameEngine');
-const { chooseCardPlay, shouldCallBluff } = require('../engine/botStrategy');
+const bluffPipeline = require('../bluffPipeline');
+const {
+  chooseCardPlay,
+  shouldCallBluff,
+  chooseBotPowerActivation,
+  shouldBotInterceptBluff,
+  chooseInterceptCard,
+  chooseSwapPick,
+  rollBotCallRate,
+} = require('../engine/botStrategy');
 const {
   getRoom,
   saveRoom,
@@ -36,6 +45,21 @@ const BOT_INTERCEPT_DELAY_MS = 700; // brief "deciding" beat before auto-passing
 // spin) waits much longer so the learner can read the expanded coach before the
 // cylinder turns. Clinic-only (lesson 'powers'); Basics keeps the snappy beat.
 const CLINIC_BOT_SPIN_DELAY_MS = 10000;
+
+// "Thinking" delay before the bot plays a card. A real opponent doesn't slam a
+// card down instantly — a randomized 4–12s pause per turn makes the bot feel
+// like it's actually weighing what to play (and masks the fact that its choice
+// is computed instantly). Applies to the card-play beat only; ending the turn /
+// arming / spinning keep their snappy beats. Re-rolled per distinct beat (the
+// armBotTurn key-guard fixes the chosen delay for that beat so repeated
+// broadcasts don't restack or re-randomize it).
+const BOT_PLAY_THINK_MIN_MS = 4000;
+const BOT_PLAY_THINK_MAX_MS = 12000;
+function _botPlayThinkDelay() {
+  return Math.floor(
+    BOT_PLAY_THINK_MIN_MS + Math.random() * (BOT_PLAY_THINK_MAX_MS - BOT_PLAY_THINK_MIN_MS),
+  );
+}
 
 // Tutorial rooms are never group rooms (room.groupId is null), so the leaderboard
 // repo handed to the spin pipeline is never actually invoked — every call site
@@ -79,10 +103,35 @@ function _pendingBotAction(room) {
   if (room.phase === 'bluff_intercept_pending' && room.pendingBluffIntercept) {
     const accused = room.players.find((p) => p.id === room.pendingBluffIntercept.accusedId);
     if (accused?.isBot && accused.status === 'alive') {
-      if (room.tutorialScenario?.botArmsIntercept) {
+      // Clinic: the bot-Shield demo scripts the arm; everything else passes.
+      if (room.tutorialScenario) {
+        return room.tutorialScenario.botArmsIntercept
+          ? { kind: 'intercept_arm', botId: accused.id }
+          : { kind: 'intercept_pass', botId: accused.id };
+      }
+      // Free play (sandbox, powers ON): defend only when it helps — the bot
+      // actually lied AND holds an interceptable card. Anywhere else the bot has
+      // no socket to defend, so it passes (no 8s stall).
+      if (
+        room.sandbox
+        && shouldBotInterceptBluff(room, accused.id)
+        && engine.listInterceptCards(room, accused.id).length > 0
+      ) {
         return { kind: 'intercept_arm', botId: accused.id };
       }
       return { kind: 'intercept_pass', botId: accused.id };
+    }
+    return null;
+  }
+
+  // Free play: the bot is the Swap holder resolving a swap_pending pause — it
+  // must pick a card from the played pile (the human picker has no analogue for
+  // a bot). Clinic Swap is a learner-defence drill, never bot-held, so this is
+  // free-play only.
+  if (room.phase === 'swap_pending' && room.swapHolderId && room.sandbox && !room.tutorialScenario) {
+    const holder = room.players.find((p) => p.id === room.swapHolderId);
+    if (holder?.isBot && holder.status === 'alive') {
+      return { kind: 'swap_pick', botId: holder.id };
     }
     return null;
   }
@@ -115,6 +164,16 @@ function _pendingBotAction(room) {
         }
         return null;
       }
+      // Free play (sandbox, powers ON): open the turn by maybe ACTIVATING an
+      // offensive power (Peek / Freeze / Assassin) BEFORE the card play. Only at
+      // turn start (no card played, no bluff called yet); the engine ledger caps
+      // it at one per turn, so the next beat falls through to play.
+      if (room.sandbox && !room.cardPlayedThisTurn && !room.bluffUsedThisTurn) {
+        const activation = chooseBotPowerActivation(room, current.id);
+        if (activation) {
+          return { kind: 'activate', botId: current.id, cardId: activation.cardId, power: activation.power };
+        }
+      }
       return { kind: room.cardPlayedThisTurn ? 'end' : 'play', botId: current.id };
     }
   }
@@ -138,7 +197,12 @@ function _botActionKey(action, room) {
     room.phase,
     room.cardPlayedThisTurn ? 1 : 0,
     room.bluffUsedThisTurn ? 1 : 0,
+    // §free-play: an offensive activation flips this false→true, so the
+    // post-activation "now play a card" beat re-arms distinctly (mirrors the
+    // bluffUsedThisTurn trick for a post-challenge play).
+    room.powerActivatedThisTurn ? 1 : 0,
     room.spinTargetId || '',
+    room.swapHolderId || '',
   ].join(':');
 }
 
@@ -150,6 +214,13 @@ function _botActionKey(action, room) {
 function armBotTurn(io, room) {
   if (!room || !room.code) return;
   const code = room.code;
+
+  // Seed this game's spontaneous bluff-call personality once play begins (sandbox
+  // only). Cleared on replay (resetRoomForReplay / restart_room) so every game
+  // gets a fresh random rate. Read by botStrategy.shouldCallBluff.
+  if (room.sandbox && room.phase === 'playing' && typeof room.botCallRate !== 'number') {
+    room.botCallRate = rollBotCallRate();
+  }
 
   const action = _pendingBotAction(room);
   if (!action) {
@@ -167,11 +238,17 @@ function armBotTurn(io, room) {
   // keeps its normal human-legible beat.
   const isClinicSpin = action.kind === 'spin'
     && room.isTutorial && room.tutorialLesson === 'powers';
-  const delay = action.kind === 'spin'
-    ? (isClinicSpin ? CLINIC_BOT_SPIN_DELAY_MS : BOT_SPIN_DELAY_MS)
-    : action.kind === 'intercept_pass'
-      ? BOT_INTERCEPT_DELAY_MS
-      : BOT_MOVE_DELAY_MS;
+  let delay;
+  if (action.kind === 'spin') {
+    delay = isClinicSpin ? CLINIC_BOT_SPIN_DELAY_MS : BOT_SPIN_DELAY_MS;
+  } else if (action.kind === 'intercept_pass') {
+    delay = BOT_INTERCEPT_DELAY_MS;
+  } else if (action.kind === 'play') {
+    // Random 4–12s "deciding what to play" pause.
+    delay = _botPlayThinkDelay();
+  } else {
+    delay = BOT_MOVE_DELAY_MS;
+  }
   const handle = setTimeout(() => {
     _onBotActExpire(io, code, key).catch((err) => {
       console.error('[bot] act handler failed', err);
@@ -229,6 +306,7 @@ async function _botEndTurn(io, code, room) {
   const freezeTrigger = engine.consumeFreezeOnTurnEnd(room, botId);
   room.cardPlayedThisTurn = false;
   room.bluffUsedThisTurn = false;
+  room._botPeekedChallengeable = null; // free-play Peek info doesn't outlive the turn
   engine.advanceTurn(room);
   const suddenDeathBanner = engine.tickSuddenDeath(room);
 
@@ -271,7 +349,11 @@ async function _onBotActExpire(io, code, key) {
     const { _resolveOnlineBluff } = require('./orchestration');
     const pending = room.pendingBluffIntercept;
     const accuserId = pending?.accuserId || null;
-    const optionCardId = pending?.options?.[0]?.cardId || null;
+    // Clinic scripts the first option; free play picks the best held defence
+    // (Shield → Mirror → Swap) via the strategy.
+    const optionCardId = room.tutorialScenario
+      ? (pending?.options?.[0]?.cardId || null)
+      : (chooseInterceptCard(room, action.botId) || pending?.options?.[0]?.cardId || null);
     _clearBluffInterceptTimer(code);
     const res = engine.armInterceptCard(room, action.botId, optionCardId);
     room.pendingBluffIntercept = null;
@@ -337,6 +419,72 @@ async function _onBotActExpire(io, code, key) {
     return;
   }
 
+  if (action.kind === 'activate') {
+    // Free play: the bot proactively activates an offensive power at turn start.
+    // Mirrors the activate_power_card handler (engine mutation + broadcast); Peek
+    // is consumed-on-use and its revealed card is stashed so the bot's challenge
+    // beat can act on a KNOWN card (a fair, in-game use of the power — not a peek
+    // at hidden state).
+    const res = engine.activatePowerCard(room, action.botId, action.cardId);
+    if (res?.ok) {
+      const bot = room.players.find((p) => p.id === action.botId);
+      if (res.power === 'peek') {
+        room._botPeekedChallengeable = res.peekedCard || null;
+      }
+      io.to(code).emit('power_card_triggered', {
+        kind: 'bot_power_activated',
+        holderId: action.botId,
+        holderName: bot?.username || null,
+        power: res.power,
+      });
+    }
+    await saveRoom(room);
+    await broadcastRoomState(io, code);
+    return;
+  }
+
+  if (action.kind === 'swap_pick') {
+    // Free play: the bot is the Swap holder. Pick a card from the played pile and
+    // resume the bluff, mirroring the swap_pick handler. Sandbox has no roles
+    // (Sniper/Medic) or betting, so the resume is the lean spin/elim path.
+    const accuserId = room.lastAction?.accuserId || null;
+    const pickedCardId = chooseSwapPick(room);
+    if (!accuserId || !pickedCardId) {
+      room.swapHolderId = null;
+      room.phase = 'playing';
+      await saveRoom(room);
+      await broadcastRoomState(io, code);
+      return;
+    }
+
+    const { applyBluffOutcome, applyPostElimSystemHooks, _bountyOnElimination,
+      _scheduleSpinPendingTimeout } = require('./orchestration');
+    const { emitPowerCardEvents } = require('./broadcast');
+    const E = engine.GAME_EVENT_TYPES;
+
+    const { events, outcome } = bluffPipeline.resumeAfterSwap(room, accuserId, pickedCardId);
+    room.swapHolderId = null;
+    if (outcome?.type === E.BLUFF_ERROR) {
+      room.phase = 'playing';
+      await saveRoom(room);
+      await broadcastRoomState(io, code);
+      return;
+    }
+
+    applyBluffOutcome(room, outcome);
+    if (outcome.type === E.FORCED_ELIMINATION) {
+      if (outcome.eliminatedPlayerId) _bountyOnElimination(room, outcome.eliminatedPlayerId);
+      applyPostElimSystemHooks(io, room);
+    }
+    if (room.phase === 'spin_pending') {
+      _scheduleSpinPendingTimeout(io, code, NOOP_LEADERBOARD_REPO);
+    }
+    await saveRoom(room);
+    emitPowerCardEvents(io, code, events);
+    await broadcastRoomState(io, code);
+    return;
+  }
+
   if (action.kind === 'spin') {
     const player = room.players.find((p) => p.id === action.botId);
     if (!player || player.status !== 'alive') return;
@@ -384,4 +532,6 @@ module.exports = {
   _roomHasBots,
   BOT_MOVE_DELAY_MS,
   BOT_SPIN_DELAY_MS,
+  BOT_PLAY_THINK_MIN_MS,
+  BOT_PLAY_THINK_MAX_MS,
 };
