@@ -105,10 +105,69 @@ function createLeaderboardRepo(supabase) {
     })));
   }
 
+  // ─── #205 — player meta-progression (XP + cosmetics) ─────────
+  // Not group-scoped: one row per signed-in player. Lives on this repo
+  // (rather than a new one) so the game-over flow — which already threads
+  // leaderboardRepo everywhere — can award XP without new dependencies.
+
+  function _mapProgressionRow(row) {
+    return {
+      userId: row.user_id,
+      xp: row.xp || 0,
+      gamesPlayed: row.games_played || 0,
+      equipped: row.equipped || {},
+      updatedAt: row.updated_at || null,
+    };
+  }
+
+  async function getProgression(userId) {
+    const result = await supabase
+      .from('player_progression')
+      .select('user_id, xp, games_played, equipped, updated_at')
+      .eq('user_id', userId)
+      .maybeSingle();
+    const row = maybeSingle(requireData(result));
+    if (!row) {
+      return { userId, xp: 0, gamesPlayed: 0, equipped: {}, updatedAt: null };
+    }
+    return _mapProgressionRow(row);
+  }
+
+  async function addXp(userId, amount, now = new Date().toISOString()) {
+    const result = await supabase.rpc('player_progression_add_xp', {
+      p_user_id: userId,
+      p_amount: amount,
+      p_now: now,
+    });
+    const row = maybeSingle(requireData(result));
+    if (!row) {
+      return { userId, xp: amount, gamesPlayed: 1, equipped: {}, updatedAt: now };
+    }
+    return _mapProgressionRow(row);
+  }
+
+  async function setEquippedCosmetics(userId, equipped, now = new Date().toISOString()) {
+    const result = await supabase
+      .from('player_progression')
+      .upsert(
+        { user_id: userId, equipped: equipped || {}, updated_at: now },
+        { onConflict: 'user_id' },
+      )
+      .select('user_id, xp, games_played, equipped, updated_at');
+    const row = maybeSingle(requireData(result));
+    if (!row) {
+      return { userId, xp: 0, gamesPlayed: 0, equipped: equipped || {}, updatedAt: now };
+    }
+    return _mapProgressionRow(row);
+  }
+
   return {
     recordGameStart,
     recordWinner,
     getLeaderboard,
+    getProgression,
+    addXp,
+    setEquippedCosmetics,
   };
 }
 

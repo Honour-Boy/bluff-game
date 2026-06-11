@@ -33,6 +33,9 @@ export function useGame(getAccessToken, getGuestAuth, authIdentityKey = null) {
   const [medicPrompt, setMedicPrompt] = useState(null);
   const [sniperPrompt, setSniperPrompt] = useState(null);
   const [pregame, setPregame] = useState(null);
+  // #205 — this client's private end-of-game XP payload. Set by `xp_awarded`,
+  // cleared whenever the room moves off game_over (next deal / reset).
+  const [xpAward, setXpAward] = useState(null);
 
   const chatOpenRef = useRef(false);
   useEffect(() => {
@@ -106,6 +109,7 @@ export function useGame(getAccessToken, getGuestAuth, authIdentityKey = null) {
     setChatMessages([]);
     setChatUnread(0);
     setChatOpen(false);
+    setXpAward(null);
   }, []);
 
   const failError = useCallback((res) => {
@@ -194,6 +198,7 @@ export function useGame(getAccessToken, getGuestAuth, authIdentityKey = null) {
     setChatUnread,
     setPowerEventQueue,
     setLeaderboardUpdateNonce,
+    setXpAward,
   });
   usePromptEvents({
     socket,
@@ -277,6 +282,7 @@ export function useGame(getAccessToken, getGuestAuth, authIdentityKey = null) {
     chatMessages,
     chatUnread,
     chatOpen,
+    xpAward,
     ...groupActions,
     ...gameActions,
     medicPrompt,

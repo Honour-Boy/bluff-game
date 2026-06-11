@@ -142,6 +142,9 @@ function runRedemptionSpin(room, playerId) {
   player.isSpectator = false;
   player.chamber = initChamber(1);
   player.riskLevel = 1;
+  // #205 — back in the game, so the elimination-order stamp no longer applies
+  // (a later death re-stamps via eliminateFromTurnOrder).
+  player.eliminatedSeq = null;
   if (!room.turnOrder.includes(playerId)) {
     room.turnOrder.push(playerId);
   }

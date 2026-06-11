@@ -25,11 +25,12 @@ export function BluffRevealCard({ card, revealed, outcomeColor = 'var(--accent)'
   return (
     <div style={{ width: 66, height: 92, perspective: 700 }}>
       <div className={`reveal-card-3d${flipped ? ' flipped' : ''}`}>
-        {/* Face-down leather back */}
+        {/* Face-down back — themed by the equipped deck skin (#205); the
+            filigree hides itself when a frame skin carries its own art. */}
         <div className="reveal-card-face reveal-card-back" aria-hidden="true">
-          <svg width="40" height="58" viewBox="0 0 44 64" style={{ opacity: 0.3 }} aria-hidden>
-            <rect x="4" y="4" width="36" height="56" rx="3" fill="none" stroke="var(--accent)" strokeWidth="0.8" />
-            <polygon points="22,16 28,24 22,32 16,24" fill="none" stroke="var(--accent)" strokeWidth="0.7" />
+          <svg width="40" height="58" viewBox="0 0 44 64" style={{ opacity: 'var(--cardback-filigree-opacity, 0.3)' }} aria-hidden>
+            <rect x="4" y="4" width="36" height="56" rx="3" fill="none" stroke="var(--cardback-accent, var(--accent))" strokeWidth="0.8" />
+            <polygon points="22,16 28,24 22,32 16,24" fill="none" stroke="var(--cardback-accent, var(--accent))" strokeWidth="0.7" />
           </svg>
         </div>
 

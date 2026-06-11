@@ -423,6 +423,10 @@ function register(io, socket, deps) {
       const result = engine.validateAndPlayCard(room, playerId, cardId);
       if (!result.ok) return callback({ success: false, error: result.error });
 
+      // #205 — only this INTERACTIVE path counts toward participation XP; idle
+      // auto-plays (lib/idleTurn.js) and bot plays deliberately don't.
+      engine.trackCardPlayed(room, playerId);
+
       if (result.card.shape === 'whot') {
         room.currentCardType = nominatedShape;
       }

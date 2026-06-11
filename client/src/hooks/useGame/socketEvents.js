@@ -22,6 +22,7 @@ export function useGameSocketEvents({
   setChatUnread,
   setPowerEventQueue,
   setLeaderboardUpdateNonce,
+  setXpAward,
 }) {
   useEffect(() => {
     const onConnect = async () => {
@@ -62,6 +63,10 @@ export function useGameSocketEvents({
         }
       }
       if (state?.lastAction?.type === 'spin_result') setSpinDismissed(false);
+      // #205 — the XP summary belongs to the game_over screen only; a fresh
+      // deal / reset (any other phase) clears it. The xp_awarded event itself
+      // arrives just BEFORE the game_over room_state on the same socket.
+      if (state?.phase && state.phase !== 'game_over') setXpAward(null);
       if (Array.isArray(state?.chatLog)) {
         setChatMessages((prev) => {
           const seen = new Set(prev.map((message) => message.id));
@@ -96,6 +101,11 @@ export function useGameSocketEvents({
       if (!event || !event.kind) return;
       const id = `${event.kind}:${event.holderId || '?'}:${Date.now()}:${Math.random().toString(36).slice(2, 8)}`;
       setPowerEventQueue((queue) => [...queue, { id, ...event }]);
+    };
+    // #205 — private end-of-game XP summary for this client.
+    const onXpAwarded = (payload = {}) => {
+      if (typeof payload?.gained !== 'number') return;
+      setXpAward(payload);
     };
     const onGroupLeaderboardUpdated = (payload = {}) => {
       const groupId = payload?.groupId;
@@ -173,6 +183,7 @@ export function useGameSocketEvents({
     socket.on('removed_from_group', onRemovedFromGroup);
     socket.on('kicked', onKicked);
     socket.on('power_card_triggered', onPowerCardTriggered);
+    socket.on('xp_awarded', onXpAwarded);
     socket.on('group_leaderboard_updated', onGroupLeaderboardUpdated);
     socket.on('lobby_idle_warning', onLobbyIdleWarning);
     socket.on('lobby_idle_warning_cancelled', onLobbyIdleWarningCancelled);
@@ -193,6 +204,7 @@ export function useGameSocketEvents({
       socket.off('removed_from_group', onRemovedFromGroup);
       socket.off('kicked', onKicked);
       socket.off('power_card_triggered', onPowerCardTriggered);
+      socket.off('xp_awarded', onXpAwarded);
       socket.off('group_leaderboard_updated', onGroupLeaderboardUpdated);
       socket.off('lobby_idle_warning', onLobbyIdleWarning);
       socket.off('lobby_idle_warning_cancelled', onLobbyIdleWarningCancelled);
@@ -218,6 +230,7 @@ export function useGameSocketEvents({
     setRoomCode,
     setRoomState,
     setSpinDismissed,
+    setXpAward,
     socket,
   ]);
 }

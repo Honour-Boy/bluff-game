@@ -116,6 +116,10 @@ function serializeRoom(room, requestingPlayerId = null, opts = {}) {
       hasBounty: !!p.hasBounty,
       consecutiveSurvivedSpins: p.consecutiveSurvivedSpins || 0,
       consecutiveCorrectBets: p.consecutiveCorrectBets || 0,
+      // #205 — equipped cosmetics (validated server-side at equip time).
+      // Public by design: purely visual, e.g. the spin overlay paints the
+      // SPINNER's gun skin for everyone at the table.
+      cosmetics: p.cosmetics || null,
     })),
     turnOrder: room.turnOrder,
     currentTurnIndex: room.currentTurnIndex,

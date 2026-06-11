@@ -301,6 +301,11 @@ function applyBluffOutcome(room, outcome) {
   }
 
   // Default: spin
+  // #205 — the bluff verdict is authoritative here: credit the accuser's
+  // correct/incorrect call for end-of-game XP.
+  if (outcome.accuserId != null && typeof outcome.bluffIsCorrect === 'boolean') {
+    engine.trackBluffOutcome(room, outcome.accuserId, outcome.bluffIsCorrect);
+  }
   room.phase = 'spin_pending';
   room.spinTargetId = outcome.spinTargetId;
   const target = room.players.find(p => p.id === outcome.spinTargetId);
@@ -476,6 +481,9 @@ async function applySpinAndBroadcast(io, code, room, player, leaderboardRepo) {
       room.pendingMirrorMatchSpin = { targetId: oppositeId, triggeredBy: player.id };
     }
   }
+
+  // #205 — survived spins feed end-of-game XP.
+  engine.trackSpinOutcome(room, player.id, spinResult.eliminated);
 
   // v2 Phase F — Bounty + Betting evaluation.
   const bountyEvents = [];
@@ -821,6 +829,8 @@ async function runMirrorMatchSpin(io, room, pending, leaderboardRepo) {
     const riskLevelBefore = target.riskLevel;
     const chamberBefore = [...target.chamber];
     const spinResult = engine.spinGun(target, engine.getSpinModifiers(room));
+    // #205 — mirror-match spins count toward survived-spin XP too.
+    engine.trackSpinOutcome(room, target.id, spinResult.eliminated);
 
     let medicPaused = false;
     if (spinResult.eliminated) {

@@ -203,6 +203,16 @@ function _sweepStaleArmedPowerCards(room) {
 }
 
 function eliminateFromTurnOrder(room, playerId) {
+  // #205 — stamp the elimination order for end-of-game placement XP. Every
+  // real elimination funnels through here (spin death, assassin strike,
+  // leave/disconnect, kick), so it's the single reliable stamp point. A
+  // redemption rejoin clears the stamp (engine/modifiers.js).
+  const stamped = (room.players || []).find(p => p.id === playerId);
+  if (stamped && stamped.eliminatedSeq == null) {
+    room.eliminationSeq = (room.eliminationSeq || 0) + 1;
+    stamped.eliminatedSeq = room.eliminationSeq;
+  }
+
   const idx = room.turnOrder.indexOf(playerId);
   if (idx === -1) return;
   room.turnOrder.splice(idx, 1);

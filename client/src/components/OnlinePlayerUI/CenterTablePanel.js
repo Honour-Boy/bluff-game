@@ -28,17 +28,20 @@ function FaceDownStack({ count, label, warning = false }) {
                 position: 'absolute',
                 width: 44,
                 height: 64,
-                /* Leather-look card back */
-                background: `
-                  linear-gradient(135deg, #1e1410 0%, #120d09 50%, #1a1108 100%),
+                /* Card back — the equipped deck skin (#205): a frame skin's
+                   SVG via --cardback-bg, else the gradient fallback (original
+                   leather by default). */
+                background: `var(--cardback-bg,
+                  linear-gradient(135deg, var(--cardback-a, #1e1410) 0%, var(--cardback-b, #120d09) 50%, var(--cardback-c, #1a1108) 100%),
                   repeating-linear-gradient(
                     45deg,
                     transparent 0px,
                     transparent 3px,
                     rgba(255,255,255,0.02) 3px,
                     rgba(255,255,255,0.02) 4px
-                  )
+                  ))
                 `,
+                backgroundSize: '100% 100%',
                 border: '1px solid var(--border-lit)',
                 borderRadius: 5,
                 top: (layers - 1 - index) * 2,
@@ -48,10 +51,11 @@ function FaceDownStack({ count, label, warning = false }) {
                   : 'none',
               }}
             >
-              {/* Card back diamond filigree */}
-              <svg width="44" height="64" viewBox="0 0 44 64" style={{ position: 'absolute', inset: 0, opacity: 0.25 }} aria-hidden>
-                <rect x="4" y="4" width="36" height="56" rx="3" fill="none" stroke="var(--accent)" strokeWidth="0.8"/>
-                <polygon points="22,16 28,24 22,32 16,24" fill="none" stroke="var(--accent)" strokeWidth="0.7"/>
+              {/* Card back diamond filigree — hidden when a frame deck skin
+                  carries its own artwork (--cardback-filigree-opacity: 0). */}
+              <svg width="44" height="64" viewBox="0 0 44 64" style={{ position: 'absolute', inset: 0, opacity: 'var(--cardback-filigree-opacity, 0.25)' }} aria-hidden>
+                <rect x="4" y="4" width="36" height="56" rx="3" fill="none" stroke="var(--cardback-accent, var(--accent))" strokeWidth="0.8"/>
+                <polygon points="22,16 28,24 22,32 16,24" fill="none" stroke="var(--cardback-accent, var(--accent))" strokeWidth="0.7"/>
               </svg>
             </div>
           ))
@@ -87,15 +91,16 @@ function LobbyDealCardBack() {
   return (
     <div style={{
       width: '100%', height: '100%',
-      background: 'linear-gradient(135deg, #1e1410 0%, #120d09 50%, #1a1108 100%)',
+      background: 'var(--cardback-bg, linear-gradient(135deg, var(--cardback-a, #1e1410) 0%, var(--cardback-b, #120d09) 50%, var(--cardback-c, #1a1108) 100%))',
+      backgroundSize: '100% 100%',
       border: '1px solid var(--border-lit)',
       borderRadius: 6,
       boxShadow: '0 6px 16px rgba(0,0,0,0.5)',
       position: 'relative', overflow: 'hidden',
     }}>
-      <svg width="100%" height="100%" viewBox="0 0 36 52" preserveAspectRatio="none" style={{ position: 'absolute', inset: 0, opacity: 0.28 }} aria-hidden>
-        <rect x="3" y="3" width="30" height="46" rx="3" fill="none" stroke="var(--accent)" strokeWidth="0.8" />
-        <polygon points="18,13 23,20 18,27 13,20" fill="none" stroke="var(--accent)" strokeWidth="0.7" />
+      <svg width="100%" height="100%" viewBox="0 0 36 52" preserveAspectRatio="none" style={{ position: 'absolute', inset: 0, opacity: 'var(--cardback-filigree-opacity, 0.28)' }} aria-hidden>
+        <rect x="3" y="3" width="30" height="46" rx="3" fill="none" stroke="var(--cardback-accent, var(--accent))" strokeWidth="0.8" />
+        <polygon points="18,13 23,20 18,27 13,20" fill="none" stroke="var(--cardback-accent, var(--accent))" strokeWidth="0.7" />
       </svg>
     </div>
   );

@@ -102,14 +102,17 @@ function renderOneCard({
       className={isJustPlayed ? 'card-play-physics' : undefined}
       style={outerStyle}
     >
-      {/* Card face */}
+      {/* Card face — shape faces follow the equipped deck skin (#205): a frame
+          skin's art ships via --cardface-bg with the shape/number overlaid in
+          its empty centre. Power cards keep their own dedicated look. */}
       <div
         style={{
           width: '100%',
           height: '100%',
           background: isPower
             ? 'linear-gradient(160deg, #1a0e08 0%, #0d0805 55%, #090503 100%)'
-            : 'linear-gradient(160deg, #221a12 0%, #16110b 55%, #0f0b07 100%)',
+            : 'var(--cardface-bg, linear-gradient(160deg, #221a12 0%, #16110b 55%, #0f0b07 100%))',
+          backgroundSize: '100% 100%',
           border: `2px solid ${borderColor}`,
           borderRadius: 7,
           display: 'flex',
@@ -172,6 +175,8 @@ function renderOneCard({
               fontWeight: 700,
               color: isWhot ? 'var(--accent)' : 'var(--text-mid)',
               letterSpacing: '0.06em',
+              // Legible over any deck-skin field (light kente, dark noir…).
+              textShadow: '0 1px 2px rgba(0,0,0,0.65)',
             }}>
               {isWhot ? 'WHOT' : card.number}
             </div>
