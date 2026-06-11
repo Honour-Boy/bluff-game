@@ -48,4 +48,8 @@ begin
 end;
 $$;
 
-revoke all on function public.player_progression_add_xp(uuid, int, timestamptz) from public;
+-- Server-only (called via the service-role key). Like the group-leaderboard
+-- functions (see 20260519203950_security_rls_and_function_hardening), anon +
+-- authenticated must also be revoked explicitly or Supabase's default grants
+-- leave the /rest/v1/rpc/ endpoint open — letting any client mint its own XP.
+revoke execute on function public.player_progression_add_xp(uuid, int, timestamptz) from public, anon, authenticated;
