@@ -20,6 +20,7 @@ import { TutorialLayer } from '../tutorial/TutorialLayer';
 import { isDefensivePreArmLocked, clinicEndTurnLock } from '../tutorial/tutorialContent';
 import {
   arcPlayers,
+  coachingActive,
   distributePlayers,
   GAME_UI_STYLE,
   orderClockwiseFromLocal,
@@ -27,7 +28,7 @@ import {
 import { useOnlinePlayerUiController } from '../../hooks/useOnlinePlayerUiController';
 import { useAtmosphere } from '../../hooks/useAtmosphere';
 
-export { CardHand, distributePlayers, orderClockwiseFromLocal };
+export { CardHand, coachingActive, distributePlayers, orderClockwiseFromLocal };
 
 export function OnlinePlayerUI({
   roomCode,
@@ -422,7 +423,10 @@ export function OnlinePlayerUI({
   const isRoundEnd = phase === 'round_end';
   const isGameOver = phase === 'game_over';
   const isLobby = phase === 'lobby';
-  const isTutorial = !!roomState?.isTutorial;
+  // Coaching layer is active for a tutorial that is NOT a sandbox. Sandbox is a
+  // plain online game vs the bot (no TutorialLayer / coach hints / clinic locks /
+  // end-of-game replay POP-UP; header shows "Rules" not "? Guide"). See helpers.
+  const isTutorial = coachingActive(roomState);
   const isMySpinTurn = isSpinPending && spinTargetId === myPlayer.id;
   // (Module 3) The challenged card is face-up for the whole spin_pending window
   // and reverse-flips the moment the spin result lands (ui.spinData is set when

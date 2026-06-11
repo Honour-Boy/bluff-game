@@ -191,10 +191,22 @@ function resetRoomForReplay(room) {
   const groupSettingsMeta = room.groupSettingsMeta || null;
   const createdAt    = room.createdAt;
   const chatLog      = room.chatLog || [];
+  // The spin sequence counter must keep climbing ACROSS replays. The client
+  // dedups spin animations by `seq:<spinSeq>` in a Set that lives for the whole
+  // (un-remounted) room session, so if the counter reset to 0 here the replay's
+  // spins would reuse `seq:1`, `seq:2`… — keys already in that Set — and every
+  // spin would be silently deduped (no cylinder animation on "Play Again").
+  const spinSeq      = room.spinSeq || 0;
   // Tutorial flag + lesson + bot seats must survive a replay reset, or "play
   // again" in a practice room would strip the bot and leave a one-player table.
   const isTutorial   = !!room.isTutorial;
   const tutorialLesson = room.tutorialLesson || null;
+  // Sandbox flags must also survive: without them the `restart_room` sandbox
+  // branch can't fire (room.sandbox gone) and the room degrades to a coached
+  // Basics reset — wiping the powers config + breaking spins. Preserve both the
+  // sandbox marker and the coaching-off flag so replay stays a plain online game.
+  const sandbox      = !!room.sandbox;
+  const tutorialCoaching = room.tutorialCoaching;
 
   const playerIdentities = room.players.map(p => ({
     id: p.id,
@@ -214,8 +226,11 @@ function resetRoomForReplay(room) {
   room.createdAt      = createdAt;
   room.lastActivityAt = Date.now();
   room.chatLog        = chatLog;
+  room.spinSeq        = spinSeq; // keep climbing across replays (see capture above)
   room.isTutorial     = isTutorial;
   if (tutorialLesson) room.tutorialLesson = tutorialLesson;
+  if (sandbox) room.sandbox = true;
+  if (typeof tutorialCoaching === 'boolean') room.tutorialCoaching = tutorialCoaching;
 
   for (const ident of playerIdentities) {
     const player = createPlayer(ident.id, ident.username, ident.socketId);

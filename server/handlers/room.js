@@ -620,11 +620,14 @@ function register(io, socket, deps) {
         return callback?.({ success: false, error: 'Game has not ended yet' });
       }
 
-      engine.resetRoomForReplay(room);
+      engine.resetRoomForReplay(room); // phase → 'lobby'; config + host + players + sandbox preserved
       if (room.sandbox) {
-        // Sandbox replay: keep the learner's chosen config (incl. powers) AND
-        // local-host privileges; just clear the per-turn ledger, reseed the bot's
-        // spontaneous bluff personality, and deal straight back in (no coaching).
+        // Sandbox replay = a plain online replay in the SAME room: keep the
+        // learner's chosen config (incl. powers) AND local-host privileges, then
+        // drop back to the LOBBY (NO startGame) so they can tweak settings before
+        // dealing again — mirroring the first sandbox game's lobby → "Open the
+        // Game" flow. Reseed the bot's per-game bluff personality; no coaching.
+        room.hostSocketId = socket.id;
         room.botBluffCallsThisGame = 0;
         room.tutorialScenario = null;
         room.tutorialStage = null;
@@ -632,7 +635,6 @@ function register(io, socket, deps) {
         room.bluffUsedThisTurn = false;
         room.powerActivatedThisTurn = false;
         room.botCallRate = rollBotCallRate();
-        engine.startGame(room);
       } else if (room.isTutorial) {
         // Replay the whole journey from Basics: all-off config, fresh counters,
         // no staged clinic. The bot stays host-of-record (no socket) so the

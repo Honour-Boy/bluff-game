@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useIsMobile } from './useIsMobile';
 import { isDefensivePreArmLocked, clinicCardPlayLock } from '../components/tutorial/tutorialContent';
+import { coachingActive } from '../components/OnlinePlayerUI/helpers';
 
 export function useOnlinePlayerUiController({
   roomState,
@@ -215,7 +216,10 @@ export function useOnlinePlayerUiController({
     setSpinComplete(false);
   }, []);
 
-  const isTutorialRoom = !!roomState?.isTutorial;
+  // Coaching room = a non-sandbox tutorial. Sandbox uses normal online pacing
+  // (it's a plain online game vs the bot), so the longer "study it" spin/peek
+  // timings below apply only to the coached Basics / Power Clinic.
+  const isTutorialRoom = coachingActive(roomState);
   // Auto-dismiss fallback. Keyed on the spin identity + completion only, so it is
   // armed exactly once per spin and never reset by re-renders. A bot/observer spin
   // has no Continue button, so this is its only exit; the human's own spin also
