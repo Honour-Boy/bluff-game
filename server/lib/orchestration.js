@@ -13,6 +13,7 @@ const {
   spinPendingTimers,
   gameOverTimers,
   redemptionTimers,
+  bluffInterceptTimers,
   getRoom,
   saveRoom,
   _clearBettingTimer,
@@ -945,6 +946,85 @@ function resolveLeaverPendingPauses(io, code, room, playerId) {
   }
 }
 
+// ─── §1.1 Bluff-interception window (shared open + timeout) ──────────────────
+// Schedule the interception window's auto-resume. On expiry (no interception
+// arrived) the bluff resolves with whatever the accused had armed beforehand
+// (usually nothing). `ms` lets a rejected arm reschedule for the time remaining
+// instead of a fresh full window. Lives here (not in handlers/bluff.js) so the
+// bot driver's challenges share the exact same window machinery.
+function _scheduleBluffInterceptTimeout(io, code, leaderboardRepo, ms = engine.BLUFF_INTERCEPT_WINDOW_MS) {
+  _clearBluffInterceptTimer(code);
+  const handle = setTimeout(async () => {
+    bluffInterceptTimers.delete(code);
+    try {
+      const room = await getRoom(code);
+      if (!room || room.phase !== 'bluff_intercept_pending') return;
+      const accuserId = room.pendingBluffIntercept?.accuserId || null;
+      // §1.2 — closing the window must NOT end anyone's turn. The accused only
+      // ever DEFENDED (off-turn); the on-turn player is the accuser, who keeps
+      // priority. We clear the window + restore `playing` here (never advance
+      // the turn) so a timed-out pass routes straight back into normal play.
+      const onTurnBefore = room.turnOrder?.[room.currentTurnIndex] ?? null;
+      room.pendingBluffIntercept = null;
+      room.phase = 'playing';
+      console.log(`[Room ${code}] bluff-intercept window TIMED OUT (no defence) — on-turn player ${onTurnBefore} retains the turn; resolving bluff.`);
+      if (!accuserId) {
+        await saveRoom(room);
+        await broadcastRoomState(io, code);
+        return;
+      }
+      await _resolveOnlineBluff(io, code, room, accuserId, leaderboardRepo);
+    } catch (err) {
+      console.error('[bluff_intercept timeout]', err);
+    }
+  }, ms);
+  bluffInterceptTimers.set(code, handle);
+}
+
+// If the accused (the previous player, who is OFF-turn) still holds an un-armed
+// defensive power card, pause and open the interception window so they can arm
+// it BEFORE the bluff resolves. Returns true when the window opened (the caller
+// must NOT resolve the bluff — bluff_intercept / the timeout above resumes it),
+// false when there's nothing to intercept with (caller resolves immediately).
+// Used by both the human call_bluff handler and the bot driver, so a bot's
+// challenge gives the accused human the same defence pop-up a human's would.
+async function maybeOpenBluffIntercept(io, code, room, accuserId, leaderboardRepo) {
+  const accusedId = engine.getPreviousTurnPlayerId(room);
+  if (!accusedId || accusedId === accuserId || !engine.canInterceptBluff(room, accusedId)) {
+    return false;
+  }
+  const accuserPlayer = room.players.find(p => p.id === accuserId);
+  const accusedPlayer = room.players.find(p => p.id === accusedId);
+  room.phase = 'bluff_intercept_pending';
+  room.pendingBluffIntercept = {
+    accuserId,
+    accuserName: accuserPlayer?.username || null,
+    accusedId,
+    accusedName: accusedPlayer?.username || null,
+    deadline: Date.now() + engine.BLUFF_INTERCEPT_WINDOW_MS,
+    options: engine.listInterceptCards(room, accusedId).map(c => ({ cardId: c.id, power: c.power })),
+  };
+  room.lastAction = {
+    type: 'bluff_intercept_window',
+    accuserId,
+    accuserName: accuserPlayer?.username || null,
+    accusedId,
+    accusedName: accusedPlayer?.username || null,
+  };
+  _scheduleBluffInterceptTimeout(io, code, leaderboardRepo);
+
+  await saveRoom(room);
+  io.to(code).emit('power_card_triggered', {
+    kind: 'bluff_intercept_window',
+    accuserId,
+    accuserName: accuserPlayer?.username || null,
+    accusedId,
+    accusedName: accusedPlayer?.username || null,
+  });
+  await broadcastRoomState(io, code);
+  return true;
+}
+
 // ─── Shared online bluff resolution ──────────────────────────
 // The full post-`resolveBluff` flow (Sniper/Medic pauses, Assassin backfire,
 // outcome application, post-elim hooks, betting, broadcast). Shared by the
@@ -1021,6 +1101,8 @@ async function _resolveOnlineBluff(io, code, room, accuserId, leaderboardRepo) {
 module.exports = {
   _sniperEligibleTargets,
   _resolveOnlineBluff,
+  _scheduleBluffInterceptTimeout,
+  maybeOpenBluffIntercept,
   maybeStartSniperPause,
   maybeStartMedicPause,
   finaliseAssassinElimination,

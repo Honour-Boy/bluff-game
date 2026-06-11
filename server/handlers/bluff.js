@@ -11,7 +11,6 @@ const {
   getRoom,
   saveRoom,
   _clearBettingTimer,
-  bluffInterceptTimers,
   _clearBluffInterceptTimer,
   _clearSpinPendingTimer,
   logTurnState,
@@ -20,6 +19,8 @@ const { broadcastRoomState, emitPowerCardEvents } = require('../lib/broadcast');
 const { maybeRecordGroupWinner } = require('../lib/roomBuilders');
 const {
   _resolveOnlineBluff,
+  _scheduleBluffInterceptTimeout,
+  maybeOpenBluffIntercept,
   maybeStartSniperPause,
   maybeStartMedicPause,
   finaliseAssassinElimination,
@@ -33,43 +34,11 @@ const {
 } = require('../lib/orchestration');
 
 // ─── Shared online bluff resolution ──────────────────────────
-// `_resolveOnlineBluff` now lives in lib/orchestration.js (alongside every helper
-// it calls), so the human `call_bluff` path, the §1.1 interception resume, and the
-// server-driven bot opponent (lib/bots.js) all resolve a challenge identically.
-// Imported above; the call sites below are unchanged.
-
-// §1.1 — schedule the interception window's auto-resume. On expiry (no
-// interception arrived) the bluff resolves with whatever the accused had
-// armed beforehand (usually nothing). `ms` lets a rejected arm reschedule for
-// the time remaining instead of a fresh full window.
-function _scheduleBluffInterceptTimeout(io, code, leaderboardRepo, ms = engine.BLUFF_INTERCEPT_WINDOW_MS) {
-  _clearBluffInterceptTimer(code);
-  const handle = setTimeout(async () => {
-    bluffInterceptTimers.delete(code);
-    try {
-      const room = await getRoom(code);
-      if (!room || room.phase !== 'bluff_intercept_pending') return;
-      const accuserId = room.pendingBluffIntercept?.accuserId || null;
-      // §1.2 — closing the window must NOT end anyone's turn. The accused only
-      // ever DEFENDED (off-turn); the on-turn player is the accuser, who keeps
-      // priority. We clear the window + restore `playing` here (never advance
-      // the turn) so a timed-out pass routes straight back into normal play.
-      const onTurnBefore = room.turnOrder?.[room.currentTurnIndex] ?? null;
-      room.pendingBluffIntercept = null;
-      room.phase = 'playing';
-      console.log(`[Room ${code}] bluff-intercept window TIMED OUT (no defence) — on-turn player ${onTurnBefore} retains the turn; resolving bluff.`);
-      if (!accuserId) {
-        await saveRoom(room);
-        await broadcastRoomState(io, code);
-        return;
-      }
-      await _resolveOnlineBluff(io, code, room, accuserId, leaderboardRepo);
-    } catch (err) {
-      console.error('[bluff_intercept timeout]', err);
-    }
-  }, ms);
-  bluffInterceptTimers.set(code, handle);
-}
+// `_resolveOnlineBluff`, the §1.1 interception window opener
+// (`maybeOpenBluffIntercept`) and its timeout all live in lib/orchestration.js
+// (alongside every helper they call), so the human `call_bluff` path, the §1.1
+// interception resume, and the server-driven bot opponent (lib/bots.js) all
+// challenge + resolve identically. Imported above.
 
 function register(io, socket, deps) {
   const { leaderboardRepo } = deps;
@@ -198,37 +167,7 @@ function register(io, socket, deps) {
         // let them arm it in response BEFORE the bluff resolves. The resolution
         // queue reads the freshly-armed card when we resume — no pipeline
         // change is needed. On arm/pass/timeout we run `_resolveOnlineBluff`.
-        const accusedId = engine.getPreviousTurnPlayerId(room);
-
-        if (accusedId && accusedId !== playerId && engine.canInterceptBluff(room, accusedId)) {
-          const accusedPlayer = room.players.find(p => p.id === accusedId);
-          room.phase = 'bluff_intercept_pending';
-          room.pendingBluffIntercept = {
-            accuserId: playerId,
-            accuserName: callerPlayer?.username || null,
-            accusedId,
-            accusedName: accusedPlayer?.username || null,
-            deadline: Date.now() + engine.BLUFF_INTERCEPT_WINDOW_MS,
-            options: engine.listInterceptCards(room, accusedId).map(c => ({ cardId: c.id, power: c.power })),
-          };
-          room.lastAction = {
-            type: 'bluff_intercept_window',
-            accuserId: playerId,
-            accuserName: callerPlayer?.username || null,
-            accusedId,
-            accusedName: accusedPlayer?.username || null,
-          };
-          _scheduleBluffInterceptTimeout(io, code, leaderboardRepo);
-
-          await saveRoom(room);
-          io.to(code).emit('power_card_triggered', {
-            kind: 'bluff_intercept_window',
-            accuserId: playerId,
-            accuserName: callerPlayer?.username || null,
-            accusedId,
-            accusedName: accusedPlayer?.username || null,
-          });
-          await broadcastRoomState(io, code);
+        if (await maybeOpenBluffIntercept(io, code, room, playerId, leaderboardRepo)) {
           return callback({ success: true, intercept: true });
         }
 

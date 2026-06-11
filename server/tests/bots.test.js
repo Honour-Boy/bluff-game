@@ -385,6 +385,69 @@ describe('bot turn driver — beats', () => {
     }
   });
 
+  it('opens the §1.1 defence window for the human when the bot challenges them', async () => {
+    const room = makeTutorialRoom();
+    // Human leads with a card, then it's the bot's turn with a challengeable
+    // card — and the human still holds an UN-ARMED Shield, so a challenge must
+    // pause for their defence pop-up exactly like a human accuser's would.
+    const humanHand = room.hands.get('human');
+    engine.validateAndPlayCard(room, 'human', humanHand[0].id);
+    engine.advanceTurn(room);
+    room.powerCardSlot = { human: [{ id: 'sh', type: 'power', power: 'shield' }], 'bot:1': [] };
+    await saveRoom(room);
+    const io = makeIo();
+
+    const rng = vi.spyOn(Math, 'random').mockReturnValue(0); // bluff roll fires
+    try {
+      await broadcastRoomState(io, room.code);
+      await vi.advanceTimersByTimeAsync(4100); // think delay (rng 0 → 4000ms)
+
+      // The challenge did NOT resolve — the human got the interception window.
+      expect(room.bluffUsedThisTurn).toBe(true);
+      expect(room.phase).toBe('bluff_intercept_pending');
+      expect(room.pendingBluffIntercept).toMatchObject({
+        accuserId: 'bot:1',
+        accusedId: 'human',
+        options: [{ cardId: 'sh', power: 'shield' }],
+      });
+      expect(room.lastAction.type).toBe('bluff_intercept_window');
+      // The bot waits — no beat is pending while the human decides.
+      expect(_pendingBotAction(room)).toBeNull();
+
+      // Human ignores it → the shared timeout closes the window and resolves.
+      await vi.advanceTimersByTimeAsync(engine.BLUFF_INTERCEPT_WINDOW_MS + 100);
+      expect(room.pendingBluffIntercept).toBeNull();
+      expect(room.phase).toBe('spin_pending');
+      expect(room.lastAction.type).toBe('spin_pending');
+      expect(room.lastAction.accuserId).toBe('bot:1');
+      expect(room.lastAction.accusedId).toBe('human');
+    } finally {
+      rng.mockRestore();
+    }
+  });
+
+  it('still resolves the bot challenge directly when the human has no defence', async () => {
+    const room = makeTutorialRoom();
+    const humanHand = room.hands.get('human');
+    engine.validateAndPlayCard(room, 'human', humanHand[0].id);
+    engine.advanceTurn(room);
+    room.powerCardSlot = { human: [], 'bot:1': [] }; // nothing to intercept with
+    await saveRoom(room);
+    const io = makeIo();
+
+    const rng = vi.spyOn(Math, 'random').mockReturnValue(0);
+    try {
+      await broadcastRoomState(io, room.code);
+      await vi.advanceTimersByTimeAsync(4100);
+
+      expect(room.bluffUsedThisTurn).toBe(true);
+      expect(room.phase).toBe('spin_pending'); // no window — straight to resolution
+      expect(room.lastAction.accuserId).toBe('bot:1');
+    } finally {
+      rng.mockRestore();
+    }
+  });
+
   it('auto-passes a bluff-intercept window aimed at the bot (no 8s stall)', async () => {
     const room = makeTutorialRoom();
     // Stage a window: the bot was the previous player, holds an un-armed Shield,
