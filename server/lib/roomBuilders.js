@@ -158,7 +158,6 @@ function stampCosmeticsInBackground(io, leaderboardRepo, roomCode, player) {
       const seated = room.players.find(p => p.id === player.id);
       if (!seated) return;
       seated.cosmetics = result.equipped;
-      seated.cosmeticsLevel = result.level;
       await saveRoom(room);
       await broadcastRoomState(io, roomCode);
     })

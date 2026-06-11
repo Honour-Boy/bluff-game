@@ -86,7 +86,9 @@ export function CoreGameOverlays({
                 style={{
                   width: 72,
                   height: 100,
-                  background: 'var(--surface2)',
+                  // #205 — the confirm preview wears the equipped deck skin.
+                  background: 'var(--cardface-bg, var(--surface2))',
+                  backgroundSize: '100% 100%',
                   border: '2px solid var(--accent)',
                   borderRadius: 8,
                   display: 'flex',
@@ -98,7 +100,7 @@ export function CoreGameOverlays({
                 }}
               >
                 <ShapeIcon shape={pendingCard.shape} size={32} />
-                <div style={{ fontSize: 18, fontWeight: 700, color: 'var(--text)', fontFamily: "'Bebas Neue', sans-serif" }}>
+                <div style={{ fontSize: 18, fontWeight: 700, color: 'var(--cardface-ink, var(--text))', fontFamily: "'Bebas Neue', sans-serif" }}>
                   {pendingCard.number}
                 </div>
               </div>

@@ -145,7 +145,9 @@ export function PowerFlowOverlays({
                   style={{
                     width: 80,
                     height: 112,
-                    background: 'var(--surface2)',
+                    // #205 — the peeked card wears the viewer's deck skin.
+                    background: 'var(--cardface-bg, var(--surface2))',
+                    backgroundSize: '100% 100%',
                     border: '2px solid var(--accent)',
                     borderRadius: 8,
                     display: 'flex',
@@ -158,7 +160,7 @@ export function PowerFlowOverlays({
                   }}
                 >
                   <ShapeIcon shape={peekedCard.shape} size={36} />
-                  <div style={{ fontSize: 20, fontWeight: 700, color: 'var(--text)', fontFamily: "'Bebas Neue', sans-serif" }}>
+                  <div style={{ fontSize: 20, fontWeight: 700, color: 'var(--cardface-ink, var(--text))', fontFamily: "'Bebas Neue', sans-serif" }}>
                     {peekedCard.shape === 'whot' ? 'WHOT' : peekedCard.number}
                   </div>
                 </div>
@@ -239,7 +241,9 @@ export function PowerFlowOverlays({
                   style={{
                     width: 56,
                     height: 80,
-                    background: 'linear-gradient(160deg, #14141a 0%, #08080a 100%)',
+                    // #205 — face-down pile picks wear the deck skin's back.
+                    background: 'var(--cardback-bg, linear-gradient(160deg, #14141a 0%, #08080a 100%))',
+                    backgroundSize: '100% 100%',
                     border: `1.5px solid ${POWER_META.swap.color}66`,
                     borderRadius: 6,
                     cursor: swapping ? 'wait' : 'pointer',

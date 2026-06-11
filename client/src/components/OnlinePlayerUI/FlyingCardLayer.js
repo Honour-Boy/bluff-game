@@ -64,10 +64,10 @@ function FlyingCardFace({ card }) {
     <div style={{
       width: '100%',
       height: '100%',
-      // #205 — shape faces follow the equipped deck skin (frame art via
-      // --cardface-bg); power cards keep their own dedicated look.
+      // #205 — all faces follow the equipped deck skin (frame art via
+      // --cardface-bg); each fallback is the card type's original gradient.
       background: isPower
-        ? 'linear-gradient(160deg, #1a0e08 0%, #0d0805 55%, #090503 100%)'
+        ? 'var(--cardface-bg, linear-gradient(160deg, #1a0e08 0%, #0d0805 55%, #090503 100%))'
         : 'var(--cardface-bg, linear-gradient(160deg, #221a12 0%, #16110b 55%, #0f0b07 100%))',
       backgroundSize: '100% 100%',
       border: `2px solid ${isPower ? powerColor : isWhot ? 'var(--accent)' : 'var(--border-lit)'}`,
@@ -86,7 +86,7 @@ function FlyingCardFace({ card }) {
       ) : (
         <>
           <ShapeIcon shape={card.shape} size={22} color={isWhot ? 'var(--accent)' : undefined} />
-          <div style={{ fontFamily: "'Cinzel', serif", fontSize: 11, fontWeight: 700, color: isWhot ? 'var(--accent)' : 'var(--text-mid)', letterSpacing: '0.06em' }}>
+          <div style={{ fontFamily: "'Cinzel', serif", fontSize: 11, fontWeight: 700, color: isWhot ? 'var(--cardface-ink, var(--accent))' : 'var(--cardface-ink, var(--text-mid))', letterSpacing: '0.06em', textShadow: '0 1px 2px rgba(0,0,0,0.45)' }}>
             {isWhot ? 'WHOT' : card.number}
           </div>
         </>

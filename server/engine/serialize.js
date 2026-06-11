@@ -118,13 +118,10 @@ function serializeRoom(room, requestingPlayerId = null, opts = {}) {
       consecutiveSurvivedSpins: p.consecutiveSurvivedSpins || 0,
       consecutiveCorrectBets: p.consecutiveCorrectBets || 0,
       // #205 — equipped cosmetics (validated server-side at equip time).
-      // Purely visual, e.g. the spin overlay paints the SPINNER's gun skin
-      // for the table — but each VIEWER only sees looks their own level has
-      // unlocked (below that, the slot defaults). Your own equips always
-      // come through in full; guests/unstamped viewers gate at level 1.
-      cosmetics: p.id === requestingPlayerId
-        ? (p.cosmetics || null)
-        : filterVisibleCosmetics(p.cosmetics, requestingPlayer?.cosmeticsLevel || 1),
+      // Purely visual and PUBLIC: every viewer sees each player's real look
+      // (their deck skin on their seat chip, the spinner's gun skin on the
+      // cylinder) — showing off the unlocks IS the feature.
+      cosmetics: p.cosmetics || null,
     })),
     turnOrder: room.turnOrder,
     currentTurnIndex: room.currentTurnIndex,

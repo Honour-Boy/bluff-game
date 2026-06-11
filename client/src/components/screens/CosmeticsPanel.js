@@ -22,6 +22,13 @@ const SLOT_ORDER = [
   { slot: 'gunSkin', title: 'Gun Skin' },
 ];
 
+// Per-category confirmation so the save line names what was actually equipped.
+const SAVE_MSG = {
+  tableFelt: 'Table felt saved — your table is dressed.',
+  cardBack: 'Deck skin saved — your cards are dressed.',
+  gunSkin: 'Chamber skin saved — your iron is dressed.',
+};
+
 function FeltSwatch({ id }) {
   const felt = tableFeltFor(id);
   // Art felts (frame SVG underlays) show their actual rim ornament; the
@@ -146,7 +153,7 @@ export function CosmeticsPanel({ getProgression, setCosmetics, onClose }) {
     const res = await setCosmetics(next);
     if (res?.success && res.equipped) {
       setEquipped({ ...DEFAULT_EQUIPPED, ...res.equipped });
-      setSaveMsg({ ok: true, text: 'Saved — your table is dressed.' });
+      setSaveMsg({ ok: true, text: SAVE_MSG[item.slot] || 'Saved.' });
     } else {
       setSaveMsg({ ok: false, text: res?.error || 'Could not save' });
     }

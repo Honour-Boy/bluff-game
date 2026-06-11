@@ -218,11 +218,9 @@ function resetRoomForReplay(room) {
     username: p.username,
     socketId: p.socketId,
     isBot: !!p.isBot,
-    // #205 — equipped cosmetics (+ the level serializeRoom gates viewers by)
-    // are part of a player's identity, stamped at join from the progression
-    // store; they must survive a replay reset.
+    // #205 — equipped cosmetics are part of a player's identity, stamped at
+    // join from the progression store; they must survive a replay reset.
     cosmetics: p.cosmetics || null,
-    cosmeticsLevel: p.cosmeticsLevel || null,
   }));
 
   for (const key of Object.keys(room)) delete room[key];
@@ -246,7 +244,6 @@ function resetRoomForReplay(room) {
     const player = createPlayer(ident.id, ident.username, ident.socketId);
     if (ident.isBot) player.isBot = true;
     if (ident.cosmetics) player.cosmetics = ident.cosmetics;
-    if (ident.cosmeticsLevel) player.cosmeticsLevel = ident.cosmeticsLevel;
     room.players.push(player);
   }
 

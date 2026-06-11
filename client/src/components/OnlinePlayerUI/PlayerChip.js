@@ -1,4 +1,30 @@
 import { VoiceIndicator } from '../VoicePanel';
+import { cardBackFor } from '../../lib/cosmetics';
+
+// ─── Mini deck-skin card — the player's OWN equipped card back (#205) ─────────
+// Deliberately resolved from player.cosmetics (broadcast to everyone), NOT the
+// --cardback-bg CSS vars: those carry the VIEWER's skin, and the seat chip
+// must show what its OWNER has equipped.
+function MiniCardBack({ cardBackId, height = 17 }) {
+  const back = cardBackFor(cardBackId);
+  const width = Math.round(height * 0.72);
+  const background = back.frame
+    ? `url("${back.frame}") center / 100% 100% no-repeat`
+    : `linear-gradient(135deg, ${back.a} 0%, ${back.b} 50%, ${back.c} 100%)`;
+  return (
+    <div
+      aria-hidden
+      style={{
+        width,
+        height,
+        borderRadius: 2,
+        background,
+        border: '1px solid var(--border-lit)',
+        flexShrink: 0,
+      }}
+    />
+  );
+}
 
 // ─── Mini chamber dots — shown as risk bullets inside the chip ────────────────
 function MiniRiskDots({ riskLevel = 1 }) {
@@ -171,15 +197,18 @@ export function PlayerChip({
         )}
       </div>
 
-      {/* Hand size */}
-      <div style={{
-        fontFamily: "'Crimson Text', serif",
-        fontSize: compact ? 9 : 11,
-        color: 'var(--text-dim)',
-        letterSpacing: '0.02em',
-        fontStyle: 'italic',
-      }}>
-        {player.handSize ?? '?'} cards
+      {/* Hand size — fronted by this player's own equipped deck skin */}
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 4 }}>
+        <MiniCardBack cardBackId={player.cosmetics?.cardBack} height={compact ? 14 : 17} />
+        <span style={{
+          fontFamily: "'Crimson Text', serif",
+          fontSize: compact ? 9 : 11,
+          color: 'var(--text-dim)',
+          letterSpacing: '0.02em',
+          fontStyle: 'italic',
+        }}>
+          {player.handSize ?? '?'} cards
+        </span>
       </div>
 
       {/* Risk dots */}

@@ -42,7 +42,7 @@ export function BluffRevealCard({ card, revealed, outcomeColor = 'var(--accent)'
           {card ? (
             <>
               <ShapeIcon shape={card.shape} size={26} />
-              <div style={{ fontFamily: "'Bebas Neue', sans-serif", fontSize: 20, color: 'var(--text)', lineHeight: 1 }}>
+              <div style={{ fontFamily: "'Bebas Neue', sans-serif", fontSize: 20, color: 'var(--cardface-ink, var(--text))', lineHeight: 1 }}>
                 {card.number}
               </div>
             </>
@@ -51,7 +51,7 @@ export function BluffRevealCard({ card, revealed, outcomeColor = 'var(--accent)'
               No card
             </div>
           )}
-          <div style={{ fontFamily: "'Cinzel', serif", fontSize: 7, color: 'var(--text-dim)', letterSpacing: '0.12em', textTransform: 'uppercase' }}>
+          <div style={{ fontFamily: "'Cinzel', serif", fontSize: 7, color: 'var(--cardface-ink, var(--text-dim))', letterSpacing: '0.12em', textTransform: 'uppercase' }}>
             {label}
           </div>
         </div>
