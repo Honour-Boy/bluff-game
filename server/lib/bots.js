@@ -69,6 +69,11 @@ function _botPlayThinkDelay() {
 const NOOP_LEADERBOARD_REPO = {
   recordWinner: async () => ({}),
   recordGameStart: async () => ({}),
+  // #205 — XP is never awarded in tutorial/practice rooms (maybeAwardGameXp
+  // gates on !room.isTutorial), but keep the surface shape complete.
+  getProgression: async () => ({ xp: 0, gamesPlayed: 0, equipped: {} }),
+  addXp: async () => ({}),
+  setEquippedCosmetics: async () => ({}),
 };
 
 function _roomHasBots(room) {

@@ -37,6 +37,8 @@ export function CoreGameOverlays({
   setShowTurnModal,
   isTutorial = false,
   suppressTurnNotice = false,
+  // #205 — the spin target's equipped gun-skin id (resolved in index.js).
+  spinGunSkinId = null,
 }) {
   // Launch a hand→pile card-fly. The hand card element (data-card-id) is still
   // in the DOM at play time; the discard pile is data-flight-target.
@@ -59,6 +61,7 @@ export function CoreGameOverlays({
         isSpinTarget={isSpinTarget}
         acknowledgeSpinResult={acknowledgeSpinResult}
         isTutorial={isTutorial}
+        gunSkinId={spinGunSkinId}
       />
 
       {pendingCard && (

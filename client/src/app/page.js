@@ -127,6 +127,10 @@ function HomeContent() {
     ghostVote,
     lastStandSpin,
     lastStandEndTurn,
+    // #205 — meta-progression: XP summary + cosmetics locker actions.
+    xpAward,
+    getProgression,
+    setCosmetics,
   } = game;
 
   // ─── Section-based background music (#A) ──────────────────────────
@@ -540,6 +544,9 @@ function HomeContent() {
         onSignOut={handleSignOut}
         onSignOutGuest={handleSignOutGuest}
         onUpdateUsername={updateUsername}
+        // #205 — XP + cosmetic locker (hidden for guests inside the gear).
+        getProgression={getProgression}
+        setCosmetics={setCosmetics}
         // ── In-room controls (Module 2) — only inside an online room ──
         inRoom={inRoomOnline}
         chatUnread={chatUnread}
@@ -733,6 +740,7 @@ function HomeContent() {
           voice={voice}
           openChat={openChat}
           chatUnread={chatUnread}
+          xpAward={xpAward}
         />
       );
     }
@@ -797,6 +805,7 @@ function HomeContent() {
           voice={voice}
           openChat={openChat}
           chatUnread={chatUnread}
+          xpAward={xpAward}
         />
       );
     }

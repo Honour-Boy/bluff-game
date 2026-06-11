@@ -28,9 +28,10 @@ function FaceDownStack({ count, label, warning = false }) {
                 position: 'absolute',
                 width: 44,
                 height: 64,
-                /* Leather-look card back */
+                /* Card back — colours follow the viewer's equipped cosmetic
+                   (#205); the fallbacks are the original leather look. */
                 background: `
-                  linear-gradient(135deg, #1e1410 0%, #120d09 50%, #1a1108 100%),
+                  linear-gradient(135deg, var(--cardback-a, #1e1410) 0%, var(--cardback-b, #120d09) 50%, var(--cardback-c, #1a1108) 100%),
                   repeating-linear-gradient(
                     45deg,
                     transparent 0px,
@@ -50,8 +51,8 @@ function FaceDownStack({ count, label, warning = false }) {
             >
               {/* Card back diamond filigree */}
               <svg width="44" height="64" viewBox="0 0 44 64" style={{ position: 'absolute', inset: 0, opacity: 0.25 }} aria-hidden>
-                <rect x="4" y="4" width="36" height="56" rx="3" fill="none" stroke="var(--accent)" strokeWidth="0.8"/>
-                <polygon points="22,16 28,24 22,32 16,24" fill="none" stroke="var(--accent)" strokeWidth="0.7"/>
+                <rect x="4" y="4" width="36" height="56" rx="3" fill="none" stroke="var(--cardback-accent, var(--accent))" strokeWidth="0.8"/>
+                <polygon points="22,16 28,24 22,32 16,24" fill="none" stroke="var(--cardback-accent, var(--accent))" strokeWidth="0.7"/>
               </svg>
             </div>
           ))
@@ -87,15 +88,15 @@ function LobbyDealCardBack() {
   return (
     <div style={{
       width: '100%', height: '100%',
-      background: 'linear-gradient(135deg, #1e1410 0%, #120d09 50%, #1a1108 100%)',
+      background: 'linear-gradient(135deg, var(--cardback-a, #1e1410) 0%, var(--cardback-b, #120d09) 50%, var(--cardback-c, #1a1108) 100%)',
       border: '1px solid var(--border-lit)',
       borderRadius: 6,
       boxShadow: '0 6px 16px rgba(0,0,0,0.5)',
       position: 'relative', overflow: 'hidden',
     }}>
       <svg width="100%" height="100%" viewBox="0 0 36 52" preserveAspectRatio="none" style={{ position: 'absolute', inset: 0, opacity: 0.28 }} aria-hidden>
-        <rect x="3" y="3" width="30" height="46" rx="3" fill="none" stroke="var(--accent)" strokeWidth="0.8" />
-        <polygon points="18,13 23,20 18,27 13,20" fill="none" stroke="var(--accent)" strokeWidth="0.7" />
+        <rect x="3" y="3" width="30" height="46" rx="3" fill="none" stroke="var(--cardback-accent, var(--accent))" strokeWidth="0.8" />
+        <polygon points="18,13 23,20 18,27 13,20" fill="none" stroke="var(--cardback-accent, var(--accent))" strokeWidth="0.7" />
       </svg>
     </div>
   );

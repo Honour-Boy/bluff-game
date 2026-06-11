@@ -125,9 +125,12 @@ export const GAME_UI_STYLE = `
     position: absolute;
     inset: 18px;
     border-radius: 50%;
+    /* #205 — felt colours come from the viewer's equipped cosmetic via CSS
+       custom properties (set on the OnlinePlayerUI root from lib/cosmetics.js);
+       the fallbacks ARE the original emerald felt. */
     background:
       radial-gradient(ellipse 56% 44% at 50% 38%, rgba(220,164,76,0.18) 0%, rgba(220,164,76,0.05) 42%, transparent 72%),
-      radial-gradient(ellipse 82% 72% at 50% 50%, #2f5e3f 0%, #245132 36%, #18391f 64%, #0e2415 84%, #0a1a10 100%);
+      radial-gradient(ellipse 82% 72% at 50% 50%, var(--felt-hi, #2f5e3f) 0%, var(--felt-mid1, #245132) 36%, var(--felt-mid2, #18391f) 64%, var(--felt-low, #0e2415) 84%, var(--felt-edge, #0a1a10) 100%);
     box-shadow: inset 0 0 56px rgba(0,0,0,0.55), inset 0 7px 24px rgba(0,0,0,0.45);
     pointer-events: none;
   }
@@ -170,8 +173,10 @@ export const GAME_UI_STYLE = `
   }
   .reveal-card-back {
     transform: rotateY(180deg);
+    /* #205 — card-back colours follow the viewer's equipped cosmetic (same
+       CSS custom properties as the deck stacks); fallbacks = original leather. */
     background:
-      linear-gradient(135deg, #1e1410 0%, #120d09 50%, #1a1108 100%),
+      linear-gradient(135deg, var(--cardback-a, #1e1410) 0%, var(--cardback-b, #120d09) 50%, var(--cardback-c, #1a1108) 100%),
       repeating-linear-gradient(45deg, transparent 0px, transparent 3px, rgba(255,255,255,0.02) 3px, rgba(255,255,255,0.02) 4px);
     border: 1px solid var(--border-lit);
     box-shadow: 0 4px 12px rgba(0,0,0,0.5);

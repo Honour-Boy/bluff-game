@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import { UserProfile } from '../screens/UserProfile';
+import { CosmeticsPanel } from '../screens/CosmeticsPanel';
 import { VoicePanel } from '../VoicePanel';
 
 // ─── Inline control icons (no emoji / font glyphs) ────────────────────────────
@@ -124,6 +125,10 @@ export function SettingsGear({
   onSignOut,
   onSignOutGuest,
   onUpdateUsername,
+  // #205 — cosmetics locker (signed-in only). Both must be present for the
+  // menu item to render; guests never see it (their XP isn't persisted).
+  getProgression,
+  setCosmetics,
   // ── In-room game controls (Module 2) ──────────────────────────────────────
   // Ported here from the old bottom-right FAB. Rendered ONLY when `inRoom` is
   // true (i.e. the client is in a lobby OR an active game). Outside a room every
@@ -146,6 +151,7 @@ export function SettingsGear({
 }) {
   const [open, setOpen] = useState(false);
   const [showProfile, setShowProfile] = useState(false);
+  const [showCosmetics, setShowCosmetics] = useState(false);
 
   // Nothing to manage if we have no identity at all.
   if (!username && !onSignOut && !onSignOutGuest) return null;
@@ -313,6 +319,19 @@ export function SettingsGear({
                 />
               )}
 
+              {/* #205 — XP level + cosmetic locker (gun skins / card backs / felts). */}
+              {!isGuest && getProgression && setCosmetics && (
+                <SettingItem
+                  label="Cosmetics & XP"
+                  onClick={() => { setOpen(false); setShowCosmetics(true); }}
+                  icon={(
+                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                      <path d="M12 3l2.4 4.9 5.4.8-3.9 3.8.9 5.4-4.8-2.5-4.8 2.5.9-5.4-3.9-3.8 5.4-.8z" stroke="currentColor" strokeWidth="1.6" strokeLinejoin="round" />
+                    </svg>
+                  )}
+                />
+              )}
+
               {onSetMusicVolume && (
                 <div style={{ padding: '6px 10px 8px' }}>
                   <div style={{
@@ -391,6 +410,14 @@ export function SettingsGear({
           username={username}
           onUpdateUsername={onUpdateUsername}
           onClose={() => setShowProfile(false)}
+        />
+      )}
+
+      {showCosmetics && (
+        <CosmeticsPanel
+          getProgression={getProgression}
+          setCosmetics={setCosmetics}
+          onClose={() => setShowCosmetics(false)}
         />
       )}
     </>

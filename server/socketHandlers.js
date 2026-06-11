@@ -45,6 +45,7 @@ const gameHandlers = require('./handlers/game');
 const bluffHandlers = require('./handlers/bluff');
 const roleHandlers = require('./handlers/roles');
 const systemsHandlers = require('./handlers/systems');
+const progressionHandlers = require('./handlers/progression');
 const chatHandlers = require('./handlers/chat');
 const voiceHandlers = require('./handlers/voice');
 const disconnectHandlers = require('./handlers/disconnect');
@@ -78,6 +79,7 @@ function registerSocketHandlers(io, socket, deps = {}) {
   bluffHandlers.register(io, socket, ctx);
   roleHandlers.register(io, socket, ctx);
   systemsHandlers.register(io, socket, ctx);
+  progressionHandlers.register(io, socket, ctx);
   chatHandlers.register(io, socket, ctx);
   voiceHandlers.register(io, socket, ctx);
   disconnectHandlers.register(io, socket, ctx);

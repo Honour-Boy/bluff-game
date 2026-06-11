@@ -17,6 +17,7 @@ const { buildDeck, dealCards } = require('./deck');
 const { randomCardType } = require('./cards');
 const { createPlayer } = require('./players');
 const { assignRoles } = require('./roles');
+const { initGameStats } = require('./progression');
 const {
   _normalisePowerCardHandCap,
   _guaranteeMinPowerCardPerPlayer,
@@ -132,6 +133,10 @@ function startGame(room) {
   room.firstBloodAwarded = false;
   for (const p of alivePlayers) p.survivalStreak = 0;
 
+  // #205 — fresh per-game progression stats (cards played / spins survived /
+  // bluff verdicts / elimination order). XP is computed from these at game_over.
+  initGameStats(room);
+
   // v2 Phase D — assign roles BEFORE the deal so the per-player
   // power-card hand cap is honoured by `_normalisePowerCardHandCap`.
   assignRoles(room);
@@ -213,6 +218,9 @@ function resetRoomForReplay(room) {
     username: p.username,
     socketId: p.socketId,
     isBot: !!p.isBot,
+    // #205 — equipped cosmetics are part of a player's identity, stamped at
+    // join from the progression store; they must survive a replay reset.
+    cosmetics: p.cosmetics || null,
   }));
 
   for (const key of Object.keys(room)) delete room[key];
@@ -235,6 +243,7 @@ function resetRoomForReplay(room) {
   for (const ident of playerIdentities) {
     const player = createPlayer(ident.id, ident.username, ident.socketId);
     if (ident.isBot) player.isBot = true;
+    if (ident.cosmetics) player.cosmetics = ident.cosmetics;
     room.players.push(player);
   }
 

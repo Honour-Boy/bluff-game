@@ -26,6 +26,7 @@ const modifiers = require('./engine/modifiers');
 const betting = require('./engine/betting');
 const room = require('./engine/room');
 const serialize = require('./engine/serialize');
+const progression = require('./engine/progression');
 
 module.exports = {
   // ─── Constants & config ──────────────────────────────────
@@ -175,4 +176,20 @@ module.exports = {
 
   // ─── Serialisation ───────────────────────────────────────
   serializeRoom: serialize.serializeRoom,
+
+  // ─── Meta-progression: XP + cosmetics (#205) ─────────────
+  XP_RULES: progression.XP_RULES,
+  levelForXp: progression.levelForXp,
+  xpForLevel: progression.xpForLevel,
+  COSMETIC_SLOTS: progression.COSMETIC_SLOTS,
+  COSMETICS: progression.COSMETICS,
+  DEFAULT_COSMETICS: progression.DEFAULT_COSMETICS,
+  isCosmeticUnlocked: progression.isCosmeticUnlocked,
+  validateEquipped: progression.validateEquipped,
+  initGameStats: progression.initGameStats,
+  trackCardPlayed: progression.trackCardPlayed,
+  trackSpinOutcome: progression.trackSpinOutcome,
+  trackBluffOutcome: progression.trackBluffOutcome,
+  computeStandings: progression.computeStandings,
+  computeXpAward: progression.computeXpAward,
 };

@@ -217,6 +217,21 @@ export function useGameActions({
     return emitPromiseAction(socket, 'last_stand_end_turn', { roomCode }, failError);
   }, [failError, roomCode, socket]);
 
+  // #205 — meta-progression. Both resolve with the raw ack ({ success,
+  // progression } / { success, equipped }) so the cosmetics panel can render
+  // errors inline; neither needs a room.
+  const getProgression = useCallback(() => {
+    return new Promise((resolve) => {
+      socket.emit('get_progression', {}, (res) => resolve(res || { success: false }));
+    });
+  }, [socket]);
+
+  const setCosmetics = useCallback((equipped) => {
+    return new Promise((resolve) => {
+      socket.emit('set_cosmetics', { equipped }, (res) => resolve(res || { success: false }));
+    });
+  }, [socket]);
+
   const sendChatMessage = useCallback((text) => {
     if (!roomCode || !text?.trim()) return;
     socket.emit('send_chat_message', { roomCode, text: text.trim() }, (res) => {
@@ -325,6 +340,8 @@ export function useGameActions({
     ghostVote,
     lastStandSpin,
     lastStandEndTurn,
+    getProgression,
+    setCosmetics,
     sendChatMessage,
     openChat,
     closeChat,

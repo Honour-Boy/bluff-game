@@ -28,6 +28,7 @@ const {
   buildAdHocRoom,
   buildPersistentGroupRoom,
   maybeRecordGroupWinner,
+  stampCosmeticsInBackground,
 } = require('../lib/roomBuilders');
 const { resolveLeaverPendingPauses } = require('../lib/orchestration');
 const { discardLobbyIdleState } = require('../lib/idleSweep');
@@ -58,6 +59,9 @@ function register(io, socket, deps) {
       if (roomMode === engine.MODES.ONLINE) {
         const player = engine.createPlayer(socket.userId, socket.username, socket.id);
         room.players.push(player);
+        // #205 — dress the seat with the player's equipped cosmetics
+        // (non-blocking; pops in on the follow-up broadcast).
+        stampCosmeticsInBackground(io, leaderboardRepo, room.code, player);
         await saveRoom(room);
         callback({ success: true, roomCode: room.code, isHost: true, mode: roomMode, playerId: socket.userId });
       } else {
@@ -126,6 +130,8 @@ function register(io, socket, deps) {
       // the room controls; the bot "hosts" the table and the server drives it.
       const human = engine.createPlayer(socket.userId, socket.username, socket.id);
       room.players.push(human);
+      // #205 — even a practice table shows your own felt/card back.
+      stampCosmeticsInBackground(io, leaderboardRepo, room.code, human);
 
       // Seat the practice bot. The id is namespaced so it can never collide with
       // a Supabase user id or a guest id; socketId is null (it never connects).
@@ -229,6 +235,9 @@ function register(io, socket, deps) {
         }
         player = engine.createPlayer(socket.userId, socket.username, socket.id);
         room.players.push(player);
+        // #205 — dress the seat with the player's equipped cosmetics
+        // (non-blocking; pops in on the follow-up broadcast).
+        stampCosmeticsInBackground(io, leaderboardRepo, code, player);
         console.log(`[Room ${code}] Joined: ${player.username}`);
       }
 

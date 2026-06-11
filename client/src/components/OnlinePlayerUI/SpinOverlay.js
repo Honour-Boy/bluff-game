@@ -1,10 +1,14 @@
+import { gunSkinFor } from '../../lib/cosmetics';
+
 const CYL = 200;
 const CX = 100;
 const CY = 100;
 const ORBIT = 58;
 const CHAM_R = 20;
 
-function CylinderSVG({ bulletChambers, bulletChambersAfter, eliminated, landingChamberIndex, rotation, animating, spinComplete }) {
+// #205 — `skin` carries the SPINNER's equipped gun-skin palette (everyone at
+// the table sees the spinner's own cylinder). Defaults to the original steel.
+function CylinderSVG({ bulletChambers, bulletChambersAfter, eliminated, landingChamberIndex, rotation, animating, spinComplete, skin }) {
   // While the cylinder is spinning we show the PRE-spin bullets (you watch the
   // round come up). Once it stops, swap to the POST-spin chamber so any bullets
   // a survival just added (always +1, +2 under Hot Potato) visibly pop in (#238).
@@ -43,7 +47,7 @@ function CylinderSVG({ bulletChambers, bulletChambersAfter, eliminated, landingC
           transition: animating ? 'transform 8s cubic-bezier(0.1, 0, 0.15, 1)' : 'none',
         }}
       >
-        <circle cx={CX} cy={CY} r={ORBIT + CHAM_R + 8} fill="#111118" stroke="#2a2a35" strokeWidth={2} />
+        <circle cx={CX} cy={CY} r={ORBIT + CHAM_R + 8} fill={skin.body} stroke={skin.bodyStroke} strokeWidth={2} />
         {chambers.map((chamber, index) => (
           <g key={index}>
             {chamber.isLanding && (
@@ -61,8 +65,8 @@ function CylinderSVG({ bulletChambers, bulletChambersAfter, eliminated, landingC
               cx={chamber.x}
               cy={chamber.y}
               r={CHAM_R}
-              fill={chamber.isBullet ? '#3a0808' : '#0d0d18'}
-              stroke={chamber.isLanding ? (chamber.isBullet ? 'var(--accent2)' : 'var(--alive)') : '#333'}
+              fill={chamber.isBullet ? '#3a0808' : skin.chamber}
+              stroke={chamber.isLanding ? (chamber.isBullet ? 'var(--accent2)' : 'var(--alive)') : skin.chamberStroke}
               strokeWidth={chamber.isLanding ? 2.5 : 1.5}
             />
             {chamber.isBullet && (
@@ -75,7 +79,7 @@ function CylinderSVG({ bulletChambers, bulletChambersAfter, eliminated, landingC
             )}
           </g>
         ))}
-        <circle cx={CX} cy={CY} r={9} fill="#222230" stroke="#444" strokeWidth={1.5} />
+        <circle cx={CX} cy={CY} r={9} fill={skin.hub} stroke={skin.hubStroke} strokeWidth={1.5} />
       </svg>
     </div>
   );
@@ -89,8 +93,10 @@ export function SpinOverlay({
   isSpinTarget,
   acknowledgeSpinResult,
   isTutorial = false,
+  gunSkinId = null,
 }) {
   if (!spinData) return null;
+  const skin = gunSkinFor(gunSkinId);
 
   return (
     <div
@@ -128,6 +134,7 @@ export function SpinOverlay({
         rotation={cylinderRotation}
         animating={cylinderAnimating}
         spinComplete={spinComplete}
+        skin={skin}
       />
 
       {spinComplete && (

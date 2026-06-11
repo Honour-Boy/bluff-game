@@ -32,20 +32,22 @@ export function useCardFlight() {
   return { flights, launch };
 }
 
-// Leather card back — used while a card is travelling to/from the deck face-down.
+// Card back — used while a card is travelling to/from the deck face-down.
+// Colours follow the viewer's equipped cosmetic (#205, CSS vars set on the
+// OnlinePlayerUI root); the fallbacks are the original leather look.
 function FlyingCardBack() {
   return (
     <div style={{
       width: '100%', height: '100%',
-      background: 'linear-gradient(135deg, #1e1410 0%, #120d09 50%, #1a1108 100%)',
+      background: 'linear-gradient(135deg, var(--cardback-a, #1e1410) 0%, var(--cardback-b, #120d09) 50%, var(--cardback-c, #1a1108) 100%)',
       border: '1px solid var(--border-lit)',
       borderRadius: 7,
       boxShadow: '0 10px 26px rgba(0,0,0,0.6)',
       position: 'relative', overflow: 'hidden',
     }}>
       <svg width="100%" height="100%" viewBox="0 0 44 64" preserveAspectRatio="none" style={{ position: 'absolute', inset: 0, opacity: 0.3 }} aria-hidden>
-        <rect x="4" y="4" width="36" height="56" rx="3" fill="none" stroke="var(--accent)" strokeWidth="0.8" />
-        <polygon points="22,16 28,24 22,32 16,24" fill="none" stroke="var(--accent)" strokeWidth="0.7" />
+        <rect x="4" y="4" width="36" height="56" rx="3" fill="none" stroke="var(--cardback-accent, var(--accent))" strokeWidth="0.8" />
+        <polygon points="22,16 28,24 22,32 16,24" fill="none" stroke="var(--cardback-accent, var(--accent))" strokeWidth="0.7" />
       </svg>
     </div>
   );

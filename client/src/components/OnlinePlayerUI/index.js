@@ -25,6 +25,8 @@ import {
   GAME_UI_STYLE,
   orderClockwiseFromLocal,
 } from './helpers';
+import { XpSummary } from './XpSummary';
+import { cosmeticStyleVars } from '../../lib/cosmetics';
 import { useOnlinePlayerUiController } from '../../hooks/useOnlinePlayerUiController';
 import { useAtmosphere } from '../../hooks/useAtmosphere';
 
@@ -71,6 +73,8 @@ export function OnlinePlayerUI({
   voice,
   openChat,
   chatUnread = 0,
+  // #205 — this client's private end-of-game XP payload (useGame), if any.
+  xpAward = null,
 }) {
   const wrapperRef = useRef(null);
   const { triggerShake, triggerAudio, startSpinAudio, stopSpinAudio } = useAtmosphere(wrapperRef);
@@ -644,10 +648,19 @@ export function OnlinePlayerUI({
 
   const isSpinPendingPhase = roomState?.phase === 'spin_pending';
 
+  // #205 — cosmetics. The viewer's OWN felt + card back theme the table via CSS
+  // custom properties on this root (defaults in the CSS keep the original look);
+  // the spin overlay paints the SPINNER's gun skin so everyone sees their iron.
+  const myCosmeticVars = cosmeticStyleVars(myPlayer?.cosmetics);
+  const spinGunSkinId = ui.spinData
+    ? (players?.find((p) => p.id === ui.spinData.spinTargetId)?.cosmetics?.gunSkin || null)
+    : null;
+
   return (
     <div
       ref={wrapperRef}
       style={{
+        ...myCosmeticVars,
         position: 'relative',
         // Fill exactly one viewport (dynamic vh handles the mobile URL bar) so
         // the table is compact with no page scroll. The middle scene flexes and
@@ -741,6 +754,8 @@ export function OnlinePlayerUI({
           }}>
             {lastAction?.winnerId === myPlayer.id ? 'Victory' : `${lastAction?.winnerName ?? '?'} Prevails`}
           </div>
+          {/* #205 — this player's private XP gain for the finished game. */}
+          <XpSummary xpAward={xpAward} isMobile={ui.isMobile} />
         </div>
       )}
 
@@ -876,6 +891,7 @@ export function OnlinePlayerUI({
         setShowTurnModal={ui.setShowTurnModal}
         isTutorial={isTutorial}
         suppressTurnNotice={suppressTurnNotice}
+        spinGunSkinId={spinGunSkinId}
       />
 
       <PowerFlowOverlays
