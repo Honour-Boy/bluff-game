@@ -21,8 +21,10 @@
 // the SIX measured centres of THIS artwork's painted holes (the art's holes
 // deviate slightly from a perfect ring — cosmetic-previews/table-previews/
 // measure3.mjs computes them) and `holeR` their radius, so the state
-// circles sit exactly in the paint. The flat fields stay as the decode-time
-// fallback.
+// circles sit exactly in the paint. `bullet` themes the round itself
+// ({ fill: casing disc, core: centre, landingCore: centre when the spin
+// lands on it }) — only the default steel keeps the original red. The flat
+// fields stay as the decode-time fallback.
 export const GUN_SKINS = {
   gun_steel: {
     body: '#111118', bodyStroke: '#2a2a35',
@@ -32,13 +34,15 @@ export const GUN_SKINS = {
   gun_noir: {
     art: '/cosmetics/chamber_noir.png', holeR: 18,
     holes: [[100, 42.9], [150.6, 73], [150.6, 127.2], [99.9, 156.5], [50.1, 127.8], [49.9, 73]],
+    bullet: { fill: '#1a1408', core: '#c8a35a', landingCore: '#f2d88a' },
     body: '#0d0c11', bodyStroke: '#c8a35a',
     chamber: '#070609', chamberStroke: '#9a7438',
     hub: '#1d1a24', hubStroke: '#ecd28c',
   },
   gun_crimson: {
     art: '/cosmetics/chamber_crimson.png', holeR: 17.5,
-    holes: [[100.3, 41.7], [148.1, 69.1], [148, 129.7], [100, 157.5], [52.7, 130.5], [52.8, 67.9]],
+    holes: [[100.6, 41.8], [145.3, 65.9], [145.2, 132], [100, 157.1], [55.5, 133.1], [55.1, 65.4]],
+    bullet: { fill: '#241008', core: '#c4a060', landingCore: '#f0d080' },
     body: '#4c1320', bodyStroke: '#c4a060',
     chamber: '#1a060c', chamberStroke: '#9c7a40',
     hub: '#6b1e2c', hubStroke: '#e6cd8e',
@@ -46,6 +50,7 @@ export const GUN_SKINS = {
   gun_neon: {
     art: '/cosmetics/chamber_neon.png', holeR: 16.5,
     holes: [[100.4, 43.4], [147.6, 72.4], [147.1, 129.4], [100.2, 157], [53.2, 129.1], [53.1, 71.9]],
+    bullet: { fill: '#14062a', core: '#e84dd0', landingCore: '#ff8ae8' },
     body: '#141436', bodyStroke: '#45e6e6',
     chamber: '#0c0c26', chamberStroke: '#6a8af0',
     hub: '#1b1b42', hubStroke: '#e84dd0',
@@ -53,6 +58,7 @@ export const GUN_SKINS = {
   gun_kente: {
     art: '/cosmetics/chamber_kente.png', holeR: 16.5,
     holes: [[101.4, 37.5], [154, 69.8], [153, 125.5], [100.5, 158], [48, 125.3], [47.8, 67.5]],
+    bullet: { fill: '#1c150d', core: '#e2a92e', landingCore: '#ffd34d' },
     body: '#8d4220', bodyStroke: '#e2a92e',
     chamber: '#1c150d', chamberStroke: '#e2a92e',
     hub: '#2f6b3a', hubStroke: '#e2a92e',
@@ -60,6 +66,7 @@ export const GUN_SKINS = {
   gun_cosmos: {
     art: '/cosmetics/chamber_cosmos.png', holeR: 21,
     holes: [[100.3, 50.9], [143.8, 78], [144.5, 128.1], [99.7, 150.1], [56, 126.3], [57.5, 78.5]],
+    bullet: { fill: '#0d081e', core: '#9a6ae8', landingCore: '#e88ad8' },
     body: '#0a0a14', bodyStroke: '#9a6ae8',
     chamber: '#06060c', chamberStroke: '#4a8ae0',
     hub: '#10101e', hubStroke: '#e88ad8',

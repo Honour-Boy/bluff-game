@@ -80,10 +80,10 @@ function CylinderSVG({ bulletChambers, bulletChambersAfter, eliminated, landingC
                 cx={chamber.x}
                 cy={chamber.y}
                 r={holeR}
-                fill={chamber.isBullet ? '#3a0808' : skin.chamber}
+                fill={chamber.isBullet ? (skin.bullet?.fill || '#3a0808') : skin.chamber}
                 // On art skins the bullet gets a faint warm rim: the round
-                // itself is near-black-on-black on the noir disc, and without
-                // the rim the sweep during the 8s spin is invisible (reported
+                // itself can be near-black-on-black (noir), and without the
+                // rim the sweep during the 8s spin is invisible (reported
                 // as "the cylinder doesn't spin").
                 stroke={skin.art
                   ? 'rgba(240,228,200,0.45)'
@@ -91,12 +91,16 @@ function CylinderSVG({ bulletChambers, bulletChambersAfter, eliminated, landingC
                 strokeWidth={skin.art ? 1.6 : chamber.isLanding ? 2.5 : 1.5}
               />
             )}
+            {/* The round's core is themed per skin (skin.bullet) — only the
+                default steel keeps the original red. */}
             {chamber.isBullet && (
               <circle
                 cx={chamber.x}
                 cy={chamber.y}
                 r={holeR * 0.42}
-                fill={chamber.isLanding ? '#ff3344' : '#882222'}
+                fill={chamber.isLanding
+                  ? (skin.bullet?.landingCore || '#ff3344')
+                  : (skin.bullet?.core || '#882222')}
               />
             )}
           </g>
