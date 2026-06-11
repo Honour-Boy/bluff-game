@@ -47,7 +47,14 @@ function CylinderSVG({ bulletChambers, bulletChambersAfter, eliminated, landingC
           transition: animating ? 'transform 8s cubic-bezier(0.1, 0, 0.15, 1)' : 'none',
         }}
       >
+        {/* Art skins paint the whole disc (body, decorated rims, hole
+            interiors, hub) via a geometry-matched SVG underlay; the flat
+            circle below it stays as the decode-time fallback. The live game
+            state — bullets and the landing ring — is ALWAYS drawn on top,
+            so empty holes show the artwork through while chamber state
+            keeps its contrast. */}
         <circle cx={CX} cy={CY} r={ORBIT + CHAM_R + 8} fill={skin.body} stroke={skin.bodyStroke} strokeWidth={2} />
+        {skin.art && <image href={skin.art} x={0} y={0} width={CYL} height={CYL} />}
         {chambers.map((chamber, index) => (
           <g key={index}>
             {chamber.isLanding && (
@@ -61,14 +68,16 @@ function CylinderSVG({ bulletChambers, bulletChambersAfter, eliminated, landingC
                 opacity={0.8}
               />
             )}
-            <circle
-              cx={chamber.x}
-              cy={chamber.y}
-              r={CHAM_R}
-              fill={chamber.isBullet ? '#3a0808' : skin.chamber}
-              stroke={chamber.isLanding ? (chamber.isBullet ? 'var(--accent2)' : 'var(--alive)') : skin.chamberStroke}
-              strokeWidth={chamber.isLanding ? 2.5 : 1.5}
-            />
+            {(chamber.isBullet || chamber.isLanding || !skin.art) && (
+              <circle
+                cx={chamber.x}
+                cy={chamber.y}
+                r={CHAM_R}
+                fill={chamber.isBullet ? '#3a0808' : skin.art ? 'none' : skin.chamber}
+                stroke={chamber.isLanding ? (chamber.isBullet ? 'var(--accent2)' : 'var(--alive)') : skin.art ? 'none' : skin.chamberStroke}
+                strokeWidth={chamber.isLanding ? 2.5 : 1.5}
+              />
+            )}
             {chamber.isBullet && (
               <circle
                 cx={chamber.x}
@@ -79,7 +88,7 @@ function CylinderSVG({ bulletChambers, bulletChambersAfter, eliminated, landingC
             )}
           </g>
         ))}
-        <circle cx={CX} cy={CY} r={9} fill={skin.hub} stroke={skin.hubStroke} strokeWidth={1.5} />
+        {!skin.art && <circle cx={CX} cy={CY} r={9} fill={skin.hub} stroke={skin.hubStroke} strokeWidth={1.5} />}
       </svg>
     </div>
   );

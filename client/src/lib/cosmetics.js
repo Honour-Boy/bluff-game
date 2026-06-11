@@ -33,30 +33,37 @@ export const GUN_SKINS = {
     hub: '#4a3408', hubStroke: '#f0c860',
   },
   // The five owner-art identities (matching the deck skins + table felts).
-  // Palettes lifted from the deck designs; empty chambers stay darker than
-  // the body and well away from the bullet reds (#3a0808/#882222) so the
-  // chamber state — the game info — keeps its contrast on every skin.
+  // `art` is a full-disc SVG recreated from the owner's chamber references
+  // (built by scripts/build-cosmetic-decks.mjs, geometry-matched to
+  // CylinderSVG): it paints body, decorated rims, hole interiors and hub,
+  // while CylinderSVG keeps drawing the live game state (bullets, landing
+  // ring) ON TOP. The flat fields stay as the decode-time fallback.
   gun_noir: {
+    art: '/cosmetics/chamber_noir.svg',
     body: '#0d0c11', bodyStroke: '#c8a35a',
     chamber: '#070609', chamberStroke: '#9a7438',
     hub: '#1d1a24', hubStroke: '#ecd28c',
   },
   gun_crimson: {
+    art: '/cosmetics/chamber_crimson.svg',
     body: '#4c1320', bodyStroke: '#c4a060',
     chamber: '#1a060c', chamberStroke: '#9c7a40',
     hub: '#6b1e2c', hubStroke: '#e6cd8e',
   },
   gun_neon: {
+    art: '/cosmetics/chamber_neon.svg',
     body: '#141436', bodyStroke: '#45e6e6',
     chamber: '#0c0c26', chamberStroke: '#6a8af0',
     hub: '#1b1b42', hubStroke: '#e84dd0',
   },
   gun_kente: {
+    art: '/cosmetics/chamber_kente.svg',
     body: '#8d4220', bodyStroke: '#e2a92e',
     chamber: '#1c150d', chamberStroke: '#e2a92e',
     hub: '#2f6b3a', hubStroke: '#e2a92e',
   },
   gun_cosmos: {
+    art: '/cosmetics/chamber_cosmos.svg',
     body: '#0a0a14', bodyStroke: '#9a6ae8',
     chamber: '#06060c', chamberStroke: '#4a8ae0',
     hub: '#10101e', hubStroke: '#e88ad8',

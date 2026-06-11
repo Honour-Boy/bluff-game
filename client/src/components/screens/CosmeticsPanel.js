@@ -70,6 +70,11 @@ function CardBackSwatch({ id }) {
 
 function GunSwatch({ id }) {
   const skin = gunSkinFor(id);
+  // Art chamber skins show the actual disc artwork (transparent corners,
+  // so no rounding needed); flat skins keep the mini cylinder mock.
+  if (skin.art) {
+    return <img src={skin.art} alt="" width={46} height={46} draggable={false} />;
+  }
   return (
     <svg width="46" height="46" viewBox="0 0 46 46" aria-hidden>
       <circle cx="23" cy="23" r="21" fill={skin.body} stroke={skin.bodyStroke} strokeWidth="2" />

@@ -293,3 +293,237 @@ for (const [out, build] of FELTS) {
   writeFileSync(join(outDir, out), svg);
   console.log(`${out}: ${(svg.length / 1024).toFixed(0)} KB`);
 }
+
+// ============================================================
+// Chamber (cylinder) art — recreations of the owner references
+// ============================================================
+// References: cosmetic-previews/chamber{1..5}.jpg (local-only).
+//   1 = noir (gold-engraved black steel)   2 = neon (circuit board)
+//   3 = crimson (burgundy + ornate gold)   4 = cosmos (galaxy chambers)
+//   5 = kente (embossed terracotta leather)
+// Geometry mirrors SpinOverlay's CylinderSVG exactly: 200×200 viewBox,
+// body disc r 86 at (100,100), six holes r 20 on orbit 58 starting at
+// 12 o'clock. The art paints the WHOLE disc — body, decorated rims, hole
+// interiors, hub — and CylinderSVG overlays only the live game state
+// (bullets, landing ring), so empty holes show the artwork through.
+
+const GCX = 100, GCY = 100, GORBIT = 58, GHOLE = 20, GBODY = 86;
+
+function holeXY(i) {
+  const a = ((i * 60 - 90) * Math.PI) / 180;
+  return [GCX + GORBIT * Math.cos(a), GCY + GORBIT * Math.sin(a)];
+}
+// Angles halfway BETWEEN holes (for rim ornaments / circuit spokes).
+const GAP_DEGS = [0, 1, 2, 3, 4, 5].map((i) => i * 60 + 30 - 90 + 90); // pointing-up motif rotated to each gap
+
+function discBase(id, stops, edgeStroke) {
+  return {
+    def: `<radialGradient id="${id}" cx="0.5" cy="0.44" r="0.62">${stops
+      .map(([o, c]) => `<stop offset="${o}" stop-color="${c}"/>`)
+      .join('')}</radialGradient>`,
+    disc: `<circle cx="${GCX}" cy="${GCY}" r="${GBODY}" fill="url(#${id})" ${edgeStroke}/>`,
+  };
+}
+
+function eachHole(fn) {
+  return [0, 1, 2, 3, 4, 5].map((i) => {
+    const [x, y] = holeXY(i);
+    return fn(x.toFixed(1), y.toFixed(1), i);
+  }).join('\n');
+}
+
+// Recessed-hole shading shared by the tactile skins.
+const HOLE_SHADE = `<radialGradient id="holeShade" cx="0.5" cy="0.45" r="0.55">
+  <stop offset="0" stop-color="#000" stop-opacity="0"/><stop offset="0.62" stop-color="#000" stop-opacity="0"/>
+  <stop offset="1" stop-color="#000" stop-opacity="0.5"/>
+</radialGradient>`;
+
+function buildNoirChamber() {
+  const base = discBase('body', [[0, '#1b1820'], [0.55, '#100e14'], [0.85, '#0a090d'], [1, '#060507']], 'stroke="#2a2a32" stroke-width="1.5"');
+  // Oil-slick sheen: faint blurred colour pools on the black steel.
+  const sheen = [[78, 78, '#7c2535'], [126, 120, '#2f6b3a'], [98, 132, '#6a4ae0']]
+    .map(([x, y, c]) => `<ellipse cx="${x}" cy="${y}" rx="26" ry="18" fill="${c}" opacity="0.07" filter="url(#soft)"/>`)
+    .join('');
+  // One engraved double-curl, repeated in each gap near the rim.
+  const curl = `<path d="M0,5 C-6,3 -9,-2 -5,-6 C-2,-9 2,-7 1,-3 M0,5 C6,3 9,-2 5,-6 C2,-9 -2,-7 -1,-3" stroke="url(#gold)" stroke-width="1" fill="none" opacity="0.85"/>
+<circle r="0.9" cy="-1" fill="url(#gold)" opacity="0.8"/>`;
+  const filigree = GAP_DEGS
+    .map((deg) => `<g transform="rotate(${deg} ${GCX} ${GCY}) translate(${GCX} 27)">${curl}</g>`)
+    .join('\n');
+  const rims = eachHole((x, y) => `<circle cx="${x}" cy="${y}" r="23.5" fill="none" stroke="url(#gold)" stroke-width="3"/>
+<circle cx="${x}" cy="${y}" r="20" fill="#030204" stroke="#1a1a20" stroke-width="1"/>`);
+  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200">
+<defs>${GOLD_GRAD}${base.def}
+<radialGradient id="brass" cx="0.42" cy="0.38" r="0.72">
+  <stop offset="0" stop-color="#e8d28e"/><stop offset="0.6" stop-color="#b08c42"/><stop offset="1" stop-color="#7a5d26"/>
+</radialGradient>
+<filter id="soft" x="-60%" y="-60%" width="220%" height="220%"><feGaussianBlur stdDeviation="10"/></filter></defs>
+${base.disc}
+${sheen}
+<circle cx="${GCX}" cy="${GCY}" r="82" fill="none" stroke="url(#gold)" stroke-width="0.8" opacity="0.5"/>
+${filigree}
+${rims}
+<circle cx="${GCX}" cy="${GCY}" r="12" fill="url(#brass)" stroke="#6b5526" stroke-width="1"/>
+<circle cx="${GCX}" cy="${GCY}" r="8.5" fill="none" stroke="#000" stroke-opacity="0.3" stroke-width="0.8"/>
+<circle cx="${GCX}" cy="${GCY}" r="5" fill="none" stroke="#000" stroke-opacity="0.3" stroke-width="0.8"/>
+<circle cx="${GCX}" cy="${GCY}" r="1.5" fill="#4a3a14"/>
+</svg>
+`;
+}
+
+function buildCrimsonChamber() {
+  const base = discBase('body', [[0, '#82293a'], [0.5, '#6b1e2c'], [0.85, '#531523'], [1, '#441020']], 'stroke="#441020" stroke-width="1"');
+  const mottle = [[70, 86, 30], [132, 70, 24], [104, 138, 28]]
+    .map(([x, y, r]) => `<circle cx="${x}" cy="${y}" r="${r}" fill="#2a0911" opacity="0.12" filter="url(#soft)"/>`)
+    .join('');
+  // Hammered gold rims: solid gradient ring + dashed dark overlay.
+  const rims = eachHole((x, y) => `<circle cx="${x}" cy="${y}" r="23.5" fill="none" stroke="url(#gold)" stroke-width="4"/>
+<circle cx="${x}" cy="${y}" r="23.5" fill="none" stroke="#5a3a14" stroke-width="4" stroke-dasharray="2 2.5" opacity="0.55"/>
+<circle cx="${x}" cy="${y}" r="20" fill="#1d060d"/>`);
+  // Small fleur accents in each rim gap.
+  const fleur = `<path d="M0,0 C-3,-4 -1,-8 0,-9 C1,-8 3,-4 0,0 M0,-2 C-4,-3 -6,-6 -5,-8 M0,-2 C4,-3 6,-6 5,-8" stroke="url(#gold)" stroke-width="1" fill="none" opacity="0.85"/>`;
+  const fleurs = GAP_DEGS
+    .map((deg) => `<g transform="rotate(${deg} ${GCX} ${GCY}) translate(${GCX} 30)">${fleur}</g>`)
+    .join('\n');
+  // Acanthus diamond cradling the hub (the reference's centrepiece).
+  const acanthus = [0, 90, 180, 270]
+    .map((deg) => `<g transform="rotate(${deg} ${GCX} ${GCY}) translate(${GCX} 73)">
+<path d="M0,6 C-7,4 -11,-2 -6,-7 C-3,-10 2,-8 1,-3 M0,6 C7,4 11,-2 6,-7 C3,-10 -2,-8 -1,-3 M0,6 L0,-1" stroke="url(#gold)" stroke-width="1.2" fill="none" opacity="0.9"/>
+</g>`)
+    .join('\n');
+  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200">
+<defs>${GOLD_GRAD}${base.def}
+<radialGradient id="dome" cx="0.4" cy="0.34" r="0.75">
+  <stop offset="0" stop-color="#f2da9a"/><stop offset="0.55" stop-color="#c89a3e"/><stop offset="1" stop-color="#8a6420"/>
+</radialGradient>
+<filter id="soft" x="-60%" y="-60%" width="220%" height="220%"><feGaussianBlur stdDeviation="8"/></filter></defs>
+${base.disc}
+${mottle}
+<circle cx="${GCX}" cy="${GCY}" r="85" fill="none" stroke="url(#gold)" stroke-width="3"/>
+<circle cx="${GCX}" cy="${GCY}" r="81.5" fill="none" stroke="#2a0a12" stroke-width="0.8" opacity="0.6"/>
+${fleurs}
+${acanthus}
+${rims}
+<circle cx="${GCX}" cy="${GCY}" r="11" fill="url(#dome)" stroke="#6b4f1e" stroke-width="1"/>
+<ellipse cx="96.5" cy="96" rx="4" ry="2.6" fill="#fff" opacity="0.3"/>
+</svg>
+`;
+}
+
+function buildNeonChamber() {
+  const base = discBase('body', [[0, '#232352'], [0.55, '#191942'], [0.85, '#121234'], [1, '#0d0d28']], 'stroke="#2e2e6a" stroke-width="2"');
+  // Triple circuit traces radiating through each rim gap, with elbows + vias.
+  const trace = `<g stroke="#c45ae8" stroke-width="1.4" fill="none">
+<path d="M-3.5,-18 L-3.5,-76"/><path d="M0,-18 L0,-78"/><path d="M3.5,-18 L3.5,-76"/>
+<path d="M3.5,-52 L10,-52 L10,-64"/><path d="M-3.5,-44 L-10,-44 L-10,-58"/>
+</g>
+<g fill="#e84dd0">
+<circle cx="10" cy="-64" r="1.6"/><circle cx="-10" cy="-58" r="1.6"/>
+<circle cx="-3.5" cy="-76" r="1.6"/><circle cx="0" cy="-78" r="1.6"/><circle cx="3.5" cy="-76" r="1.6"/>
+</g>`;
+  const traces = GAP_DEGS
+    .map((deg) => `<g transform="rotate(${deg} ${GCX} ${GCY}) translate(${GCX} ${GCY})">
+<g opacity="0.3" filter="url(#glow)">${trace}</g>${trace}
+</g>`)
+    .join('\n');
+  // Teal glow rings — the reference's signature chamber look.
+  const rims = eachHole((x, y) => `<circle cx="${x}" cy="${y}" r="22" fill="none" stroke="#3ae6c8" stroke-width="6" opacity="0.4" filter="url(#glow)"/>
+<circle cx="${x}" cy="${y}" r="22" fill="none" stroke="#45e6d0" stroke-width="2.8"/>
+<circle cx="${x}" cy="${y}" r="19.5" fill="#05050d" stroke="#1a6a5e" stroke-width="1"/>`);
+  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200">
+<defs>${base.def}
+<radialGradient id="hubP" cx="0.42" cy="0.38" r="0.72">
+  <stop offset="0" stop-color="#c98ae8"/><stop offset="0.5" stop-color="#8a5ac8"/><stop offset="1" stop-color="#4a2a78"/>
+</radialGradient>
+<filter id="glow" x="-80%" y="-80%" width="260%" height="260%"><feGaussianBlur stdDeviation="2.6"/></filter></defs>
+${base.disc}
+${traces}
+${rims}
+<circle cx="${GCX}" cy="${GCY}" r="13" fill="#e84dd0" opacity="0.3" filter="url(#glow)"/>
+<circle cx="${GCX}" cy="${GCY}" r="11" fill="url(#hubP)" stroke="#b06ae8" stroke-width="1"/>
+</svg>
+`;
+}
+
+function buildCosmosChamber() {
+  const base = discBase('body', [[0, '#0c0c16'], [0.6, '#08080f'], [1, '#05050a']], 'stroke="#1a1a26" stroke-width="1"');
+  const nebulae = [[66, 70, 30, 20, '#9a6ae8'], [138, 76, 26, 18, '#e88ad8'], [80, 140, 28, 18, '#4a8ae0'], [134, 130, 24, 16, '#6a4ae0']]
+    .map(([x, y, rx, ry, c]) => `<ellipse cx="${x}" cy="${y}" rx="${rx}" ry="${ry}" fill="${c}" opacity="0.16" filter="url(#neb)"/>`)
+    .join('');
+  const rand = mulberry32(264);
+  let stars = '';
+  for (let n = 0; n < 240 && stars.split('circle').length < 80; n++) {
+    const x = rand() * 200, y = rand() * 200;
+    const dx = (x - GCX) / GBODY, dy = (y - GCY) / GBODY;
+    if (dx * dx + dy * dy > 0.92) continue;
+    stars += `<circle cx="${x.toFixed(0)}" cy="${y.toFixed(0)}" r="${(0.4 + rand() * 0.9).toFixed(1)}" fill="#cfd8ff" opacity="${(0.25 + rand() * 0.7).toFixed(2)}"/>`;
+  }
+  // Each empty chamber is a tiny galaxy: gunmetal ring, starburst core.
+  const burst = Array.from({ length: 8 }, (_, k) => {
+    const a = (k * 45 * Math.PI) / 180;
+    const r1 = 3, r2 = k % 2 ? 9 : 13;
+    return `<line x1="${(r1 * Math.cos(a)).toFixed(1)}" y1="${(r1 * Math.sin(a)).toFixed(1)}" x2="${(r2 * Math.cos(a)).toFixed(1)}" y2="${(r2 * Math.sin(a)).toFixed(1)}"/>`;
+  }).join('');
+  const rims = eachHole((x, y) => `<circle cx="${x}" cy="${y}" r="26" fill="none" stroke="#8a8af0" stroke-width="1" opacity="0.3"/>
+<circle cx="${x}" cy="${y}" r="23.5" fill="none" stroke="#34344a" stroke-width="4"/>
+<circle cx="${x}" cy="${y}" r="20" fill="#04040a"/>
+<g transform="translate(${x} ${y})" stroke="#cfd8ff" stroke-width="0.7" opacity="0.85">${burst}</g>
+<circle cx="${x}" cy="${y}" r="4" fill="#b8aaff" opacity="0.4"/>
+<circle cx="${x}" cy="${y}" r="1.8" fill="#fff"/>`);
+  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200">
+<defs>${base.def}<filter id="neb" x="-60%" y="-60%" width="220%" height="220%"><feGaussianBlur stdDeviation="12"/></filter></defs>
+${base.disc}
+${nebulae}
+${stars}
+<circle cx="${GCX}" cy="${GCY}" r="84" fill="none" stroke="#d8dcf2" stroke-width="5" opacity="0.3" filter="url(#neb)"/>
+<circle cx="${GCX}" cy="${GCY}" r="84" fill="none" stroke="#d8dcf2" stroke-width="1.2" opacity="0.8"/>
+${rims}
+<circle cx="${GCX}" cy="${GCY}" r="10" fill="#15151f" stroke="#3a3a4e" stroke-width="1.2"/>
+</svg>
+`;
+}
+
+function buildKenteChamber() {
+  const base = discBase('body', [[0, '#bd6535'], [0.55, '#a85128'], [0.85, '#934723'], [1, '#7e3a1c']], 'stroke="#5e2a12" stroke-width="1.5"');
+  const creases = [[40, 150, 168, 60], [150, 36, 52, 158], [96, 20, 110, 180]]
+    .map(([x1, y1, x2, y2]) => `<path d="M${x1},${y1} Q${GCX},${GCY} ${x2},${y2}" stroke="#5e2a12" stroke-width="1" fill="none" opacity="0.15"/>`)
+    .join('');
+  // Eight-point compass star pressed into each chamber recess.
+  const starPts = Array.from({ length: 16 }, (_, k) => {
+    const r = k % 2 ? 6.5 : 14;
+    const a = ((k * 22.5 - 90) * Math.PI) / 180;
+    return `${(r * Math.cos(a)).toFixed(1)},${(r * Math.sin(a)).toFixed(1)}`;
+  }).join(' ');
+  const rims = eachHole((x, y, i) => `<circle cx="${x}" cy="${y}" r="24" fill="none" stroke="url(#gold)" stroke-width="3.5"/>
+<circle cx="${x}" cy="${y}" r="24" fill="none" stroke="#1c150d" stroke-width="1.2" stroke-dasharray="2.5 2.5" opacity="0.6"/>
+<circle cx="${x}" cy="${y}" r="20" fill="${i % 2 ? '#2f6b3a' : '#c08a2a'}"/>
+<g transform="translate(${x} ${y})"><polygon points="${starPts}" fill="none" stroke="#1c150d" stroke-width="1.3"/><circle r="5" fill="none" stroke="#1c150d" stroke-width="1"/></g>
+<circle cx="${x}" cy="${y}" r="20" fill="url(#holeShade)"/>`);
+  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200">
+<defs>${GOLD_GRAD}${base.def}${HOLE_SHADE}
+<radialGradient id="dome" cx="0.4" cy="0.34" r="0.75">
+  <stop offset="0" stop-color="#f2da9a"/><stop offset="0.55" stop-color="#c89a3e"/><stop offset="1" stop-color="#8a6420"/>
+</radialGradient></defs>
+${base.disc}
+${creases}
+<circle cx="${GCX}" cy="${GCY}" r="83" fill="none" stroke="#e2a92e" stroke-width="1" opacity="0.5"/>
+${rims}
+<circle cx="${GCX}" cy="${GCY}" r="12" fill="url(#dome)" stroke="#6b4f1e" stroke-width="1"/>
+<ellipse cx="96" cy="95.5" rx="4.5" ry="3" fill="#fff" opacity="0.35"/>
+</svg>
+`;
+}
+
+const CHAMBERS = [
+  ['chamber_noir.svg', buildNoirChamber],
+  ['chamber_crimson.svg', buildCrimsonChamber],
+  ['chamber_neon.svg', buildNeonChamber],
+  ['chamber_cosmos.svg', buildCosmosChamber],
+  ['chamber_kente.svg', buildKenteChamber],
+];
+
+for (const [out, build] of CHAMBERS) {
+  const svg = build();
+  writeFileSync(join(outDir, out), svg);
+  console.log(`${out}: ${(svg.length / 1024).toFixed(0)} KB`);
+}
