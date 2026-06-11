@@ -54,17 +54,16 @@ function xpForLevel(level) {
 const COSMETIC_SLOTS = ['gunSkin', 'cardBack', 'tableFelt'];
 
 const COSMETICS = [
-  // Gun / cylinder skins (the spin overlay's revolver). The noir / crimson /
-  // neon / kente / cosmos skins share an unlock level with their deck + felt
-  // counterparts — levelling unlocks the matching SET in one go.
+  // Gun / cylinder skins (the spin overlay's revolver): the original steel
+  // + the five owner-art identities, which share an unlock level with their
+  // deck + felt counterparts — levelling unlocks the matching SET in one go.
+  // (The interim brass/obsidian/gilded recolors were cut before ever
+  // shipping — no equipped rows can reference them.)
   { id: 'gun_steel', slot: 'gunSkin', label: 'Steel', unlockLevel: 1 },
   { id: 'gun_noir', slot: 'gunSkin', label: 'Noir', unlockLevel: 2 },
   { id: 'gun_crimson', slot: 'gunSkin', label: 'Crimson', unlockLevel: 3 },
-  { id: 'gun_brass', slot: 'gunSkin', label: 'Brass', unlockLevel: 4 },
   { id: 'gun_neon', slot: 'gunSkin', label: 'Neon', unlockLevel: 6 },
-  { id: 'gun_obsidian', slot: 'gunSkin', label: 'Obsidian', unlockLevel: 7 },
   { id: 'gun_kente', slot: 'gunSkin', label: 'Kente', unlockLevel: 9 },
-  { id: 'gun_gilded', slot: 'gunSkin', label: 'Gilded', unlockLevel: 10 },
   { id: 'gun_cosmos', slot: 'gunSkin', label: 'Cosmos', unlockLevel: 10 },
   // Deck skins — theme the card BACKS (deck / played pile / reveal / flights)
   // AND the player's own hand's card faces (frame + shape/number). Rendered

@@ -11,62 +11,55 @@
 // ─── Gun / cylinder skins (SpinOverlay) ───────────────────────
 // Keys mirror the hard-coded colors CylinderSVG used before #205;
 // `gun_steel` IS that original palette.
+// The locker is gun_steel (the original look, Lv1 default) + the five
+// owner-art identities — nothing else.
+//
+// Art skins: `art` is the owner's actual chamber artwork (traced vectors
+// rasterized by scripts/build-chamber-skins.mjs onto CylinderSVG's exact
+// disc geometry). It paints body, decorated rims, hole interiors and hub;
+// CylinderSVG draws only the live game state (bullets) ON TOP. `holes` are
+// the SIX measured centres of THIS artwork's painted holes (the art's holes
+// deviate slightly from a perfect ring — cosmetic-previews/table-previews/
+// measure3.mjs computes them) and `holeR` their radius, so the state
+// circles sit exactly in the paint. The flat fields stay as the decode-time
+// fallback.
 export const GUN_SKINS = {
   gun_steel: {
     body: '#111118', bodyStroke: '#2a2a35',
     chamber: '#0d0d18', chamberStroke: '#333',
     hub: '#222230', hubStroke: '#444',
   },
-  gun_brass: {
-    body: '#1d1607', bodyStroke: '#8a6a24',
-    chamber: '#171003', chamberStroke: '#9a7a2e',
-    hub: '#3a2c10', hubStroke: '#c89a3e',
-  },
-  gun_obsidian: {
-    body: '#0a0812', bodyStroke: '#4d3568',
-    chamber: '#0c0716', chamberStroke: '#5b3f86',
-    hub: '#1d1430', hubStroke: '#8a64c8',
-  },
-  gun_gilded: {
-    body: '#241a05', bodyStroke: '#c8922e',
-    chamber: '#1a1204', chamberStroke: '#e0b04f',
-    hub: '#4a3408', hubStroke: '#f0c860',
-  },
-  // The five owner-art identities (matching the deck skins + table felts).
-  // `art` is the owner's actual chamber artwork (traced vectors rasterized
-  // by scripts/build-chamber-skins.mjs onto CylinderSVG's exact disc
-  // geometry): it paints body, decorated rims, hole interiors and hub,
-  // while CylinderSVG keeps drawing the live game state (bullets, landing
-  // ring) ON TOP. `orbit`/`holeR` say where THIS artwork's holes actually
-  // sit (measured from the art; defaults 58/20) so the state circles land
-  // precisely in the painted holes. The flat fields stay as the decode-time
-  // fallback.
   gun_noir: {
-    art: '/cosmetics/chamber_noir.png', orbit: 57, holeR: 18,
+    art: '/cosmetics/chamber_noir.png', holeR: 18,
+    holes: [[100, 42.9], [150.6, 73], [150.6, 127.2], [99.9, 156.5], [50.1, 127.8], [49.9, 73]],
     body: '#0d0c11', bodyStroke: '#c8a35a',
     chamber: '#070609', chamberStroke: '#9a7438',
     hub: '#1d1a24', hubStroke: '#ecd28c',
   },
   gun_crimson: {
-    art: '/cosmetics/chamber_crimson.png', orbit: 58, holeR: 17.5,
+    art: '/cosmetics/chamber_crimson.png', holeR: 17.5,
+    holes: [[100.3, 41.7], [148.1, 69.1], [148, 129.7], [100, 157.5], [52.7, 130.5], [52.8, 67.9]],
     body: '#4c1320', bodyStroke: '#c4a060',
     chamber: '#1a060c', chamberStroke: '#9c7a40',
     hub: '#6b1e2c', hubStroke: '#e6cd8e',
   },
   gun_neon: {
-    art: '/cosmetics/chamber_neon.png', orbit: 56.5, holeR: 16.5,
+    art: '/cosmetics/chamber_neon.png', holeR: 16.5,
+    holes: [[100.4, 43.4], [147.6, 72.4], [147.1, 129.4], [100.2, 157], [53.2, 129.1], [53.1, 71.9]],
     body: '#141436', bodyStroke: '#45e6e6',
     chamber: '#0c0c26', chamberStroke: '#6a8af0',
     hub: '#1b1b42', hubStroke: '#e84dd0',
   },
   gun_kente: {
-    art: '/cosmetics/chamber_kente.png', orbit: 60.5, holeR: 16.5,
+    art: '/cosmetics/chamber_kente.png', holeR: 16.5,
+    holes: [[101.4, 37.5], [154, 69.8], [153, 125.5], [100.5, 158], [48, 125.3], [47.8, 67.5]],
     body: '#8d4220', bodyStroke: '#e2a92e',
     chamber: '#1c150d', chamberStroke: '#e2a92e',
     hub: '#2f6b3a', hubStroke: '#e2a92e',
   },
   gun_cosmos: {
-    art: '/cosmetics/chamber_cosmos.png', orbit: 48.5, holeR: 21,
+    art: '/cosmetics/chamber_cosmos.png', holeR: 21,
+    holes: [[100.3, 50.9], [143.8, 78], [144.5, 128.1], [99.7, 150.1], [56, 126.3], [57.5, 78.5]],
     body: '#0a0a14', bodyStroke: '#9a6ae8',
     chamber: '#06060c', chamberStroke: '#4a8ae0',
     hub: '#10101e', hubStroke: '#e88ad8',

@@ -67,7 +67,7 @@ describe('cosmetics catalog + equip validation', () => {
   it('unlock gating follows the level curve', () => {
     expect(isCosmeticUnlocked('felt_wine', 0)).toBe(false);   // needs level 2
     expect(isCosmeticUnlocked('felt_wine', 100)).toBe(true);  // level 2
-    expect(isCosmeticUnlocked('gun_gilded', 100)).toBe(false);
+    expect(isCosmeticUnlocked('gun_cosmos', 100)).toBe(false); // needs level 10
     expect(isCosmeticUnlocked('nope', 999999)).toBe(false);
   });
 

@@ -13,10 +13,10 @@ function CylinderSVG({ bulletChambers, bulletChambersAfter, eliminated, landingC
   // round come up). Once it stops, swap to the POST-spin chamber so any bullets
   // a survival just added (always +1, +2 under Hot Potato) visibly pop in (#238).
   const activeBullets = spinComplete && bulletChambersAfter ? bulletChambersAfter : bulletChambers;
-  // Art skins may override where their painted holes sit (orbit) and how
-  // wide they are (holeR), so the live state circles land exactly in the
-  // artwork's holes.
-  const orbit = skin.orbit || ORBIT;
+  // Art skins carry the SIX measured centres of their painted holes (the
+  // owner artwork's holes deviate slightly from a perfect ring — see
+  // cosmetic-previews/table-previews/measure3.mjs) plus their radius, so
+  // bullets sit exactly in the paint. Flat skins keep the exact ring.
   const holeR = skin.holeR || CHAM_R;
   const chambers = [0, 1, 2, 3, 4, 5].map((index) => {
     const angleRad = ((index * 60 - 90) * Math.PI) / 180;
@@ -24,12 +24,10 @@ function CylinderSVG({ bulletChambers, bulletChambersAfter, eliminated, landingC
     // bullet on an elimination — never contradicted by a freshly-added bullet.
     const isLanding = spinComplete && index === landingChamberIndex;
     const isBullet = isLanding ? !!eliminated : activeBullets.has(index);
-    return {
-      x: CX + orbit * Math.cos(angleRad),
-      y: CY + orbit * Math.sin(angleRad),
-      isBullet,
-      isLanding,
-    };
+    const [x, y] = skin.holes
+      ? skin.holes[index]
+      : [CX + ORBIT * Math.cos(angleRad), CY + ORBIT * Math.sin(angleRad)];
+    return { x, y, isBullet, isLanding };
   });
 
   return (
@@ -62,7 +60,11 @@ function CylinderSVG({ bulletChambers, bulletChambersAfter, eliminated, landingC
         {skin.art && <image href={skin.art} x={0} y={0} width={CYL} height={CYL} />}
         {chambers.map((chamber, index) => (
           <g key={index}>
-            {chamber.isLanding && (
+            {/* The landing highlight ring is a flat-skin affordance only —
+                on the art skins it fought the artwork (and read as a stray
+                green ring), so there the outcome is told by the pointer +
+                the landing slot's bullet/empty state alone. */}
+            {chamber.isLanding && !skin.art && (
               <circle
                 cx={chamber.x}
                 cy={chamber.y}
@@ -73,14 +75,20 @@ function CylinderSVG({ bulletChambers, bulletChambersAfter, eliminated, landingC
                 opacity={0.8}
               />
             )}
-            {(chamber.isBullet || chamber.isLanding || !skin.art) && (
+            {(chamber.isBullet || !skin.art) && (
               <circle
                 cx={chamber.x}
                 cy={chamber.y}
                 r={holeR}
-                fill={chamber.isBullet ? '#3a0808' : skin.art ? 'none' : skin.chamber}
-                stroke={chamber.isLanding ? (chamber.isBullet ? 'var(--accent2)' : 'var(--alive)') : skin.art ? 'none' : skin.chamberStroke}
-                strokeWidth={chamber.isLanding ? 2.5 : 1.5}
+                fill={chamber.isBullet ? '#3a0808' : skin.chamber}
+                // On art skins the bullet gets a faint warm rim: the round
+                // itself is near-black-on-black on the noir disc, and without
+                // the rim the sweep during the 8s spin is invisible (reported
+                // as "the cylinder doesn't spin").
+                stroke={skin.art
+                  ? 'rgba(240,228,200,0.45)'
+                  : chamber.isLanding ? (chamber.isBullet ? 'var(--accent2)' : 'var(--alive)') : skin.chamberStroke}
+                strokeWidth={skin.art ? 1.6 : chamber.isLanding ? 2.5 : 1.5}
               />
             )}
             {chamber.isBullet && (
