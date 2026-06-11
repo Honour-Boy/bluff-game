@@ -426,6 +426,60 @@ describe('bot turn driver — beats', () => {
     }
   });
 
+  it('full Mirror loop: bot challenges → human arms Mirror via the real handler → bot takes the reflected spin', async () => {
+    const room = makeTutorialRoom();
+    // Stage: human (previous player) LIED — square on a circle table — and
+    // still holds an un-armed Mirror. It's the bot's turn.
+    room.turnOrder = ['human', 'bot:1'];
+    room.currentTurnIndex = 1;
+    room.isFirstTurn = false;
+    room.prevTurnPlayerId = 'human';
+    const card = { id: 'c1', type: 'shape', shape: 'square', number: 3 };
+    room.lastPlayedCard = card;
+    room.challengeableCard = card;
+    room.challengeableCardType = 'circle';
+    room.playedPile = [card];
+    room.powerCardSlot = { human: [{ id: 'mr', type: 'power', power: 'mirror' }], 'bot:1': [] };
+    // Empty the bot's chamber so the reflected spin deterministically survives.
+    const bot = room.players.find((p) => p.id === 'bot:1');
+    bot.chamber = [null, null, null, null, null, null];
+    bot.riskLevel = 0;
+    await saveRoom(room);
+    const io = makeIo();
+
+    const rng = vi.spyOn(Math, 'random').mockReturnValue(0); // bluff roll fires
+    try {
+      await broadcastRoomState(io, room.code);
+      await vi.advanceTimersByTimeAsync(4100); // bot challenges → window opens
+      expect(room.phase).toBe('bluff_intercept_pending');
+      expect(room.pendingBluffIntercept.options).toEqual([{ cardId: 'mr', power: 'mirror' }]);
+
+      // The human defends through the REAL bluff_intercept socket handler.
+      const bluffHandler = require('../handlers/bluff.js');
+      const handlers = {};
+      bluffHandler.register(io, { id: 'host-sock', userId: 'human', on: (e, cb) => { handlers[e] = cb; } }, {
+        leaderboardRepo: { recordWinner: async () => ({}), recordGameStart: async () => ({}) },
+      });
+      const cb = vi.fn();
+      await handlers['bluff_intercept']({ roomCode: room.code, cardId: 'mr' }, cb);
+      expect(cb.mock.calls[0][0]).toMatchObject({ success: true, armed: 'mirror' });
+
+      // Mirror reflected the consequence onto the accuser — the BOT spins.
+      expect(room.pendingBluffIntercept).toBeNull();
+      expect(room.phase).toBe('spin_pending');
+      expect(room.spinTargetId).toBe('bot:1');
+
+      // …and the bot driver finishes the loop on its own (spin beat).
+      await vi.advanceTimersByTimeAsync(1600);
+      expect(room.lastAction.type).toBe('spin_result');
+      expect(room.lastAction.spinTargetId).toBe('bot:1');
+      expect(room.lastAction.eliminated).toBe(false);
+      expect(room.phase).toBe('playing');
+    } finally {
+      rng.mockRestore();
+    }
+  });
+
   it('still resolves the bot challenge directly when the human has no defence', async () => {
     const room = makeTutorialRoom();
     const humanHand = room.hands.get('human');
