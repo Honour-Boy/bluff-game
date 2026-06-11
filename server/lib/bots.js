@@ -502,15 +502,22 @@ async function _onBotActExpire(io, code, key) {
 
   if (action.kind === 'play') {
     // Open the turn by maybe CHALLENGING the previous player (once per turn,
-    // before playing a card). Mirrors the call_bluff handler: stamp the ledger
-    // flag, then run the shared resolver (which sets spin_pending + broadcasts).
-    // After it resolves (a spin lands on the bot or the human), the bot's turn
-    // continues on the next beat — bluffUsedThisTurn is now set, so it can't
-    // bluff again and will just play a card.
+    // before playing a card). Mirrors the call_bluff handler EXACTLY: stamp the
+    // ledger flag, give the accused their §1.1 interception window (the human
+    // gets the same "defend yourself" pop-up a human challenger would trigger —
+    // on arm/pass/timeout the shared machinery resolves and re-arms us), and
+    // only resolve directly when there's nothing to intercept with. After it
+    // resolves (a spin lands on the bot or the human), the bot's turn continues
+    // on the next beat — bluffUsedThisTurn is now set, so it can't bluff again
+    // and will just play a card.
     if (shouldCallBluff(room, action.botId)) {
       room.bluffUsedThisTurn = true;
       // Tutorial "≥2 calls per game" guarantee reads this counter (botStrategy).
       room.botBluffCallsThisGame = (room.botBluffCallsThisGame || 0) + 1;
+      const { maybeOpenBluffIntercept } = require('./orchestration');
+      if (await maybeOpenBluffIntercept(io, code, room, action.botId, NOOP_LEADERBOARD_REPO)) {
+        return; // window open — the accused (human) decides; we wait
+      }
       await _resolveOnlineBluff(io, code, room, action.botId, NOOP_LEADERBOARD_REPO);
       return;
     }

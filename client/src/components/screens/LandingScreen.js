@@ -6,6 +6,7 @@ const HowToPlayModal = lazy(() =>
   import('./HowToPlayModal').then((m) => ({ default: m.HowToPlayModal })),
 );
 import { ShapeIcon } from '../shared/ShapeIcon';
+import { useIsMobile } from '../../hooks/useIsMobile';
 
 // ─── Tavern sign icon — carved suit marks ────────────────────────────────────
 function SuitMark({ shape, delay = 0 }) {
@@ -66,7 +67,8 @@ export function LandingScreen({
   musicEnabled = true,
   onToggleMusic,
 }) {
-  const [mode, setMode] = useState(null);              // null | 'host' | 'join'
+  const [mode, setMode] = useState(null);              // null | 'play' | 'host' | 'join' | 'practice'
+  const isMobile = useIsMobile();
   const [showHowToPlay, setShowHowToPlay] = useState(false);
   const [roomCode, setRoomCode] = useState('');
   const [selectedGameMode, setSelectedGameMode] = useState(null);
@@ -120,8 +122,9 @@ export function LandingScreen({
     onCreateRoom(selectedGameMode);
   };
 
+  // Host/Join now live one level under "Play", so their backs return there.
   const handleBackFromHost = () => {
-    setMode(null);
+    setMode('play');
     setSelectedGameMode(null);
     setError(null);
   };
@@ -192,8 +195,10 @@ export function LandingScreen({
         className="fade-in tilt-panel"
         style={{ width: '100%', maxWidth: 480, position: 'relative', zIndex: 1 }}
       >
-        {/* Tavern sign - a carved board hung from chains, gently swaying */}
-        <div style={{ textAlign: 'center', marginBottom: 36, paddingTop: 20 }}>
+        {/* Tavern sign - a carved board hung from chains, gently swaying.
+            Mobile compresses the sign's air (and the title below) so the whole
+            landing fits one phone viewport with no scroll. */}
+        <div style={{ textAlign: 'center', marginBottom: isMobile ? 18 : 36, paddingTop: isMobile ? 6 : 20 }}>
           <div className="hanging-sign" style={{ display: 'inline-block', position: 'relative', maxWidth: '100%' }}>
             {/* Iron chains */}
             <div aria-hidden="true" style={{ position: 'absolute', top: -18, left: '20%', width: 2, height: 18, background: 'linear-gradient(180deg, var(--border-glow), var(--border))' }} />
@@ -214,7 +219,7 @@ export function LandingScreen({
                 className="candle-title"
                 style={{
                   fontFamily: "'Cinzel Decorative', 'Cinzel', serif",
-                  fontSize: 'clamp(56px, 16vw, 88px)',
+                  fontSize: isMobile ? 'clamp(42px, 13vw, 60px)' : 'clamp(56px, 16vw, 88px)',
                   color: 'var(--accent)',
                   lineHeight: 0.9,
                   letterSpacing: '0.08em',
@@ -239,7 +244,7 @@ export function LandingScreen({
             display: 'flex',
             justifyContent: 'center',
             gap: 14,
-            marginTop: 18,
+            marginTop: isMobile ? 12 : 18,
           }}>
             {['circle', 'square', 'triangle', 'cross', 'star'].map((shape, i) => (
               <SuitMark key={shape} shape={shape} delay={i * 0.07} />
@@ -250,7 +255,7 @@ export function LandingScreen({
         {/* Connection status - candlelight indicator */}
         <div style={{
           display: 'flex', alignItems: 'center', gap: 7, justifyContent: 'center',
-          marginBottom: 26,
+          marginBottom: isMobile ? 16 : 26,
           fontFamily: "'Cinzel', serif",
           fontSize: 9,
           letterSpacing: '0.18em',
@@ -285,7 +290,10 @@ export function LandingScreen({
         {/* ── Main menu ── */}
         {!mode && (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-            <PlaqueButton ember onClick={() => setMode('host')} disabled={!connected}>
+            {/* ONE "Play" entry — like Practice, it opens a choice (Open Game /
+                Join Game) instead of two separate landing buttons, so the
+                landing stays short enough to fit a phone screen unscrolled. */}
+            <PlaqueButton ember onClick={() => { setError(null); setMode('play'); }} disabled={!connected}>
               {/* Dice icon */}
               <svg width="15" height="15" viewBox="0 0 24 24" fill="none" aria-hidden="true">
                 <rect x="2" y="2" width="20" height="20" rx="4" stroke="currentColor" strokeWidth="1.8"/>
@@ -295,16 +303,7 @@ export function LandingScreen({
                 <circle cx="8" cy="16" r="1.5" fill="currentColor"/>
                 <circle cx="12" cy="12" r="1.5" fill="currentColor"/>
               </svg>
-              Open a Table (Host)
-            </PlaqueButton>
-
-            <PlaqueButton onClick={() => setMode('join')} disabled={!connected}>
-              {/* Door icon */}
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-                <rect x="3" y="2" width="18" height="20" rx="2" stroke="currentColor" strokeWidth="1.8"/>
-                <circle cx="15" cy="12" r="1.5" fill="currentColor"/>
-              </svg>
-              Enter a Room (Player)
+              Play
             </PlaqueButton>
 
             {/* Learn by playing - a solo practice table against a bot. ONE entry
@@ -336,7 +335,8 @@ export function LandingScreen({
                       letterSpacing: '0.1em', fontWeight: 700,
                     }}
                   >
-                    ✓
+                    {/* Mobile keeps the compact tick; larger screens spell it out. */}
+                    {isMobile ? '✓' : '✓ Completed'}
                   </span>
                 ) : tutorialHint ? (
                   <span
@@ -394,6 +394,100 @@ export function LandingScreen({
               </div>
             )}
 
+          </div>
+        )}
+
+        {/* ── Play: choose Open Game or Join Game ── */}
+        {mode === 'play' && (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+            <div style={{
+              fontFamily: "'Cinzel', serif",
+              fontSize: 9,
+              color: 'var(--text-dim)',
+              letterSpacing: '0.22em',
+              textTransform: 'uppercase',
+              marginBottom: 2,
+            }}>
+              Play with Others
+            </div>
+
+            <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
+              {[
+                {
+                  key: 'open',
+                  icon: (
+                    <svg width="28" height="28" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                      <rect x="2" y="2" width="20" height="20" rx="4" stroke="currentColor" strokeWidth="1.8"/>
+                      <circle cx="8" cy="8" r="1.5" fill="currentColor"/>
+                      <circle cx="16" cy="16" r="1.5" fill="currentColor"/>
+                      <circle cx="16" cy="8" r="1.5" fill="currentColor"/>
+                      <circle cx="8" cy="16" r="1.5" fill="currentColor"/>
+                      <circle cx="12" cy="12" r="1.5" fill="currentColor"/>
+                    </svg>
+                  ),
+                  title: 'Open Game',
+                  desc: 'Host a new table — physical or online — and invite the others with its room cipher.',
+                  onPick: () => { setError(null); setMode('host'); },
+                },
+                {
+                  key: 'join',
+                  icon: (
+                    <svg width="28" height="28" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                      <rect x="3" y="2" width="18" height="20" rx="2" stroke="currentColor" strokeWidth="1.8"/>
+                      <circle cx="15" cy="12" r="1.5" fill="currentColor"/>
+                    </svg>
+                  ),
+                  title: 'Join Game',
+                  desc: 'Got a room cipher from a host? Enter it and take your seat at their table.',
+                  onPick: () => { setError(null); setMode('join'); },
+                },
+              ].map(({ key, icon, title, desc, onPick }) => (
+                <div
+                  key={key}
+                  role="button"
+                  tabIndex={0}
+                  onClick={() => { if (connected) onPick(); }}
+                  onKeyDown={(e) => { if ((e.key === 'Enter' || e.key === ' ') && connected) onPick(); }}
+                  style={{
+                    flex: '1 1 180px',
+                    padding: '16px',
+                    background: 'linear-gradient(160deg, var(--surface2) 0%, var(--surface) 100%)',
+                    border: '2px solid var(--border-lit)',
+                    borderRadius: 'var(--radius)',
+                    cursor: connected ? 'pointer' : 'not-allowed',
+                    opacity: connected ? 0.92 : 0.5,
+                    transition: 'border-color 0.18s, background 0.18s, box-shadow 0.18s, opacity 0.18s',
+                    outline: 'none',
+                  }}
+                >
+                  <div style={{ color: 'var(--accent)', marginBottom: 8 }}>{icon}</div>
+                  <div style={{
+                    fontFamily: "'Cinzel', serif",
+                    fontSize: 16,
+                    color: 'var(--text)',
+                    marginBottom: 6,
+                  }}>
+                    {title}
+                  </div>
+                  <div style={{
+                    fontFamily: "'Crimson Text', serif",
+                    fontSize: 13,
+                    color: 'var(--text-dim)',
+                    lineHeight: 1.5,
+                  }}>
+                    {desc}
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            <button
+              type="button"
+              style={{ fontSize: 11 }}
+              onClick={() => { setMode(null); setError(null); }}
+            >
+              ← Back to the Bar
+            </button>
           </div>
         )}
 
@@ -722,7 +816,7 @@ export function LandingScreen({
               type="button"
               style={{ fontSize: 11 }}
               onClick={() => {
-                setMode(null);
+                setMode('play');
                 setError(null);
                 if (!initialJoinCode) {
                   setRoomCode('');
