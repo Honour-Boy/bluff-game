@@ -24,10 +24,15 @@ const SLOT_ORDER = [
 
 function FeltSwatch({ id }) {
   const felt = tableFeltFor(id);
+  // Art felts (frame SVG underlays) show their actual rim ornament; the
+  // CSS-only felts keep the plain colour-gradient ellipse.
+  const background = felt.frame
+    ? `url("${felt.frame}") center / 100% 100% no-repeat`
+    : `radial-gradient(ellipse at 50% 45%, ${felt.hi} 0%, ${felt.mid1} 40%, ${felt.mid2} 70%, ${felt.edge} 100%)`;
   return (
     <div style={{
       width: 52, height: 38, borderRadius: '50%',
-      background: `radial-gradient(ellipse at 50% 45%, ${felt.hi} 0%, ${felt.mid1} 40%, ${felt.mid2} 70%, ${felt.edge} 100%)`,
+      background,
       boxShadow: 'inset 0 0 10px rgba(0,0,0,0.55)',
       border: '2px solid rgba(120,80,40,0.6)',
     }} />
