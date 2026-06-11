@@ -13,6 +13,11 @@ function CylinderSVG({ bulletChambers, bulletChambersAfter, eliminated, landingC
   // round come up). Once it stops, swap to the POST-spin chamber so any bullets
   // a survival just added (always +1, +2 under Hot Potato) visibly pop in (#238).
   const activeBullets = spinComplete && bulletChambersAfter ? bulletChambersAfter : bulletChambers;
+  // Art skins may override where their painted holes sit (orbit) and how
+  // wide they are (holeR), so the live state circles land exactly in the
+  // artwork's holes.
+  const orbit = skin.orbit || ORBIT;
+  const holeR = skin.holeR || CHAM_R;
   const chambers = [0, 1, 2, 3, 4, 5].map((index) => {
     const angleRad = ((index * 60 - 90) * Math.PI) / 180;
     // The landing slot always reflects the actual outcome: empty on a survival,
@@ -20,8 +25,8 @@ function CylinderSVG({ bulletChambers, bulletChambersAfter, eliminated, landingC
     const isLanding = spinComplete && index === landingChamberIndex;
     const isBullet = isLanding ? !!eliminated : activeBullets.has(index);
     return {
-      x: CX + ORBIT * Math.cos(angleRad),
-      y: CY + ORBIT * Math.sin(angleRad),
+      x: CX + orbit * Math.cos(angleRad),
+      y: CY + orbit * Math.sin(angleRad),
       isBullet,
       isLanding,
     };
@@ -61,7 +66,7 @@ function CylinderSVG({ bulletChambers, bulletChambersAfter, eliminated, landingC
               <circle
                 cx={chamber.x}
                 cy={chamber.y}
-                r={CHAM_R + 5}
+                r={holeR + 5}
                 fill="none"
                 stroke={chamber.isBullet ? 'var(--accent2)' : 'var(--alive)'}
                 strokeWidth={3}
@@ -72,7 +77,7 @@ function CylinderSVG({ bulletChambers, bulletChambersAfter, eliminated, landingC
               <circle
                 cx={chamber.x}
                 cy={chamber.y}
-                r={CHAM_R}
+                r={holeR}
                 fill={chamber.isBullet ? '#3a0808' : skin.art ? 'none' : skin.chamber}
                 stroke={chamber.isLanding ? (chamber.isBullet ? 'var(--accent2)' : 'var(--alive)') : skin.art ? 'none' : skin.chamberStroke}
                 strokeWidth={chamber.isLanding ? 2.5 : 1.5}
@@ -82,7 +87,7 @@ function CylinderSVG({ bulletChambers, bulletChambersAfter, eliminated, landingC
               <circle
                 cx={chamber.x}
                 cy={chamber.y}
-                r={CHAM_R * 0.42}
+                r={holeR * 0.42}
                 fill={chamber.isLanding ? '#ff3344' : '#882222'}
               />
             )}
