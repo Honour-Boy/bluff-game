@@ -120,6 +120,24 @@ function validateEquipped(equipped, xp) {
   return out;
 }
 
+// What a VIEWER gets to see of another player's equipped cosmetics: a
+// cosmetic is only visible to viewers who have reached its unlock level
+// themselves — below that they see the slot default. (The owner always
+// sees their own equips in full; serializeRoom skips this for self.)
+// Guests / unseated viewers pass level 1 and see defaults only.
+function filterVisibleCosmetics(equipped, viewerLevel) {
+  if (!equipped || typeof equipped !== 'object') return equipped || null;
+  const level = Math.max(1, Math.floor(viewerLevel) || 1);
+  const out = { ...DEFAULT_COSMETICS };
+  for (const slot of COSMETIC_SLOTS) {
+    const item = typeof equipped[slot] === 'string' ? _catalogById.get(equipped[slot]) : null;
+    if (item && item.slot === slot && item.unlockLevel <= level) {
+      out[slot] = item.id;
+    }
+  }
+  return out;
+}
+
 // ─── Per-game stat tracking ───────────────────────────────────
 //
 // startGame calls initGameStats; the trackers below are invoked from the
@@ -225,6 +243,7 @@ module.exports = {
   DEFAULT_COSMETICS,
   isCosmeticUnlocked,
   validateEquipped,
+  filterVisibleCosmetics,
   initGameStats,
   trackCardPlayed,
   trackSpinOutcome,

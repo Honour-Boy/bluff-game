@@ -186,6 +186,7 @@ module.exports = {
   DEFAULT_COSMETICS: progression.DEFAULT_COSMETICS,
   isCosmeticUnlocked: progression.isCosmeticUnlocked,
   validateEquipped: progression.validateEquipped,
+  filterVisibleCosmetics: progression.filterVisibleCosmetics,
   initGameStats: progression.initGameStats,
   trackCardPlayed: progression.trackCardPlayed,
   trackSpinOutcome: progression.trackSpinOutcome,

@@ -121,15 +121,20 @@ async function maybeAwardGameXp(io, room, leaderboardRepo) {
   return awards;
 }
 
-// #205 — look up a (signed-in) player's validated equipped cosmetics so the
-// join/create handlers can stamp them onto the seated player object.
+// #205 — look up a (signed-in) player's validated equipped cosmetics + level
+// so the join/create handlers can stamp them onto the seated player object.
+// The level doubles as the VIEWER gate in serializeRoom: a player only sees
+// other players' cosmetics they have reached themselves.
 // Best-effort: any failure just means default cosmetics.
 async function fetchEquippedCosmetics(leaderboardRepo, userId) {
   if (!isPersistentUserId(userId)) return null;
   if (typeof leaderboardRepo?.getProgression !== 'function') return null;
   try {
     const row = await leaderboardRepo.getProgression(userId);
-    return engine.validateEquipped(row.equipped, row.xp);
+    return {
+      equipped: engine.validateEquipped(row.equipped, row.xp),
+      level: engine.levelForXp(row.xp),
+    };
   } catch (err) {
     console.error('[progression] failed to fetch cosmetics for', userId, err);
     return null;
@@ -144,15 +149,16 @@ async function fetchEquippedCosmetics(leaderboardRepo, userId) {
 // also feeds — same cycle-avoidance trick as lib/bots.js.
 function stampCosmeticsInBackground(io, leaderboardRepo, roomCode, player) {
   fetchEquippedCosmetics(leaderboardRepo, player.id)
-    .then(async (cosmetics) => {
-      if (!cosmetics) return;
+    .then(async (result) => {
+      if (!result) return;
       const { getRoom, saveRoom } = require('./state');
       const { broadcastRoomState } = require('./broadcast');
       const room = await getRoom(roomCode);
       if (!room) return;
       const seated = room.players.find(p => p.id === player.id);
       if (!seated) return;
-      seated.cosmetics = cosmetics;
+      seated.cosmetics = result.equipped;
+      seated.cosmeticsLevel = result.level;
       await saveRoom(room);
       await broadcastRoomState(io, roomCode);
     })
