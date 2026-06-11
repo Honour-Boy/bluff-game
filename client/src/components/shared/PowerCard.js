@@ -140,8 +140,12 @@ export function PowerCard({ type, size = "md", style }) {
         width: s.w,
         height: s.h,
         position: "relative",
+        // #205 — wears the equipped deck skin when a frame skin sets
+        // --cardface-bg (in-game contexts); the near-black gradient is the
+        // default look everywhere else (landing, how-to-play, pickers).
         background:
-          "linear-gradient(160deg, #0d0d10 0%, #08080a 55%, #050507 100%)",
+          "var(--cardface-bg, linear-gradient(160deg, #0d0d10 0%, #08080a 55%, #050507 100%))",
+        backgroundSize: "100% 100%",
         border: `2px solid ${meta.color}`,
         borderRadius: s.radius,
         padding: s.pad,
@@ -226,7 +230,8 @@ export function PowerCard({ type, size = "md", style }) {
             textTransform: "uppercase",
             textAlign: "center",
             lineHeight: 1,
-            textShadow: `0 0 8px ${meta.color}aa`,
+            // Dark drop under the glow — legible over bright skin fields.
+            textShadow: `0 0 8px ${meta.color}aa, 0 1px 2px rgba(0,0,0,0.85)`,
           }}
         >
           {meta.label}

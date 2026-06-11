@@ -1,5 +1,5 @@
-// ============================================================
-// #205 — Game-over XP award funnel + progression socket handlers
+﻿// ============================================================
+// #205 â€” Game-over XP award funnel + progression socket handlers
 // ============================================================
 // maybeAwardGameXp rides maybeRecordGroupWinner (every game_over path), so a
 // finished online game persists XP per human and emits a private `xp_awarded`
@@ -72,7 +72,7 @@ function finishedRoom({ loserId = U2 } = {}) {
 beforeEach(() => { rooms.clear(); });
 afterEach(() => { vi.clearAllMocks(); });
 
-describe('#205 — maybeAwardGameXp', () => {
+describe('#205 â€” maybeAwardGameXp', () => {
   it('persists XP per signed-in human and emits a private xp_awarded to each', async () => {
     const io = makeIo();
     const repo = makeRepo();
@@ -107,7 +107,7 @@ describe('#205 — maybeAwardGameXp', () => {
   it('rides maybeRecordGroupWinner so every game-over site awards XP', async () => {
     const io = makeIo();
     const repo = makeRepo();
-    const room = finishedRoom(); // ad-hoc (no groupId) — winner recording no-ops
+    const room = finishedRoom(); // ad-hoc (no groupId) â€” winner recording no-ops
     await maybeRecordGroupWinner(io, room, repo);
     expect(repo.addXp).toHaveBeenCalledTimes(2);
     expect(repo.recordWinner).not.toHaveBeenCalled();
@@ -128,7 +128,7 @@ describe('#205 — maybeAwardGameXp', () => {
 
   it('flags newly-crossed unlock tiers on a level-up', async () => {
     const io = makeIo();
-    // 90 existing XP: any gain ≥10 crosses into level 2 (felt_wine unlocks).
+    // 90 existing XP: any gain â‰¥10 crosses into level 2 (felt_noir unlocks).
     const repo = makeRepo({
       addXp: vi.fn().mockImplementation(async (userId, amount) => ({
         userId, xp: 90 + amount, gamesPlayed: 2, equipped: {},
@@ -140,7 +140,7 @@ describe('#205 — maybeAwardGameXp', () => {
 
     const winnerEvt = io.log.find((e) => e.event === 'xp_awarded' && e.to === 'sock-1');
     expect(winnerEvt.payload.leveledUp).toBe(true);
-    expect(winnerEvt.payload.unlocked.map((u) => u.id)).toContain('felt_wine');
+    expect(winnerEvt.payload.unlocked.map((u) => u.id)).toContain('felt_noir');
   });
 
   it('stays inert for tutorial rooms, physical mode, solo tables, and legacy repos', async () => {
@@ -167,7 +167,7 @@ describe('#205 — maybeAwardGameXp', () => {
   });
 });
 
-describe('#205 — progression handlers', () => {
+describe('#205 â€” progression handlers', () => {
   function captureHandlers(io, socket, repo) {
     const handlers = {};
     socket.on = (evt, cb) => { handlers[evt] = cb; };
@@ -179,7 +179,7 @@ describe('#205 — progression handlers', () => {
     const repo = makeRepo({
       getProgression: vi.fn().mockResolvedValue({
         xp: 150, gamesPlayed: 3,
-        equipped: { tableFelt: 'felt_wine', cardBack: 'back_kente' }, // kente needs L9
+        equipped: { tableFelt: 'felt_noir', cardBack: 'back_kente' }, // kente needs L9
       }),
     });
     const handlers = captureHandlers(makeIo(), { id: 'sock-1', userId: U1, isGuest: false }, repo);
@@ -190,8 +190,8 @@ describe('#205 — progression handlers', () => {
     const res = cb.mock.calls[0][0];
     expect(res.success).toBe(true);
     expect(res.progression.level).toBe(2);
-    expect(res.progression.equipped.tableFelt).toBe('felt_wine');
-    expect(res.progression.equipped.cardBack).toBe(DEFAULT_COSMETICS.cardBack); // locked → default
+    expect(res.progression.equipped.tableFelt).toBe('felt_noir');
+    expect(res.progression.equipped.cardBack).toBe(DEFAULT_COSMETICS.cardBack); // locked â†’ default
     expect(Array.isArray(res.progression.catalog)).toBe(true);
   });
 
@@ -223,13 +223,13 @@ describe('#205 — progression handlers', () => {
     const handlers = captureHandlers(io, { id: 'sock-1', userId: U1, isGuest: false }, repo);
     const cb = vi.fn();
     await handlers['set_cosmetics']({
-      equipped: { tableFelt: 'felt_wine', gunSkin: 'gun_cosmos' }, // cosmos needs L10
+      equipped: { tableFelt: 'felt_noir', gunSkin: 'gun_cosmos' }, // cosmos needs L10
     }, cb);
 
     const res = cb.mock.calls[0][0];
     expect(res.success).toBe(true);
-    expect(res.equipped.tableFelt).toBe('felt_wine');
-    expect(res.equipped.gunSkin).toBe(DEFAULT_COSMETICS.gunSkin); // locked → default
+    expect(res.equipped.tableFelt).toBe('felt_noir');
+    expect(res.equipped.gunSkin).toBe(DEFAULT_COSMETICS.gunSkin); // locked â†’ default
     expect(repo.setEquippedCosmetics).toHaveBeenCalledWith(U1, res.equipped);
     expect(room.players[0].cosmetics).toEqual(res.equipped);
   });
@@ -238,7 +238,7 @@ describe('#205 — progression handlers', () => {
     const repo = makeRepo();
     const handlers = captureHandlers(makeIo(), { id: 'sock-g', userId: GUEST, isGuest: true }, repo);
     const cb = vi.fn();
-    await handlers['set_cosmetics']({ equipped: { tableFelt: 'felt_wine' } }, cb);
+    await handlers['set_cosmetics']({ equipped: { tableFelt: 'felt_noir' } }, cb);
     expect(cb.mock.calls[0][0].success).toBe(false);
     expect(repo.setEquippedCosmetics).not.toHaveBeenCalled();
   });

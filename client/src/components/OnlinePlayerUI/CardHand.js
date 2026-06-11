@@ -102,15 +102,16 @@ function renderOneCard({
       className={isJustPlayed ? 'card-play-physics' : undefined}
       style={outerStyle}
     >
-      {/* Card face — shape faces follow the equipped deck skin (#205): a frame
-          skin's art ships via --cardface-bg with the shape/number overlaid in
-          its empty centre. Power cards keep their own dedicated look. */}
+      {/* Card face — ALL faces follow the equipped deck skin (#205): a frame
+          skin's art ships via --cardface-bg with the shape/number (or power
+          icon/label) overlaid in its empty centre. Each fallback is the card
+          type's original dedicated gradient. */}
       <div
         style={{
           width: '100%',
           height: '100%',
           background: isPower
-            ? 'linear-gradient(160deg, #1a0e08 0%, #0d0805 55%, #090503 100%)'
+            ? 'var(--cardface-bg, linear-gradient(160deg, #1a0e08 0%, #0d0805 55%, #090503 100%))'
             : 'var(--cardface-bg, linear-gradient(160deg, #221a12 0%, #16110b 55%, #0f0b07 100%))',
           backgroundSize: '100% 100%',
           border: `2px solid ${borderColor}`,
@@ -154,7 +155,9 @@ function renderOneCard({
               letterSpacing: '0.1em',
               color: powerColor,
               textTransform: 'uppercase',
-              textShadow: `0 0 7px ${powerColor}88`,
+              // Dark drop under the glow keeps the label readable over a
+              // bright deck-skin field (kente).
+              textShadow: `0 0 7px ${powerColor}88, 0 1px 2px rgba(0,0,0,0.85)`,
               lineHeight: 1,
               textAlign: 'center',
               padding: '0 2px',
@@ -173,10 +176,13 @@ function renderOneCard({
               fontFamily: "'Cinzel', serif",
               fontSize: 11,
               fontWeight: 700,
-              color: isWhot ? 'var(--accent)' : 'var(--text-mid)',
+              // Bright-field skins (kente) set --cardface-ink dark so the
+              // number stays legible; dark skins fall back to light text.
+              color: isWhot
+                ? 'var(--cardface-ink, var(--accent))'
+                : 'var(--cardface-ink, var(--text-mid))',
               letterSpacing: '0.06em',
-              // Legible over any deck-skin field (light kente, dark noir…).
-              textShadow: '0 1px 2px rgba(0,0,0,0.65)',
+              textShadow: '0 1px 2px rgba(0,0,0,0.45)',
             }}>
               {isWhot ? 'WHOT' : card.number}
             </div>

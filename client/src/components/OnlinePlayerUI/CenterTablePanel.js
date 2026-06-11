@@ -230,7 +230,10 @@ export function CenterTablePanel({
               className="focal-breathe"
               style={{
                 padding: '12px 14px',
-                background: 'radial-gradient(ellipse at 50% 35%, rgba(45,34,18,0.95) 0%, rgba(18,13,8,0.95) 100%)',
+                // #205 — the Required focal card follows the equipped deck
+                // skin's face art; fallback = the original radial face.
+                background: 'var(--cardface-bg, radial-gradient(ellipse at 50% 35%, rgba(45,34,18,0.95) 0%, rgba(18,13,8,0.95) 100%))',
+                backgroundSize: '100% 100%',
                 border: '2px solid var(--accent)',
                 borderRadius: 8,
               }}
@@ -347,7 +350,10 @@ export function CenterTablePanel({
               </div>
               <div style={{
                 padding: '11px 13px',
-                background: 'radial-gradient(ellipse at 50% 35%, rgba(45,34,18,0.95) 0%, rgba(18,13,8,0.95) 100%)',
+                // #205 — themed like the Required focal card above so the
+                // bluff-reveal pair matches the equipped deck skin.
+                background: 'var(--cardface-bg, radial-gradient(ellipse at 50% 35%, rgba(45,34,18,0.95) 0%, rgba(18,13,8,0.95) 100%))',
+                backgroundSize: '100% 100%',
                 border: '2px solid var(--accent)',
                 borderRadius: 8,
               }}>

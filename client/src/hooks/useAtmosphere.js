@@ -16,8 +16,9 @@ import { useCallback, useEffect, useRef, useSyncExternalStore } from 'react';
 //   stopSpinAudio()                     — cancels all pending click timeouts (early
 //                                         dismiss / unmount cleanup).
 //
-// Audio is synthesised entirely via Web Audio API — no asset files required.
-// Silently no-ops when AudioContext is unavailable.
+// Audio is synthesised via Web Audio API, except the lethal-hit gunshot which
+// plays the recorded sample in public/audio/gunshot.mp3 (synth fallback while
+// it loads). Silently no-ops when AudioContext is unavailable.
 
 // ─── Web Audio context ────────────────────────────────────────────────────────
 function getCtx() {
@@ -256,10 +257,44 @@ function playEliminateSound(ctx) {
   fall.start(now + 0.5); fall.stop(now + 1.55);
 }
 
-// Gunshot — (Module 8.2) a high-impact crack + low boom, fired when a spin lands
-// on a live round (lethal bullet hit). Sharp filtered-noise crack over a fast
-// descending boom body, then a short tail.
+// ─── Recorded gunshot sample ─────────────────────────────────────────────────
+// The lethal-hit cue plays the real recording (public/audio/gunshot.mp3)
+// through the master bus. Fetched + decoded once, lazily — kicked off by the
+// first triggerAudio call of the session so it's ready long before any spin
+// can land on a live round. The synth below stays as the fallback so the cue
+// can never be silent (decode still in flight, fetch failed, offline…).
+let _gunshotBuf = null;
+let _gunshotLoading = false;
+function _loadGunshotSample(ctx) {
+  if (_gunshotBuf || _gunshotLoading || typeof fetch === 'undefined') return;
+  _gunshotLoading = true;
+  fetch('/audio/gunshot.mp3')
+    .then((r) => (r.ok ? r.arrayBuffer() : Promise.reject(new Error(r.status))))
+    .then((ab) => ctx.decodeAudioData(ab))
+    .then((buf) => { _gunshotBuf = buf; })
+    .catch(() => { _gunshotLoading = false; }); // allow a retry next cue
+}
+
 function playGunshot(ctx) {
+  resume(ctx);
+  if (_gunshotBuf) {
+    const src = ctx.createBufferSource();
+    src.buffer = _gunshotBuf;
+    const g = ctx.createGain();
+    g.gain.value = 0.9; // recorded shot is hot — sit it just under the synth peaks
+    src.connect(g); g.connect(masterOut(ctx));
+    src.start(ctx.currentTime);
+    return;
+  }
+  _loadGunshotSample(ctx);
+  playGunshotSynth(ctx);
+}
+
+// Synth gunshot (fallback) — a high-impact crack + low boom, fired when a spin
+// lands on a live round (lethal bullet hit) and the recorded sample isn't
+// decoded yet. Sharp filtered-noise crack over a fast descending boom body,
+// then a short tail.
+function playGunshotSynth(ctx) {
   resume(ctx);
   const now = ctx.currentTime;
   const out = masterOut(ctx);
@@ -872,6 +907,9 @@ export function useAtmosphere(wrapperRef) {
   const triggerAudio = useCallback((kind) => {
     const ctx = getCtx();
     if (!ctx) return;
+    // Warm the recorded gunshot on the session's first cue (no-op once loaded)
+    // so a later lethal hit plays the sample, not the synth fallback.
+    _loadGunshotSample(ctx);
     const fn = AUDIO_MAP[kind];
     if (fn) {
       // Duck the ambience bed under the cue, then let it swell back.

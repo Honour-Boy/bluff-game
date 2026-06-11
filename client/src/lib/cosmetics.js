@@ -79,14 +79,19 @@ export const GUN_SKINS = {
 // art by client/scripts/build-cosmetic-decks.mjs, in public/cosmetics) that
 // paints BOTH the face-down backs and, with the shape + number overlaid in
 // its empty centre, this player's own hand cards. `accent` colours the
-// filigree/glow accents wherever the skin shows.
+// filigree/glow accents wherever the skin shows. `ink` (optional) overrides
+// the number/label text colour on the FACE — set it dark for skins with a
+// BRIGHT field (kente) where the default light text would wash out.
+// Perf: `frame` points at PNG rasters (scripts/build-deck-rasters.mjs), not
+// the source SVGs — painting the vector art on every card re-rasterized it
+// per element size and made the table lag (worst on the heavy kente trace).
 export const CARD_BACKS = {
   back_leather: { a: '#1e1410', b: '#120d09', c: '#1a1108', accent: 'var(--accent)' },
-  back_noir: { frame: '/cosmetics/deck_noir.svg', field: '#0c0b0f', accent: '#c8a35a' },
-  back_crimson: { frame: '/cosmetics/deck_crimson.svg', field: '#691d2b', accent: '#c4a060' },
-  back_neon: { frame: '/cosmetics/deck_neon.svg', field: '#141436', accent: '#45e6e6' },
-  back_kente: { frame: '/cosmetics/deck_kente.svg', field: '#aa5229', accent: '#e2a92e' },
-  back_cosmos: { frame: '/cosmetics/deck_cosmos.svg', field: '#060609', accent: '#9a6ae8' },
+  back_noir: { frame: '/cosmetics/deck_noir.png', field: '#0c0b0f', accent: '#c8a35a' },
+  back_crimson: { frame: '/cosmetics/deck_crimson.png', field: '#691d2b', accent: '#c4a060' },
+  back_neon: { frame: '/cosmetics/deck_neon.png', field: '#141436', accent: '#45e6e6' },
+  back_kente: { frame: '/cosmetics/deck_kente.png', field: '#aa5229', accent: '#e2a92e', ink: '#190f06' },
+  back_cosmos: { frame: '/cosmetics/deck_cosmos.png', field: '#060609', accent: '#9a6ae8' },
 };
 
 // ─── Table felts (the oval's cloth) ───────────────────────────
@@ -98,9 +103,6 @@ export const CARD_BACKS = {
 // image decodes (and feeds any colour-only consumers like swatches).
 export const TABLE_FELTS = {
   felt_emerald: { hi: '#2f5e3f', mid1: '#245132', mid2: '#18391f', low: '#0e2415', edge: '#0a1a10' },
-  felt_wine: { hi: '#5e2f3a', mid1: '#51242f', mid2: '#391820', low: '#240e13', edge: '#1a0a0d' },
-  felt_midnight: { hi: '#2f3f5e', mid1: '#243251', mid2: '#182339', low: '#0e1524', edge: '#0a0f1a' },
-  felt_ocean: { hi: '#2f5e58', mid1: '#245149', mid2: '#183934', low: '#0e2420', edge: '#0a1a17' },
   felt_noir: { frame: '/cosmetics/felt_noir.svg', hi: '#211d29', mid1: '#14121a', mid2: '#0e0d13', low: '#0b0a0f', edge: '#07060a' },
   felt_crimson: { frame: '/cosmetics/felt_crimson.svg', hi: '#8a2a3c', mid1: '#6b1e2c', mid2: '#581826', low: '#4c1320', edge: '#3a0d18' },
   felt_neon: { frame: '/cosmetics/felt_neon.svg', hi: '#20204c', mid1: '#17173c', mid2: '#131336', low: '#101030', edge: '#0c0c26' },
@@ -157,6 +159,9 @@ export function cosmeticStyleVars(equipped) {
     vars['--cardback-bg'] = `url("${back.frame}")`;
     vars['--cardface-bg'] = `url("${back.frame}")`;
     vars['--cardback-filigree-opacity'] = '0';
+    // Bright-field skins (kente) carry a dark ink so face text stays legible;
+    // dark skins leave it unset and the per-surface light fallbacks apply.
+    if (back.ink) vars['--cardface-ink'] = back.ink;
   } else {
     vars['--cardback-a'] = back.a;
     vars['--cardback-b'] = back.b;

@@ -280,6 +280,7 @@ export function OnlinePlayerUI({
   const playedReshuffleRef = useRef(null);
   const prevSpinDataRef = useRef(null);
   const reshuffleDelayRef = useRef(null);
+  const awaitingTurnAckReshuffleRef = useRef(false);
 
   const playReshuffleAnimation = useCallback(() => {
     if (typeof document === 'undefined' || !launchCardFlight) return;
@@ -319,6 +320,29 @@ export function OnlinePlayerUI({
     setTimeout(() => setReshuffling(false), phase2 + n * 55 + 320);
   }, [launchCardFlight, roomState?.myHand]);
 
+  // Gate keeper for both reshuffle paths: the flight animation plays ONLY for
+  // the player whose turn it now is, and never under the "YOUR TURN" notice —
+  // if the notice is still up (it always is right after the turn flips), hold
+  // the animation until the player taps OK, then play. Coached tutorial rooms
+  // suppress the notice entirely, so they play immediately.
+  const requestReshuffleAnimation = useCallback(() => {
+    if (!isMyTurn) return; // bystanders just get the silently refreshed fan
+    if (ui.showTurnModal && !coachingActive(roomState)) {
+      awaitingTurnAckReshuffleRef.current = true;
+      return;
+    }
+    playReshuffleAnimation();
+  }, [isMyTurn, ui.showTurnModal, roomState, playReshuffleAnimation]);
+
+  // Release: the held reshuffle plays once the turn notice is acknowledged.
+  useEffect(() => {
+    if (!ui.showTurnModal && awaitingTurnAckReshuffleRef.current) {
+      awaitingTurnAckReshuffleRef.current = false;
+      clearTimeout(reshuffleDelayRef.current);
+      reshuffleDelayRef.current = setTimeout(() => playReshuffleAnimation(), 250);
+    }
+  }, [ui.showTurnModal, playReshuffleAnimation]);
+
   // Overlay-close watcher (spin path). When the spin overlay goes non-null →
   // null and a reshuffle is queued, play it after a short settle.
   useEffect(() => {
@@ -329,9 +353,9 @@ export function OnlinePlayerUI({
       pendingReshuffleRef.current = null;
       playedReshuffleRef.current = la;
       clearTimeout(reshuffleDelayRef.current);
-      reshuffleDelayRef.current = setTimeout(() => playReshuffleAnimation(), 250);
+      reshuffleDelayRef.current = setTimeout(() => requestReshuffleAnimation(), 250);
     }
-  }, [ui.spinData, playReshuffleAnimation]);
+  }, [ui.spinData, requestReshuffleAnimation]);
 
   // No-spin path (shield block / assassin backfire): the reshuffle arrives on a
   // non-spin lastAction with no overlay, so play it on arrival. Guarded by the
@@ -343,8 +367,8 @@ export function OnlinePlayerUI({
     if (ui.spinData) return;                  // wait for any overlay to clear
     if (playedReshuffleRef.current === la) return;
     playedReshuffleRef.current = la;
-    playReshuffleAnimation();
-  }, [roomState?.lastAction, ui.spinData, playReshuffleAnimation]);
+    requestReshuffleAnimation();
+  }, [roomState?.lastAction, ui.spinData, requestReshuffleAnimation]);
 
   // Clear the pending-reshuffle delay timer on unmount.
   useEffect(() => () => clearTimeout(reshuffleDelayRef.current), []);
@@ -651,7 +675,12 @@ export function OnlinePlayerUI({
   // #205 — cosmetics. The viewer's OWN felt + card back theme the table via CSS
   // custom properties on this root (defaults in the CSS keep the original look);
   // the spin overlay paints the SPINNER's gun skin so everyone sees their iron.
-  const myCosmeticVars = cosmeticStyleVars(myPlayer?.cosmetics);
+  // Memoized: this component re-renders constantly (timers, spin frames) and a
+  // fresh vars object would make React re-diff the whole root style each time.
+  const myCosmeticVars = useMemo(
+    () => cosmeticStyleVars(myPlayer?.cosmetics),
+    [myPlayer?.cosmetics],
+  );
   const spinGunSkinId = ui.spinData
     ? (players?.find((p) => p.id === ui.spinData.spinTargetId)?.cosmetics?.gunSkin || null)
     : null;

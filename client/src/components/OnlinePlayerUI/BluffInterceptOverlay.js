@@ -33,7 +33,9 @@ function ArmCardButton({ option, busy, onArm, glow = false }) {
         gap: 8,
         width: 104,
         height: 150,
-        background: 'linear-gradient(160deg, #0d0d10 0%, #08080a 55%, #050507 100%)',
+        // #205 — the defence cards wear the player's equipped deck skin.
+        background: 'var(--cardface-bg, linear-gradient(160deg, #0d0d10 0%, #08080a 55%, #050507 100%))',
+        backgroundSize: '100% 100%',
         // Tutorial: a thick high-visibility border + pulsing glow isolates exactly
         // where to tap to defend (Module 4 Step E).
         border: `${glow ? 3 : 2}px solid ${meta.color}`,
