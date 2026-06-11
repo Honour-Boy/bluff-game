@@ -13,18 +13,21 @@ function CylinderSVG({ bulletChambers, bulletChambersAfter, eliminated, landingC
   // round come up). Once it stops, swap to the POST-spin chamber so any bullets
   // a survival just added (always +1, +2 under Hot Potato) visibly pop in (#238).
   const activeBullets = spinComplete && bulletChambersAfter ? bulletChambersAfter : bulletChambers;
+  // Art skins carry the SIX measured centres of their painted holes (the
+  // owner artwork's holes deviate slightly from a perfect ring — see
+  // cosmetic-previews/table-previews/measure3.mjs) plus their radius, so
+  // bullets sit exactly in the paint. Flat skins keep the exact ring.
+  const holeR = skin.holeR || CHAM_R;
   const chambers = [0, 1, 2, 3, 4, 5].map((index) => {
     const angleRad = ((index * 60 - 90) * Math.PI) / 180;
     // The landing slot always reflects the actual outcome: empty on a survival,
     // bullet on an elimination — never contradicted by a freshly-added bullet.
     const isLanding = spinComplete && index === landingChamberIndex;
     const isBullet = isLanding ? !!eliminated : activeBullets.has(index);
-    return {
-      x: CX + ORBIT * Math.cos(angleRad),
-      y: CY + ORBIT * Math.sin(angleRad),
-      isBullet,
-      isLanding,
-    };
+    const [x, y] = skin.holes
+      ? skin.holes[index]
+      : [CX + ORBIT * Math.cos(angleRad), CY + ORBIT * Math.sin(angleRad)];
+    return { x, y, isBullet, isLanding };
   });
 
   return (
@@ -47,39 +50,62 @@ function CylinderSVG({ bulletChambers, bulletChambersAfter, eliminated, landingC
           transition: animating ? 'transform 8s cubic-bezier(0.1, 0, 0.15, 1)' : 'none',
         }}
       >
+        {/* Art skins paint the whole disc (body, decorated rims, hole
+            interiors, hub) via a geometry-matched SVG underlay; the flat
+            circle below it stays as the decode-time fallback. The live game
+            state — bullets and the landing ring — is ALWAYS drawn on top,
+            so empty holes show the artwork through while chamber state
+            keeps its contrast. */}
         <circle cx={CX} cy={CY} r={ORBIT + CHAM_R + 8} fill={skin.body} stroke={skin.bodyStroke} strokeWidth={2} />
+        {skin.art && <image href={skin.art} x={0} y={0} width={CYL} height={CYL} />}
         {chambers.map((chamber, index) => (
           <g key={index}>
-            {chamber.isLanding && (
+            {/* The landing highlight ring is a flat-skin affordance only —
+                on the art skins it fought the artwork (and read as a stray
+                green ring), so there the outcome is told by the pointer +
+                the landing slot's bullet/empty state alone. */}
+            {chamber.isLanding && !skin.art && (
               <circle
                 cx={chamber.x}
                 cy={chamber.y}
-                r={CHAM_R + 5}
+                r={holeR + 5}
                 fill="none"
                 stroke={chamber.isBullet ? 'var(--accent2)' : 'var(--alive)'}
                 strokeWidth={3}
                 opacity={0.8}
               />
             )}
-            <circle
-              cx={chamber.x}
-              cy={chamber.y}
-              r={CHAM_R}
-              fill={chamber.isBullet ? '#3a0808' : skin.chamber}
-              stroke={chamber.isLanding ? (chamber.isBullet ? 'var(--accent2)' : 'var(--alive)') : skin.chamberStroke}
-              strokeWidth={chamber.isLanding ? 2.5 : 1.5}
-            />
+            {(chamber.isBullet || !skin.art) && (
+              <circle
+                cx={chamber.x}
+                cy={chamber.y}
+                r={holeR}
+                fill={chamber.isBullet ? (skin.bullet?.fill || '#3a0808') : skin.chamber}
+                // On art skins the bullet gets a faint warm rim: the round
+                // itself can be near-black-on-black (noir), and without the
+                // rim the sweep during the 8s spin is invisible (reported
+                // as "the cylinder doesn't spin").
+                stroke={skin.art
+                  ? 'rgba(240,228,200,0.45)'
+                  : chamber.isLanding ? (chamber.isBullet ? 'var(--accent2)' : 'var(--alive)') : skin.chamberStroke}
+                strokeWidth={skin.art ? 1.6 : chamber.isLanding ? 2.5 : 1.5}
+              />
+            )}
+            {/* The round's core is themed per skin (skin.bullet) — only the
+                default steel keeps the original red. */}
             {chamber.isBullet && (
               <circle
                 cx={chamber.x}
                 cy={chamber.y}
-                r={CHAM_R * 0.42}
-                fill={chamber.isLanding ? '#ff3344' : '#882222'}
+                r={holeR * 0.42}
+                fill={chamber.isLanding
+                  ? (skin.bullet?.landingCore || '#ff3344')
+                  : (skin.bullet?.core || '#882222')}
               />
             )}
           </g>
         ))}
-        <circle cx={CX} cy={CY} r={9} fill={skin.hub} stroke={skin.hubStroke} strokeWidth={1.5} />
+        {!skin.art && <circle cx={CX} cy={CY} r={9} fill={skin.hub} stroke={skin.hubStroke} strokeWidth={1.5} />}
       </svg>
     </div>
   );

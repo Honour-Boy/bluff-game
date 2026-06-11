@@ -223,7 +223,7 @@ describe('#205 — progression handlers', () => {
     const handlers = captureHandlers(io, { id: 'sock-1', userId: U1, isGuest: false }, repo);
     const cb = vi.fn();
     await handlers['set_cosmetics']({
-      equipped: { tableFelt: 'felt_wine', gunSkin: 'gun_gilded' }, // gilded needs L10
+      equipped: { tableFelt: 'felt_wine', gunSkin: 'gun_cosmos' }, // cosmos needs L10
     }, cb);
 
     const res = cb.mock.calls[0][0];

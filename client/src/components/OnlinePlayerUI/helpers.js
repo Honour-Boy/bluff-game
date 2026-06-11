@@ -127,9 +127,13 @@ export const GAME_UI_STYLE = `
     border-radius: 50%;
     /* #205 — felt colours come from the viewer's equipped cosmetic via CSS
        custom properties (set on the OnlinePlayerUI root from lib/cosmetics.js);
-       the fallbacks ARE the original emerald felt. */
+       the fallbacks ARE the original emerald felt. Art felts additionally set
+       --felt-bg (a full-bleed SVG underlay, clipped to the ellipse by the
+       border-radius) which sits between the lamp sheen and the colour
+       gradient — same slot mechanism as --cardback-bg on the deck skins. */
     background:
       radial-gradient(ellipse 56% 44% at 50% 38%, rgba(220,164,76,0.18) 0%, rgba(220,164,76,0.05) 42%, transparent 72%),
+      var(--felt-bg, none) center center / 100% 100% no-repeat,
       radial-gradient(ellipse 82% 72% at 50% 50%, var(--felt-hi, #2f5e3f) 0%, var(--felt-mid1, #245132) 36%, var(--felt-mid2, #18391f) 64%, var(--felt-low, #0e2415) 84%, var(--felt-edge, #0a1a10) 100%);
     box-shadow: inset 0 0 56px rgba(0,0,0,0.55), inset 0 7px 24px rgba(0,0,0,0.45);
     pointer-events: none;

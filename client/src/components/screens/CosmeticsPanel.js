@@ -24,10 +24,15 @@ const SLOT_ORDER = [
 
 function FeltSwatch({ id }) {
   const felt = tableFeltFor(id);
+  // Art felts (frame SVG underlays) show their actual rim ornament; the
+  // CSS-only felts keep the plain colour-gradient ellipse.
+  const background = felt.frame
+    ? `url("${felt.frame}") center / 100% 100% no-repeat`
+    : `radial-gradient(ellipse at 50% 45%, ${felt.hi} 0%, ${felt.mid1} 40%, ${felt.mid2} 70%, ${felt.edge} 100%)`;
   return (
     <div style={{
       width: 52, height: 38, borderRadius: '50%',
-      background: `radial-gradient(ellipse at 50% 45%, ${felt.hi} 0%, ${felt.mid1} 40%, ${felt.mid2} 70%, ${felt.edge} 100%)`,
+      background,
       boxShadow: 'inset 0 0 10px rgba(0,0,0,0.55)',
       border: '2px solid rgba(120,80,40,0.6)',
     }} />
@@ -65,6 +70,11 @@ function CardBackSwatch({ id }) {
 
 function GunSwatch({ id }) {
   const skin = gunSkinFor(id);
+  // Art chamber skins show the actual disc artwork (transparent corners,
+  // so no rounding needed); flat skins keep the mini cylinder mock.
+  if (skin.art) {
+    return <img src={skin.art} alt="" width={46} height={46} draggable={false} />;
+  }
   return (
     <svg width="46" height="46" viewBox="0 0 46 46" aria-hidden>
       <circle cx="23" cy="23" r="21" fill={skin.body} stroke={skin.bodyStroke} strokeWidth="2" />

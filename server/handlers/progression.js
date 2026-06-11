@@ -77,12 +77,14 @@ function register(io, socket, deps = {}) {
       const valid = engine.validateEquipped(equipped, row.xp);
       await leaderboardRepo.setEquippedCosmetics(socket.userId, valid);
 
-      // Live-update any table this player is seated at so the whole room
-      // sees the new look on the next state push.
+      // Live-update any table this player is seated at so the room sees the
+      // new look on the next state push (each viewer still only sees what
+      // their own level has unlocked — serializeRoom gates on cosmeticsLevel).
       for (const [code, room] of rooms) {
         const seated = room.players?.find(p => p.id === socket.userId);
         if (!seated) continue;
         seated.cosmetics = valid;
+        seated.cosmeticsLevel = engine.levelForXp(row.xp);
         await saveRoom(room);
         await broadcastRoomState(io, code);
       }

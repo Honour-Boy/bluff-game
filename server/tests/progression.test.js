@@ -14,6 +14,7 @@ const {
   DEFAULT_COSMETICS,
   isCosmeticUnlocked,
   validateEquipped,
+  filterVisibleCosmetics,
   initGameStats,
   trackCardPlayed,
   trackSpinOutcome,
@@ -21,7 +22,7 @@ const {
   computeStandings,
   computeXpAward,
 } = require('../engine/progression.js');
-const { createRoom, createPlayer, startGame, eliminateFromTurnOrder, MODES, defaultRoomConfig } = require('../gameEngine.js');
+const { createRoom, createPlayer, startGame, eliminateFromTurnOrder, MODES, defaultRoomConfig, serializeRoom } = require('../gameEngine.js');
 
 function makeRoom(ids = ['p0', 'p1', 'p2']) {
   const room = createRoom('sock-host', MODES.ONLINE, defaultRoomConfig());
@@ -67,7 +68,7 @@ describe('cosmetics catalog + equip validation', () => {
   it('unlock gating follows the level curve', () => {
     expect(isCosmeticUnlocked('felt_wine', 0)).toBe(false);   // needs level 2
     expect(isCosmeticUnlocked('felt_wine', 100)).toBe(true);  // level 2
-    expect(isCosmeticUnlocked('gun_gilded', 100)).toBe(false);
+    expect(isCosmeticUnlocked('gun_cosmos', 100)).toBe(false); // needs level 10
     expect(isCosmeticUnlocked('nope', 999999)).toBe(false);
   });
 
@@ -83,6 +84,47 @@ describe('cosmetics catalog + equip validation', () => {
     expect(out.tableFelt).toBe('felt_wine');
     expect(out.cardBack).toBe(DEFAULT_COSMETICS.cardBack);
     expect(out.gunSkin).toBe(DEFAULT_COSMETICS.gunSkin);
+  });
+
+  it('filterVisibleCosmetics hides looks the VIEWER has not reached', () => {
+    const equipped = { gunSkin: 'gun_cosmos', cardBack: 'back_noir', tableFelt: 'felt_kente' };
+    // Level-1 viewer: everything above their level collapses to defaults.
+    expect(filterVisibleCosmetics(equipped, 1)).toEqual(DEFAULT_COSMETICS);
+    // Level-2 viewer: sees the L2 deck skin, not the L9/L10 pieces.
+    expect(filterVisibleCosmetics(equipped, 2)).toEqual({
+      ...DEFAULT_COSMETICS,
+      cardBack: 'back_noir',
+    });
+    // Level-10 viewer: sees the full look.
+    expect(filterVisibleCosmetics(equipped, 10)).toEqual(equipped);
+    // Defensive: null stays null, garbage levels gate at 1.
+    expect(filterVisibleCosmetics(null, 10)).toBeNull();
+    expect(filterVisibleCosmetics(equipped, undefined)).toEqual(DEFAULT_COSMETICS);
+  });
+
+  it('serializeRoom gates other players\' cosmetics by the viewer\'s level, never the owner\'s own', () => {
+    const room = makeRoom(['viewer', 'owner']);
+    const owner = room.players.find(p => p.id === 'owner');
+    owner.cosmetics = { gunSkin: 'gun_cosmos', cardBack: 'back_noir', tableFelt: 'felt_kente' };
+    owner.cosmeticsLevel = 10;
+    const viewer = room.players.find(p => p.id === 'viewer');
+    viewer.cosmetics = { ...DEFAULT_COSMETICS, cardBack: 'back_noir' };
+    viewer.cosmeticsLevel = 2;
+
+    // The L2 viewer sees only what THEY have reached of the owner's look…
+    const forViewer = serializeRoom(room, 'viewer');
+    expect(forViewer.players.find(p => p.id === 'owner').cosmetics).toEqual({
+      ...DEFAULT_COSMETICS,
+      cardBack: 'back_noir',
+    });
+    // …their own equips untouched…
+    expect(forViewer.players.find(p => p.id === 'viewer').cosmetics).toEqual(viewer.cosmetics);
+    // …while the owner always sees their own full look.
+    const forOwner = serializeRoom(room, 'owner');
+    expect(forOwner.players.find(p => p.id === 'owner').cosmetics).toEqual(owner.cosmetics);
+    // An unstamped/guest viewer gates at level 1 — defaults only.
+    const forGuest = serializeRoom(room, 'nobody');
+    expect(forGuest.players.find(p => p.id === 'owner').cosmetics).toEqual(DEFAULT_COSMETICS);
   });
 
   it('validateEquipped always returns a complete object', () => {

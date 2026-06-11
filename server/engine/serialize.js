@@ -8,6 +8,7 @@
 
 const { MODES, MEDIC_MAX_SAVES } = require('./constants');
 const { isBarehandVisible } = require('./roles');
+const { filterVisibleCosmetics } = require('./progression');
 
 function serializeRoom(room, requestingPlayerId = null, opts = {}) {
   const isOnline = room.mode === MODES.ONLINE;
@@ -117,9 +118,13 @@ function serializeRoom(room, requestingPlayerId = null, opts = {}) {
       consecutiveSurvivedSpins: p.consecutiveSurvivedSpins || 0,
       consecutiveCorrectBets: p.consecutiveCorrectBets || 0,
       // #205 — equipped cosmetics (validated server-side at equip time).
-      // Public by design: purely visual, e.g. the spin overlay paints the
-      // SPINNER's gun skin for everyone at the table.
-      cosmetics: p.cosmetics || null,
+      // Purely visual, e.g. the spin overlay paints the SPINNER's gun skin
+      // for the table — but each VIEWER only sees looks their own level has
+      // unlocked (below that, the slot defaults). Your own equips always
+      // come through in full; guests/unstamped viewers gate at level 1.
+      cosmetics: p.id === requestingPlayerId
+        ? (p.cosmetics || null)
+        : filterVisibleCosmetics(p.cosmetics, requestingPlayer?.cosmeticsLevel || 1),
     })),
     turnOrder: room.turnOrder,
     currentTurnIndex: room.currentTurnIndex,
