@@ -179,7 +179,7 @@ describe('#205 — progression handlers', () => {
     const repo = makeRepo({
       getProgression: vi.fn().mockResolvedValue({
         xp: 150, gamesPlayed: 3,
-        equipped: { tableFelt: 'felt_wine', cardBack: 'back_royal' }, // royal needs L9
+        equipped: { tableFelt: 'felt_wine', cardBack: 'back_kente' }, // kente needs L9
       }),
     });
     const handlers = captureHandlers(makeIo(), { id: 'sock-1', userId: U1, isGuest: false }, repo);

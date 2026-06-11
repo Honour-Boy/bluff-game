@@ -39,13 +39,14 @@ function FlyingCardBack() {
   return (
     <div style={{
       width: '100%', height: '100%',
-      background: 'linear-gradient(135deg, var(--cardback-a, #1e1410) 0%, var(--cardback-b, #120d09) 50%, var(--cardback-c, #1a1108) 100%)',
+      background: 'var(--cardback-bg, linear-gradient(135deg, var(--cardback-a, #1e1410) 0%, var(--cardback-b, #120d09) 50%, var(--cardback-c, #1a1108) 100%))',
+      backgroundSize: '100% 100%',
       border: '1px solid var(--border-lit)',
       borderRadius: 7,
       boxShadow: '0 10px 26px rgba(0,0,0,0.6)',
       position: 'relative', overflow: 'hidden',
     }}>
-      <svg width="100%" height="100%" viewBox="0 0 44 64" preserveAspectRatio="none" style={{ position: 'absolute', inset: 0, opacity: 0.3 }} aria-hidden>
+      <svg width="100%" height="100%" viewBox="0 0 44 64" preserveAspectRatio="none" style={{ position: 'absolute', inset: 0, opacity: 'var(--cardback-filigree-opacity, 0.3)' }} aria-hidden>
         <rect x="4" y="4" width="36" height="56" rx="3" fill="none" stroke="var(--cardback-accent, var(--accent))" strokeWidth="0.8" />
         <polygon points="22,16 28,24 22,32 16,24" fill="none" stroke="var(--cardback-accent, var(--accent))" strokeWidth="0.7" />
       </svg>
@@ -63,9 +64,12 @@ function FlyingCardFace({ card }) {
     <div style={{
       width: '100%',
       height: '100%',
+      // #205 — shape faces follow the equipped deck skin (frame art via
+      // --cardface-bg); power cards keep their own dedicated look.
       background: isPower
         ? 'linear-gradient(160deg, #1a0e08 0%, #0d0805 55%, #090503 100%)'
-        : 'linear-gradient(160deg, #221a12 0%, #16110b 55%, #0f0b07 100%)',
+        : 'var(--cardface-bg, linear-gradient(160deg, #221a12 0%, #16110b 55%, #0f0b07 100%))',
+      backgroundSize: '100% 100%',
       border: `2px solid ${isPower ? powerColor : isWhot ? 'var(--accent)' : 'var(--border-lit)'}`,
       borderRadius: 7,
       display: 'flex',

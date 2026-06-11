@@ -17,7 +17,8 @@ import {
 
 const SLOT_ORDER = [
   { slot: 'tableFelt', title: 'Table Felt' },
-  { slot: 'cardBack', title: 'Card Back' },
+  // Deck skins theme the card backs AND your own hand's card faces.
+  { slot: 'cardBack', title: 'Deck Skin' },
   { slot: 'gunSkin', title: 'Gun Skin' },
 ];
 
@@ -35,6 +36,18 @@ function FeltSwatch({ id }) {
 
 function CardBackSwatch({ id }) {
   const back = cardBackFor(id);
+  // Frame deck skins show their actual artwork; the CSS-only leather keeps
+  // the original gradient + filigree.
+  if (back.frame) {
+    return (
+      <div style={{
+        width: 34, height: 48, borderRadius: 4,
+        backgroundImage: `url("${back.frame}")`,
+        backgroundSize: '100% 100%',
+        border: '1px solid var(--border-lit)',
+      }} />
+    );
+  }
   return (
     <div style={{
       width: 34, height: 48, borderRadius: 4,

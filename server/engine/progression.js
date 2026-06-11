@@ -59,11 +59,17 @@ const COSMETICS = [
   { id: 'gun_brass', slot: 'gunSkin', label: 'Brass', unlockLevel: 4 },
   { id: 'gun_obsidian', slot: 'gunSkin', label: 'Obsidian', unlockLevel: 7 },
   { id: 'gun_gilded', slot: 'gunSkin', label: 'Gilded', unlockLevel: 10 },
-  // Card backs (deck / played pile / reveal back / lobby deal)
-  { id: 'back_leather', slot: 'cardBack', label: 'Leather', unlockLevel: 1 },
-  { id: 'back_crimson', slot: 'cardBack', label: 'Crimson', unlockLevel: 3 },
-  { id: 'back_midnight', slot: 'cardBack', label: 'Midnight', unlockLevel: 6 },
-  { id: 'back_royal', slot: 'cardBack', label: 'Royal', unlockLevel: 9 },
+  // Deck skins — theme the card BACKS (deck / played pile / reveal / flights)
+  // AND the player's own hand's card faces (frame + shape/number). Rendered
+  // from framed SVG art in client/public/cosmetics (built by
+  // client/scripts/build-cosmetic-decks.mjs); 'back_leather' stays the
+  // CSS-only original look.
+  { id: 'back_leather', slot: 'cardBack', label: 'Classic Leather', unlockLevel: 1 },
+  { id: 'back_noir', slot: 'cardBack', label: 'Noir Filigree', unlockLevel: 2 },
+  { id: 'back_crimson', slot: 'cardBack', label: 'Royal Crimson', unlockLevel: 3 },
+  { id: 'back_neon', slot: 'cardBack', label: 'Neon Circuit', unlockLevel: 6 },
+  { id: 'back_kente', slot: 'cardBack', label: 'Kente Royale', unlockLevel: 9 },
+  { id: 'back_cosmos', slot: 'cardBack', label: 'Cosmos', unlockLevel: 10 },
   // Table felts (the oval's cloth)
   { id: 'felt_emerald', slot: 'tableFelt', label: 'Emerald', unlockLevel: 1 },
   { id: 'felt_wine', slot: 'tableFelt', label: 'Wine', unlockLevel: 2 },

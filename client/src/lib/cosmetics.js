@@ -34,13 +34,20 @@ export const GUN_SKINS = {
   },
 };
 
-// ─── Card backs (deck / played pile / reveal back / lobby deal) ──
-// `back_leather` is the original leather-look gradient.
+// ─── Deck skins (card backs + the player's own hand's card faces) ──
+// `back_leather` is the original CSS-only leather look. The others carry a
+// `frame`: a self-contained colored SVG (built from the owner-supplied frame
+// art by client/scripts/build-cosmetic-decks.mjs, in public/cosmetics) that
+// paints BOTH the face-down backs and, with the shape + number overlaid in
+// its empty centre, this player's own hand cards. `accent` colours the
+// filigree/glow accents wherever the skin shows.
 export const CARD_BACKS = {
   back_leather: { a: '#1e1410', b: '#120d09', c: '#1a1108', accent: 'var(--accent)' },
-  back_crimson: { a: '#2c0e12', b: '#170708', c: '#240b0e', accent: '#d8606a' },
-  back_midnight: { a: '#0e1626', b: '#070b14', c: '#0c1220', accent: '#6f8fd8' },
-  back_royal: { a: '#1c1030', b: '#0e0818', c: '#170d28', accent: '#b08fe8' },
+  back_noir: { frame: '/cosmetics/deck_noir.svg', field: '#0c0b0f', accent: '#c8a35a' },
+  back_crimson: { frame: '/cosmetics/deck_crimson.svg', field: '#691d2b', accent: '#c4a060' },
+  back_neon: { frame: '/cosmetics/deck_neon.svg', field: '#141436', accent: '#45e6e6' },
+  back_kente: { frame: '/cosmetics/deck_kente.svg', field: '#aa5229', accent: '#e2a92e' },
+  back_cosmos: { frame: '/cosmetics/deck_cosmos.svg', field: '#060609', accent: '#9a6ae8' },
 };
 
 // ─── Table felts (the oval's cloth) ───────────────────────────
@@ -71,21 +78,34 @@ export function tableFeltFor(id) {
 }
 
 // The CSS custom properties the table styles consume (helpers.js +
-// CenterTablePanel). Spread onto the OnlinePlayerUI root so the viewer's
-// OWN felt + card back theme everything below; defaults in the CSS keep
-// the original look when no cosmetics are equipped.
+// CenterTablePanel + CardHand and friends). Spread onto the OnlinePlayerUI
+// root so the viewer's OWN felt + deck skin theme everything below; defaults
+// in the CSS keep the original look when no cosmetics are equipped.
+//
+// Two deck-skin flavours:
+//  • CSS-only (leather): gradient stop vars + the gold mini-filigree overlay.
+//  • Frame art: --cardback-bg / --cardface-bg point at the skin SVG (which is
+//    self-contained — field + ornament), and the filigree overlay is hidden
+//    (--cardback-filigree-opacity: 0) so it doesn't fight the artwork.
 export function cosmeticStyleVars(equipped) {
   const felt = tableFeltFor(equipped?.tableFelt);
   const back = cardBackFor(equipped?.cardBack);
-  return {
+  const vars = {
     '--felt-hi': felt.hi,
     '--felt-mid1': felt.mid1,
     '--felt-mid2': felt.mid2,
     '--felt-low': felt.low,
     '--felt-edge': felt.edge,
-    '--cardback-a': back.a,
-    '--cardback-b': back.b,
-    '--cardback-c': back.c,
     '--cardback-accent': back.accent,
   };
+  if (back.frame) {
+    vars['--cardback-bg'] = `url("${back.frame}")`;
+    vars['--cardface-bg'] = `url("${back.frame}")`;
+    vars['--cardback-filigree-opacity'] = '0';
+  } else {
+    vars['--cardback-a'] = back.a;
+    vars['--cardback-b'] = back.b;
+    vars['--cardback-c'] = back.c;
+  }
+  return vars;
 }

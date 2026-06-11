@@ -75,7 +75,7 @@ describe('cosmetics catalog + equip validation', () => {
     const out = validateEquipped(
       {
         tableFelt: 'felt_wine',     // unlocked at level 2
-        cardBack: 'back_royal',     // needs level 9 — locked
+        cardBack: 'back_kente',     // needs level 9 — locked
         gunSkin: 'felt_midnight',   // wrong slot
       },
       100, // level 2
