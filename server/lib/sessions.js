@@ -116,8 +116,18 @@ function resolveLogin(io, rooms, { userId, deviceId, socketId, takeover = false 
   // No prior session → clean proceed.
   if (!existing) return { ok: true, evicted: null };
 
-  // Same device replacing its own session (two tabs / refresh): evict whatever
-  // socket the entry points at (newest tab wins, older tab gets force_logout).
+  // THE SAME socket re-authenticating (the client authenticates on `connect`
+  // AND again when the auth identity settles, plus React strict-mode double
+  // effects) — there is nothing to evict, and we must NEVER force_logout the
+  // very socket asking. Without this guard a re-auth self-evicts and the user
+  // is logged out for no reason. This is checked before the deviceId branch.
+  if (existing.socketId === socketId) {
+    return { ok: true, evicted: null };
+  }
+
+  // Same device, different socket (a new tab, or a reconnect that minted a new
+  // socket id): replace silently, evicting the old socket (newest wins; a dead
+  // old socket is a harmless no-op emit).
   if (existing.deviceId === deviceId) {
     return { ok: true, evicted: existing.socketId };
   }
