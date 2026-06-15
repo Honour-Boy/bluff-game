@@ -7,14 +7,21 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { getSocket } from '../../lib/socket';
 import { clearRoomSession } from '../../lib/sessionStore';
+import { getDeviceId } from '../../lib/device';
 import { useGameBrowserEffects, useSocketAuthenticationEffect } from './browserEffects';
 import { useGameActions } from './gameActions';
 import { useGroupActions } from './groupActions';
 import { usePromptEvents, usePreGameEvents } from './promptEffects';
 import { useGameSocketEvents } from './socketEvents';
 
-export function useGame(getAccessToken, getGuestAuth, authIdentityKey = null) {
+export function useGame(getAccessToken, getGuestAuth, authIdentityKey = null, onForceSignOut = null) {
   const socket = getSocket();
+
+  // Single-device eviction/refusal callback (wired to useAuth.forceSignOut).
+  // Held in a ref so the socket-event subscription doesn't re-bind when the
+  // caller passes a fresh closure.
+  const onForceSignOutRef = useRef(onForceSignOut);
+  useEffect(() => { onForceSignOutRef.current = onForceSignOut; }, [onForceSignOut]);
 
   const [roomCode, setRoomCode] = useState(null);
   const [isHost, setIsHost] = useState(false);
@@ -133,14 +140,21 @@ export function useGame(getAccessToken, getGuestAuth, authIdentityKey = null) {
 
   const authenticateSocket = useCallback(() => {
     return new Promise(async (resolve) => {
+      const deviceId = getDeviceId();
       if (getAccessToken) {
         const token = await getAccessToken();
         if (token) {
-          socket.emit('authenticate', { token }, (res) => {
+          socket.emit('authenticate', { token, deviceId }, (res) => {
             if (res?.success) {
               setAuthenticated(true);
               resolve(true);
             } else {
+              // Single-device gate refused this login: the account is seated at
+              // a table on another device. Sign this device out so it isn't left
+              // half-authenticated, and surface the use-another-account notice.
+              if (res?.code === 'account_in_room') {
+                onForceSignOutRef.current?.('account_in_room');
+              }
               console.warn('[socket] auth failed:', res?.error);
               resolve(false);
             }
@@ -152,7 +166,7 @@ export function useGame(getAccessToken, getGuestAuth, authIdentityKey = null) {
       if (getGuestAuth) {
         const guest = getGuestAuth();
         if (guest?.username) {
-          socket.emit('authenticate', { guest }, (res) => {
+          socket.emit('authenticate', { guest, deviceId }, (res) => {
             if (res?.success) {
               setAuthenticated(true);
               resolve(true);
@@ -182,6 +196,7 @@ export function useGame(getAccessToken, getGuestAuth, authIdentityKey = null) {
     authenticateSocket,
     notify,
     clearSession,
+    onForceSignOutRef,
     playChatPing,
     chatOpenRef,
     myUserIdRef,

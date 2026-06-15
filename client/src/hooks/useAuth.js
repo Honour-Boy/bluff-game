@@ -110,6 +110,12 @@ export function useAuth() {
   const [profile, setProfile] = useState(null);   // { id, username } | null
   const [loading, setLoading] = useState(true);   // true while session is loading
   const [authError, setAuthError] = useState(null);
+  // Single-device sessions: set when this device was signed out NOT by the
+  // user — evicted by a login elsewhere ('signed_in_elsewhere') or refused
+  // because the account is seated at a table on another device
+  // ('account_in_room'). AuthScreen renders it as a banner; cleared when the
+  // user starts a fresh sign-in.
+  const [signedOutReason, setSignedOutReason] = useState(null);
 
   // Guest user: { id: 'guest:<uuid>', username, isGuest: true } | null
   // Lives alongside `user`. Mutually exclusive — sign-in clears the
@@ -227,6 +233,7 @@ export function useAuth() {
   // even though both are served by the same Supabase project.
   const sendEmailOtp = useCallback(async ({ email }) => {
     setAuthError(null);
+    setSignedOutReason(null);
     const redirectTo = typeof window !== 'undefined' ? window.location.origin : undefined;
     const { error } = await supabase.auth.signInWithOtp({
       email,
@@ -242,6 +249,7 @@ export function useAuth() {
   // ─── Google OAuth ──────────────────────────────────────────
   const signInWithGoogle = useCallback(async () => {
     setAuthError(null);
+    setSignedOutReason(null);
     const { error } = await supabase.auth.signInWithOAuth({
       provider: 'google',
       options: { redirectTo: `${window.location.origin}` },
@@ -271,6 +279,23 @@ export function useAuth() {
     setGuestUser(null);
   }, []);
 
+  // ─── Forced sign-out (single-device sessions) ─────────────
+  // Triggered by the socket layer when the server evicts this device
+  // (`force_logout`) or refuses the login because the account is seated
+  // elsewhere (`account_in_room`). Local scope only — signs THIS device out
+  // without touching the device that won the seat. Records the reason so the
+  // AuthScreen can explain why the user landed back at login.
+  const forceSignOut = useCallback(async (reason) => {
+    try { await supabase.auth.signOut(); } catch (_) { /* no live session is fine */ }
+    clearLoginAt();
+    setUser(null);
+    setProfile(null);
+    profileLoadedForRef.current = null;
+    clearGuestFromStorage();
+    setGuestUser(null);
+    setSignedOutReason(reason || 'signed_in_elsewhere');
+  }, []);
+
   // ─── Guest sign-in ─────────────────────────────────────────
   // Validates length client-side, mints a UUID, persists both to
   // sessionStorage so a refresh keeps the same guest identity, and
@@ -280,6 +305,7 @@ export function useAuth() {
   // trip.
   const signInAsGuest = useCallback(({ username }) => {
     setAuthError(null);
+    setSignedOutReason(null);
     const trimmed = String(username || '').trim();
     if (!isValidGuestUsername(trimmed)) {
       const msg = `Display name must be ${GUEST_USERNAME_MIN}-${GUEST_USERNAME_MAX} characters`;
@@ -370,6 +396,8 @@ export function useAuth() {
     loading,
     authError,
     setAuthError,
+    signedOutReason,
+    forceSignOut,
     sendEmailOtp,
     signInWithGoogle,
     signInAsGuest,

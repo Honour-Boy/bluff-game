@@ -6,6 +6,7 @@ export function useGameSocketEvents({
   authenticateSocket,
   notify,
   clearSession,
+  onForceSignOutRef,
   playChatPing,
   chatOpenRef,
   myUserIdRef,
@@ -153,6 +154,16 @@ export function useGameSocketEvents({
       clearSession();
       notify(reason || 'The host removed you from the room.', 'error');
     };
+    // Single-device sessions: this account just signed in on another device,
+    // so the server evicted THIS socket. Drop any live room locally and hand
+    // off to useAuth.forceSignOut (Supabase local sign-out + AuthScreen banner).
+    // The server disconnects this socket ~250ms later; signing out first stops
+    // a reconnect→re-auth loop.
+    const onForceLogout = ({ reason } = {}) => {
+      clearRoomSession();
+      clearSession();
+      onForceSignOutRef?.current?.(reason || 'signed_in_elsewhere');
+    };
     const onLobbyIdleWarning = ({ secondsUntilAction, willAutoStart } = {}) => {
       const secs = secondsUntilAction ?? 60;
       notify(
@@ -182,6 +193,7 @@ export function useGameSocketEvents({
     socket.on('game_ended', onGameEnded);
     socket.on('removed_from_group', onRemovedFromGroup);
     socket.on('kicked', onKicked);
+    socket.on('force_logout', onForceLogout);
     socket.on('power_card_triggered', onPowerCardTriggered);
     socket.on('xp_awarded', onXpAwarded);
     socket.on('group_leaderboard_updated', onGroupLeaderboardUpdated);
@@ -203,6 +215,7 @@ export function useGameSocketEvents({
       socket.off('game_ended', onGameEnded);
       socket.off('removed_from_group', onRemovedFromGroup);
       socket.off('kicked', onKicked);
+      socket.off('force_logout', onForceLogout);
       socket.off('power_card_triggered', onPowerCardTriggered);
       socket.off('xp_awarded', onXpAwarded);
       socket.off('group_leaderboard_updated', onGroupLeaderboardUpdated);
@@ -217,6 +230,7 @@ export function useGameSocketEvents({
     leaderboardCacheRef,
     myUserIdRef,
     notify,
+    onForceSignOutRef,
     playChatPing,
     setAuthenticated,
     setChatMessages,

@@ -33,6 +33,16 @@ const {
 const { resolveLeaverPendingPauses } = require('../lib/orchestration');
 const { discardLobbyIdleState } = require('../lib/idleSweep');
 const { rollBotCallRate } = require('../engine/botStrategy');
+const { seatedElsewhere } = require('../lib/sessions');
+
+// Defense-in-depth for the single-device policy: an account already seated at
+// a table via a different live socket can never create or join a second seat.
+// Near-unreachable once the authenticate gate is in place (one socket per
+// account), but it directly encodes the owner's "one account, one table" ask
+// and survives any future auth-path regression. Guests have a per-browser id
+// and no account to contest, so they're exempt.
+const SEATED_ELSEWHERE_MSG =
+  'This account is already at a table on another device. Finish that game first.';
 
 function register(io, socket, deps) {
   const { groupsRepo, groupSettingsRepo, leaderboardRepo } = deps;
@@ -42,6 +52,9 @@ function register(io, socket, deps) {
     if (!socket.userId) return callback({ success: false, error: 'Not authenticated' });
     if (!socketRateLimit(socket, 'create_room', 5, 60_000).allowed) {
       return callback({ success: false, error: 'Rate limit exceeded' });
+    }
+    if (!socket.isGuest && seatedElsewhere(io, rooms, socket.userId, socket.id)) {
+      return callback({ success: false, error: SEATED_ELSEWHERE_MSG });
     }
 
     try {
@@ -185,6 +198,13 @@ function register(io, socket, deps) {
     try {
       const code = roomCode?.toUpperCase();
       if (!code) return callback({ success: false, error: 'Room not found' });
+
+      // Defense-in-depth: refuse if this account is already seated at a
+      // DIFFERENT table via a live socket (the target room is excluded so a
+      // same-device rejoin is never blocked). Guests exempt.
+      if (!socket.isGuest && seatedElsewhere(io, rooms, socket.userId, socket.id, code)) {
+        return callback({ success: false, error: SEATED_ELSEWHERE_MSG });
+      }
 
       let room = await getRoom(code);
       const group = await groupsRepo.getActiveGroupByCode(code);

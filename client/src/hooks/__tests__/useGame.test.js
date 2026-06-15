@@ -406,7 +406,9 @@ describe('useGame — authentication', () => {
     // Capture the auth callback so we can fire success.
     socketHolder.socket.emit.mockImplementationOnce((event, payload, cb) => {
       expect(event).toBe('authenticate');
-      expect(payload).toEqual({ token: 'jwt-abc' });
+      // Single-device sessions: the persistent deviceId now rides along.
+      expect(payload).toEqual(expect.objectContaining({ token: 'jwt-abc' }));
+      expect(payload).toHaveProperty('deviceId');
       cb({ success: true });
     });
 
@@ -414,6 +416,33 @@ describe('useGame — authentication', () => {
     await waitFor(() => {
       expect(getAccessToken).toHaveBeenCalled();
     });
+  });
+
+  it('force_logout clears the local session and invokes onForceSignOut with the reason', async () => {
+    const onForceSignOut = vi.fn();
+    renderHook(() => useGame(null, null, null, onForceSignOut));
+
+    sessionStorage.setItem('bluff_session', JSON.stringify({
+      roomCode: 'AB12', isHost: false, playerId: 'p1',
+    }));
+
+    act(() => socketHolder.socket.__emit('force_logout', { reason: 'signed_in_elsewhere' }));
+
+    await waitFor(() => expect(onForceSignOut).toHaveBeenCalledWith('signed_in_elsewhere'));
+    expect(sessionStorage.getItem('bluff_session')).toBeNull();
+  });
+
+  it('an account_in_room auth refusal triggers onForceSignOut', async () => {
+    const getAccessToken = vi.fn().mockResolvedValue('jwt-abc');
+    const onForceSignOut = vi.fn();
+    renderHook(() => useGame(getAccessToken, null, null, onForceSignOut));
+
+    socketHolder.socket.emit.mockImplementationOnce((event, payload, cb) => {
+      cb({ success: false, code: 'account_in_room', error: 'seated elsewhere' });
+    });
+
+    act(() => socketHolder.socket.__emit('connect'));
+    await waitFor(() => expect(onForceSignOut).toHaveBeenCalledWith('account_in_room'));
   });
 
   it('skips reconnect when there is no saved session', async () => {
