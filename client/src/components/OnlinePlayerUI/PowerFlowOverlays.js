@@ -86,7 +86,7 @@ export function PowerFlowOverlays({
               {POWER_META[heldPowerCard.power]?.flavor || ''}
             </div>
             <div style={{ display: 'flex', gap: 10 }}>
-              <button className="primary" onClick={handleActivatePower} disabled={activating} style={{ flex: 1, padding: '12px' }}>
+              <button className="primary" onClick={handleActivatePower} disabled={activating} data-tour-id="btn-activate-power" style={{ flex: 1, padding: '12px' }}>
                 {activating ? '…' : '⚡ Activate'}
               </button>
               <button
@@ -124,6 +124,7 @@ export function PowerFlowOverlays({
         >
           <div
             className="card fade-in"
+            data-tour-id="peek-result"
             style={{
               maxWidth: 320,
               width: '100%',

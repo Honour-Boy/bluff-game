@@ -392,14 +392,17 @@ export function CardHand({
 
       {/* Power card slot - separate brass bracket */}
       {powerCardSlot.length > 0 && (
-        <div style={{
-          flexShrink: 0,
-          display: 'flex',
-          flexDirection: 'column',
-          alignItems: 'center',
-          gap: 5,
-          paddingBottom: 4,
-        }}>
+        <div
+          data-tour-id="power-slot"
+          style={{
+            flexShrink: 0,
+            display: 'flex',
+            flexDirection: 'column',
+            alignItems: 'center',
+            gap: 5,
+            paddingBottom: 4,
+          }}
+        >
           <div style={{
             fontFamily: "'Cinzel', serif",
             fontSize: 8,

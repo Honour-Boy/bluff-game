@@ -206,7 +206,7 @@ export function SpinOverlay({
             </div>
           )}
           {isSpinTarget ? (
-            <button className="primary" onClick={acknowledgeSpinResult} style={{ padding: '10px 32px', fontSize: 14 }}>
+            <button className="primary" onClick={acknowledgeSpinResult} data-tour-id="btn-spin-continue" style={{ padding: '10px 32px', fontSize: 14 }}>
               Continue
             </button>
           ) : (

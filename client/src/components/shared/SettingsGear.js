@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { UserProfile } from '../screens/UserProfile';
 import { CosmeticsPanel } from '../screens/CosmeticsPanel';
 import { VoicePanel } from '../VoicePanel';
+import { TOUR_IDS } from '../tutorial/tourIds';
 
 // ─── Inline control icons (no emoji / font glyphs) ────────────────────────────
 const _ic = { width: 13, height: 13, viewBox: '0 0 24 24', fill: 'none', 'aria-hidden': true };
@@ -73,13 +74,14 @@ function TrackSkipButton({ dir, onClick }) {
   );
 }
 
-function SettingItem({ icon, label, onClick, accent = false, badge = null, disabled = false }) {
+function SettingItem({ icon, label, onClick, accent = false, badge = null, disabled = false, tourId = null }) {
   return (
     <button
       type="button"
       role="menuitem"
       onClick={onClick}
       disabled={disabled}
+      data-tour-id={tourId || undefined}
       style={{
         display: 'flex', alignItems: 'center', gap: 9, width: '100%',
         padding: '9px 10px',
@@ -177,6 +179,7 @@ export function SettingsGear({
           aria-expanded={open}
           aria-label="Settings"
           title="Settings"
+          data-tour-id={TOUR_IDS.settingsGear}
           style={{
             height: 40,
             display: 'flex', alignItems: 'center', gap: 7,
@@ -257,6 +260,7 @@ export function SettingsGear({
                     <SettingItem
                       icon={<IconChat />}
                       label="Chat"
+                      tourId={TOUR_IDS.settingsChat}
                       badge={chatUnread > 99 ? '99+' : chatUnread > 0 ? String(chatUnread) : null}
                       onClick={() => { setOpen(false); onOpenChat(); }}
                     />
@@ -265,6 +269,7 @@ export function SettingsGear({
                     <SettingItem
                       icon={<IconRules />}
                       label="Game settings"
+                      tourId={TOUR_IDS.settingsGameSettings}
                       onClick={() => { setOpen(false); onOpenGameSettings(); }}
                     />
                   )}
@@ -272,6 +277,7 @@ export function SettingsGear({
                     <SettingItem
                       icon={<IconBoard />}
                       label="Leaderboard"
+                      tourId={TOUR_IDS.settingsLeaderboard}
                       onClick={() => { setOpen(false); onOpenLeaderboard(); }}
                     />
                   )}
@@ -286,6 +292,7 @@ export function SettingsGear({
                     <SettingItem
                       icon={<IconLeaveTable />}
                       label={leaveDisabled ? 'Leave (finish turn)' : 'Leave table'}
+                      tourId={TOUR_IDS.settingsLeave}
                       disabled={leaveDisabled}
                       onClick={() => { if (leaveDisabled) return; setOpen(false); onLeaveTable(); }}
                     />
@@ -309,6 +316,7 @@ export function SettingsGear({
               {!isGuest && onUpdateUsername && (
                 <SettingItem
                   label="Edit profile"
+                  tourId={TOUR_IDS.settingsProfile}
                   onClick={() => { setOpen(false); setShowProfile(true); }}
                   icon={(
                     <svg width="13" height="13" viewBox="0 0 24 24" fill="none" aria-hidden="true">
@@ -323,6 +331,7 @@ export function SettingsGear({
               {!isGuest && getProgression && setCosmetics && (
                 <SettingItem
                   label="Cosmetics & XP"
+                  tourId={TOUR_IDS.settingsCosmetics}
                   onClick={() => { setOpen(false); setShowCosmetics(true); }}
                   icon={(
                     <svg width="13" height="13" viewBox="0 0 24 24" fill="none" aria-hidden="true">
@@ -332,57 +341,61 @@ export function SettingsGear({
                 />
               )}
 
-              {onSetMusicVolume && (
-                <div style={{ padding: '6px 10px 8px' }}>
-                  <div style={{
-                    display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-                    fontFamily: "'Space Mono', monospace", fontSize: 9,
-                    color: 'var(--text-dim)', letterSpacing: '0.12em',
-                    textTransform: 'uppercase', marginBottom: 5,
-                  }}>
-                    <span>Music volume</span>
-                    <span>{Math.round((musicVolume ?? 1) * 100)}%</span>
-                  </div>
-                  <input
-                    type="range"
-                    min={0}
-                    max={100}
-                    value={Math.round((musicVolume ?? 1) * 100)}
-                    onChange={(e) => onSetMusicVolume((Number(e.target.value) || 0) / 100)}
-                    aria-label="Music volume"
-                    style={{ width: '100%', accentColor: 'var(--accent)', cursor: 'pointer' }}
-                  />
-                  {(onPrevTrack || onNextTrack) && (
-                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 10, marginTop: 9 }}>
-                      <TrackSkipButton dir="prev" onClick={onPrevTrack} />
-                      <span style={{
-                        fontFamily: "'Space Mono', monospace", fontSize: 8,
-                        color: 'var(--text-dim)', letterSpacing: '0.16em', textTransform: 'uppercase',
-                      }}>Track</span>
-                      <TrackSkipButton dir="next" onClick={onNextTrack} />
+              {/* Audio controls grouped under one tour anchor (volume + skip +
+                  on/off toggle) so the spotlight can cut them out as a block. */}
+              <div data-tour-id={TOUR_IDS.settingsAudio}>
+                {onSetMusicVolume && (
+                  <div style={{ padding: '6px 10px 8px' }}>
+                    <div style={{
+                      display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                      fontFamily: "'Space Mono', monospace", fontSize: 9,
+                      color: 'var(--text-dim)', letterSpacing: '0.12em',
+                      textTransform: 'uppercase', marginBottom: 5,
+                    }}>
+                      <span>Music volume</span>
+                      <span>{Math.round((musicVolume ?? 1) * 100)}%</span>
                     </div>
-                  )}
-                </div>
-              )}
+                    <input
+                      type="range"
+                      min={0}
+                      max={100}
+                      value={Math.round((musicVolume ?? 1) * 100)}
+                      onChange={(e) => onSetMusicVolume((Number(e.target.value) || 0) / 100)}
+                      aria-label="Music volume"
+                      style={{ width: '100%', accentColor: 'var(--accent)', cursor: 'pointer' }}
+                    />
+                    {(onPrevTrack || onNextTrack) && (
+                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 10, marginTop: 9 }}>
+                        <TrackSkipButton dir="prev" onClick={onPrevTrack} />
+                        <span style={{
+                          fontFamily: "'Space Mono', monospace", fontSize: 8,
+                          color: 'var(--text-dim)', letterSpacing: '0.16em', textTransform: 'uppercase',
+                        }}>Track</span>
+                        <TrackSkipButton dir="next" onClick={onNextTrack} />
+                      </div>
+                    )}
+                  </div>
+                )}
 
-              {onToggleMusic && (
-                <SettingItem
-                  label={musicEnabled ? 'Music: On' : 'Music: Off'}
-                  onClick={() => onToggleMusic()}
-                  icon={musicEnabled ? (
-                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-                      <path d="M9 18V6l10-2v12" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
-                      <circle cx="6.5" cy="18" r="2.5" stroke="currentColor" strokeWidth="1.8" />
-                      <circle cx="16.5" cy="16" r="2.5" stroke="currentColor" strokeWidth="1.8" />
-                    </svg>
-                  ) : (
-                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-                      <path d="M9 18V6l10-2v12" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" opacity="0.5" />
-                      <path d="M3 3l18 18" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
-                    </svg>
-                  )}
-                />
-              )}
+                {onToggleMusic && (
+                  <SettingItem
+                    label={musicEnabled ? 'Music: On' : 'Music: Off'}
+                    onClick={() => onToggleMusic()}
+                    icon={musicEnabled ? (
+                      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                        <path d="M9 18V6l10-2v12" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+                        <circle cx="6.5" cy="18" r="2.5" stroke="currentColor" strokeWidth="1.8" />
+                        <circle cx="16.5" cy="16" r="2.5" stroke="currentColor" strokeWidth="1.8" />
+                      </svg>
+                    ) : (
+                      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                        <path d="M9 18V6l10-2v12" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" opacity="0.5" />
+                        <path d="M3 3l18 18" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
+                      </svg>
+                    )}
+                  />
+                )}
+              </div>
 
               <div style={{ height: 1, background: 'var(--border)', margin: '3px 4px' }} />
 
