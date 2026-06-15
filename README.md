@@ -274,6 +274,18 @@ Timers are keyed by `${roomCode}:${playerId}` and cleared on reconnect.
 
 ---
 
+## Single-device sessions
+
+Each account may be signed in on **one live device at a time**, enforced at the socket `authenticate` gate (the realtime server is the authority — Supabase alone can't kill a live socket). An in-memory registry (`server/lib/sessions.js`) holds one entry per account:
+
+- **Idle elsewhere** (old device signed in but not seated in a room) → **last-login-wins**: the old socket gets a `force_logout` event and is disconnected; the new device proceeds.
+- **Seated in a room elsewhere** (old device in a lobby or live game) → the new login is **refused** with code `account_in_room`; the seated device is never disturbed. (Corollary: an account can never be seated in a room from two devices.)
+- **Same physical device** (refresh / new tab / reconnect) → **silent replace**, identified by a persistent `localStorage['bluff_device_id']` sent with `authenticate`. Never refused, even mid-game.
+
+**Guests are exempt** (per-browser id, no account to contest). Old clients that send no `deviceId` degrade safely to "unique device" semantics. A defense-in-depth seat guard in `handlers/room.js` (`seatedElsewhere`) also blocks a second seat at create/join.
+
+---
+
 ## Socket Events Reference
 
 ### Client → Server
@@ -297,6 +309,7 @@ Timers are keyed by `${roomCode}:${playerId}` and cleared on reconnect.
 | `room_state` | Full room snapshot | Broadcast on every state change |
 | `bluff_called` | `{ callerId }` | Notify host of bluff |
 | `host_disconnected` | `{}` | Notify players if host drops |
+| `force_logout` | `{ reason }` | Single-device sessions: this device was signed in elsewhere; client signs out locally |
 
 ---
 
