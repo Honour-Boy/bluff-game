@@ -76,17 +76,11 @@ function register(io, socket) {
         || 'Player';
 
       // ── Single-device gate (one account, one live device) ──────────
-      // Decide BEFORE stamping socket.userId so a refused login never
-      // becomes able to act on the account. See lib/sessions.js.
+      // Last-login-wins, unconditionally: this device takes the account and
+      // any previously-signed-in device is force-logged-out (even mid-game).
+      // The active device is never the one kicked out. See lib/sessions.js.
       const device = deviceIdFor(deviceId, socket.id);
       const verdict = resolveLogin(io, rooms, { userId, deviceId: device, socketId: socket.id });
-      if (!verdict.ok) {
-        return callback?.({
-          success: false,
-          code: 'account_in_room',
-          error: 'This account is currently at a table on another device. Finish that game or use a different account on this device.',
-        });
-      }
       if (verdict.evicted) {
         const old = io.sockets?.sockets?.get?.(verdict.evicted);
         if (old) {

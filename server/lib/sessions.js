@@ -79,40 +79,38 @@ function seatedElsewhere(io, rooms, userId, socketId, exceptCode = null) {
 }
 
 // Decide the fate of a fresh authenticated login. Returns one of:
-//   { ok: true,  evicted: null }        — no contest, or stale entry cleaned.
-//   { ok: true,  evicted: oldSocketId } — caller force-logs-out the old socket.
-//   { ok: false, reason: 'account_in_room' } — old device seated → refuse.
+//   { ok: true, evicted: null }        — no contest, or stale entry cleaned.
+//   { ok: true, evicted: oldSocketId } — caller force-logs-out the old socket.
+//
+// LAST-LOGIN-WINS, UNCONDITIONALLY (owner decision 2026-06-15): the device
+// signing in NOW always takes the account; the previously-signed-in device is
+// force-logged-out — EVEN IF it was seated in a room/game. The active device
+// must never be the one kicked out. (This reverses the earlier "old device in
+// a room refuses the new login with account_in_room" rule.)
 //
 // `io` is used only to verify whether the previously-registered socket is
-// still alive (a TCP corpse that hasn't been reaped shouldn't lock the user
-// out forever).
+// still alive (a TCP corpse that hasn't been reaped shouldn't trigger a
+// pointless eviction emit).
 function resolveLogin(io, rooms, { userId, deviceId, socketId }) {
   const existing = sessions.get(userId);
 
   // No prior session → clean proceed.
   if (!existing) return { ok: true, evicted: null };
 
-  // Same device (or the user is just replacing their own session) → always
-  // allowed; evict whatever socket the entry points at (covers two tabs:
-  // newest wins, older tab gets the force_logout).
+  // Same device replacing its own session (two tabs / refresh): evict whatever
+  // socket the entry points at (newest tab wins, older tab gets force_logout).
   if (existing.deviceId === deviceId) {
     return { ok: true, evicted: existing.socketId };
   }
 
-  // Different device. Is the old socket even still alive?
+  // Different device. If the old socket is already gone, just clean the entry.
   const oldLive = !!io?.sockets?.sockets?.get?.(existing.socketId);
   if (!oldLive) {
-    // Corpse — drop it and let the new device in.
     sessions.delete(userId);
     return { ok: true, evicted: null };
   }
 
-  // Old device is live AND seated in a room → the new login can't disturb it.
-  if (isSeated(rooms, userId)) {
-    return { ok: false, reason: 'account_in_room' };
-  }
-
-  // Old device live but idle → last-login-wins.
+  // Old device still live → evict it. New login always wins.
   return { ok: true, evicted: existing.socketId };
 }
 

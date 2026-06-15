@@ -64,12 +64,12 @@ describe('resolveLogin — verdict matrix', () => {
     expect(v).toEqual({ ok: true, evicted: 'old' });
   });
 
-  it('seated on a different LIVE device → refused', () => {
+  it('seated on a different LIVE device → STILL evicts the old (last-login-wins, even in a room)', () => {
     registerSession('u1', { socketId: 'old', deviceId: DEV_A, username: 'U' });
     const io = makeIo(['old', 'new']);
     const rooms = roomsSeating('u1', 'old');
     const v = resolveLogin(io, rooms, { userId: 'u1', deviceId: DEV_B, socketId: 'new' });
-    expect(v).toEqual({ ok: false, reason: 'account_in_room' });
+    expect(v).toEqual({ ok: true, evicted: 'old' });
   });
 
   it('seated but SAME device → allowed (replace, evict old)', () => {
