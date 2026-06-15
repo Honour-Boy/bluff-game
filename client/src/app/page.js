@@ -22,7 +22,9 @@ import { KickPlayerPanel } from '../components/shared/KickPlayerPanel';
 import { PreGameSettingsPanel } from '../components/screens/PreGameSettingsPanel';
 import { LobbyConfigSummary } from '../components/LobbyConfigSummary';
 import { LeaderboardPanel } from '../components/LeaderboardPanel';
+import { IntroVideo } from '../components/shared/IntroVideo';
 import { useIsMobile } from '../hooks/useIsMobile';
+import { shouldShowIntro, markIntroSeen, rearmIntro } from '../lib/intro';
 
 // §M4 — non-blocking "reconnecting" pill shown while the socket is down but the
 // player is still in a room. Sits top-centre, above the table; the resilient
@@ -72,7 +74,30 @@ function HomeContent() {
   const searchParams = useSearchParams();
   const initialJoinCode = searchParams.get('join') || null;
   const [homeView, setHomeView] = useState('landing');
+  // ─── Intro splash (revolver-blast video) ──────────────────────────
+  // Fires once per genuine game open (fresh tab / first entry, and the
+  // next entry after sign-out). Gated in lib/intro.js so it never replays
+  // on a refresh, reconnect, or in-app navigation. Decided in an effect
+  // (not a lazy initializer) so it stays SSR/hydration-safe.
+  const [introActive, setIntroActive] = useState(false);
+  const introCheckedRef = useRef(false);
+  useEffect(() => {
+    if (introCheckedRef.current) return;
+    introCheckedRef.current = true;
+    if (shouldShowIntro()) setIntroActive(true);
+  }, []);
+  const dismissIntro = useCallback(() => {
+    markIntroSeen();
+    setIntroActive(false);
+  }, []);
   const [groupsLoading, setGroupsLoading] = useState(false);
+
+  // Replay the intro on a fresh sign-in within the same tab (logout →
+  // login). `handleSignOut` re-armed the gate; the null → user transition
+  // here is the "new entry" that plays it again. Skips the initial mount
+  // (handled by the open-check effect above) so a restored session that
+  // already saw the splash doesn't double-fire it.
+  const prevUserIdRef = useRef(undefined);
   const [groupsList, setGroupsList] = useState([]);
   const [groupInvites, setGroupInvites] = useState([]);
   const [selectedGroup, setSelectedGroup] = useState(null);
@@ -132,6 +157,14 @@ function HomeContent() {
     getProgression,
     setCosmetics,
   } = game;
+
+  useEffect(() => {
+    const uid = user?.id ?? null;
+    const prev = prevUserIdRef.current;
+    prevUserIdRef.current = uid;
+    if (prev === undefined) return; // initial mount — open-check effect owns it
+    if (!prev && uid && shouldShowIntro()) setIntroActive(true);
+  }, [user?.id]);
 
   // ─── Section-based background music (#A) ──────────────────────────
   // Each area of the app has its own track; the section is derived from the
@@ -427,11 +460,13 @@ function HomeContent() {
   // local session so we can't linger as a ghost player after sign-out.
   const handleSignOut = useCallback(async () => {
     leaveGame();
+    rearmIntro(); // next entry after logout should replay the intro splash
     await signOut();
   }, [leaveGame, signOut]);
 
   const handleSignOutGuest = useCallback(async () => {
     leaveGame();
+    rearmIntro();
     await signOutGuest();
   }, [leaveGame, signOutGuest]);
 
@@ -478,6 +513,14 @@ function HomeContent() {
   useEffect(() => {
     if (!inRoomOnline) { setGameSettingsOpen(false); setLeaderboardOpen(false); }
   }, [inRoomOnline]);
+
+  // ─── Intro splash ──────────────────────────────────────────
+  // Takes the whole screen on a genuine open, over even the loading
+  // splash. The auth/socket hooks above keep bootstrapping underneath
+  // while it plays, so there's no extra wait once it dismisses.
+  if (introActive) {
+    return <IntroVideo onDone={dismissIntro} />;
+  }
 
   // ─── Loading splash ────────────────────────────────────────
   if (loading) {
