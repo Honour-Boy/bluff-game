@@ -154,7 +154,10 @@ button:hover:not(:disabled) {
   color: var(--accent);
   background: linear-gradient(160deg, var(--surface3) 0%, var(--surface2) 100%);
   box-shadow: 0 0 14px var(--glow-gold), inset 0 1px 0 rgba(200,146,46,0.12);
-  transform: translateY(-1px);
+  /* No translateY lift on hover: a 1px shift moves the button out from under
+     the cursor at its edge, dropping :hover and re-triggering it — a sustained
+     pointer/arrow cursor flicker. The glow + colour shift carry the affordance;
+     the lift stays on :focus-visible / :active, which don't flicker. */
 }
 
 button:focus-visible {
@@ -191,7 +194,7 @@ button.primary:hover:not(:disabled) {
   border-color: var(--accent);
   color: #120a03;
   box-shadow: 0 4px 16px var(--glow-gold), inset 0 1px 0 rgba(255,235,140,0.35);
-  transform: translateY(-2px);
+  /* No hover lift — see button:hover note (prevents cursor flicker). */
 }
 
 button.primary:focus-visible {
@@ -212,7 +215,7 @@ button.ember:hover:not(:disabled) {
   border-color: var(--ember);
   color: #fff4ec;
   box-shadow: 0 4px 22px var(--glow-ember), inset 0 1px 0 rgba(255,195,165,0.35);
-  transform: translateY(-2px);
+  /* No hover lift — see button:hover note (prevents cursor flicker). */
 }
 button.ember:focus-visible {
   box-shadow: 0 0 0 2px rgba(212,81,58,0.55), 0 4px 22px var(--glow-ember);
