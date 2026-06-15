@@ -92,11 +92,23 @@ describe('resolveLogin — verdict matrix', () => {
     expect(v.activeDevice.name).toBe('Another device');
   });
 
-  it('SAME device → replaces silently (evict old, no conflict)', () => {
+  it('SAME device, different socket → replaces silently (evict old, no conflict)', () => {
     registerSession('u1', { socketId: 'old', deviceId: DEV_A, username: 'U' });
     const io = makeIo(['old', 'new']);
     const v = resolveLogin(io, new Map(), { userId: 'u1', deviceId: DEV_A, socketId: 'new' });
     expect(v).toEqual({ ok: true, evicted: 'old' });
+  });
+
+  it('SAME socket re-authenticating → no eviction (never self-logout)', () => {
+    // The client authenticates on connect AND again when identity settles, on
+    // the SAME socket. That must not evict (and force_logout) itself.
+    registerSession('u1', { socketId: 'sock', deviceId: DEV_A, username: 'U' });
+    const io = makeIo(['sock']);
+    const v = resolveLogin(io, new Map(), { userId: 'u1', deviceId: DEV_A, socketId: 'sock' });
+    expect(v).toEqual({ ok: true, evicted: null });
+    // Even a different-device-id value on the same socket must not self-evict.
+    const v2 = resolveLogin(io, new Map(), { userId: 'u1', deviceId: DEV_B, socketId: 'sock' });
+    expect(v2).toEqual({ ok: true, evicted: null });
   });
 
   it('old socket already dead → allowed and the stale entry is cleaned', () => {
