@@ -26,6 +26,33 @@ function mintId() {
   });
 }
 
+// A best-effort human-readable label for THIS device, e.g. "Chrome on
+// Windows" / "Safari on iPhone". Sent with `authenticate` so a takeover screen
+// on another device can name the session it's about to end. The server
+// re-sanitises it; this is purely a friendly hint, never trusted for logic.
+export function getDeviceName() {
+  if (typeof navigator === 'undefined') return 'Unknown device';
+  const ua = navigator.userAgent || '';
+
+  let os = 'Unknown OS';
+  if (/Windows/i.test(ua)) os = 'Windows';
+  else if (/iPhone/i.test(ua)) os = 'iPhone';
+  else if (/iPad/i.test(ua)) os = 'iPad';
+  else if (/Android/i.test(ua)) os = 'Android';
+  else if (/Mac OS X|Macintosh/i.test(ua)) os = 'Mac';
+  else if (/Linux/i.test(ua)) os = 'Linux';
+
+  let browser = 'Browser';
+  // Order matters: Edge/Opera/Brave masquerade as Chrome; check them first.
+  if (/Edg\//i.test(ua)) browser = 'Edge';
+  else if (/OPR\/|Opera/i.test(ua)) browser = 'Opera';
+  else if (/Firefox\//i.test(ua)) browser = 'Firefox';
+  else if (/Chrome\//i.test(ua)) browser = 'Chrome';
+  else if (/Safari\//i.test(ua)) browser = 'Safari';
+
+  return `${browser} on ${os}`;
+}
+
 // Read (creating once) the persistent device id. Returns null only when
 // storage is entirely unavailable (SSR / hard private mode) — the server
 // then treats the login as a unique device, which is the safe default.

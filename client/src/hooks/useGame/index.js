@@ -7,7 +7,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { getSocket } from '../../lib/socket';
 import { clearRoomSession } from '../../lib/sessionStore';
-import { getDeviceId } from '../../lib/device';
+import { getDeviceId, getDeviceName } from '../../lib/device';
 import { useGameBrowserEffects, useSocketAuthenticationEffect } from './browserEffects';
 import { useGameActions } from './gameActions';
 import { useGroupActions } from './groupActions';
@@ -31,6 +31,11 @@ export function useGame(getAccessToken, getGuestAuth, authIdentityKey = null, on
   const [connected, setConnected] = useState(socket.connected);
   const [notification, setNotification] = useState(null);
   const [authenticated, setAuthenticated] = useState(false);
+  // Single-active-session: when a login is contested by another live device,
+  // the server refuses with the active device's info instead of silently
+  // kicking either side. We surface it here so page.js can show a takeover
+  // screen ({ name, since } | null).
+  const [sessionConflict, setSessionConflict] = useState(null);
   const [spinDismissed, setSpinDismissed] = useState(false);
   const [leaderboardUpdateNonce, setLeaderboardUpdateNonce] = useState(0);
   const [chatMessages, setChatMessages] = useState([]);
@@ -138,27 +143,33 @@ export function useGame(getAccessToken, getGuestAuth, authIdentityKey = null, on
     }
   }, [notify, clearSession, socket]);
 
-  const authenticateSocket = useCallback(() => {
+  // `takeover` is passed when the user confirms ending another device's
+  // session from the conflict screen.
+  const authenticateSocket = useCallback(({ takeover = false } = {}) => {
     return new Promise(async (resolve) => {
       const deviceId = getDeviceId();
+      const deviceName = getDeviceName();
+      const onResult = (res, label) => {
+        if (res?.success) {
+          setSessionConflict(null);
+          setAuthenticated(true);
+          resolve(true);
+          return;
+        }
+        // Single-active-session: another live device holds the account. Surface
+        // it so the UI can show a takeover screen naming that device — DON'T
+        // sign out or loop-retry; the user decides.
+        if (res?.code === 'session_active_elsewhere') {
+          setSessionConflict(res.activeDevice || { name: 'Another device' });
+        }
+        console.warn(`[socket] ${label} failed:`, res?.error || res?.code);
+        resolve(false);
+      };
+
       if (getAccessToken) {
         const token = await getAccessToken();
         if (token) {
-          socket.emit('authenticate', { token, deviceId }, (res) => {
-            if (res?.success) {
-              setAuthenticated(true);
-              resolve(true);
-            } else {
-              // Single-device gate refused this login: the account is seated at
-              // a table on another device. Sign this device out so it isn't left
-              // half-authenticated, and surface the use-another-account notice.
-              if (res?.code === 'account_in_room') {
-                onForceSignOutRef.current?.('account_in_room');
-              }
-              console.warn('[socket] auth failed:', res?.error);
-              resolve(false);
-            }
-          });
+          socket.emit('authenticate', { token, deviceId, deviceName, takeover }, (res) => onResult(res, 'auth'));
           return;
         }
       }
@@ -166,15 +177,7 @@ export function useGame(getAccessToken, getGuestAuth, authIdentityKey = null, on
       if (getGuestAuth) {
         const guest = getGuestAuth();
         if (guest?.username) {
-          socket.emit('authenticate', { guest, deviceId }, (res) => {
-            if (res?.success) {
-              setAuthenticated(true);
-              resolve(true);
-            } else {
-              console.warn('[socket] guest auth failed:', res?.error);
-              resolve(false);
-            }
-          });
+          socket.emit('authenticate', { guest, deviceId, deviceName, takeover }, (res) => onResult(res, 'guest auth'));
           return;
         }
       }
@@ -182,6 +185,21 @@ export function useGame(getAccessToken, getGuestAuth, authIdentityKey = null, on
       resolve(false);
     });
   }, [getAccessToken, getGuestAuth, socket]);
+
+  // User confirmed the takeover on the conflict screen: re-authenticate with
+  // the takeover flag so the server evicts the other device and lets us in.
+  const takeOverSession = useCallback(() => authenticateSocket({ takeover: true }), [authenticateSocket]);
+
+  // Tell the server to release this device's single-active-session entry on
+  // sign-out (the socket stays connected, so without this the account would
+  // look signed-in here forever).
+  const signOutSocket = useCallback(() => {
+    try {
+      if (socket?.connected) socket.emit('sign_out', {}, () => {});
+    } catch (_) { /* transport hiccup — disconnect will clear it anyway */ }
+    setSessionConflict(null);
+    setAuthenticated(false);
+  }, [socket]);
 
   useGameBrowserEffects({ roomCode, isHost, playerId });
   useSocketAuthenticationEffect({
@@ -291,6 +309,9 @@ export function useGame(getAccessToken, getGuestAuth, authIdentityKey = null, on
     error,
     connected,
     authenticated,
+    sessionConflict,
+    takeOverSession,
+    signOutSocket,
     notification,
     spinDismissed,
     leaderboardUpdateNonce,

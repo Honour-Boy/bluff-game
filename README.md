@@ -276,12 +276,13 @@ Timers are keyed by `${roomCode}:${playerId}` and cleared on reconnect.
 
 ## Single-device sessions
 
-Each account may be signed in on **one live device at a time**, enforced at the socket `authenticate` gate (the realtime server is the authority — Supabase alone can't kill a live socket). An in-memory registry (`server/lib/sessions.js`) holds one entry per account, with **last-login-wins** semantics:
+Exactly **one device is active per account at a time**, enforced at the socket `authenticate` gate (the realtime server is the authority — Supabase alone can't kill a live socket). An in-memory registry (`server/lib/sessions.js`) holds one entry per account, carrying the device's `deviceId`, a friendly `deviceName` (e.g. "Chrome on Windows"), and when it signed in.
 
-- **Another device signs in** (idle OR seated in a lobby/live game) → the device signing in **now always wins**; the previously-signed-in device gets a `force_logout` event and is disconnected (even mid-game). The active device is never the one kicked out.
-- **Same physical device** (refresh / new tab / reconnect) → **silent replace**, identified by a persistent `localStorage['bluff_device_id']` sent with `authenticate`. Never disturbed.
+- **A different device signs in** → the server does **not** silently kick either side. It refuses the new login with `session_active_elsewhere` and the **name of the active device**, and the new device shows a takeover screen ("Already signed in elsewhere → Log out that device & continue"). On confirm, the new device re-authenticates with `takeover: true`; the old device gets a `force_logout` event and is disconnected. Net result: still only one active session, but the user chooses when to move it.
+- **Same physical device** (refresh / new tab / reconnect) → **silent replace**, identified by a persistent `localStorage['bluff_device_id']` sent with `authenticate`. Never prompts.
+- **Sign-out** emits a `sign_out` event so the server releases the entry immediately — a signed-out account is never seen as still active (the socket itself stays connected on the auth screen).
 
-**Guests are exempt** (per-browser id, no account to contest). Old clients that send no `deviceId` degrade safely to "unique device" semantics. A defense-in-depth seat guard in `handlers/room.js` (`seatedElsewhere`) blocks a second simultaneous seat at create/join (the evicted device's seat is freed when its socket disconnects).
+**Guests are exempt** (per-browser id, no account to contest). Old clients that send no `deviceId` degrade safely to "unique device" semantics. A defense-in-depth seat guard in `handlers/room.js` (`seatedElsewhere`) blocks a second simultaneous seat at create/join.
 
 ---
 
@@ -301,6 +302,7 @@ Each account may be signed in on **one live device at a time**, enforced at the 
 | `round_win` | `{ roomCode, playerId }` | Host declares round winner |
 | `call_bluff` | `{ roomCode, playerId }` | Player calls bluff |
 | `player_continue` | `{ roomCode, playerId }` | Player continues turn |
+| `sign_out` | `{}` | Release this device's single-active-session entry on sign-out |
 
 ### Server → Client
 | Event | Payload | Description |

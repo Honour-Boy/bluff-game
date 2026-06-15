@@ -11,6 +11,7 @@ import { describe, it, expect, beforeEach } from 'vitest';
 import {
   isValidDeviceId,
   deviceIdFor,
+  sanitizeDeviceName,
   getSession,
   isSeated,
   seatedElsewhere,
@@ -48,6 +49,15 @@ describe('deviceId helpers', () => {
     expect(deviceIdFor(undefined, 'sock1')).toBe('conn:sock1');
     expect(deviceIdFor('garbage', 'sock2')).toBe('conn:sock2');
   });
+
+  it('sanitizeDeviceName strips angle brackets / control chars, clamps, and nulls empties', () => {
+    expect(sanitizeDeviceName('Chrome on Windows')).toBe('Chrome on Windows');
+    expect(sanitizeDeviceName('  Safari   on  iOS ')).toBe('Safari on iOS');
+    expect(sanitizeDeviceName('<script>x</script>')).toBe('scriptx/script');
+    expect(sanitizeDeviceName('')).toBeNull();
+    expect(sanitizeDeviceName(undefined)).toBeNull();
+    expect(sanitizeDeviceName('a'.repeat(200)).length).toBe(60);
+  });
 });
 
 describe('resolveLogin — verdict matrix', () => {
@@ -57,26 +67,35 @@ describe('resolveLogin — verdict matrix', () => {
     expect(v).toEqual({ ok: true, evicted: null });
   });
 
-  it('idle on a different device → last-login-wins (evict old)', () => {
-    registerSession('u1', { socketId: 'old', deviceId: DEV_A, username: 'U' });
-    const io = makeIo(['old', 'new']); // both live, u1 not seated anywhere
+  it('different LIVE device, no takeover → reports session_active_elsewhere with the device name', () => {
+    registerSession('u1', { socketId: 'old', deviceId: DEV_A, deviceName: 'Chrome on Windows', username: 'U' });
+    const io = makeIo(['old', 'new']); // both live
     const v = resolveLogin(io, new Map(), { userId: 'u1', deviceId: DEV_B, socketId: 'new' });
-    expect(v).toEqual({ ok: true, evicted: 'old' });
+    expect(v.ok).toBe(false);
+    expect(v.reason).toBe('session_active_elsewhere');
+    expect(v.activeDevice.name).toBe('Chrome on Windows');
+    expect(typeof v.activeDevice.since).toBe('number');
   });
 
-  it('seated on a different LIVE device → STILL evicts the old (last-login-wins, even in a room)', () => {
+  it('different LIVE device WITH takeover → evicts the old (user confirmed)', () => {
     registerSession('u1', { socketId: 'old', deviceId: DEV_A, username: 'U' });
     const io = makeIo(['old', 'new']);
     const rooms = roomsSeating('u1', 'old');
-    const v = resolveLogin(io, rooms, { userId: 'u1', deviceId: DEV_B, socketId: 'new' });
+    const v = resolveLogin(io, rooms, { userId: 'u1', deviceId: DEV_B, socketId: 'new', takeover: true });
     expect(v).toEqual({ ok: true, evicted: 'old' });
   });
 
-  it('seated but SAME device → allowed (replace, evict old)', () => {
+  it('falls back to a generic device name when none was recorded', () => {
     registerSession('u1', { socketId: 'old', deviceId: DEV_A, username: 'U' });
     const io = makeIo(['old', 'new']);
-    const rooms = roomsSeating('u1', 'old');
-    const v = resolveLogin(io, rooms, { userId: 'u1', deviceId: DEV_A, socketId: 'new' });
+    const v = resolveLogin(io, new Map(), { userId: 'u1', deviceId: DEV_B, socketId: 'new' });
+    expect(v.activeDevice.name).toBe('Another device');
+  });
+
+  it('SAME device → replaces silently (evict old, no conflict)', () => {
+    registerSession('u1', { socketId: 'old', deviceId: DEV_A, username: 'U' });
+    const io = makeIo(['old', 'new']);
+    const v = resolveLogin(io, new Map(), { userId: 'u1', deviceId: DEV_A, socketId: 'new' });
     expect(v).toEqual({ ok: true, evicted: 'old' });
   });
 
