@@ -62,10 +62,10 @@ function GoogleButton({ onClick }) {
 // Redesigned as a moody inn-registry: sign your name in the ledger or produce
 // your seal (Google) to enter. Guests may enter under a pseudonym, but their
 // place at the table vanishes when they leave.
-// Single-device sessions: copy for the reason this device landed back at login.
+// Single-active-session: copy for why this device landed back at login. Set
+// when another device took over (the server force-logged-out this one).
 const SIGNED_OUT_COPY = {
   signed_in_elsewhere: 'You signed in on another device, so this one was signed out.',
-  account_in_room: 'This account is currently at a table on another device. Finish that game, or use a different account here.',
 };
 
 export function AuthScreen({ onSendEmailOtp, onGoogleSignIn, onGuestSignIn, error, setError, signedOutReason }) {

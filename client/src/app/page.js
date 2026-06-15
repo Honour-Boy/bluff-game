@@ -8,6 +8,7 @@ import { useGame } from '../hooks/useGame';
 import { useMusic, gameMusicStage } from '../hooks/useAtmosphere';
 import { useVoice } from '../hooks/useVoice';
 import { AuthScreen } from '../components/screens/AuthScreen';
+import { SessionConflictScreen } from '../components/screens/SessionConflictScreen';
 import { LandingScreen } from '../components/screens/LandingScreen';
 import { GroupsScreen } from '../components/screens/GroupsScreen';
 import { GroupDetailScreen } from '../components/screens/GroupDetailScreen';
@@ -127,6 +128,7 @@ function HomeContent() {
     roomCode, isHost, playerId,
     roomState, myPlayer, isMyTurn, currentPlayer,
     gameMode, error, connected, authenticated, notification,
+    sessionConflict, takeOverSession, signOutSocket,
     createRoom, startTutorial, startSandbox, skipToPowers, advanceTutorial, joinRoom, startGame,
     createGroup, listMyGroups, getGroup,
     inviteToGroup, listMyInvites, respondToInvite,
@@ -467,15 +469,17 @@ function HomeContent() {
   // local session so we can't linger as a ghost player after sign-out.
   const handleSignOut = useCallback(async () => {
     leaveGame();
+    signOutSocket(); // release the server's single-active-session entry
     rearmIntro(); // next entry after logout should replay the intro splash
     await signOut();
-  }, [leaveGame, signOut]);
+  }, [leaveGame, signOutSocket, signOut]);
 
   const handleSignOutGuest = useCallback(async () => {
     leaveGame();
+    signOutSocket();
     rearmIntro();
     await signOutGuest();
-  }, [leaveGame, signOutGuest]);
+  }, [leaveGame, signOutSocket, signOutGuest]);
 
   // Voice — auto-joins muted on room entry (issue #49). Mic stays
   // unpublished until first user-gesture toggle, so first-time visitors
@@ -566,6 +570,20 @@ function HomeContent() {
         error={authError}
         setError={setAuthError}
         signedOutReason={signedOutReason}
+      />
+    );
+  }
+
+  // ─── Single-active-session conflict ────────────────────────
+  // Signed in to Supabase but the socket login was refused because the account
+  // is active on another live device. Show the takeover screen (names that
+  // device) instead of the app until the user logs it out or switches account.
+  if (sessionConflict) {
+    return (
+      <SessionConflictScreen
+        activeDevice={sessionConflict}
+        onTakeOver={takeOverSession}
+        onUseAnother={handleSignOut}
       />
     );
   }

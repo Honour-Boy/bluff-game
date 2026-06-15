@@ -432,17 +432,41 @@ describe('useGame — authentication', () => {
     expect(sessionStorage.getItem('bluff_session')).toBeNull();
   });
 
-  it('an account_in_room auth refusal triggers onForceSignOut', async () => {
+  it('a session_active_elsewhere refusal surfaces the conflict (does NOT sign out)', async () => {
     const getAccessToken = vi.fn().mockResolvedValue('jwt-abc');
     const onForceSignOut = vi.fn();
-    renderHook(() => useGame(getAccessToken, null, null, onForceSignOut));
+    const { result } = renderHook(() => useGame(getAccessToken, null, null, onForceSignOut));
 
     socketHolder.socket.emit.mockImplementationOnce((event, payload, cb) => {
-      cb({ success: false, code: 'account_in_room', error: 'seated elsewhere' });
+      cb({ success: false, code: 'session_active_elsewhere', activeDevice: { name: 'Chrome on Windows', since: Date.now() } });
     });
 
     act(() => socketHolder.socket.__emit('connect'));
-    await waitFor(() => expect(onForceSignOut).toHaveBeenCalledWith('account_in_room'));
+    await waitFor(() => expect(result.current.sessionConflict?.name).toBe('Chrome on Windows'));
+    expect(onForceSignOut).not.toHaveBeenCalled();
+  });
+
+  it('takeOverSession re-authenticates with takeover:true and clears the conflict', async () => {
+    const getAccessToken = vi.fn().mockResolvedValue('jwt-abc');
+    const { result } = renderHook(() => useGame(getAccessToken, null, null, vi.fn()));
+
+    // First auth fails with a conflict.
+    socketHolder.socket.emit.mockImplementationOnce((event, payload, cb) => {
+      cb({ success: false, code: 'session_active_elsewhere', activeDevice: { name: 'Safari on iPhone' } });
+    });
+    act(() => socketHolder.socket.__emit('connect'));
+    await waitFor(() => expect(result.current.sessionConflict).toBeTruthy());
+
+    // The takeover attempt sends takeover:true and succeeds.
+    let sentTakeover;
+    socketHolder.socket.emit.mockImplementationOnce((event, payload, cb) => {
+      sentTakeover = payload?.takeover;
+      cb({ success: true });
+    });
+    await act(async () => { await result.current.takeOverSession(); });
+
+    expect(sentTakeover).toBe(true);
+    await waitFor(() => expect(result.current.sessionConflict).toBeNull());
   });
 
   it('skips reconnect when there is no saved session', async () => {
