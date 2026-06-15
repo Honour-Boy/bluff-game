@@ -23,6 +23,7 @@ import { PreGameSettingsPanel } from '../components/screens/PreGameSettingsPanel
 import { LobbyConfigSummary } from '../components/LobbyConfigSummary';
 import { LeaderboardPanel } from '../components/LeaderboardPanel';
 import { IntroVideo } from '../components/shared/IntroVideo';
+import { IntroLoading } from '../components/shared/IntroLoading';
 import { useIsMobile } from '../hooks/useIsMobile';
 import { shouldShowIntro, markIntroSeen, rearmIntro } from '../lib/intro';
 
@@ -74,22 +75,27 @@ function HomeContent() {
   const searchParams = useSearchParams();
   const initialJoinCode = searchParams.get('join') || null;
   const [homeView, setHomeView] = useState('landing');
-  // ─── Intro splash (revolver-blast video) ──────────────────────────
+  // ─── Intro splash (revolver-blast video → 5s loading beat) ─────────
   // Fires once per genuine game open (fresh tab / first entry, and the
   // next entry after sign-out). Gated in lib/intro.js so it never replays
   // on a refresh, reconnect, or in-app navigation. Decided in an effect
   // (not a lazy initializer) so it stays SSR/hydration-safe.
-  const [introActive, setIntroActive] = useState(false);
+  // Phases: 'video' → 'loading' → null (app shows). The video plays in
+  // full, then a branded 3s progress bar masks the auth/socket bootstrap.
+  const [introPhase, setIntroPhase] = useState(null); // null | 'video' | 'loading'
   const introCheckedRef = useRef(false);
   useEffect(() => {
     if (introCheckedRef.current) return;
     introCheckedRef.current = true;
-    if (shouldShowIntro()) setIntroActive(true);
+    if (shouldShowIntro()) setIntroPhase('video');
   }, []);
-  const dismissIntro = useCallback(() => {
+  // Mark "seen" when the video ends (so a reload during the loading beat
+  // doesn't replay it), then hand off to the 5s loading screen.
+  const finishIntroVideo = useCallback(() => {
     markIntroSeen();
-    setIntroActive(false);
+    setIntroPhase('loading');
   }, []);
+  const finishIntroLoading = useCallback(() => setIntroPhase(null), []);
   const [groupsLoading, setGroupsLoading] = useState(false);
 
   // Replay the intro on a fresh sign-in within the same tab (logout →
@@ -104,6 +110,7 @@ function HomeContent() {
 
   const {
     user, profile, loading, authError, setAuthError,
+    signedOutReason, forceSignOut,
     sendEmailOtp, signInWithGoogle, signInAsGuest, signOut, signOutGuest,
     updateUsername,
     getAccessToken, getGuestAuth, username, isGuest,
@@ -114,7 +121,7 @@ function HomeContent() {
   // Without this third arg, the existing socket stays unauthenticated
   // after guest sign-in and online-room actions get "Not authenticated"
   // (issue #52).
-  const game = useGame(getAccessToken, getGuestAuth, user?.id ?? null);
+  const game = useGame(getAccessToken, getGuestAuth, user?.id ?? null, forceSignOut);
 
   const {
     roomCode, isHost, playerId,
@@ -163,7 +170,7 @@ function HomeContent() {
     const prev = prevUserIdRef.current;
     prevUserIdRef.current = uid;
     if (prev === undefined) return; // initial mount — open-check effect owns it
-    if (!prev && uid && shouldShowIntro()) setIntroActive(true);
+    if (!prev && uid && shouldShowIntro()) setIntroPhase('video');
   }, [user?.id]);
 
   // ─── Section-based background music (#A) ──────────────────────────
@@ -518,8 +525,11 @@ function HomeContent() {
   // Takes the whole screen on a genuine open, over even the loading
   // splash. The auth/socket hooks above keep bootstrapping underneath
   // while it plays, so there's no extra wait once it dismisses.
-  if (introActive) {
-    return <IntroVideo onDone={dismissIntro} />;
+  if (introPhase === 'video') {
+    return <IntroVideo onDone={finishIntroVideo} />;
+  }
+  if (introPhase === 'loading') {
+    return <IntroLoading onDone={finishIntroLoading} />;
   }
 
   // ─── Loading splash ────────────────────────────────────────
@@ -555,6 +565,7 @@ function HomeContent() {
         onGuestSignIn={signInAsGuest}
         error={authError}
         setError={setAuthError}
+        signedOutReason={signedOutReason}
       />
     );
   }

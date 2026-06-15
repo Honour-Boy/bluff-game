@@ -7,56 +7,81 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 // ============================================================
 //
 // Plays `/videos/intro.mp4` (the revolver-blast crimson-paint splash)
-// edge-to-edge, then calls `onDone`. Dismissal paths, all routed through
-// the same guarded `finish` so it can only fire once:
+// edge-to-edge, IN FULL, then calls `onDone`. Dismissal paths, all routed
+// through the same guarded `finish` so it fires once:
 //   • the clip ends (`onEnded`),
 //   • the player taps Skip, or
 //   • Escape.
 //
-// Audio: browsers block autoplay-with-sound without a prior gesture, so
-// we attempt sound first and silently fall back to a muted autoplay if
-// the play() promise rejects — the splash always renders, never a frozen
-// black frame. A hard safety timeout dismisses the overlay if `onEnded`
-// never arrives (codec / decode failure) so the intro can never trap the
-// player out of the app.
+// Full-playback guarantee: browsers may START an unmuted autoplay and then
+// quietly PAUSE it a beat later (the "video plays half then stops" bug). We
+// attempt sound first, but a `pause` before the real end mutes and resumes
+// so the clip always reaches its end. The safety timeout is derived from the
+// actual duration (+buffer) once metadata loads — never a guess that could
+// cut an 8s clip short — with a generous fallback only if metadata never
+// arrives, so the splash can't trap the player either.
 
-const SAFETY_TIMEOUT_MS = 12_000;
+const FALLBACK_SAFETY_MS = 15_000; // only used if loadedmetadata never fires
 
 export function IntroVideo({ onDone }) {
   const videoRef = useRef(null);
   const doneRef = useRef(false);
+  const safetyRef = useRef(null);
   const [leaving, setLeaving] = useState(false);
 
   const finish = useCallback(() => {
     if (doneRef.current) return;
     doneRef.current = true;
+    if (safetyRef.current) clearTimeout(safetyRef.current);
     setLeaving(true);
-    // Let the fade-out play before unmounting.
-    setTimeout(() => onDone?.(), 320);
+    setTimeout(() => onDone?.(), 320); // let the fade-out play before unmounting
   }, [onDone]);
 
-  // Attempt sound-on playback; fall back to muted autoplay if blocked.
+  const armSafety = useCallback((ms) => {
+    if (safetyRef.current) clearTimeout(safetyRef.current);
+    safetyRef.current = setTimeout(finish, ms);
+  }, [finish]);
+
   useEffect(() => {
     const el = videoRef.current;
     if (!el) return undefined;
+
+    // Try sound-on; fall back to a muted autoplay if the browser blocks it.
     el.play().catch(() => {
       el.muted = true;
-      el.play().catch(() => { /* give up silently; onEnded / timeout still dismiss */ });
+      el.play().catch(() => { /* give up silently — onEnded / safety still dismiss */ });
     });
-    return undefined;
-  }, []);
+
+    // If an unmuted autoplay gets paused before the clip ends, mute and resume
+    // so the full video always plays (the "plays half" fix).
+    const onPause = () => {
+      if (doneRef.current || el.ended) return;
+      el.muted = true;
+      el.play().catch(() => {});
+    };
+    // Once we know the real length, size the safety net to it (+buffer).
+    const onMeta = () => {
+      const dur = Number.isFinite(el.duration) && el.duration > 0 ? el.duration : null;
+      armSafety(dur ? dur * 1000 + 3000 : FALLBACK_SAFETY_MS);
+    };
+
+    el.addEventListener('pause', onPause);
+    el.addEventListener('loadedmetadata', onMeta);
+    armSafety(FALLBACK_SAFETY_MS); // until metadata loads
+    if (el.readyState >= 1) onMeta(); // metadata already available
+
+    return () => {
+      el.removeEventListener('pause', onPause);
+      el.removeEventListener('loadedmetadata', onMeta);
+      if (safetyRef.current) clearTimeout(safetyRef.current);
+    };
+  }, [armSafety]);
 
   // Esc to skip.
   useEffect(() => {
     const onKey = (e) => { if (e.key === 'Escape') finish(); };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [finish]);
-
-  // Safety net: never strand the player on the splash.
-  useEffect(() => {
-    const t = setTimeout(finish, SAFETY_TIMEOUT_MS);
-    return () => clearTimeout(t);
   }, [finish]);
 
   return (

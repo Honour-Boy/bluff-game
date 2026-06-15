@@ -62,7 +62,16 @@ function GoogleButton({ onClick }) {
 // Redesigned as a moody inn-registry: sign your name in the ledger or produce
 // your seal (Google) to enter. Guests may enter under a pseudonym, but their
 // place at the table vanishes when they leave.
-export function AuthScreen({ onSendEmailOtp, onGoogleSignIn, onGuestSignIn, error, setError }) {
+// Single-device sessions: copy for the reason this device landed back at login.
+const SIGNED_OUT_COPY = {
+  signed_in_elsewhere: 'You signed in on another device, so this one was signed out.',
+  account_in_room: 'This account is currently at a table on another device. Finish that game, or use a different account here.',
+};
+
+export function AuthScreen({ onSendEmailOtp, onGoogleSignIn, onGuestSignIn, error, setError, signedOutReason }) {
+  const signedOutCopy = signedOutReason
+    ? (SIGNED_OUT_COPY[signedOutReason] || SIGNED_OUT_COPY.signed_in_elsewhere)
+    : null;
   const [email, setEmail] = useState('');
   const [guestName, setGuestName] = useState('');
   // 'email' | 'guest' | 'sent'
@@ -165,6 +174,22 @@ export function AuthScreen({ onSendEmailOtp, onGoogleSignIn, onGuestSignIn, erro
             boxShadow: '0 12px 48px rgba(0,0,0,0.8), 0 0 0 1px rgba(255,255,255,0.03)',
           }}
         >
+          {signedOutCopy && !error && (
+            <div style={{
+              padding: '10px 14px',
+              background: 'rgba(240,181,74,0.10)',
+              border: '1px solid var(--accent)',
+              borderRadius: 'var(--radius)',
+              color: 'var(--accent)',
+              fontFamily: "'Crimson Text', serif",
+              fontSize: 14,
+              marginBottom: 16,
+              lineHeight: 1.5,
+            }}>
+              {signedOutCopy}
+            </div>
+          )}
+
           {error && (
             <div style={{
               padding: '10px 14px',

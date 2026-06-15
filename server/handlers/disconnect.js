@@ -27,12 +27,19 @@ const { broadcastRoomState, emitPowerCardEvents } = require('../lib/broadcast');
 const { maybeRecordGroupWinner } = require('../lib/roomBuilders');
 const { applyBluffOutcome } = require('../lib/orchestration');
 const { discardLobbyIdleState } = require('../lib/idleSweep');
+const { clearSession } = require('../lib/sessions');
 
 function register(io, socket, deps) {
   const { leaderboardRepo } = deps;
 
   socket.on('disconnect', async () => {
     console.log(`[Socket] Disconnected: ${socket.id}`);
+
+    // Single-device registry: release this account's session, but ONLY if it
+    // still points at this socket. A late disconnect from an already-evicted
+    // socket must not wipe the new session that replaced it. (No-op for guests
+    // and unauthenticated sockets — they were never registered.)
+    clearSession(socket.userId, socket.id);
 
     for (const [code, room] of rooms.entries()) {
       // ── Tutorial / Practice: the human is a non-host seat (the bot "hosts"),

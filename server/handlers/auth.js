@@ -15,11 +15,16 @@ const {
   GUEST_USERNAME_MIN,
   GUEST_USERNAME_MAX,
 } = require('../lib/guestAuth');
+const {
+  deviceIdFor,
+  resolveLogin,
+  registerSession,
+} = require('../lib/sessions');
 
 function register(io, socket) {
   // ─── AUTHENTICATE socket with Supabase JWT or guest ──────
   // Must be called once after connecting, before any game events.
-  socket.on('authenticate', async ({ token, guest } = {}, callback) => {
+  socket.on('authenticate', async ({ token, guest, deviceId } = {}, callback) => {
     if (!socketRateLimit(socket, 'authenticate', 5, 10_000).allowed) {
       return callback?.({ success: false, error: 'Rate limit exceeded' });
     }
@@ -63,13 +68,39 @@ function register(io, socket) {
         .eq('id', data.user.id)
         .single();
 
-      socket.userId   = data.user.id;
-      socket.isGuest  = false;
-      socket.username = profile?.username
+      const userId = data.user.id;
+      const username = profile?.username
         || data.user.user_metadata?.username
         || data.user.user_metadata?.full_name
         || data.user.email?.split('@')[0]
         || 'Player';
+
+      // ── Single-device gate (one account, one live device) ──────────
+      // Decide BEFORE stamping socket.userId so a refused login never
+      // becomes able to act on the account. See lib/sessions.js.
+      const device = deviceIdFor(deviceId, socket.id);
+      const verdict = resolveLogin(io, rooms, { userId, deviceId: device, socketId: socket.id });
+      if (!verdict.ok) {
+        return callback?.({
+          success: false,
+          code: 'account_in_room',
+          error: 'This account is currently at a table on another device. Finish that game or use a different account on this device.',
+        });
+      }
+      if (verdict.evicted) {
+        const old = io.sockets?.sockets?.get?.(verdict.evicted);
+        if (old) {
+          old.emit('force_logout', { reason: 'signed_in_elsewhere' });
+          old.userId = null; // immediately dead to game events
+          setTimeout(() => old.disconnect(true), 250); // let the event flush
+        }
+      }
+      registerSession(userId, { socketId: socket.id, deviceId: device, username });
+
+      socket.userId   = userId;
+      socket.deviceId = device;
+      socket.isGuest  = false;
+      socket.username = username;
 
       callback?.({ success: true });
     } catch (err) {
