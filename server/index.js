@@ -8,6 +8,7 @@ const { Server } = require('socket.io');
 const cors = require('cors');
 const rateLimit = require('express-rate-limit');
 const { registerSocketHandlers, rooms } = require('./socketHandlers');
+const { makeOriginAllow } = require('./lib/corsOrigins');
 
 const PORT = process.env.PORT || 3001;
 
@@ -27,11 +28,20 @@ if (!corsOrigin) {
   corsOrigin = '*';
   console.warn('[cors] CLIENT_URL not set — falling back to "*" (development only).');
 }
-// Allow comma-separated list, e.g. "https://app.com,https://staging.app.com"
-const allowedOrigins = corsOrigin === '*' ? '*' : corsOrigin.split(',').map(s => s.trim()).filter(Boolean);
+// CLIENT_URL is a comma-separated EXACT allow-list, e.g.
+//   "https://app.com,https://staging.app.com".
+// PREVIEW_ORIGIN_REGEX (optional) additionally allows any origin matching a
+// pattern — used on the staging box (Railway) so dynamic Vercel preview URLs
+// (https://bluff-game-<hash>-<scope>.vercel.app) pass without a redeploy. Anchor
+// it to your project+scope, e.g.
+//   ^https://bluff-game-[a-z0-9-]+-honour-boys-projects\.vercel\.app$
+const previewOriginRegex = process.env.PREVIEW_ORIGIN_REGEX || null;
+const originAllowed = makeOriginAllow({ clientUrl: corsOrigin, previewRegex: previewOriginRegex });
+// Express/Socket.IO origin callback form: (origin, cb) => cb(err, allow).
+const corsOriginFn = (origin, cb) => cb(null, originAllowed(origin));
 
 const app = express();
-app.use(cors({ origin: allowedOrigins }));
+app.use(cors({ origin: corsOriginFn }));
 app.use(express.json());
 
 // ─── Health check / room info endpoints ─────────────────────
@@ -63,7 +73,7 @@ app.get('/room/:code',
 // ─── HTTP + Socket.IO server ─────────────────────────────────
 const server = http.createServer(app);
 const io = new Server(server, {
-  cors: { origin: allowedOrigins, methods: ['GET', 'POST'] },
+  cors: { origin: corsOriginFn, methods: ['GET', 'POST'] },
   // §2.1 — aggressive heartbeat. A shorter ping interval keeps a steady stream
   // of WebSocket ping/pong frames flowing so idle-detection on free-tier hosts
   // (Render et al.) is far less likely to flag the container as inactive and
@@ -177,6 +187,6 @@ process.on('uncaughtException', (err) => {
 });
 
 server.listen(PORT, () => {
-  console.log(`🎮 Bluff Game Server running on port ${PORT} (cors origin: ${corsOrigin})`);
+  console.log(`🎮 Bluff Game Server running on port ${PORT} (cors origin: ${corsOrigin}${previewOriginRegex ? ` | preview regex: ${previewOriginRegex}` : ''})`);
   console.log(`[diag] keepalive every ${KEEPALIVE_INTERVAL_MS / 1000}s, diagnostics every ${DIAGNOSTICS_INTERVAL_MS / 1000}s, socket ping every 15s`);
 });
