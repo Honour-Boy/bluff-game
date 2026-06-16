@@ -53,10 +53,20 @@ export function useTourAnchor(anchorId, activeBeatKey, { missingTimeoutMs = MISS
 
     let resizeObserver = null;
     let observedEl = null;
+    let scrolledIntoView = false; // once per beat — bring a low menu row into view
 
     const pump = () => {
       if (cancelled) return;
       const el = document.querySelector(`[data-tour-id="${anchorId}"]`);
+
+      // The target may sit below the fold of a scrolling container (e.g. the
+      // settings menu's Leave / Voice rows). Scroll it into view ONCE so the
+      // cutout lands on it instead of clipping off-screen (which read as a skip).
+      if (el && !scrolledIntoView && typeof el.scrollIntoView === 'function') {
+        scrolledIntoView = true;
+        try { el.scrollIntoView({ block: 'nearest', inline: 'nearest' }); } catch (_) {}
+      }
+
       const next = measure(el);
 
       // (Re)attach a ResizeObserver to the live element each time it changes.
