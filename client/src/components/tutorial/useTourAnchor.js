@@ -97,6 +97,11 @@ export function useTourAnchor(anchorId, activeBeatKey, { missingTimeoutMs = MISS
     pump();
     const kick1 = setTimeout(schedule, 50);
     const kick2 = setTimeout(schedule, 200);
+    // Low-frequency safety re-measure: a target can vanish (menu/modal unmount)
+    // with NO resize/scroll event, and a ResizeObserver doesn't fire on removal —
+    // so poll, ensuring a silently-removed anchor still trips the missing timeout
+    // (never strand the player) and a drifting target stays tracked.
+    const poll = setInterval(schedule, 400);
 
     const onResize = () => schedule();
     const onScroll = () => schedule();
@@ -108,6 +113,7 @@ export function useTourAnchor(anchorId, activeBeatKey, { missingTimeoutMs = MISS
       cancelled = true;
       clearTimeout(kick1);
       clearTimeout(kick2);
+      clearInterval(poll);
       if (missingTimerRef.current) { clearTimeout(missingTimerRef.current); missingTimerRef.current = null; }
       if (rafRef.current && typeof cancelAnimationFrame !== 'undefined') cancelAnimationFrame(rafRef.current);
       rafRef.current = 0;

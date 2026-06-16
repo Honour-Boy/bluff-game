@@ -671,7 +671,9 @@ export function OnlinePlayerUI({
     || ui.justEliminated;
   const aBannerShowing = (powerEventQueue?.length || 0) > 0;
   // Announcements wait behind any blocking overlay (broadens the spin-only hold).
-  const holdAnnouncements = holdForSpin || blockingOverlayActive;
+  // Also held for the whole spotlight tour so a stray banner can't pop over the
+  // cutout (the staged steps don't generate any, but this keeps it guaranteed).
+  const holdAnnouncements = holdForSpin || blockingOverlayActive || tourActive;
   // The "your turn" notice is redundant in the guided tutorial (the coach says it)
   // and must never render over another overlay.
   const suppressTurnNotice = isTutorial || blockingOverlayActive || aBannerShowing;

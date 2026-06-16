@@ -69,6 +69,15 @@ describe('computePopupPosition — quadrant flip', () => {
     expect(p.left).toBeGreaterThanOrEqual(8);
     expect(p.top).toBeGreaterThanOrEqual(8);
   });
+
+  it('keeps a narrow popup fully on-screen at phone width', () => {
+    const phoneVw = 320;
+    const popupW = 296; // 320 - 24, what the component uses on a phone
+    const hole = computeHole({ top: 60, left: 40, width: 120, height: 40 }, 'square', phoneVw, 640);
+    const p = computePopupPosition(hole, phoneVw, 640, popupW);
+    expect(p.left).toBeGreaterThanOrEqual(8);
+    expect(p.left + popupW).toBeLessThanOrEqual(phoneVw - 8 + 0.001);
+  });
 });
 
 describe('TourSpotlight — rendering', () => {
@@ -103,5 +112,20 @@ describe('TourSpotlight — rendering', () => {
   it('renders nothing without a rect', () => {
     const { container } = render(<TourSpotlight rect={null} copy="hi" />);
     expect(container.firstChild).toBeNull();
+  });
+
+  it('shrinks the popup to fit a phone-width viewport', () => {
+    const original = window.innerWidth;
+    try {
+      window.innerWidth = 320;
+      const { container } = render(
+        <TourSpotlight rect={rect} shape="rect" copy="hi" showNext onNext={() => {}} onSkip={() => {}} />,
+      );
+      const popup = container.querySelector('[data-tour-popup="true"]');
+      expect(popup).toBeTruthy();
+      expect(popup.style.width).toBe('296px'); // 320 - 24
+    } finally {
+      window.innerWidth = original;
+    }
   });
 });

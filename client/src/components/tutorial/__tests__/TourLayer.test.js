@@ -72,6 +72,20 @@ describe('TourLayer', () => {
     expect(screen.getByText('last')).toBeTruthy();
   });
 
+  it('skips a beat whose anchor is REMOVED mid-tour (never strands)', () => {
+    mountAnchors(['a1', 'a2', 'a3']);
+    render(<TourLayer beats={BEATS} signals={{}} onComplete={() => {}} onSkip={() => {}} />);
+    act(() => { vi.advanceTimersByTime(120); });
+    act(() => { screen.getByText('Next').click(); });   // → beat 2 (click-target on a2)
+    act(() => { vi.advanceTimersByTime(120); });
+    expect(screen.getByText('do it')).toBeTruthy();
+
+    // a2 vanishes (e.g. a menu/modal unmounts) with no resize/scroll event.
+    document.querySelector('[data-tour-id="a2"]').remove();
+    act(() => { vi.advanceTimersByTime(2200); });        // poll detects + missing timeout
+    expect(screen.getByText('last')).toBeTruthy();
+  });
+
   it('Escape fires onSkip', () => {
     mountAnchors(['a1', 'a2', 'a3']);
     const onSkip = vi.fn();

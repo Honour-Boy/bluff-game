@@ -94,9 +94,12 @@ export function TourSpotlight({
   const vw = typeof window !== 'undefined' ? window.innerWidth : 1024;
   const vh = typeof window !== 'undefined' ? window.innerHeight : 768;
 
+  // Narrow viewports (phones): shrink the popup so it never overflows; the side-
+  // fit math + clamping then use the real width.
+  const popupW = Math.min(POPUP_W, vw - 24);
   const hole = computeHole(rect, shape, vw, vh);
   const strips = computeStrips(hole, vw, vh);
-  const popup = computePopupPosition(hole, vw, vh);
+  const popup = computePopupPosition(hole, vw, vh, popupW);
 
   return (
     <div role="dialog" aria-modal="true" aria-label={copy || 'Guided tour'}>
@@ -133,8 +136,9 @@ export function TourSpotlight({
 
       {/* Explanation popup */}
       <div
+        data-tour-popup="true"
         style={{
-          position: 'fixed', top: popup.top, left: popup.left, width: POPUP_W,
+          position: 'fixed', top: popup.top, left: popup.left, width: popupW,
           zIndex: POPUP_Z,
           background: 'var(--surface)',
           border: '1px solid var(--accent-dim)',
@@ -170,6 +174,7 @@ export function TourSpotlight({
           <button
             type="button"
             onClick={onSkip}
+            aria-label="Skip the tour"
             style={{
               background: 'none', border: 'none', padding: 0,
               fontFamily: "'Space Mono', monospace", fontSize: 10,
@@ -180,7 +185,7 @@ export function TourSpotlight({
             Skip tour
           </button>
           {showNext && (
-            <button type="button" className="primary" onClick={onNext} style={{ padding: '8px 22px', fontSize: 12 }}>
+            <button type="button" className="primary" onClick={onNext} aria-label="Next step" style={{ padding: '8px 22px', fontSize: 12 }}>
               Next
             </button>
           )}
