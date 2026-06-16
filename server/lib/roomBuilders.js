@@ -3,7 +3,7 @@
 // ============================================================
 
 const engine = require('../gameEngine');
-const { isPersistentUserId } = require('../groupsRepo');
+const { isPersistentUserId, normalizeTier } = require('../groupsRepo');
 
 function getGroupAuthError(socket) {
   if (!socket.userId) return 'Not authenticated';
@@ -28,15 +28,26 @@ function buildPersistentGroupRoom(group, opts = {}) {
     settingsRecord = null,
     defaultSettings,
   } = opts;
+  // Phase 6 (G4) — the group is bound to ONE tier (groups.required_tier), NOT
+  // the live host's tier. Cap the stored/default settings to that tier so a
+  // persistent group room can never bypass the gate Phase 2 added for ad-hoc
+  // rooms. (Secret roles are forced ON for Syndicate+ by applyTierCapsToConfig.)
+  const tier = normalizeTier(group?.required_tier);
+  const rawConfig = settingsRecord?.payload || defaultSettings || engine.defaultRoomConfig();
+  const cappedConfig = engine.applyTierCapsToConfig(
+    engine.normalizeRoomConfig(rawConfig),
+    tier,
+  );
   const room = engine.createRoom(
     hostSocketId,
     engine.MODES.ONLINE,
-    settingsRecord?.payload || defaultSettings,
+    cappedConfig,
   );
   room.code = group.code;
   room.groupId = group.id;
   room.hostUserId = group.host_user_id;
   room.hostSocketId = hostSocketId;
+  engine.applyTierFlags(room, tier);
   room.groupSettingsMeta = settingsRecord
     ? {
         updatedAt: settingsRecord.updatedAt,

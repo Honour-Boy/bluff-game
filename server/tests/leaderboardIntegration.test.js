@@ -80,7 +80,11 @@ describe('group leaderboard integration', () => {
       upsertGroupSettings: vi.fn().mockResolvedValue({ updatedAt: '2026-05-15T22:00:00.000Z' }),
     };
 
-    registerSocketHandlers(io, socket, { leaderboardRepo, groupSettingsRepo });
+    registerSocketHandlers(io, socket, {
+      leaderboardRepo,
+      groupSettingsRepo,
+      groupsRepo: { getActiveGroupById: async () => null },
+    });
     const startGame = socket.handlers.get('start_game');
     const endTurn = socket.handlers.get('end_turn');
 

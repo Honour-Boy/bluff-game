@@ -5,6 +5,36 @@ const GROUP_NAME_MAX = 64;
 const GROUP_MEMBER_LIMIT = 100;
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
+const VALID_TIERS = ['streets', 'backroads', 'syndicate', 'covenant'];
+// Display labels for tier-named gate errors (Phase 6). Kept here (not the
+// engine) so the repo's error messages are self-contained.
+const TIER_LABELS = {
+  streets: 'Streets',
+  backroads: 'Backroads',
+  syndicate: 'Syndicate',
+  covenant: 'Covenant',
+};
+
+function normalizeTier(raw) {
+  return VALID_TIERS.includes(raw) ? raw : 'streets';
+}
+
+// Ordinal rank for upward-only comparisons (streets < … < covenant).
+function tierRank(tier) {
+  const i = VALID_TIERS.indexOf(normalizeTier(tier));
+  return i < 0 ? 0 : i;
+}
+
+function tierLabel(tier) {
+  return TIER_LABELS[tier] || TIER_LABELS.streets;
+}
+
+// The user-facing message when a player's tier doesn't match a group's. Pure
+// so it can be unit-tested and reused on both the join and entry gates.
+function tierMismatchMessage(requiredTier, joinerTier) {
+  return `This crew runs ${tierLabel(requiredTier)} stakes — you're ${tierLabel(joinerTier)}.`;
+}
+
 function normalizeGroupName(raw) {
   const name = String(raw || '').trim();
   if (!name || name.length > GROUP_NAME_MAX) return null;
@@ -94,7 +124,7 @@ function createGroupsRepo(supabase) {
   async function getActiveGroupByCode(code) {
     const result = await supabase
       .from('groups')
-      .select('id, code, name, host_user_id, owner_user_id, created_at, deleted_at')
+      .select('id, code, name, host_user_id, owner_user_id, required_tier, created_at, deleted_at')
       .eq('code', code)
       .is('deleted_at', null)
       .limit(1);
@@ -104,7 +134,7 @@ function createGroupsRepo(supabase) {
   async function getActiveGroupById(groupId) {
     const result = await supabase
       .from('groups')
-      .select('id, code, name, host_user_id, owner_user_id, created_at, deleted_at')
+      .select('id, code, name, host_user_id, owner_user_id, required_tier, created_at, deleted_at')
       .eq('id', groupId)
       .is('deleted_at', null)
       .limit(1);
@@ -263,10 +293,14 @@ function createGroupsRepo(supabase) {
     return maybeSingle(requireData(result));
   }
 
-  async function createGroup({ hostUserId, name }) {
+  // Phase 6 (G2) — a group is bound to the creator's current tier. The handler
+  // derives `requiredTier` from the creator's level (XP) and passes it in; the
+  // client cannot pick a tier it isn't in (the value is overwritten here).
+  async function createGroup({ hostUserId, name, requiredTier = 'streets' }) {
     if (!isPersistentUserId(hostUserId)) throw new Error('Groups require an authenticated account');
     const normalizedName = normalizeGroupName(name);
     if (!normalizedName) throw new Error('Group name must be between 1 and 64 characters');
+    const tier = normalizeTier(requiredTier);
 
     // §3.3 — block duplicate active group names before allocating a code.
     const nameClash = await getActiveGroupByName(normalizedName);
@@ -284,8 +318,9 @@ function createGroupsRepo(supabase) {
         name: normalizedName,
         host_user_id: hostUserId,
         owner_user_id: hostUserId,
+        required_tier: tier,
       })
-      .select('id, code, name, host_user_id, owner_user_id')
+      .select('id, code, name, host_user_id, owner_user_id, required_tier')
       .single();
     const group = requireData(insertGroupResult);
 
@@ -303,6 +338,7 @@ function createGroupsRepo(supabase) {
       code: group.code,
       name: group.name,
       role: 'host',
+      requiredTier: group.required_tier,
     };
   }
 
@@ -318,7 +354,7 @@ function createGroupsRepo(supabase) {
     const groupIds = memberships.map((membership) => membership.group_id);
     const groupsResult = await supabase
       .from('groups')
-      .select('id, code, name, host_user_id, owner_user_id, created_at, deleted_at')
+      .select('id, code, name, host_user_id, owner_user_id, required_tier, created_at, deleted_at')
       .in('id', groupIds)
       .is('deleted_at', null);
     const groups = requireData(groupsResult) || [];
@@ -344,6 +380,7 @@ function createGroupsRepo(supabase) {
           name: group.name,
           role: membership.role,
           memberCount: counts.get(group.id) || 0,
+          requiredTier: group.required_tier || 'streets',
         };
       })
       .sort((a, b) => a.name.localeCompare(b.name));
@@ -360,6 +397,7 @@ function createGroupsRepo(supabase) {
       role: membership.role,
       hostUserId: group.host_user_id,
       ownerUserId: group.owner_user_id,
+      requiredTier: group.required_tier || 'streets',
       members,
       pendingInvites,
     };
@@ -524,7 +562,10 @@ function createGroupsRepo(supabase) {
       .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
   }
 
-  async function respondToInvite({ inviteId, inviteeUserId, accept }) {
+  // Phase 6 (G3) — `joinerTier` is the invitee's current tier (derived from
+  // their XP by the handler). Accepting an invite to a group whose
+  // required_tier doesn't match is rejected; declining is always allowed.
+  async function respondToInvite({ inviteId, inviteeUserId, accept, joinerTier = null }) {
     if (!isPersistentUserId(inviteeUserId)) throw new Error('Groups require an authenticated account');
     const inviteResult = await supabase
       .from('group_invites')
@@ -550,6 +591,12 @@ function createGroupsRepo(supabase) {
 
     const group = await getActiveGroupById(invite.group_id);
     if (!group) throw new Error('Group not found');
+
+    // G3 — tier gate. A new member must match the group's bound tier.
+    const requiredTier = group.required_tier || 'streets';
+    if (joinerTier && normalizeTier(joinerTier) !== requiredTier) {
+      throw new Error(tierMismatchMessage(requiredTier, normalizeTier(joinerTier)));
+    }
 
     const existingMembership = await getMembership(invite.group_id, inviteeUserId);
     if (!existingMembership) {
@@ -694,6 +741,73 @@ function createGroupsRepo(supabase) {
     return !!membership;
   }
 
+  // ─── Phase 6 (G5) — owner tier-mismatch resolution ──────────────────────────
+  // XP only ever rises, so an owner can be promoted ABOVE the group's bound
+  // tier. The group then blocks new games until the owner resolves it: either
+  // re-tier the group up (setGroupTier — upward only, evicts sub-tier members)
+  // or hand ownership to a member who still matches the tier (transferOwnership).
+
+  // Re-tier the group up to `newTier` (owner-only, upward-only) and evict the
+  // members the handler identified as below the new tier. The owner is never
+  // evicted (they are, by definition, AT or above the new tier). Returns the
+  // evicted user ids so the handler can boot them from any live room.
+  async function setGroupTier({ groupId, ownerUserId, newTier, evictUserIds = [] }) {
+    const group = await getActiveGroupById(groupId);
+    if (!group) throw new Error('Group not found');
+    if (group.owner_user_id !== ownerUserId) throw new Error('Only the group owner can re-tier this group');
+    const next = normalizeTier(newTier);
+    const current = normalizeTier(group.required_tier);
+    if (tierRank(next) <= tierRank(current)) {
+      throw new Error('A group can only be re-tiered upward');
+    }
+
+    const updateResult = await supabase
+      .from('groups')
+      .update({ required_tier: next })
+      .eq('id', groupId)
+      .is('deleted_at', null);
+    requireData(updateResult);
+
+    const evicted = [];
+    for (const userId of evictUserIds) {
+      if (userId === ownerUserId) continue; // never evict the owner
+      const deleteResult = await supabase
+        .from('group_members')
+        .delete()
+        .eq('group_id', groupId)
+        .eq('user_id', userId);
+      requireData(deleteResult);
+      await clearInviteHistory(groupId, userId);
+      evicted.push(userId);
+    }
+
+    return { success: true, requiredTier: next, evicted };
+  }
+
+  // Hand the PERMANENT ownership to a tier-matching member (G5 path a). Unlike
+  // transferHost (which only moves the acting host_user_id stand-in), this moves
+  // owner_user_id too, and syncs roles so the new owner is host-of-record. The
+  // handler must verify the new owner currently matches the group's tier.
+  async function transferOwnership({ groupId, ownerUserId, newOwnerUserId }) {
+    const group = await getActiveGroupById(groupId);
+    if (!group) throw new Error('Group not found');
+    if (group.owner_user_id !== ownerUserId) throw new Error('Only the group owner can hand over ownership');
+    if (ownerUserId === newOwnerUserId) return { success: true, ownerUserId };
+
+    const newOwnerMembership = await getMembership(groupId, newOwnerUserId);
+    if (!newOwnerMembership) throw new Error('New owner must be a group member');
+
+    const updateGroupResult = await supabase
+      .from('groups')
+      .update({ owner_user_id: newOwnerUserId, host_user_id: newOwnerUserId })
+      .eq('id', groupId)
+      .is('deleted_at', null);
+    requireData(updateGroupResult);
+
+    await applyActingHost(groupId, newOwnerUserId);
+    return { success: true, ownerUserId: newOwnerUserId, hostUserId: newOwnerUserId };
+  }
+
   return {
     GROUP_MEMBER_LIMIT,
     createGroup,
@@ -713,6 +827,8 @@ function createGroupsRepo(supabase) {
     getActiveGroupByName,
     getActiveGroupById,
     isGroupMember,
+    setGroupTier,
+    transferOwnership,
   };
 }
 
@@ -721,7 +837,12 @@ module.exports = {
   GROUP_CODE_LENGTH,
   MAX_GROUP_CODE_ATTEMPTS,
   GROUP_MEMBER_LIMIT,
+  VALID_TIERS,
   normalizeGroupName,
+  normalizeTier,
+  tierRank,
+  tierLabel,
+  tierMismatchMessage,
   isPersistentUserId,
   generateGroupCodeCandidate,
   pickUniqueGroupCode,

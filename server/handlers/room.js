@@ -35,6 +35,7 @@ const { resolveLeaverPendingPauses } = require('../lib/orchestration');
 const { discardLobbyIdleState } = require('../lib/idleSweep');
 const { rollBotCallRate } = require('../engine/botStrategy');
 const { seatedElsewhere } = require('../lib/sessions');
+const { tierMismatchMessage } = require('../groupsRepo');
 
 // Defense-in-depth for the single-device policy: an account already seated at
 // a table via a different live socket can never create or join a second seat.
@@ -252,6 +253,26 @@ function register(io, socket, deps) {
         const allowed = await groupsRepo.isGroupMember(group.id, socket.userId);
         if (!allowed) {
           return callback({ success: false, error: 'not_a_group_member' });
+        }
+
+        // Phase 6 (G3) — tier entry gate. A group is bound to one tier; a
+        // member promoted ABOVE it (XP only rises) is blocked on entry until
+        // the owner re-tiers the group or hands over — block-on-entry avoids
+        // surprise removals. Guests never reach group rooms. Default Streets on
+        // any lookup failure so a flaky read can't silently open a higher tier.
+        const requiredTier = group.required_tier || 'streets';
+        let joinerTier = 'streets';
+        try {
+          joinerTier = engine.tierForLevel(await leaderboardRepo.getLevel(socket.userId));
+        } catch (err) {
+          console.error('[Room] join tier lookup failed, defaulting to streets', err);
+        }
+        if (joinerTier !== requiredTier) {
+          return callback({
+            success: false,
+            error: tierMismatchMessage(requiredTier, joinerTier),
+            code: 'tier_mismatch',
+          });
         }
       } else if (!room) {
         return callback({ success: false, error: 'Room not found' });

@@ -1,6 +1,8 @@
 'use client';
 
 import { useState } from 'react';
+import { TierBadge } from '../shared/TierBadge';
+import { tierMeta } from '../../lib/tiers';
 
 function formatJoinedDate(value) {
   if (!value) return 'Joined recently';
@@ -71,6 +73,8 @@ export function GroupDetailScreen({
   onTransferHost,
   onReclaimHost,
   onHandBackHost,
+  onTransferOwnership,
+  onRegroupRetier,
   onRemoveMember,
   onDeleteGroup,
   onLeaveGroup,
@@ -91,6 +95,22 @@ export function GroupDetailScreen({
   const isOwner = !!ownerUserId && currentUserId === ownerUserId;
   const isActingHost = !!actingHostId && currentUserId === actingHostId;
   const standInActive = !!ownerUserId && !!actingHostId && ownerUserId !== actingHostId;
+
+  // Phase 6 — group tier + owner mismatch (G5). The server flags
+  // `ownerTierMismatch` and annotates each member with `.tier`/`.tierMatches`
+  // (only when there IS a mismatch) so the owner can resolve it.
+  const requiredTier = group?.requiredTier || 'streets';
+  const ownerTierMismatch = !!group?.ownerTierMismatch;
+  const handoverCandidates = ownerTierMismatch
+    ? (group.members || []).filter((m) => m.tierMatches && m.userId !== ownerUserId)
+    : [];
+  const evictionCount = ownerTierMismatch
+    ? (group.members || []).filter((m) => m.tierMatches === false && m.userId !== ownerUserId).length
+    : 0;
+  const myMembership = (group?.members || []).find((m) => m.userId === currentUserId);
+  // When a mismatch is active the server resolves each member's tier; a member
+  // whose tier no longer matches can't enter the room (block-on-entry).
+  const myEntryBlocked = ownerTierMismatch && myMembership && myMembership.tierMatches === false;
 
   if (!group) {
     return (
@@ -148,6 +168,18 @@ export function GroupDetailScreen({
   const handleRemoveMember = async (userId) => {
     setBusyAction(`remove:${userId}`);
     await onRemoveMember(userId);
+    setBusyAction(null);
+  };
+
+  const handleTransferOwnership = async (userId) => {
+    setBusyAction(`owner:${userId}`);
+    await onTransferOwnership?.(userId);
+    setBusyAction(null);
+  };
+
+  const handleRegroupRetier = async () => {
+    setBusyAction('retier');
+    await onRegroupRetier?.();
     setBusyAction(null);
   };
 
@@ -227,6 +259,9 @@ export function GroupDetailScreen({
           >
             {group.name}
           </h1>
+          <div style={{ marginTop: 12 }}>
+            <TierBadge tier={requiredTier} size="lg" />
+          </div>
           <div style={{
             marginTop: 10,
             fontFamily: "'Crimson Text', serif",
@@ -248,7 +283,13 @@ export function GroupDetailScreen({
           <button type="button" onClick={onBack}>
             ← Back to Guilds
           </button>
-          <button type="button" className="primary" onClick={onEnterRoom}>
+          <button
+            type="button"
+            className="primary"
+            onClick={onEnterRoom}
+            disabled={myEntryBlocked}
+            title={myEntryBlocked ? `This crew runs ${tierMeta(requiredTier).name} stakes — you've outgrown it.` : undefined}
+          >
             Enter the Room →
           </button>
         </div>
@@ -304,6 +345,88 @@ export function GroupDetailScreen({
             <button type="button" onClick={handleHandBackHost} disabled={busyAction === 'handback'}>
               {busyAction === 'handback' ? 'Returning…' : 'Return Command'}
             </button>
+          )}
+        </div>
+      )}
+
+      {/* Phase 6 (G5) — owner tier-mismatch resolution. The owner has climbed
+          above the crew's bound tier; new games are blocked until they re-tier
+          the guild up or hand it to a member who still matches. */}
+      {ownerTierMismatch && (
+        <div style={{
+          padding: '16px 18px',
+          borderRadius: 'var(--radius)',
+          border: '1px solid var(--accent2)',
+          background: 'rgba(155,28,28,0.08)',
+          fontFamily: "'Crimson Text', serif",
+          display: 'flex',
+          flexDirection: 'column',
+          gap: 12,
+        }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+            <span style={{
+              fontFamily: "'Cinzel', serif", fontSize: 11, letterSpacing: '0.16em',
+              textTransform: 'uppercase', color: 'var(--accent2)', fontWeight: 700,
+            }}>
+              Tier Mismatch
+            </span>
+            <TierBadge tier={requiredTier} />
+            <span style={{ color: 'var(--text-dim)', fontSize: 13 }}>crew ·</span>
+            <span style={{ color: 'var(--text-dim)', fontSize: 13 }}>owner now</span>
+            <TierBadge tier={group.ownerTier} />
+          </div>
+          <div style={{ fontSize: 14, color: 'var(--text)', lineHeight: 1.6 }}>
+            {isOwner
+              ? 'You’ve outgrown this crew’s tier. New games are blocked until you re-tier the guild up or hand it to a member who still matches the tier.'
+              : 'The owner has outgrown this crew’s tier. New games are paused until they re-tier the guild or hand it over.'}
+          </div>
+
+          {isOwner && (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+              {/* (b) Re-tier up — evicts sub-tier members. */}
+              <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
+                <button
+                  type="button"
+                  className="primary"
+                  onClick={handleRegroupRetier}
+                  disabled={busyAction === 'retier'}
+                >
+                  {busyAction === 'retier'
+                    ? 'Re-tiering…'
+                    : `Re-tier guild to ${tierMeta(group.ownerTier).name}`}
+                </button>
+                <span style={{ fontSize: 13, color: 'var(--text-dim)', fontStyle: 'italic' }}>
+                  {evictionCount > 0
+                    ? `Removes ${evictionCount} member${evictionCount === 1 ? '' : 's'} below the new tier.`
+                    : 'No members will be removed.'}
+                </span>
+              </div>
+
+              {/* (a) Hand ownership to a tier-matching member. */}
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                <span style={{ fontSize: 12, color: 'var(--text-dim)', letterSpacing: '0.04em' }}>
+                  …or hand the guild to a {tierMeta(requiredTier).name} member:
+                </span>
+                {handoverCandidates.length === 0 ? (
+                  <span style={{ fontSize: 13, color: 'var(--text-dim)', fontStyle: 'italic' }}>
+                    No member currently matches the crew’s tier.
+                  </span>
+                ) : (
+                  <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                    {handoverCandidates.map((m) => (
+                      <button
+                        key={m.userId}
+                        type="button"
+                        onClick={() => handleTransferOwnership(m.userId)}
+                        disabled={busyAction === `owner:${m.userId}`}
+                      >
+                        {busyAction === `owner:${m.userId}` ? 'Handing over…' : `Hand to ${m.username}`}
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </div>
           )}
         </div>
       )}

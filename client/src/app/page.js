@@ -144,6 +144,7 @@ function HomeContent() {
     inviteToGroup, listMyInvites, respondToInvite,
     revokeInvite, removeMember, transferHost,
     reclaimHost, handBackHost,
+    transferOwnership, regroupRetier,
     deleteGroup, leaveGroup, getGroupLeaderboard,
     nextTurn, resolveBluff,
     playCard, endTurn, playerSpin,
@@ -430,6 +431,33 @@ function HomeContent() {
     }
     return res;
   }, [fetchGroupDetail, invalidateGroupsCache, refreshGroupsHome, selectedGroup?.id, handBackHost]);
+
+  // Phase 6 (G5) — owner tier-mismatch resolution.
+  const handleTransferOwnership = useCallback(async (newOwnerUserId) => {
+    if (!selectedGroup?.id) return { success: false, error: 'Group not found' };
+    const res = await transferOwnership(selectedGroup.id, newOwnerUserId);
+    if (res?.success) {
+      invalidateGroupsCache('all', selectedGroup.id);
+      await Promise.all([
+        refreshGroupsHome(),
+        fetchGroupDetail(selectedGroup.id),
+      ]);
+    }
+    return res;
+  }, [fetchGroupDetail, invalidateGroupsCache, refreshGroupsHome, selectedGroup?.id, transferOwnership]);
+
+  const handleRegroupRetier = useCallback(async () => {
+    if (!selectedGroup?.id) return { success: false, error: 'Group not found' };
+    const res = await regroupRetier(selectedGroup.id);
+    if (res?.success) {
+      invalidateGroupsCache('all', selectedGroup.id);
+      await Promise.all([
+        refreshGroupsHome(),
+        fetchGroupDetail(selectedGroup.id),
+      ]);
+    }
+    return res;
+  }, [fetchGroupDetail, invalidateGroupsCache, refreshGroupsHome, selectedGroup?.id, regroupRetier]);
 
   const handleRemoveMember = useCallback(async (userId) => {
     if (!selectedGroup?.id) return { success: false, error: 'Group not found' };
@@ -760,6 +788,8 @@ function HomeContent() {
           onTransferHost={handleTransferHost}
           onReclaimHost={handleReclaimHost}
           onHandBackHost={handleHandBackHost}
+          onTransferOwnership={handleTransferOwnership}
+          onRegroupRetier={handleRegroupRetier}
           onRemoveMember={handleRemoveMember}
           onDeleteGroup={handleDeleteGroup}
           onLeaveGroup={handleLeaveGroup}

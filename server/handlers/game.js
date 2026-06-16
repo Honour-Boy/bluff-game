@@ -96,7 +96,25 @@ function schedulePreGameSelectionOpen(io, code) {
 }
 
 function register(io, socket, deps) {
-  const { groupSettingsRepo, leaderboardRepo } = deps;
+  const { groupSettingsRepo, leaderboardRepo, groupsRepo } = deps;
+
+  // Phase 6 (G5) — a persistent group whose OWNER has been promoted above the
+  // group's bound tier is in a mismatch state that blocks new games until the
+  // owner re-tiers or hands over. Checked at start time (lazily) for group
+  // rooms only; ad-hoc rooms and a matching owner pass straight through.
+  async function groupOwnerTierMismatch(room) {
+    if (!room.groupId || !groupsRepo || !leaderboardRepo) return null;
+    try {
+      const group = await groupsRepo.getActiveGroupById(room.groupId);
+      if (!group) return null;
+      const requiredTier = group.required_tier || 'streets';
+      const ownerTier = engine.tierForLevel(await leaderboardRepo.getLevel(group.owner_user_id));
+      return ownerTier !== requiredTier ? { requiredTier, ownerTier } : null;
+    } catch (err) {
+      console.error('[start_game] owner tier check failed', err);
+      return null; // never block a game on a flaky read
+    }
+  }
 
   // ─── HOST: Start the game ─────────────────────────────────
   socket.on('start_game', async ({ roomCode } = {}, callback) => {
@@ -114,6 +132,16 @@ function register(io, socket, deps) {
         && room.players.some(p => p.id === socket.userId && !p.isBot);
       if (room.hostSocketId !== socket.id && !isTutorialStarter) {
         return callback({ success: false, error: 'Not the host' });
+      }
+
+      // Phase 6 (G5) — block new games while the group owner is tier-mismatched.
+      const mismatch = await groupOwnerTierMismatch(room);
+      if (mismatch) {
+        return callback({
+          success: false,
+          error: 'The group owner has outgrown this crew\'s tier. The owner must re-tier the group or hand it over before new games can start.',
+          code: 'owner_tier_mismatch',
+        });
       }
 
       // v2 Phase E2 — Mirror Match auto-disable when alive count is odd.
