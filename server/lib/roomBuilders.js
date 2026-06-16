@@ -82,7 +82,7 @@ async function maybeAwardGameXp(io, room, leaderboardRepo) {
   const standings = engine.computeStandings(room);
   const awards = [];
   for (const player of humans) {
-    const award = engine.computeXpAward(room, player, standings);
+    const award = engine.computeXpAward(room, player, room.tier || 'streets', standings);
     if (!award.breakdown || award.total <= 0) continue;
 
     const isGuest = !isPersistentUserId(player.id);
@@ -108,6 +108,11 @@ async function maybeAwardGameXp(io, room, leaderboardRepo) {
       totalXp: isGuest ? null : totalXp,
       level: isGuest ? null : level,
       leveledUp: !isGuest && level > levelBefore,
+      // Level/tier transition fields for the client level-up toast (#307).
+      previousLevel: isGuest ? null : levelBefore,
+      newLevel: isGuest ? null : level,
+      previousTier: isGuest ? null : engine.tierForLevel(levelBefore),
+      newTier: isGuest ? null : engine.tierForLevel(level),
       // Items that just crossed their unlock threshold this game.
       unlocked: !isGuest && level > levelBefore
         ? engine.COSMETICS.filter(c => c.unlockLevel > levelBefore && c.unlockLevel <= level)

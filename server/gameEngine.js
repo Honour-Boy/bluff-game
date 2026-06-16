@@ -178,9 +178,10 @@ module.exports = {
   serializeRoom: serialize.serializeRoom,
 
   // ─── Meta-progression: XP + cosmetics (#205) ─────────────
-  XP_RULES: progression.XP_RULES,
+  XP_TABLE: progression.XP_TABLE,
   levelForXp: progression.levelForXp,
   xpForLevel: progression.xpForLevel,
+  tierForLevel: progression.tierForLevel,
   COSMETIC_SLOTS: progression.COSMETIC_SLOTS,
   COSMETICS: progression.COSMETICS,
   DEFAULT_COSMETICS: progression.DEFAULT_COSMETICS,
@@ -190,6 +191,10 @@ module.exports = {
   trackCardPlayed: progression.trackCardPlayed,
   trackSpinOutcome: progression.trackSpinOutcome,
   trackBluffOutcome: progression.trackBluffOutcome,
+  trackBluffDefended: progression.trackBluffDefended,
+  trackPlayerEliminated: progression.trackPlayerEliminated,
+  trackPowerCardResolved: progression.trackPowerCardResolved,
+  trackLastStandWin: progression.trackLastStandWin,
   computeStandings: progression.computeStandings,
   computeXpAward: progression.computeXpAward,
 };

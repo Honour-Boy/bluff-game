@@ -7,9 +7,10 @@ import { createRequire } from 'module';
 
 const require = createRequire(import.meta.url);
 const {
-  XP_RULES,
+  XP_TABLE,
   levelForXp,
   xpForLevel,
+  tierForLevel,
   COSMETICS,
   DEFAULT_COSMETICS,
   isCosmeticUnlocked,
@@ -18,6 +19,10 @@ const {
   trackCardPlayed,
   trackSpinOutcome,
   trackBluffOutcome,
+  trackBluffDefended,
+  trackPlayerEliminated,
+  trackPowerCardResolved,
+  trackLastStandWin,
   computeStandings,
   computeXpAward,
 } = require('../engine/progression.js');
@@ -29,18 +34,27 @@ function makeRoom(ids = ['p0', 'p1', 'p2']) {
   return room;
 }
 
-describe('level curve', () => {
-  it('maps cumulative XP to levels quadratically', () => {
+describe('level curve (20-level lookup table)', () => {
+  it('maps cumulative XP to levels off the threshold table', () => {
     expect(levelForXp(0)).toBe(1);
-    expect(levelForXp(99)).toBe(1);
-    expect(levelForXp(100)).toBe(2);
-    expect(levelForXp(399)).toBe(2);
-    expect(levelForXp(400)).toBe(3);
-    expect(levelForXp(900)).toBe(4);
+    expect(levelForXp(149)).toBe(1);
+    expect(levelForXp(150)).toBe(2);
+    expect(levelForXp(349)).toBe(2);
+    expect(levelForXp(350)).toBe(3);
+    expect(levelForXp(34000)).toBe(20);
+    expect(levelForXp(99999)).toBe(20); // capped at MAX_LEVEL
+  });
+
+  it('xpForLevel returns the cumulative floor for a level (capped)', () => {
+    expect(xpForLevel(1)).toBe(0);
+    expect(xpForLevel(3)).toBe(350);
+    expect(xpForLevel(14)).toBe(11500);
+    expect(xpForLevel(20)).toBe(34000);
+    expect(xpForLevel(21)).toBe(34000); // capped
   });
 
   it('xpForLevel is the inverse floor of levelForXp', () => {
-    for (let level = 1; level <= 12; level++) {
+    for (let level = 1; level <= 20; level++) {
       const floor = xpForLevel(level);
       expect(levelForXp(floor)).toBe(level);
       if (level > 1) expect(levelForXp(floor - 1)).toBe(level - 1);
@@ -50,7 +64,37 @@ describe('level curve', () => {
   it('is defensive about garbage input', () => {
     expect(levelForXp(-50)).toBe(1);
     expect(levelForXp(undefined)).toBe(1);
+    expect(levelForXp(NaN)).toBe(1);
     expect(xpForLevel(0)).toBe(0);
+    expect(xpForLevel(NaN)).toBe(0);
+  });
+});
+
+describe('tierForLevel', () => {
+  it('groups levels into the four tiers', () => {
+    expect(tierForLevel(1)).toBe('streets');
+    expect(tierForLevel(2)).toBe('streets');
+    expect(tierForLevel(3)).toBe('backroads');
+    expect(tierForLevel(8)).toBe('backroads');
+    expect(tierForLevel(9)).toBe('syndicate');
+    expect(tierForLevel(13)).toBe('syndicate');
+    expect(tierForLevel(14)).toBe('covenant');
+    expect(tierForLevel(20)).toBe('covenant');
+  });
+
+  it('never throws for out-of-range input', () => {
+    expect(tierForLevel(0)).toBe('streets');
+    expect(tierForLevel(-5)).toBe('streets');
+    expect(tierForLevel(999)).toBe('covenant');
+    expect(tierForLevel(undefined)).toBe('streets');
+  });
+
+  it('XP_TABLE has all eight action types for every tier', () => {
+    const keys = ['win', 'spinSurvived', 'correctBluffCall', 'bluffDefended',
+      'playerEliminated', 'powerCardResolved', 'lastStandWin', 'participation'];
+    for (const tier of ['streets', 'backroads', 'syndicate', 'covenant']) {
+      expect(Object.keys(XP_TABLE[tier]).sort()).toEqual([...keys].sort());
+    }
   });
 });
 
@@ -66,8 +110,9 @@ describe('cosmetics catalog + equip validation', () => {
 
   it('unlock gating follows the level curve', () => {
     expect(isCosmeticUnlocked('felt_noir', 0)).toBe(false);   // needs level 2
-    expect(isCosmeticUnlocked('felt_noir', 100)).toBe(true);  // level 2
-    expect(isCosmeticUnlocked('gun_cosmos', 100)).toBe(false); // needs level 10
+    expect(isCosmeticUnlocked('felt_noir', 150)).toBe(true);  // level 2 (150 xp)
+    expect(isCosmeticUnlocked('gun_cosmos', 150)).toBe(false); // needs level 10
+    expect(isCosmeticUnlocked('gun_cosmos', 4900)).toBe(true); // level 10
     expect(isCosmeticUnlocked('nope', 999999)).toBe(false);
   });
 
@@ -78,7 +123,7 @@ describe('cosmetics catalog + equip validation', () => {
         cardBack: 'back_kente',     // needs level 9 — locked
         gunSkin: 'felt_kente',      // wrong slot
       },
-      100, // level 2
+      150, // level 2
     );
     expect(out.tableFelt).toBe('felt_noir');
     expect(out.cardBack).toBe(DEFAULT_COSMETICS.cardBack);
@@ -118,6 +163,10 @@ describe('per-game stat tracking', () => {
         spinsSurvived: 0,
         bluffCallsMade: 0,
         correctBluffCalls: 0,
+        bluffDefended: 0,
+        playersEliminated: 0,
+        powerCardsResolved: 0,
+        lastStandWin: false,
       });
       expect(p.eliminatedSeq).toBeNull();
     }
@@ -142,6 +191,27 @@ describe('per-game stat tracking', () => {
     // Unknown player / room without stats: must not throw.
     trackCardPlayed(room, 'ghost');
     trackBluffOutcome({ players: [] }, 'p0', true);
+  });
+
+  it('new trackers bump their counters and no-op without stats', () => {
+    const room = makeRoom();
+    initGameStats(room);
+    trackBluffDefended(room, 'p0');
+    trackBluffDefended(room, 'p0');
+    trackPlayerEliminated(room, 'p0');
+    trackPlayerEliminated(room, null); // null killer → no-op
+    trackPowerCardResolved(room, 'p0');
+    trackLastStandWin(room, 'p0');
+    const stats = room.players[0].gameStats;
+    expect(stats.bluffDefended).toBe(2);
+    expect(stats.playersEliminated).toBe(1);
+    expect(stats.powerCardsResolved).toBe(1);
+    expect(stats.lastStandWin).toBe(true);
+    // Unknown player / room without stats: must not throw.
+    trackBluffDefended(room, 'ghost');
+    trackPlayerEliminated({ players: [] }, 'p0');
+    trackPowerCardResolved({ players: [] }, 'p0');
+    trackLastStandWin({ players: [] }, 'p0');
   });
 
   it('eliminateFromTurnOrder stamps elimination order once', () => {
@@ -176,54 +246,63 @@ describe('standings + XP award', () => {
   it('awards nothing to a player who never actively played a card (anti-AFK)', () => {
     const room = finishedRoom();
     const afk = room.players.find((p) => p.id === 'a');
-    const award = computeXpAward(room, afk);
+    const award = computeXpAward(room, afk, 'streets');
     expect(award.total).toBe(0);
     expect(award.breakdown).toBeNull();
   });
 
-  it('winner gets participation + placement pool + win bonus', () => {
+  it('sums tier-keyed rates for a Backroads winner (spec worked example)', () => {
+    // Level-5 (Backroads) winner: won, survived 2 spins, 1 correct bluff call,
+    // 1 bluff defended, 1 player eliminated, ≥1 card played.
+    // 150 + (50×2) + 60 + 40 + 35 + 0 + 0 + 20 = 405.
     const room = finishedRoom();
     const winner = room.players.find((p) => p.id === 'w');
     winner.gameStats.cardsPlayed = 3;
     winner.gameStats.spinsSurvived = 2;
     winner.gameStats.correctBluffCalls = 1;
-    const award = computeXpAward(room, winner);
+    winner.gameStats.bluffDefended = 1;
+    winner.gameStats.playersEliminated = 1;
+    const award = computeXpAward(room, winner, 'backroads');
     expect(award.placement).toBe(1);
+    const r = XP_TABLE.backroads;
     expect(award.breakdown).toEqual({
-      participation: XP_RULES.participation,
-      spinsSurvived: 2 * XP_RULES.perSpinSurvived,
-      correctBluffCalls: XP_RULES.perCorrectBluffCall,
-      placement: XP_RULES.placementPool,
-      win: XP_RULES.win,
+      win: r.win,
+      spinsSurvived: 2 * r.spinSurvived,
+      correctBluffCalls: r.correctBluffCall,
+      bluffDefended: r.bluffDefended,
+      playersEliminated: r.playerEliminated,
+      powerCardsResolved: 0,
+      lastStandWin: 0,
+      participation: r.participation,
     });
-    expect(award.total).toBe(
-      XP_RULES.participation
-      + 2 * XP_RULES.perSpinSurvived
-      + XP_RULES.perCorrectBluffCall
-      + XP_RULES.placementPool
-      + XP_RULES.win,
-    );
+    expect(award.total).toBe(405);
   });
 
-  it('last place gets no placement bonus; middle gets a partial one', () => {
-    const room = finishedRoom();
-    const mid = room.players.find((p) => p.id === 'b');
-    const last = room.players.find((p) => p.id === 'a');
-    mid.gameStats.cardsPlayed = 1;
-    last.gameStats.cardsPlayed = 1;
-    expect(computeXpAward(room, mid).breakdown.placement).toBe(XP_RULES.placementPool / 2);
-    expect(computeXpAward(room, mid).breakdown.win).toBe(0);
-    expect(computeXpAward(room, last).breakdown.placement).toBe(0);
-  });
-
-  it('caps the per-event bonuses so dragged-out games cannot farm', () => {
+  it('Streets tier zeroes power-card and last-stand XP even when earned', () => {
     const room = finishedRoom();
     const winner = room.players.find((p) => p.id === 'w');
     winner.gameStats.cardsPlayed = 1;
-    winner.gameStats.spinsSurvived = 999;
-    winner.gameStats.correctBluffCalls = 999;
+    winner.gameStats.powerCardsResolved = 3;
+    winner.gameStats.lastStandWin = true;
+    const award = computeXpAward(room, winner, 'streets');
+    expect(award.breakdown.powerCardsResolved).toBe(0);
+    expect(award.breakdown.lastStandWin).toBe(0);
+  });
+
+  it('non-winner gets no win XP but keeps participation', () => {
+    const room = finishedRoom();
+    const last = room.players.find((p) => p.id === 'a');
+    last.gameStats.cardsPlayed = 1;
+    const award = computeXpAward(room, last, 'syndicate');
+    expect(award.breakdown.win).toBe(0);
+    expect(award.breakdown.participation).toBe(XP_TABLE.syndicate.participation);
+  });
+
+  it('defaults to streets rates when tier is omitted', () => {
+    const room = finishedRoom();
+    const winner = room.players.find((p) => p.id === 'w');
+    winner.gameStats.cardsPlayed = 1;
     const award = computeXpAward(room, winner);
-    expect(award.breakdown.spinsSurvived).toBe(XP_RULES.spinsSurvivedCap);
-    expect(award.breakdown.correctBluffCalls).toBe(XP_RULES.correctBluffCallsCap);
+    expect(award.breakdown.win).toBe(XP_TABLE.streets.win);
   });
 });

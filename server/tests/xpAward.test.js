@@ -15,7 +15,7 @@ const {
   createPlayer,
   startGame,
   eliminateFromTurnOrder,
-  XP_RULES,
+  XP_TABLE,
   DEFAULT_COSMETICS,
   MODES,
   defaultRoomConfig,
@@ -83,7 +83,7 @@ describe('#205 â€” maybeAwardGameXp', () => {
     expect(repo.addXp).toHaveBeenCalledTimes(2);
     const winnerAward = awards.find((a) => a.playerId === U1);
     const loserAward = awards.find((a) => a.playerId === U2);
-    expect(winnerAward.breakdown.win).toBe(XP_RULES.win);
+    expect(winnerAward.breakdown.win).toBe(XP_TABLE.streets.win);
     expect(winnerAward.placement).toBe(1);
     expect(loserAward.breakdown.win).toBe(0);
     expect(loserAward.placement).toBe(2);
@@ -212,7 +212,7 @@ describe('#205 â€” progression handlers', () => {
   it('set_cosmetics persists only owned items and live-updates the seated player', async () => {
     const io = makeIo();
     const repo = makeRepo({
-      getProgression: vi.fn().mockResolvedValue({ xp: 100, gamesPlayed: 1, equipped: {} }), // level 2
+      getProgression: vi.fn().mockResolvedValue({ xp: 150, gamesPlayed: 1, equipped: {} }), // level 2
     });
     // Seat the player at a live table so the equip propagates.
     const room = createRoom('sock-1', MODES.ONLINE, defaultRoomConfig());
