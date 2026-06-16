@@ -6,6 +6,7 @@
 const { ROLES, MODES } = require('./constants');
 const { initChamber } = require('./chamber');
 const { _creditSwapTurnFor, _removePlayerFromSwapSnapshots } = require('./powerCards');
+const { checkDualWin } = require('./pact');
 
 /**
  * Create a new player.
@@ -253,8 +254,49 @@ function handleDisconnect(room, socketId) {
 }
 
 function checkGameOver(room) {
+  // Covenant — The Pact. If both partners of an active pact are the last two
+  // standing they SHARE the win, so the game is over at two alive (not one).
+  // Returns a sentinel that carries `.id`/`.username` (the first partner) so the
+  // ~14 existing call sites that only stamp a single winner keep working; the
+  // online game-over paths read `.dualWin`/`.dualWinners` for the shared reveal.
+  const dual = checkDualWin(room);
+  if (dual) {
+    return {
+      id: dual[0].id,
+      username: dual[0].username,
+      dualWin: true,
+      dualWinners: dual,
+    };
+  }
   const alive = room.players.filter(p => p.status === 'alive');
   return alive.length <= 1 ? alive[0] || null : false;
+}
+
+// Build the `game_over` lastAction for a checkGameOver result, expanding the
+// dual-win sentinel into the partner-pair shape the client reveal reads. Single
+// wins keep the historical `{ winnerId, winnerName }` shape.
+function buildGameOverLastAction(winner) {
+  if (winner?.dualWin && Array.isArray(winner.dualWinners)) {
+    return {
+      type: 'game_over',
+      dualWin: true,
+      winnerIds: winner.dualWinners.map(p => p.id),
+      winnerNames: winner.dualWinners.map(p => p.username),
+      winnerId: winner.dualWinners[0]?.id || null,
+      winnerName: winner.dualWinners[0]?.username || null,
+    };
+  }
+  return { type: 'game_over', winnerId: winner.id, winnerName: winner.username };
+}
+
+// Stamp (or clear) `room.dualWinnerIds` from a checkGameOver result so the XP
+// award path can credit BOTH partners with the win. Must run before
+// maybeAwardGameXp / maybeRecordGroupWinner at every game-over site.
+function markDualWinners(room, winner) {
+  room.dualWinnerIds = winner?.dualWin && Array.isArray(winner.dualWinners)
+    ? winner.dualWinners.map(p => p.id)
+    : null;
+  return room;
 }
 
 function declareRoundWinner(room, playerId) {
@@ -315,6 +357,8 @@ module.exports = {
   eliminatePlayer,
   handleDisconnect,
   checkGameOver,
+  buildGameOverLastAction,
+  markDualWinners,
   declareRoundWinner,
   reconnectPlayer,
   pickReplacementHost,

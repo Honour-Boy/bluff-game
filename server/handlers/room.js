@@ -17,6 +17,7 @@ const {
   _clearGameOverTimer,
   _clearRedemptionTimer,
   _clearBloodDebtTimer,
+  _clearPactVolunteerTimer,
   _clearSpeedModeTimer,
   _clearIdleTurnTimer,
   _clearBotTimer,
@@ -487,6 +488,7 @@ function register(io, socket, deps) {
         _clearGameOverTimer(code);
         _clearRedemptionTimer(code);
         _clearBloodDebtTimer(code);
+        _clearPactVolunteerTimer(code);
         _clearSpeedModeTimer(code);
         _clearIdleTurnTimer(code);
         _clearBotTimer(code);
@@ -518,7 +520,8 @@ function register(io, socket, deps) {
         const gameOverWinner = engine.checkGameOver(room);
         if (gameOverWinner) {
           room.phase = 'game_over';
-          room.lastAction = { type: 'game_over', winnerId: gameOverWinner.id, winnerName: gameOverWinner.username };
+          room.lastAction = engine.buildGameOverLastAction(gameOverWinner);
+          engine.markDualWinners(room, gameOverWinner);
           await maybeRecordGroupWinner(io, room, leaderboardRepo);
         }
       } else {
@@ -567,6 +570,7 @@ function register(io, socket, deps) {
         _clearGameOverTimer(code);
         _clearRedemptionTimer(code);
         _clearBloodDebtTimer(code);
+        _clearPactVolunteerTimer(code);
         _clearSpeedModeTimer(code);
         _clearIdleTurnTimer(code);
         discardLobbyIdleState(code);
@@ -662,7 +666,8 @@ function register(io, socket, deps) {
         const gameOverWinner = engine.checkGameOver(room);
         if (gameOverWinner) {
           room.phase = 'game_over';
-          room.lastAction = { type: 'game_over', winnerId: gameOverWinner.id, winnerName: gameOverWinner.username };
+          room.lastAction = engine.buildGameOverLastAction(gameOverWinner);
+          engine.markDualWinners(room, gameOverWinner);
           await maybeRecordGroupWinner(io, room, leaderboardRepo);
         }
       }
@@ -777,6 +782,7 @@ function register(io, socket, deps) {
       _clearGameOverTimer(code);
       _clearRedemptionTimer(code);
       _clearBloodDebtTimer(code);
+      _clearPactVolunteerTimer(code);
       _clearSpeedModeTimer(code);
       _clearIdleTurnTimer(code);
       discardLobbyIdleState(code);

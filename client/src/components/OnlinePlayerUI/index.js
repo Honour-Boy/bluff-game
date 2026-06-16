@@ -15,6 +15,9 @@ import { BluffInterceptOverlay } from './BluffInterceptOverlay';
 import RedemptionOverlay from './RedemptionOverlay';
 import SpeedModeTimer from './SpeedModeTimer';
 import { BloodDebtOverlay } from '../BloodDebtOverlay';
+import { PactOfferOverlay } from '../PactOfferOverlay';
+import { PactVolunteerOverlay } from '../PactVolunteerOverlay';
+import { PactSelectorOverlay } from '../PactSelectorOverlay';
 import { PreGameSelectionModal } from '../PreGameSelectionModal';
 import { SmokeLayer } from '../shared/SmokeLayer';
 import { TutorialLayer } from '../tutorial/TutorialLayer';
@@ -67,6 +70,11 @@ export function OnlinePlayerUI({
   saboteurTransfer,
   sniperRedirect,
   bloodDebtTarget,
+  pactChoose,
+  pactRespond,
+  volunteerForPact,
+  pactVolunteer,
+  setPactVolunteer,
   bluffIntercept,
   medicPrompt,
   sniperPrompt,
@@ -111,6 +119,9 @@ export function OnlinePlayerUI({
   const [pannable, setPannable] = useState(false);
   // Tutorial — bumped by the header "Guide" button to reopen the guided walkthrough.
   const [guideSignal, setGuideSignal] = useState(0);
+  // Covenant — the Pact selector can dismiss their partner-picker (keeps the
+  // server-set default). Sticky so it doesn't re-pop on every room_state push.
+  const [pactSelectorDismissed, setPactSelectorDismissed] = useState(false);
   // Spotlight tour — flips true when the walk's last beat is finished, so the
   // congrats card replaces the spotlight. Reset whenever we leave the tour.
   const [tourDone, setTourDone] = useState(false);
@@ -214,7 +225,10 @@ export function OnlinePlayerUI({
     // cylinder, and it sounded a "win" even when the local player had just lost.
     // The loser's defeat sting now rides the "Eliminated" card instead (below).
     if (phase === 'game_over' && prevPhase !== 'game_over') {
-      const iWon = la?.winnerId === myPlayer?.id;
+      // Covenant — a Pact dual win credits both partners (winnerIds).
+      const iWon = la?.dualWin
+        ? (la.winnerIds || []).includes(myPlayer?.id)
+        : la?.winnerId === myPlayer?.id;
       if (iWon) {
         // Spin-driven game-overs are deferred server-side to the spin-acknowledge,
         // so by here the cylinder has normally already stopped + been dismissed →
@@ -632,6 +646,7 @@ export function OnlinePlayerUI({
           voice={voice}
           onClick={showSpectatorView ? () => ui.handleSpectatePlayer(player.id) : undefined}
           bettingEnabled={bettingEnabled}
+          isPactPartner={roomState?.pact?.active && roomState?.pact?.partnerId === player.id}
         />
       </div>
     );
@@ -828,7 +843,11 @@ export function OnlinePlayerUI({
             overflow: 'hidden',
             textOverflow: 'ellipsis',
           }}>
-            {lastAction?.winnerId === myPlayer.id ? 'Victory' : `${lastAction?.winnerName ?? '?'} Prevails`}
+            {lastAction?.dualWin
+              ? ((lastAction.winnerIds || []).includes(myPlayer.id)
+                  ? 'Shared Victory — The Pact Holds'
+                  : `${(lastAction.winnerNames || []).join(' & ')} Prevail`)
+              : (lastAction?.winnerId === myPlayer.id ? 'Victory' : `${lastAction?.winnerName ?? '?'} Prevails`)}
           </div>
           {/* #205 — this player's private XP gain for the finished game. */}
           <XpSummary xpAward={xpAward} isMobile={ui.isMobile} />
@@ -1007,6 +1026,38 @@ export function OnlinePlayerUI({
           prompt={bloodDebtPrompt}
           onPick={(targetUserId) => bloodDebtTarget?.(targetUserId)}
           onDismiss={() => setBloodDebtPrompt?.(null)}
+        />
+      )}
+
+      {/* Covenant — The Pact (all gated to Covenant rooms). Selector picks a
+          partner during pre_game; the target accepts/denies once play begins;
+          a partner can volunteer to take a spin. */}
+      {roomState?.tier === 'covenant'
+        && phase === 'pre_game'
+        && roomState?.pact?.amSelector
+        && !roomState?.pact?.active
+        && !pactSelectorDismissed && (
+        <PactSelectorOverlay
+          players={(roomState?.players || []).filter(p => p.status === 'alive' && p.id !== myPlayer?.id).map(p => ({ id: p.id, username: p.username }))}
+          onChoose={(targetUserId) => pactChoose?.(targetUserId)}
+          onDismiss={() => setPactSelectorDismissed(true)}
+        />
+      )}
+
+      {roomState?.tier === 'covenant'
+        && roomState?.pact?.offerPending
+        && phase === 'playing' && (
+        <PactOfferOverlay
+          selectorName={roomState.pact.selectorName}
+          onRespond={(accepted) => pactRespond?.(accepted)}
+        />
+      )}
+
+      {roomState?.tier === 'covenant' && pactVolunteer && (
+        <PactVolunteerOverlay
+          prompt={pactVolunteer}
+          onVolunteer={() => volunteerForPact?.()}
+          onDismiss={() => setPactVolunteer?.(null)}
         />
       )}
 

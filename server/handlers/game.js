@@ -13,6 +13,8 @@ const {
   _clearPreGameTimer,
   _clearGameOverTimer,
   _clearBloodDebtTimer,
+  _clearPactVolunteerTimer,
+  _clearSpinPendingTimer,
   logTurnState,
 } = require('../lib/state');
 const { broadcastRoomState } = require('../lib/broadcast');
@@ -40,11 +42,28 @@ async function emitRoleReveals(io, room) {
   }
 }
 
+// Covenant — privately prompt the Pact Selector with the list of alive players
+// they may bond with (everyone but themselves). Fired alongside the role reveals.
+async function emitPactSelectorPrompt(io, room) {
+  const selector = room.players.find(p => p.id === room.pactSelectorId);
+  if (!selector?.socketId) return;
+  const choices = room.players
+    .filter(p => p.status === 'alive' && p.id !== selector.id)
+    .map(p => ({ id: p.id, username: p.username }));
+  io.to(selector.socketId).emit('pact_selector_prompt', {
+    playerNames: choices,
+    defaultTargetId: room.pactTargetId || null,
+  });
+}
+
 async function finalizePreGameAndBroadcast(io, code) {
   const room = await getRoom(code);
   if (!room || room.phase !== 'pre_game') return;
   const result = engine.finalizePreGame(room);
   if (!result.ok) return;
+  // Covenant — grant the Pact Selector their reserved power card now that every
+  // other player's pre-game pick has been applied (no-op outside Covenant rooms).
+  engine.grantPactSelectorCard(room);
   await saveRoom(room);
   io.to(code).emit('pre_game_complete');
   await broadcastRoomState(io, code);
@@ -192,7 +211,14 @@ function register(io, socket, deps) {
       // roles and powers are off, so the role-reveal + selection window would
       // just stall the learner on a "you are Barehand" card. Deal straight in.
       const runsPreGame = room.mode === engine.MODES.ONLINE && !room.isTutorial;
+      // Covenant — The Pact. Designate the secret Selector + a default Target
+      // AFTER the deal/roles (startGame) but BEFORE beginPreGame builds the pools,
+      // so the Selector's pool can be emptied (they forgo the normal pick for a
+      // reserved power card granted at finalize).
+      const isCovenant = runsPreGame && engine.getRoomTier(room) === 'covenant';
+      if (isCovenant) engine.assignPactRoles(room);
       if (runsPreGame) engine.beginPreGame(room);
+      if (isCovenant) engine.pactSelectorAutoAssignPower(room);
 
       if (room.groupId) {
         try {
@@ -257,6 +283,11 @@ function register(io, socket, deps) {
       // open selection once the reveal display window elapses.
       if (runsPreGame) {
         await emitRoleReveals(io, room);
+        // Covenant — privately prompt the Pact Selector to choose their partner
+        // (a sensible random default is already set; this lets them override it).
+        if (isCovenant && room.pactSelectorId) {
+          await emitPactSelectorPrompt(io, room);
+        }
         // #2 — skip the "Claim your edge" picker when fewer than 2 power types
         // are enabled; otherwise open it after the role-reveal window.
         if (room.pregameSelectionSkipped) {
@@ -635,7 +666,8 @@ function register(io, socket, deps) {
       const gameOverWinner = engine.checkGameOver(room);
       if (gameOverWinner) {
         room.phase = 'game_over';
-        room.lastAction = { type: 'game_over', winnerId: gameOverWinner.id, winnerName: gameOverWinner.username };
+        room.lastAction = engine.buildGameOverLastAction(gameOverWinner);
+        engine.markDualWinners(room, gameOverWinner);
         await maybeRecordGroupWinner(io, room, leaderboardRepo);
       }
 
@@ -764,6 +796,95 @@ function register(io, socket, deps) {
       callback?.({ success: true });
     } catch (err) {
       callback?.({ success: false, error: err.message });
+    }
+  });
+
+  // ─── COVENANT: Pact Selector picks their partner (pre_game) ──────────────
+  // A sensible random default is already set at game start; this lets the
+  // Selector override it any time before the pact is offered.
+  socket.on('pact_choose', async ({ roomCode, targetUserId } = {}, callback) => {
+    try {
+      if (!socket.userId) return callback?.({ success: false, error: 'Not authenticated' });
+      const code = roomCode?.toUpperCase();
+      const room = await getRoom(code);
+      if (!room) return callback?.({ success: false, error: 'Room not found' });
+      if (room.pactSelectorId !== socket.userId) {
+        return callback?.({ success: false, error: 'Not the Pact selector' });
+      }
+      if (room.pact || room.pactOfferPending) {
+        return callback?.({ success: false, error: 'Pact already offered' });
+      }
+      const target = room.players.find(
+        p => p.id === targetUserId && p.status === 'alive' && p.id !== socket.userId,
+      );
+      if (!target) return callback?.({ success: false, error: 'Invalid pact target' });
+      room.pactTargetId = targetUserId;
+      await saveRoom(room);
+      return callback?.({ success: true });
+    } catch (err) {
+      return callback?.({ success: false, error: err.message });
+    }
+  });
+
+  // ─── COVENANT: Pact Target accepts or denies the bond (in-game) ──────────
+  socket.on('pact_respond', async ({ roomCode, accepted } = {}, callback) => {
+    try {
+      if (!socket.userId) return callback?.({ success: false, error: 'Not authenticated' });
+      const code = roomCode?.toUpperCase();
+      const room = await getRoom(code);
+      if (!room) return callback?.({ success: false, error: 'Room not found' });
+      if (room.phase !== 'playing') return callback?.({ success: false, error: 'Not in playing phase' });
+      if (room.pactTargetId !== socket.userId) {
+        return callback?.({ success: false, error: 'No pact offer for you' });
+      }
+      if (!room.pactOfferPending) return callback?.({ success: false, error: 'No pact offer pending' });
+
+      const selectorId = room.pactSelectorId;
+      const result = engine.applyPactResponse(room, !!accepted);
+      if (!result.ok) return callback?.({ success: false, error: 'Could not resolve pact' });
+      await saveRoom(room);
+
+      if (result.action === 'confirmed') {
+        const a = room.players.find(p => p.id === result.a);
+        const b = room.players.find(p => p.id === result.b);
+        if (a?.socketId) io.to(a.socketId).emit('pact_confirmed', { partnerId: b?.id || null, partnerName: b?.username || null });
+        if (b?.socketId) io.to(b.socketId).emit('pact_confirmed', { partnerId: a?.id || null, partnerName: a?.username || null });
+      } else {
+        const sel = room.players.find(p => p.id === selectorId);
+        if (sel?.socketId) io.to(sel.socketId).emit('pact_denied', {});
+      }
+      await broadcastRoomState(io, code);
+      return callback?.({ success: true });
+    } catch (err) {
+      return callback?.({ success: false, error: err.message });
+    }
+  });
+
+  // ─── COVENANT: Pact partner volunteers to take a spin (in-game) ──────────
+  // While the table is parked on a spin aimed at one partner, the OTHER partner
+  // can step in and take the bullet. Resolves the spin against the volunteer.
+  socket.on('pact_volunteer', async ({ roomCode } = {}, callback) => {
+    try {
+      if (!socket.userId) return callback?.({ success: false, error: 'Not authenticated' });
+      const code = roomCode?.toUpperCase();
+      const room = await getRoom(code);
+      if (!room) return callback?.({ success: false, error: 'Room not found' });
+      if (room.phase !== 'spin_pending') return callback?.({ success: false, error: 'No spin pending' });
+      const pending = room.pendingPactVolunteer;
+      if (!pending || pending.partnerId !== socket.userId) {
+        return callback?.({ success: false, error: 'Not your volunteer prompt' });
+      }
+      const volunteer = room.players.find(p => p.id === socket.userId && p.status === 'alive');
+      if (!volunteer) return callback?.({ success: false, error: 'Cannot volunteer' });
+
+      _clearPactVolunteerTimer(code);
+      room.pendingPactVolunteer = null;
+      room.spinTargetId = volunteer.id;
+      _clearSpinPendingTimer(code);
+      const spinResult = await applySpinAndBroadcast(io, code, room, volunteer, leaderboardRepo, { spinReason: 'pact_volunteer' });
+      return callback?.({ success: true, spinResult });
+    } catch (err) {
+      return callback?.({ success: false, error: err.message });
     }
   });
 }

@@ -17,6 +17,7 @@ const {
   _clearGameOverTimer,
   _clearRedemptionTimer,
   _clearBloodDebtTimer,
+  _clearPactVolunteerTimer,
   _clearSpeedModeTimer,
   _clearIdleTurnTimer,
   _clearBotTimer,
@@ -58,6 +59,7 @@ function register(io, socket, deps) {
         _clearGameOverTimer(code);
         _clearRedemptionTimer(code);
         _clearBloodDebtTimer(code);
+        _clearPactVolunteerTimer(code);
         _clearSpeedModeTimer(code);
         _clearIdleTurnTimer(code);
         _clearBotTimer(code);
@@ -79,6 +81,7 @@ function register(io, socket, deps) {
         _clearGameOverTimer(code);
         _clearRedemptionTimer(code);
         _clearBloodDebtTimer(code);
+        _clearPactVolunteerTimer(code);
         _clearSpeedModeTimer(code);
         _clearIdleTurnTimer(code);
         _clearBotTimer(code);
@@ -141,7 +144,8 @@ function register(io, socket, deps) {
           const winner = engine.checkGameOver(room);
           if (winner) {
             room.phase = 'game_over';
-            room.lastAction = { type: 'game_over', winnerId: winner.id, winnerName: winner.username };
+            room.lastAction = engine.buildGameOverLastAction(winner);
+            engine.markDualWinners(room, winner);
             await maybeRecordGroupWinner(io, room, leaderboardRepo);
           }
           await saveRoom(room);

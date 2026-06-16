@@ -269,6 +269,28 @@ function serializeRoom(room, requestingPlayerId = null, opts = {}) {
             msRemaining: Math.max(0, (room.redemption.deadline || 0) - Date.now()),
           }
         : undefined,
+    // Covenant — The Pact. Reconnect-safe view, gated so it never leaks the
+    // secret bond: partnerId is exposed only to the two partners; the offer
+    // (and the selector's identity) only to the target it's aimed at; amSelector
+    // only to the selector themselves. null in non-Covenant rooms.
+    pact: isOnline && (room.pact || room.pactSelectorId || room.pactOfferPending)
+      ? {
+          active: !!room.pact?.active,
+          partnerId: room.pact?.active
+            ? (room.pact.a === requestingPlayerId
+                ? room.pact.b
+                : room.pact.b === requestingPlayerId
+                  ? room.pact.a
+                  : null)
+            : null,
+          amSelector: !!room.pactSelectorId && requestingPlayerId === room.pactSelectorId,
+          offerPending: !!room.pactOfferPending && requestingPlayerId === room.pactTargetId,
+          selectorName:
+            room.pactOfferPending && requestingPlayerId === room.pactTargetId
+              ? (room.players.find(p => p.id === room.pactSelectorId)?.username || null)
+              : null,
+        }
+      : null,
     // Pre-game selection & role reveal (#116). Authoritative view for
     // the requesting player — reconnect-safe. Only the caller's own
     // pool/selection is exposed; other players' picks stay private,

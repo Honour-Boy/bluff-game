@@ -14,6 +14,7 @@ const {
   _clearGameOverTimer,
   _clearRedemptionTimer,
   _clearBloodDebtTimer,
+  _clearPactVolunteerTimer,
   _clearSpeedModeTimer,
   _clearIdleTurnTimer,
   logRoomDeletion,
@@ -69,6 +70,7 @@ function startInactivitySweep(io) {
       _clearGameOverTimer(code);
       _clearRedemptionTimer(code);
       _clearBloodDebtTimer(code);
+      _clearPactVolunteerTimer(code);
       _clearSpeedModeTimer(code);
       _clearIdleTurnTimer(code);
       const hostTimer = hostDisconnectTimers.get(code);
@@ -246,6 +248,7 @@ async function dismissIdleLobby(io, code, reason) {
   _clearGameOverTimer(code);
   _clearRedemptionTimer(code);
   _clearBloodDebtTimer(code);
+  _clearPactVolunteerTimer(code);
   _clearSpeedModeTimer(code);
   _clearIdleTurnTimer(code);
   const hostTimer = hostDisconnectTimers.get(code);

@@ -42,6 +42,10 @@ const redemptionTimers = new Map();   // roomCode → setTimeout handle
 // bluff caller. One handle per room.
 const bloodDebtTimers = new Map();    // roomCode → setTimeout handle
 
+// Covenant — The Pact volunteer-pull window. Armed when a spin would fall on one
+// pact partner; on expiry the original target spins. One handle per room.
+const pactVolunteerTimers = new Map(); // roomCode → setTimeout handle
+
 // Speed Mode — one per-turn countdown handle per room. Stamped when a new
 // player's turn opens (online + roomModifiers.speedMode); on expiry the server
 // auto-ends that player's turn. Re-armed on every turn change, paused whenever
@@ -110,6 +114,10 @@ function _clearRedemptionTimer(code) {
 function _clearBloodDebtTimer(code) {
   const t = bloodDebtTimers.get(code);
   if (t) { clearTimeout(t); bloodDebtTimers.delete(code); }
+}
+function _clearPactVolunteerTimer(code) {
+  const t = pactVolunteerTimers.get(code);
+  if (t) { clearTimeout(t); pactVolunteerTimers.delete(code); }
 }
 function _clearSpeedModeTimer(code) {
   const t = speedModeTimers.get(code);
@@ -183,6 +191,7 @@ module.exports = {
   gameOverTimers,
   redemptionTimers,
   bloodDebtTimers,
+  pactVolunteerTimers,
   speedModeTimers,
   idleTurnTimers,
   botTimers,
@@ -198,6 +207,7 @@ module.exports = {
   _clearGameOverTimer,
   _clearRedemptionTimer,
   _clearBloodDebtTimer,
+  _clearPactVolunteerTimer,
   _clearSpeedModeTimer,
   _clearIdleTurnTimer,
   _clearBotTimer,

@@ -243,7 +243,11 @@ function computeXpAward(room, player, tier = 'streets', standings = computeStand
   }
 
   const rates = XP_TABLE[tier] || XP_TABLE.streets;
-  const isWinner = placement === 1 && player.status === 'alive';
+  // Covenant — a Pact dual win credits BOTH surviving partners with the win XP,
+  // even though only the placement-1 partner is the nominal "winner".
+  const dualWinnerIds = Array.isArray(room?.dualWinnerIds) ? room.dualWinnerIds : [];
+  const isWinner = player.status === 'alive'
+    && (placement === 1 || dualWinnerIds.includes(player.id));
 
   const breakdown = {
     win: isWinner ? rates.win : 0,

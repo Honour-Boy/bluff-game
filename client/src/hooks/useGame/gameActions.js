@@ -214,6 +214,21 @@ export function useGameActions({
     return emitPromiseAction(socket, 'blood_debt_target', { roomCode, targetUserId }, failError);
   }, [failError, roomCode, socket]);
 
+  // Covenant — The Pact. Selector picks their secret partner during pre_game.
+  const pactChoose = useCallback((targetUserId) => {
+    return emitPromiseAction(socket, 'pact_choose', { roomCode, targetUserId }, failError);
+  }, [failError, roomCode, socket]);
+
+  // Covenant — The Pact. Target accepts or denies the offered bond.
+  const pactRespond = useCallback((accepted) => {
+    return emitPromiseAction(socket, 'pact_respond', { roomCode, accepted: !!accepted }, failError);
+  }, [failError, roomCode, socket]);
+
+  // Covenant — The Pact. A partner volunteers to take the other's spin.
+  const volunteerForPact = useCallback(() => {
+    return emitPromiseAction(socket, 'pact_volunteer', { roomCode }, failError);
+  }, [failError, roomCode, socket]);
+
   // §1.1 — accused responds to a bluff during the interception window: arm a
   // defensive card (cardId set) or pass (cardId null). Either closes the window.
   const bluffIntercept = useCallback((cardId = null) => {
@@ -357,6 +372,9 @@ export function useGameActions({
     saboteurTransfer,
     sniperRedirect,
     bloodDebtTarget,
+    pactChoose,
+    pactRespond,
+    volunteerForPact,
     bluffIntercept,
     placeBet,
     ghostVote,

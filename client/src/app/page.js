@@ -162,6 +162,11 @@ function HomeContent() {
     saboteurTransfer,
     sniperRedirect,
     bloodDebtTarget,
+    pactChoose,
+    pactRespond,
+    volunteerForPact,
+    pactVolunteer,
+    setPactVolunteer,
     bluffIntercept,
     medicPrompt,
     sniperPrompt,
@@ -858,6 +863,11 @@ function HomeContent() {
           saboteurTransfer={saboteurTransfer}
           sniperRedirect={sniperRedirect}
           bloodDebtTarget={bloodDebtTarget}
+          pactChoose={pactChoose}
+          pactRespond={pactRespond}
+          volunteerForPact={volunteerForPact}
+          pactVolunteer={pactVolunteer}
+          setPactVolunteer={setPactVolunteer}
           bluffIntercept={bluffIntercept}
           medicPrompt={medicPrompt}
           sniperPrompt={sniperPrompt}
@@ -929,6 +939,11 @@ function HomeContent() {
           saboteurTransfer={saboteurTransfer}
           sniperRedirect={sniperRedirect}
           bloodDebtTarget={bloodDebtTarget}
+          pactChoose={pactChoose}
+          pactRespond={pactRespond}
+          volunteerForPact={volunteerForPact}
+          pactVolunteer={pactVolunteer}
+          setPactVolunteer={setPactVolunteer}
           bluffIntercept={bluffIntercept}
           medicPrompt={medicPrompt}
           sniperPrompt={sniperPrompt}

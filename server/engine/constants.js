@@ -154,6 +154,11 @@ const REDEMPTION_PENDING_TIMEOUT_MS = 30_000;
 // expiry the debt defaults to the bluff caller.
 const BLOOD_DEBT_WINDOW_MS = 10_000;
 
+// Covenant — The Pact volunteer-pull window. When a spin would fall on one Pact
+// partner, the OTHER partner gets this long to volunteer to take the bullet in
+// their place; on expiry the original target spins.
+const PACT_VOLUNTEER_WINDOW_MS = 6_000;
+
 // Speed Mode (roomModifiers.speedMode) — each player's turn is capped at this
 // many ms. When the deadline passes the server auto-ENDS the turn (no auto-spin
 // — #79 bans auto-spin in every mode). The lobby advertises a 25s turn timer.
@@ -317,6 +322,8 @@ module.exports = {
   SPIN_PENDING_TIMEOUT_MS,
   PENDING_GAME_OVER_TIMEOUT_MS,
   REDEMPTION_PENDING_TIMEOUT_MS,
+  BLOOD_DEBT_WINDOW_MS,
+  PACT_VOLUNTEER_WINDOW_MS,
   SPEED_MODE_TURN_MS,
   IDLE_TURN_TIMEOUT_MS,
   defaultRoomConfig,

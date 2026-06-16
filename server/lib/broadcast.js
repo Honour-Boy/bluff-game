@@ -32,9 +32,44 @@ function emitHostChanged(io, roomCode, { hostId, hostName, reason } = {}) {
   io.to(roomCode).emit('host_changed', { hostId, hostName, reason });
 }
 
+// Covenant — The Pact offer. Once play has begun (phase 'playing') and a pact
+// has been set up (selector + target) but not yet offered, privately offer the
+// bond to the target. Deferred one turn when the target is the very first player
+// on the clock so the modal doesn't cover their opening turn. One-shot, guarded
+// by room flags so it never re-fires across broadcasts.
+function maybePactOffer(io, room) {
+  if (room.mode !== engine.MODES.ONLINE) return;
+  if (room.phase !== 'playing') return;
+  if (room.pact) return;                                   // already accepted/denied
+  if (room.pactOfferSent) return;                          // already offered once
+  if (!room.pactSelectorId || !room.pactTargetId) return;  // no pact set up
+
+  const firstTurnPlayerId = room.turnOrder?.[room.currentTurnIndex] || null;
+  if (room.isFirstTurn && room.pactTargetId === firstTurnPlayerId) {
+    room.pactOfferDeferred = true; // wait until the turn rotates off the target
+    return;
+  }
+
+  room.pactOfferSent = true;
+  room.pactOfferDeferred = false;
+  room.pactOfferPending = true;
+  const target = room.players.find(p => p.id === room.pactTargetId);
+  const selector = room.players.find(p => p.id === room.pactSelectorId);
+  if (target?.socketId) {
+    io.to(target.socketId).emit('pact_offer', {
+      selectorId: room.pactSelectorId,
+      selectorName: selector?.username || null,
+    });
+  }
+}
+
 async function broadcastRoomState(io, roomCode) {
   const room = await getRoom(roomCode);
   if (!room) return;
+
+  // Covenant — offer the Pact once play begins (mutates room flags BEFORE the
+  // serialize below so `pactOfferPending` ships in this same push).
+  maybePactOffer(io, room);
 
   // Speed Mode (online) — arm / re-arm the per-turn countdown BEFORE serializing
   // so a turn change's freshly-stamped `room.speedModeDeadline` ships in THIS

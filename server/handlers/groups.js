@@ -237,7 +237,8 @@ function register(io, socket, deps) {
         const winner = engine.checkGameOver(room);
         if (winner) {
           room.phase = 'game_over';
-          room.lastAction = { type: 'game_over', winnerId: winner.id, winnerName: winner.username };
+          room.lastAction = engine.buildGameOverLastAction(winner);
+          engine.markDualWinners(room, winner);
           await maybeRecordGroupWinner(io, room, leaderboardRepo);
         }
       }

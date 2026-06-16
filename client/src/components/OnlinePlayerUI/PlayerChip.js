@@ -65,6 +65,7 @@ export function PlayerChip({
   onClick,
   compact = false,
   bettingEnabled = false,
+  isPactPartner = false,
 }) {
   const alive = player.status === 'alive';
   const width = compact ? 64 : 80;
@@ -124,6 +125,24 @@ export function PlayerChip({
         boxShadow: '0 3px 10px rgba(0,0,0,0.5), inset 0 1px 0 rgba(255,255,255,0.04)',
       }}
     >
+      {/* Covenant — Pact partner marker (only shown to the bonded partners). */}
+      {alive && isPactPartner && (
+        <span
+          title="Your pact partner"
+          style={{
+            position: 'absolute',
+            top: 2,
+            left: 4,
+            fontSize: compact ? 9 : 11,
+            color: 'var(--accent)',
+            lineHeight: 1,
+            textShadow: '0 0 6px var(--glow-gold, rgba(212,175,55,0.6))',
+          }}
+        >
+          🜂
+        </span>
+      )}
+
       {/* Bounty marker - tiny crimson badge */}
       {alive && player.hasBounty && (
         <span

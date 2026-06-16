@@ -144,14 +144,20 @@ export function SpinOverlay({
           fontSize: 20,
           fontStyle: 'italic',
           letterSpacing: '0.04em',
-          color: spinData.spinReason === 'blood_debt' ? 'var(--eliminated, #c0392b)' : 'var(--text-dim)',
+          color: spinData.spinReason === 'blood_debt'
+            ? 'var(--eliminated, #c0392b)'
+            : spinData.spinReason === 'pact_volunteer'
+              ? 'var(--accent, #d4af37)'
+              : 'var(--text-dim)',
           marginBottom: 32,
           textAlign: 'center',
         }}
       >
         {spinData.spinReason === 'blood_debt'
           ? `⛧ Blood Debt — the price comes due for ${spinData.spinTargetName}…`
-          : `${spinData.spinTargetName} pulls the trigger…`}
+          : spinData.spinReason === 'pact_volunteer'
+            ? `🜂 ${spinData.spinTargetName} takes the bullet for their partner…`
+            : `${spinData.spinTargetName} pulls the trigger…`}
       </div>
 
       <CylinderSVG

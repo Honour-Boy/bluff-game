@@ -157,6 +157,17 @@ function register(io, socket, deps) {
         return callback({ success: false, error: 'Not part of this lesson step' });
       }
 
+      // Covenant — The Pact. Partners can NEVER call each other's bluffs. Reject
+      // privately (no table-visible event) WITHOUT consuming the caller's bluff
+      // for this turn (return before bluffUsedThisTurn is set).
+      if (room.mode === engine.MODES.ONLINE) {
+        const accusedId = engine.getPreviousTurnPlayerId(room);
+        if (engine.isPactBluffBlocked(room, playerId, accusedId)) {
+          io.to(socket.id).emit('pact_bluff_blocked', {});
+          return callback({ success: false, error: 'pact_bluff_blocked' });
+        }
+      }
+
       // Covenant — Blood Debt. A caller carrying a debt fires an EXTRA "debt
       // spin" on themselves after the primary resolution. Queue it now (don't
       // consume the flag yet — that happens when the debt spin actually fires,
