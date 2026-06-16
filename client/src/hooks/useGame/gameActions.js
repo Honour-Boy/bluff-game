@@ -77,6 +77,20 @@ export function useGameActions({
     });
   }, [failError, roomCode, socket]);
 
+  // Tutorial — intro "Show me around": deal (if needed) + enter the spotlight tour.
+  const startTour = useCallback(() => {
+    socket.emit('tutorial_start_tour', { roomCode }, (res) => {
+      if (!res?.success) failError(res);
+    });
+  }, [failError, roomCode, socket]);
+
+  // Tutorial — congrats "Begin Practice" / Skip tour: reset to a fresh Basics game.
+  const finishTour = useCallback(() => {
+    socket.emit('tutorial_finish_tour', { roomCode }, (res) => {
+      if (!res?.success) failError(res);
+    });
+  }, [failError, roomCode, socket]);
+
   const joinRoom = useCallback((code) => {
     socket.emit('join_room', { roomCode: code.toUpperCase() }, (res) => {
       if (res.success) {
@@ -315,6 +329,8 @@ export function useGameActions({
     startSandbox,
     skipToPowers,
     advanceTutorial,
+    startTour,
+    finishTour,
     joinRoom,
     startGame,
     nextTurn,

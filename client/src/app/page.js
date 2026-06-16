@@ -139,7 +139,7 @@ function HomeContent() {
     roomState, myPlayer, isMyTurn, currentPlayer,
     gameMode, error, connected, authenticated, notification,
     sessionConflict, takeOverSession, signOutSocket,
-    createRoom, startTutorial, startSandbox, skipToPowers, advanceTutorial, joinRoom, startGame,
+    createRoom, startTutorial, startSandbox, skipToPowers, advanceTutorial, startTour, finishTour, joinRoom, startGame,
     createGroup, listMyGroups, getGroup,
     inviteToGroup, listMyInvites, respondToInvite,
     revokeInvite, removeMember, transferHost,
@@ -798,6 +798,8 @@ function HomeContent() {
           startGame={startGame}
           skipToPowers={skipToPowers}
           advanceTutorial={advanceTutorial}
+          startTour={startTour}
+          finishTour={finishTour}
           playCardOnline={playCardOnline}
           callBluff={callBluff}
           endTurn={endTurn}
@@ -864,6 +866,8 @@ function HomeContent() {
           startGame={startGame}
           skipToPowers={skipToPowers}
           advanceTutorial={advanceTutorial}
+          startTour={startTour}
+          finishTour={finishTour}
           playCardOnline={playCardOnline}
           callBluff={callBluff}
           endTurn={endTurn}

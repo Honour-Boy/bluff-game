@@ -18,6 +18,7 @@ import { PreGameSelectionModal } from '../PreGameSelectionModal';
 import { SmokeLayer } from '../shared/SmokeLayer';
 import { TutorialLayer } from '../tutorial/TutorialLayer';
 import { OnlineTourLayer } from '../tutorial/OnlineTourLayer';
+import { TourCongrats } from '../tutorial/TourCongrats';
 import { isDefensivePreArmLocked, clinicEndTurnLock } from '../tutorial/tutorialContent';
 import {
   arcPlayers,
@@ -42,6 +43,8 @@ export function OnlinePlayerUI({
   startGame,
   skipToPowers,
   advanceTutorial,
+  startTour,
+  finishTour,
   playCardOnline,
   callBluff,
   endTurn,
@@ -104,6 +107,9 @@ export function OnlinePlayerUI({
   const [pannable, setPannable] = useState(false);
   // Tutorial — bumped by the header "Guide" button to reopen the guided walkthrough.
   const [guideSignal, setGuideSignal] = useState(0);
+  // Spotlight tour — flips true when the walk's last beat is finished, so the
+  // congrats card replaces the spotlight. Reset whenever we leave the tour.
+  const [tourDone, setTourDone] = useState(false);
   const ready = !!(roomState && myPlayer);
 
   useEffect(() => {
@@ -463,6 +469,9 @@ export function OnlinePlayerUI({
   // server-set lesson so normal rooms (and the Basics / Power-Clinic lessons)
   // are untouched. Drives the OnlineTourLayer + suppressions below.
   const tourActive = isTutorial && roomState?.tutorialLesson === 'tour';
+  // Clear the local "tour finished" latch whenever we're not in the tour, so a
+  // later replay starts the walk fresh instead of jumping straight to congrats.
+  useEffect(() => { if (!tourActive) setTourDone(false); }, [tourActive]);
   const isMySpinTurn = isSpinPending && spinTargetId === myPlayer.id;
   // (Module 3) The challenged card is face-up for the whole spin_pending window
   // and reverse-flips the moment the spin result lands (ui.spinData is set when
@@ -1064,6 +1073,8 @@ export function OnlinePlayerUI({
           startGame={startGame}
           skipToPowers={skipToPowers}
           advanceTutorial={advanceTutorial}
+          startTour={startTour}
+          finishTour={finishTour}
           restartRoom={restartRoom}
           leaveGame={leaveGame}
           isMobile={ui.isMobile}
@@ -1078,16 +1089,18 @@ export function OnlinePlayerUI({
       )}
 
       {/* Spotlight "Show me around" tour — runs over the live table during the
-          'tour' practice lesson. Part-B signals (card played, turn ended, spin
-          acknowledged…) are wired in Phase 3; Part A (the settings walk) works
-          off the menu's own DOM state. */}
-      {tourActive && (
+          'tour' practice lesson. The walk shows until its last beat is done (or
+          the server flags tourComplete), then the congrats card takes over. */}
+      {tourActive && !tourDone && !roomState?.tourComplete && (
         <OnlineTourLayer
           isGuest={isGuest}
           partBSignals={tourSignals}
-          onComplete={() => { /* Phase 4: congrats → tutorial_finish_tour */ }}
-          onSkip={() => { /* Phase 4: tutorial_finish_tour */ }}
+          onComplete={() => setTourDone(true)}
+          onSkip={() => { if (typeof finishTour === 'function') finishTour(); }}
         />
+      )}
+      {tourActive && (tourDone || roomState?.tourComplete) && (
+        <TourCongrats onBeginPractice={() => { if (typeof finishTour === 'function') finishTour(); }} />
       )}
 
       <style>{GAME_UI_STYLE}</style>
