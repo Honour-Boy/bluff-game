@@ -390,6 +390,10 @@ input::placeholder {
 .stagger-child:nth-child(4) { animation-delay: 0.18s; }
 .stagger-child:nth-child(5) { animation-delay: 0.24s; }
 
+/* Continuous rotation — the ChamberSpinner loading motif (and the post-intro
+   IntroLoading cylinder). Plain 360° loop; callers set the duration. */
+@keyframes spin { to { transform: rotate(360deg); } }
+
 /* Refresh spin */
 @keyframes groups-refresh-spin { to { transform: rotate(360deg); } }
 .groups-refresh-icon { display: inline-block; font-size: 13px; line-height: 1; }

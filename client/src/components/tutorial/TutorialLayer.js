@@ -63,7 +63,13 @@ function ControlsGrid({ controls }) {
 }
 
 // ─── Intro walkthrough modal ──────────────────────────────────────────────────
-function IntroModal({ slides, step, slide, canBegin, isHost, onBack, onNext, onSkip, onBegin }) {
+function IntroModal({
+  slides, step, slide, canBegin, isHost, onBack, onNext, onSkip, onBegin,
+  // Spotlight tour offer on the final slide (Basics path only). When set, the
+  // final CTA becomes a "Show me around" / "Skip tour" pair. `tourDoneBefore`
+  // flips the emphasis so a returning player isn't pushed back through the tour.
+  offerTour = false, onShowTour, onSkipTour, tourDoneBefore = false,
+}) {
   const total = slides.length;
   const isLast = step === total - 1;
   return (
@@ -153,6 +159,29 @@ function IntroModal({ slides, step, slide, canBegin, isHost, onBack, onNext, onS
             <button onClick={onNext} className="primary" style={{ flex: 1, minHeight: 44, fontSize: 13 }}>
               Next →
             </button>
+          ) : offerTour && canBegin ? (
+            // Final Basics slide → offer the guided spotlight tour. A first-timer
+            // is nudged INTO the tour (primary); a returning player gets a primary
+            // "Begin practice" and a quieter "Show me around again".
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 8, flex: 1 }}>
+              <button
+                onClick={tourDoneBefore ? onSkipTour : onShowTour}
+                className="primary"
+                style={{ minHeight: 44, fontSize: 13 }}
+              >
+                {tourDoneBefore ? 'Begin practice' : 'Show me around'}
+              </button>
+              <button
+                onClick={tourDoneBefore ? onShowTour : onSkipTour}
+                style={{
+                  minHeight: 38, fontSize: 11, background: 'none', border: 'none',
+                  color: 'var(--text-dim)', cursor: 'pointer', textDecoration: 'underline',
+                  letterSpacing: '0.06em',
+                }}
+              >
+                {tourDoneBefore ? 'Show me around again' : 'Skip tour →'}
+              </button>
+            </div>
           ) : (
             <button onClick={onBegin} className="primary" style={{ flex: 1, minHeight: 44, fontSize: 13 }}>
               {canBegin ? (slide.cta || 'Begin practice') : 'Got it'}
@@ -690,6 +719,8 @@ export function TutorialLayer({
   startGame,
   skipToPowers,
   advanceTutorial,
+  startTour,
+  finishTour,
   restartRoom,
   leaveGame,
   isMobile = false,
@@ -832,6 +863,25 @@ export function TutorialLayer({
   };
   const handleBegin = () => { spawnBasics(); closeIntro(); };
   const replayIntro = () => { setIntroStep(0); setIntroReopened(true); setCoachHidden(false); };
+
+  // Spotlight tour CTAs on the final Basics slide. "Show me around" hands off to
+  // the server tour (deal-if-needed + stage step 0) — we latch spawnedRef so the
+  // Basics deal effect doesn't ALSO fire. "Skip tour" is just the ordinary Basics
+  // begin (deal + coach), so a skipper never even enters the tour lesson.
+  const tourDoneBefore = (() => {
+    try { return typeof window !== 'undefined' && !!window.localStorage.getItem('bluff_tour_done'); }
+    catch (_) { return false; }
+  })();
+  const handleShowTour = () => {
+    if (!spawnedRef.current && typeof startTour === 'function') {
+      spawnedRef.current = true;
+      startTour();
+    }
+    setIntroDone(true);
+    setIntroReopened(false);
+    setIntroStep(0);
+  };
+  const handleSkipTour = () => { handleBegin(); };
 
   // Clinic briefing pop-up (before each staged instance) + resolved explanation.
   // Held back while a cylinder is still spinning OR the practice loss hand-off is
@@ -976,6 +1026,11 @@ export function TutorialLayer({
           onNext={() => setIntroStep((s) => Math.min(slides.length - 1, s + 1))}
           onSkip={closeIntro}
           onBegin={handleBegin}
+          // Offer the spotlight tour on the final Basics slide only.
+          offerTour={path === 'basics' && typeof startTour === 'function'}
+          onShowTour={handleShowTour}
+          onSkipTour={handleSkipTour}
+          tourDoneBefore={tourDoneBefore}
         />
       )}
 

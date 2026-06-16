@@ -111,6 +111,7 @@ export function CoreGameOverlays({
             <div style={{ display: 'flex', gap: 10 }}>
               <button
                 className="primary"
+                data-tour-id="btn-confirm-play"
                 style={{ flex: 1, padding: '12px' }}
                 onClick={() => {
                   if (pendingCard.shape === 'whot') {

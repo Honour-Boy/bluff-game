@@ -70,25 +70,39 @@ function serializeRoom(room, requestingPlayerId = null, opts = {}) {
     // `lockBluff` disables the Call-Bluff button during own-turn drills. null
     // outside the clinic. No card data here — hands stay gated to their owner.
     tutorialScenario: room.isTutorial && room.tutorialScenario
-      ? {
-          index: room.tutorialScenario.index,
-          power: room.tutorialScenario.power,
-          actor: room.tutorialScenario.actor || 'player',
-          step: room.tutorialScenario.step || 'intro',
-          lockBluff: !!room.tutorialScenario.lockBluff,
-          expect: room.tutorialScenario.expect || null,
-          // (Module 4.1) Defensive drills first show a distinct "the bot is calling
-          // your bluff" beat; the client coach keys off this to announce the
-          // challenge BEFORE the defend window opens.
-          challengeAnnounced: !!room.tutorialScenario.challengeAnnounced,
-          total: room.tutorialScenario.total || null,
-          playerStep: room.tutorialScenario.playerStep ?? null,
-          playerTotal: room.tutorialScenario.playerTotal ?? null,
-        }
+      ? (room.tutorialScenario.tour
+          // Spotlight "Show me around" tour instance — a different shape the
+          // client tour layer keys off (step + stepIndex drive the Part-B beats).
+          ? {
+              tour: true,
+              step: room.tutorialScenario.step,
+              stepIndex: room.tutorialScenario.stepIndex,
+              totalSteps: room.tutorialScenario.totalSteps,
+              expect: room.tutorialScenario.expect || null,
+              lockBluff: !!room.tutorialScenario.lockBluff,
+            }
+          : {
+              index: room.tutorialScenario.index,
+              power: room.tutorialScenario.power,
+              actor: room.tutorialScenario.actor || 'player',
+              step: room.tutorialScenario.step || 'intro',
+              lockBluff: !!room.tutorialScenario.lockBluff,
+              expect: room.tutorialScenario.expect || null,
+              // (Module 4.1) Defensive drills first show a distinct "the bot is calling
+              // your bluff" beat; the client coach keys off this to announce the
+              // challenge BEFORE the defend window opens.
+              challengeAnnounced: !!room.tutorialScenario.challengeAnnounced,
+              total: room.tutorialScenario.total || null,
+              playerStep: room.tutorialScenario.playerStep ?? null,
+              playerTotal: room.tutorialScenario.playerTotal ?? null,
+            })
       : null,
     // True once the clinic's final drill is done (drives the "you've learned the
     // powers" end screen). Only meaningful in a tutorial room.
     tutorialClinicComplete: room.isTutorial ? !!room.tutorialClinicComplete : undefined,
+    // True once the spotlight tour's last instance is done (drives the tour's
+    // congrats card). Only meaningful in a tutorial room.
+    tourComplete: room.isTutorial ? !!room.tourComplete : undefined,
     players: room.players.map(p => ({
       id: p.id,
       username: p.username,

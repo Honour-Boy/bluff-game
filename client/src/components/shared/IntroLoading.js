@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
+import { ChamberSpinner } from './ChamberSpinner';
 
 // ============================================================
 // IntroLoading — branded 3s progress beat after the intro video
@@ -9,43 +10,12 @@ import { useEffect, useRef, useState } from 'react';
 // Shown for a fixed 3s once the intro splash video finishes, then calls
 // `onDone`. A themed determinate progress bar sweeps 1 → 100% across the
 // 3s (driven by rAF so the bar fill and the live % readout stay in lock-
-// step), under a slowly-spinning revolver cylinder and the wordmark.
-// Purely cosmetic — it masks the auth/socket bootstrap finishing
-// underneath while the early-return holds the app.
+// step), under a slowly-spinning revolver cylinder (the shared
+// ChamberSpinner) and the wordmark. Purely cosmetic — it masks the
+// auth/socket bootstrap finishing underneath while the early-return holds
+// the app.
 
 const HOLD_MS = 3000;
-
-// Six chambers around a ring (the revolver motif), placed by polar coords.
-function Cylinder() {
-  const r = 30; // ring radius within an 80×80 box (centre 40,40)
-  const holes = Array.from({ length: 6 }, (_, i) => {
-    const a = (Math.PI / 3) * i - Math.PI / 2; // start at top
-    return { cx: 40 + r * Math.cos(a), cy: 40 + r * Math.sin(a) };
-  });
-  return (
-    <svg
-      width="80"
-      height="80"
-      viewBox="0 0 80 80"
-      style={{ animation: 'spin 3.2s linear infinite' }}
-      aria-hidden="true"
-    >
-      <circle cx="40" cy="40" r="37" fill="none" stroke="rgba(240,181,74,0.35)" strokeWidth="2" />
-      <circle cx="40" cy="40" r="8" fill="none" stroke="rgba(240,181,74,0.5)" strokeWidth="2" />
-      {holes.map((h, i) => (
-        <circle
-          key={i}
-          cx={h.cx}
-          cy={h.cy}
-          r="6"
-          fill={i === 0 ? 'var(--accent)' : 'rgba(240,181,74,0.18)'}
-          stroke="rgba(240,181,74,0.5)"
-          strokeWidth="1.5"
-        />
-      ))}
-    </svg>
-  );
-}
 
 export function IntroLoading({ onDone }) {
   const doneRef = useRef(false);
@@ -87,7 +57,7 @@ export function IntroLoading({ onDone }) {
       {/* Local keyframe for the moving sheen across the fill. */}
       <style>{`@keyframes introSheen { from { transform: translateX(-120%); } to { transform: translateX(320%); } }`}</style>
 
-      <Cylinder />
+      <ChamberSpinner />
 
       <div style={{
         fontFamily: "'Bebas Neue', sans-serif",

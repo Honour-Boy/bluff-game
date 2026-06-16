@@ -25,6 +25,7 @@ import { LobbyConfigSummary } from '../components/LobbyConfigSummary';
 import { LeaderboardPanel } from '../components/LeaderboardPanel';
 import { IntroVideo } from '../components/shared/IntroVideo';
 import { IntroLoading } from '../components/shared/IntroLoading';
+import { ChamberSpinner } from '../components/shared/ChamberSpinner';
 import { useIsMobile } from '../hooks/useIsMobile';
 import { shouldShowIntro, markIntroSeen, rearmIntro } from '../lib/intro';
 
@@ -84,11 +85,17 @@ function HomeContent() {
   // Phases: 'video' → 'loading' → null (app shows). The video plays in
   // full, then a branded 3s progress bar masks the auth/socket bootstrap.
   const [introPhase, setIntroPhase] = useState(null); // null | 'video' | 'loading'
+  // #274 — the background music must NOT start until the intro splash (video →
+  // 3s loading beat) has fully finished, or the lobby track bleeds over the
+  // intro's own audio. Stays false while an intro is showing; flips true the
+  // moment there's no intro to play, or once the loading beat completes.
+  const [introResolved, setIntroResolved] = useState(false);
   const introCheckedRef = useRef(false);
   useEffect(() => {
     if (introCheckedRef.current) return;
     introCheckedRef.current = true;
     if (shouldShowIntro()) setIntroPhase('video');
+    else setIntroResolved(true); // no intro this open — music may start now
   }, []);
   // Mark "seen" when the video ends (so a reload during the loading beat
   // doesn't replay it), then hand off to the 5s loading screen.
@@ -96,7 +103,10 @@ function HomeContent() {
     markIntroSeen();
     setIntroPhase('loading');
   }, []);
-  const finishIntroLoading = useCallback(() => setIntroPhase(null), []);
+  const finishIntroLoading = useCallback(() => {
+    setIntroPhase(null);
+    setIntroResolved(true); // intro fully done — landing music may fade in now
+  }, []);
   const [groupsLoading, setGroupsLoading] = useState(false);
 
   // Replay the intro on a fresh sign-in within the same tab (logout →
@@ -129,7 +139,7 @@ function HomeContent() {
     roomState, myPlayer, isMyTurn, currentPlayer,
     gameMode, error, connected, authenticated, notification,
     sessionConflict, takeOverSession, signOutSocket,
-    createRoom, startTutorial, startSandbox, skipToPowers, advanceTutorial, joinRoom, startGame,
+    createRoom, startTutorial, startSandbox, skipToPowers, advanceTutorial, startTour, finishTour, joinRoom, startGame,
     createGroup, listMyGroups, getGroup,
     inviteToGroup, listMyInvites, respondToInvite,
     revokeInvite, removeMember, transferHost,
@@ -172,7 +182,12 @@ function HomeContent() {
     const prev = prevUserIdRef.current;
     prevUserIdRef.current = uid;
     if (prev === undefined) return; // initial mount — open-check effect owns it
-    if (!prev && uid && shouldShowIntro()) setIntroPhase('video');
+    if (!prev && uid && shouldShowIntro()) {
+      // Replaying the intro (same-tab logout → login): re-gate the music so the
+      // lobby track doesn't keep bleeding over the replayed splash (#274).
+      setIntroResolved(false);
+      setIntroPhase('video');
+    }
   }, [user?.id]);
 
   // ─── Section-based background music (#A) ──────────────────────────
@@ -194,8 +209,13 @@ function HomeContent() {
             : (inGroupRoom ? 'groups' : 'lobby'))
     : (homeView === 'groups' || homeView === 'group') ? 'groups' : 'lobby';
   useEffect(() => {
+    // #274 — hold all music until the intro splash has fully resolved. Because
+    // _setSection is the sole place that arms the audio unlock + starts the
+    // playlist, gating here also stops a Skip-tap gesture from kick-starting the
+    // bed mid-intro.
+    if (!introResolved) return;
     setSection(musicSection);
-  }, [setSection, musicSection]);
+  }, [setSection, musicSection, introResolved]);
 
   // Game-state progressive music: feed the in-game intensity stage (player
   // attrition) so the 'game' section crossfades from quiet tension up to the
@@ -550,9 +570,7 @@ function HomeContent() {
         }}>
           BLUFF
         </div>
-        <div style={{ fontSize: 11, color: 'var(--text-dim)', letterSpacing: '0.15em' }}>
-          Loading...
-        </div>
+        <ChamberSpinner size={56} />
       </div>
     );
   }
@@ -780,6 +798,8 @@ function HomeContent() {
           startGame={startGame}
           skipToPowers={skipToPowers}
           advanceTutorial={advanceTutorial}
+          startTour={startTour}
+          finishTour={finishTour}
           playCardOnline={playCardOnline}
           callBluff={callBluff}
           endTurn={endTurn}
@@ -813,6 +833,7 @@ function HomeContent() {
           openChat={openChat}
           chatUnread={chatUnread}
           xpAward={xpAward}
+          isGuest={isGuest}
         />
       );
     }
@@ -845,6 +866,8 @@ function HomeContent() {
           startGame={startGame}
           skipToPowers={skipToPowers}
           advanceTutorial={advanceTutorial}
+          startTour={startTour}
+          finishTour={finishTour}
           playCardOnline={playCardOnline}
           callBluff={callBluff}
           endTurn={endTurn}
@@ -878,6 +901,7 @@ function HomeContent() {
           openChat={openChat}
           chatUnread={chatUnread}
           xpAward={xpAward}
+          isGuest={isGuest}
         />
       );
     }
@@ -900,8 +924,11 @@ function HomeContent() {
   }
 
   return wrap(
-    <div style={{ textAlign: 'center', padding: 60, color: 'var(--text-dim)' }}>
-      Loading...
+    <div style={{
+      display: 'flex', justifyContent: 'center',
+      alignItems: 'center', padding: 60,
+    }}>
+      <ChamberSpinner size={56} />
     </div>
   );
 }
@@ -917,7 +944,7 @@ function PageLoading() {
       <div style={{ fontFamily: "'Bebas Neue', sans-serif", fontSize: 64, color: 'var(--accent)', lineHeight: 1 }}>
         BLUFF
       </div>
-      <div style={{ fontSize: 11, color: 'var(--text-dim)', letterSpacing: '0.15em' }}>Loading...</div>
+      <ChamberSpinner size={56} />
     </div>
   );
 }

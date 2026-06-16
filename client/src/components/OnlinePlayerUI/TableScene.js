@@ -50,6 +50,9 @@ export function TableScene({
   isMyTurn,
   currentPlayer,
   revealFlipped,
+  // While the spotlight tour is active the cutout can't track a panning table,
+  // so panning is locked off (the board stays centred).
+  dragDisabled = false,
 }) {
   const hasTop = distributed.top.length > 0;
   const hasLeft = distributed.left.length > 0;
@@ -77,7 +80,7 @@ export function TableScene({
           screen; dragElastic gives a little dampened overscroll. */}
       <motion.div
         ref={boardRef}
-        drag
+        drag={!dragDisabled}
         dragConstraints={panConstraints}
         dragElastic={0.15}
         dragMomentum
@@ -88,7 +91,7 @@ export function TableScene({
           flexDirection: 'column',
           alignItems: 'center',
           gap: 10,
-          cursor: 'grab',
+          cursor: dragDisabled ? 'default' : 'grab',
           // Extra top room so a top-row chip's contextual popup (Module 2) has
           // headroom and isn't clipped by the viewport's overflow:hidden.
           padding: '34px 16px 16px',

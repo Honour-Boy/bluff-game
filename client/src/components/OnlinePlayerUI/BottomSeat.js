@@ -248,6 +248,7 @@ export function BottomSeat({
             <button
               className="primary"
               onClick={endTurn}
+              data-tour-id="btn-end-turn"
               // Power Clinic: disabled until the drill's scripted action is done
               // (the server refuses it too). Tooltip explains what's still needed.
               disabled={endTurnLocked}
@@ -327,6 +328,7 @@ export function BottomSeat({
           <button
             className="danger"
             onClick={playerSpin}
+            data-tour-id="btn-pull-trigger"
             style={{
               width: 'min(420px, 100%)', fontSize: 16, padding: '18px',
               letterSpacing: '0.18em',
@@ -380,6 +382,7 @@ export function BottomSeat({
                   <button
                     className="danger"
                     onClick={callBluff}
+                    data-tour-id="btn-call-bluff"
                     disabled={bluffDisabled}
                     title={bluffBlockedThisTurn
                       ? 'No card to challenge - last turn was frozen'

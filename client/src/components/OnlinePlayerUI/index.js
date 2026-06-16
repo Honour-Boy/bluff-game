@@ -17,6 +17,8 @@ import SpeedModeTimer from './SpeedModeTimer';
 import { PreGameSelectionModal } from '../PreGameSelectionModal';
 import { SmokeLayer } from '../shared/SmokeLayer';
 import { TutorialLayer } from '../tutorial/TutorialLayer';
+import { OnlineTourLayer } from '../tutorial/OnlineTourLayer';
+import { TourCongrats } from '../tutorial/TourCongrats';
 import { isDefensivePreArmLocked, clinicEndTurnLock } from '../tutorial/tutorialContent';
 import {
   arcPlayers,
@@ -41,6 +43,8 @@ export function OnlinePlayerUI({
   startGame,
   skipToPowers,
   advanceTutorial,
+  startTour,
+  finishTour,
   playCardOnline,
   callBluff,
   endTurn,
@@ -75,6 +79,9 @@ export function OnlinePlayerUI({
   chatUnread = 0,
   // #205 — this client's private end-of-game XP payload (useGame), if any.
   xpAward = null,
+  // Spotlight tour: whether THIS client is a guest (drops the profile / cosmetics
+  // beats, which guests don't have in the settings menu).
+  isGuest = false,
 }) {
   const wrapperRef = useRef(null);
   const { triggerShake, triggerAudio, startSpinAudio, stopSpinAudio } = useAtmosphere(wrapperRef);
@@ -100,6 +107,9 @@ export function OnlinePlayerUI({
   const [pannable, setPannable] = useState(false);
   // Tutorial — bumped by the header "Guide" button to reopen the guided walkthrough.
   const [guideSignal, setGuideSignal] = useState(0);
+  // Spotlight tour — flips true when the walk's last beat is finished, so the
+  // congrats card replaces the spotlight. Reset whenever we leave the tour.
+  const [tourDone, setTourDone] = useState(false);
   const ready = !!(roomState && myPlayer);
 
   useEffect(() => {
@@ -455,6 +465,13 @@ export function OnlinePlayerUI({
   // plain online game vs the bot (no TutorialLayer / coach hints / clinic locks /
   // end-of-game replay POP-UP; header shows "Rules" not "? Guide"). See helpers.
   const isTutorial = coachingActive(roomState);
+  // Spotlight "Show me around" tour is the active practice lesson. Gated on the
+  // server-set lesson so normal rooms (and the Basics / Power-Clinic lessons)
+  // are untouched. Drives the OnlineTourLayer + suppressions below.
+  const tourActive = isTutorial && roomState?.tutorialLesson === 'tour';
+  // Clear the local "tour finished" latch whenever we're not in the tour, so a
+  // later replay starts the walk fresh instead of jumping straight to congrats.
+  useEffect(() => { if (!tourActive) setTourDone(false); }, [tourActive]);
   const isMySpinTurn = isSpinPending && spinTargetId === myPlayer.id;
   // (Module 3) The challenged card is face-up for the whole spin_pending window
   // and reverse-flips the moment the spin result lands (ui.spinData is set when
@@ -654,14 +671,20 @@ export function OnlinePlayerUI({
     || ui.justEliminated;
   const aBannerShowing = (powerEventQueue?.length || 0) > 0;
   // Announcements wait behind any blocking overlay (broadens the spin-only hold).
-  const holdAnnouncements = holdForSpin || blockingOverlayActive;
+  // Also held for the whole spotlight tour so a stray banner can't pop over the
+  // cutout (the staged steps don't generate any, but this keeps it guaranteed).
+  const holdAnnouncements = holdForSpin || blockingOverlayActive || tourActive;
   // The "your turn" notice is redundant in the guided tutorial (the coach says it)
   // and must never render over another overlay.
   const suppressTurnNotice = isTutorial || blockingOverlayActive || aBannerShowing;
 
   // Clinic progress for the in-flow top band (reserves its own height; the rest
-  // of the HUD sits below it, so nothing is obstructed).
-  const scenarioForBar = roomState?.tutorialScenario || null;
+  // of the HUD sits below it, so nothing is obstructed). The spotlight tour uses
+  // a different scenario shape (no index/total) — exclude it so the bar never
+  // renders a NaN width during the tour.
+  const scenarioForBar = (roomState?.tutorialScenario && !roomState.tutorialScenario.tour)
+    ? roomState.tutorialScenario
+    : null;
   const clinicComplete = !!roomState?.tutorialClinicComplete;
   const clinicProgressPct = clinicComplete
     ? 100
@@ -684,6 +707,25 @@ export function OnlinePlayerUI({
   const spinGunSkinId = ui.spinData
     ? (players?.find((p) => p.id === ui.spinData.spinTargetId)?.cosmetics?.gunSkin || null)
     : null;
+
+  // Spotlight tour — Part-B signals. Each `do-action` beat advances when the
+  // SERVER-confirmed effect (or a client overlay) reflects the action, NOT on the
+  // raw click. Keyed to the tourContent `waitFor` strings. The step transitions
+  // (turn-ended / spin-acknowledged) are driven by the director restaging.
+  const tourScenarioStep = roomState?.tutorialScenario?.tour ? roomState.tutorialScenario.step : null;
+  const tourSignals = useMemo(() => ({
+    'card-pending': !!ui.pendingCard,
+    'card-played': !!cardPlayedThisTurn,
+    'turn-ended': tourScenarioStep != null && tourScenarioStep !== 'play_card',
+    'bluff-called': !!bluffUsedThisTurn,
+    'spun': !!ui.spinData,
+    'spin-acknowledged': tourScenarioStep === 'activate_power',
+    'power-modal-open': !!ui.powerConfirmOpen,
+    'power-activated': !!ui.peekedCard || !!roomState?.powerActivatedThisTurn,
+  }), [
+    ui.pendingCard, cardPlayedThisTurn, tourScenarioStep, bluffUsedThisTurn,
+    ui.spinData, ui.powerConfirmOpen, ui.peekedCard, roomState?.powerActivatedThisTurn,
+  ]);
 
   return (
     <div
@@ -825,6 +867,7 @@ export function OnlinePlayerUI({
         isMyTurn={isMyTurn}
         currentPlayer={currentPlayer}
         revealFlipped={revealFlipped}
+        dragDisabled={tourActive}
       />
 
       <div style={{ flex: '0 0 auto', paddingBottom: 'env(safe-area-inset-bottom, 0px)' }}>
@@ -1021,8 +1064,10 @@ export function OnlinePlayerUI({
 
       <FlyingCardLayer flights={flights} />
 
-      {/* Tutorial / Practice - guided intro + live coach, gated to tutorial rooms. */}
-      {isTutorial && (
+      {/* Tutorial / Practice - guided intro + live coach, gated to tutorial rooms.
+          Suppressed during the spotlight tour (OnlineTourLayer owns the screen
+          then; the Basics/clinic coach must not compete with the spotlight). */}
+      {isTutorial && !tourActive && (
         <TutorialLayer
           roomState={roomState}
           myPlayerId={myPlayer?.id || null}
@@ -1030,6 +1075,8 @@ export function OnlinePlayerUI({
           startGame={startGame}
           skipToPowers={skipToPowers}
           advanceTutorial={advanceTutorial}
+          startTour={startTour}
+          finishTour={finishTour}
           restartRoom={restartRoom}
           leaveGame={leaveGame}
           isMobile={ui.isMobile}
@@ -1041,6 +1088,21 @@ export function OnlinePlayerUI({
           clinicActionHint={ui.clinicActionHint}
           lesson={roomState?.tutorialLesson || 'basics'}
         />
+      )}
+
+      {/* Spotlight "Show me around" tour — runs over the live table during the
+          'tour' practice lesson. The walk shows until its last beat is done (or
+          the server flags tourComplete), then the congrats card takes over. */}
+      {tourActive && !tourDone && !roomState?.tourComplete && (
+        <OnlineTourLayer
+          isGuest={isGuest}
+          partBSignals={tourSignals}
+          onComplete={() => setTourDone(true)}
+          onSkip={() => { if (typeof finishTour === 'function') finishTour(); }}
+        />
+      )}
+      {tourActive && (tourDone || roomState?.tourComplete) && (
+        <TourCongrats onBeginPractice={() => { if (typeof finishTour === 'function') finishTour(); }} />
       )}
 
       <style>{GAME_UI_STYLE}</style>

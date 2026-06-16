@@ -100,6 +100,12 @@ function _botCanForceBluff(room, botId) {
 function _pendingBotAction(room) {
   if (!room || room.mode !== engine.MODES.ONLINE || !_roomHasBots(room)) return null;
 
+  // Spotlight tour: the bot is FROZEN for the whole tour. Every "bot play" the
+  // Part-B beats need is written directly by the scenario stager
+  // (engine/tourScenarios.js), so the driver must never act — a stray bot move
+  // would derail the staged instance.
+  if (room.isTutorial && room.tutorialLesson === 'tour') return null;
+
   // A bot accused during a bluff-intercept window normally auto-passes — it has
   // no socket to arm a defence, so without this a human bluff against a power-
   // holding bot would stall the whole window. EXCEPTION: the clinic's bot-Shield

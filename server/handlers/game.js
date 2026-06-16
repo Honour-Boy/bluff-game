@@ -18,7 +18,7 @@ const { broadcastRoomState } = require('../lib/broadcast');
 const { socketRateLimit } = require('../lib/rateLimiter');
 const { maybeRecordGroupWinner } = require('../lib/roomBuilders');
 const { runMirrorMatchSpin, resolvePendingGameOver, beginRedemption } = require('../lib/orchestration');
-const { _beginPowerClinic, advanceClinic } = require('../lib/tutorialDirector');
+const { _beginPowerClinic, advanceClinic, _beginTour } = require('../lib/tutorialDirector');
 const { clinicEndTurnBlock, clinicActionBlock } = require('../engine/tutorialScenarios');
 
 // ─── Pre-game selection orchestration (#116) ─────────────────
@@ -289,6 +289,66 @@ function register(io, socket, deps) {
       return callback?.({ success: true });
     } catch (err) {
       console.error('[tutorial_advance]', err);
+      return callback?.({ success: false, error: err.message });
+    }
+  });
+
+  // ─── TUTORIAL: Start the "Show me around" spotlight tour ───────────────────
+  // From the intro's "Show me around" button. Deals the room if it's still in
+  // the lobby, flips the lesson to 'tour', and stages the first Part-B instance.
+  // Only the seated human. The bot is frozen for the whole tour (lib/bots.js).
+  socket.on('tutorial_start_tour', async ({ roomCode } = {}, callback) => {
+    try {
+      if (!socket.userId) return callback?.({ success: false, error: 'Not authenticated' });
+      const code = roomCode?.toUpperCase();
+      const room = await getRoom(code);
+      if (!room) return callback?.({ success: false, error: 'Room not found' });
+      if (!room.isTutorial) return callback?.({ success: false, error: 'Not a tutorial room' });
+      if (!room.players.some(p => p.id === socket.userId && !p.isBot)) {
+        return callback?.({ success: false, error: 'Not in this room' });
+      }
+
+      // The Basics deal may already have happened (intro dismissal); deal here
+      // only if we're still in the lobby. _beginTour fully restages the room.
+      if (room.phase === 'lobby') engine.startGame(room);
+      _beginTour(room);
+
+      await saveRoom(room);
+      await broadcastRoomState(io, code);
+      return callback?.({ success: true });
+    } catch (err) {
+      console.error('[tutorial_start_tour]', err);
+      return callback?.({ success: false, error: err.message });
+    }
+  });
+
+  // ─── TUTORIAL: Finish the tour → fresh Basics game ─────────────────────────
+  // From the congrats screen's "Begin Practice" (and from Skip tour). Resets the
+  // room to a freshly-dealt Basics game so the existing coaching flow takes over.
+  socket.on('tutorial_finish_tour', async ({ roomCode } = {}, callback) => {
+    try {
+      if (!socket.userId) return callback?.({ success: false, error: 'Not authenticated' });
+      const code = roomCode?.toUpperCase();
+      const room = await getRoom(code);
+      if (!room) return callback?.({ success: false, error: 'Room not found' });
+      if (!room.isTutorial) return callback?.({ success: false, error: 'Not a tutorial room' });
+      if (!room.players.some(p => p.id === socket.userId && !p.isBot)) {
+        return callback?.({ success: false, error: 'Not in this room' });
+      }
+
+      engine.resetRoomForReplay(room); // → lobby; players + config + sandbox preserved
+      room.tutorialLesson = 'basics';
+      room.tutorialScenario = null;
+      room.tourComplete = false;
+      room.tutorialClinicComplete = false;
+      room.tourSpinAcked = false;
+      engine.startGame(room);          // deal the fresh Basics game
+
+      await saveRoom(room);
+      await broadcastRoomState(io, code);
+      return callback?.({ success: true });
+    } catch (err) {
+      console.error('[tutorial_finish_tour]', err);
       return callback?.({ success: false, error: err.message });
     }
   });
@@ -607,6 +667,16 @@ function register(io, socket, deps) {
     }
 
     io.to(code).emit('spin_acknowledged');
+
+    // Spotlight tour: a survived spin doesn't mutate room state, so the
+    // call_bluff_chain step (B5–B7) can only know its spin (B6) was acknowledged
+    // (B7) from here. Stamp the marker + re-broadcast so the director advances to
+    // the next staged instance.
+    if (room && room.isTutorial && room.tutorialLesson === 'tour' && room.tutorialScenario?.tour) {
+      room.tourSpinAcked = true;
+      await saveRoom(room);
+      await broadcastRoomState(io, code);
+    }
   });
 }
 
