@@ -664,6 +664,10 @@ function HomeContent() {
               isGroupRoom={!!roomState?.groupId}
               savedMeta={roomState?.groupSettingsMeta}
               playerCount={aliveCount}
+              // Phase 5 (#308): tier-gate the toggles to the room's tier
+              // (host's tier at creation). Informational only — the server
+              // enforces caps at create_room.
+              tier={roomState?.tier || null}
               // (Module 5) Sandbox: only power cards are configurable today; the
               // rest render with a "Coming Soon" tag.
               sandbox={!!roomState?.sandbox}
@@ -784,6 +788,7 @@ function HomeContent() {
         connected={connected}
         musicEnabled={musicEnabled}
         onToggleMusic={toggleMusic}
+        getProgression={getProgression}
       />
     );
   }

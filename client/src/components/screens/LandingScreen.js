@@ -6,6 +6,8 @@ const HowToPlayModal = lazy(() =>
   import('./HowToPlayModal').then((m) => ({ default: m.HowToPlayModal })),
 );
 import { ShapeIcon } from '../shared/ShapeIcon';
+import { TierBadge } from '../shared/TierBadge';
+import { tierForLevel } from '../../lib/tiers';
 import { useIsMobile } from '../../hooks/useIsMobile';
 
 // ─── Tavern sign icon — carved suit marks ────────────────────────────────────
@@ -66,8 +68,24 @@ export function LandingScreen({
   connected,
   musicEnabled = true,
   onToggleMusic,
+  getProgression,
 }) {
   const [mode, setMode] = useState(null);              // null | 'play' | 'host' | 'join' | 'practice'
+  // Phase 5 (#305): the player's progression tier, shown as a chip beside their
+  // name. Derived from level; fetched once for signed-in players (guests are
+  // always Streets and get no badge).
+  const [tier, setTier] = useState(null);
+  useEffect(() => {
+    if (isGuest || !getProgression) { setTier(null); return; }
+    let alive = true;
+    getProgression().then((res) => {
+      if (!alive) return;
+      if (res?.success && res.progression) {
+        setTier(tierForLevel(res.progression.level));
+      }
+    }).catch(() => { /* badge is cosmetic — ignore fetch errors */ });
+    return () => { alive = false; };
+  }, [isGuest, getProgression]);
   const isMobile = useIsMobile();
   const [showHowToPlay, setShowHowToPlay] = useState(false);
   const [roomCode, setRoomCode] = useState('');
@@ -704,6 +722,7 @@ export function LandingScreen({
                   fontStyle: 'italic',
                 }}>
                   Seated as: <strong style={{ color: 'var(--text)', fontStyle: 'normal' }}>{username}</strong>
+                  {tier && <TierBadge tier={tier} style={{ marginLeft: 8, verticalAlign: 'middle' }} />}
                 </div>
                 <div style={{
                   fontFamily: "'Crimson Text', serif",
@@ -763,6 +782,7 @@ export function LandingScreen({
               fontStyle: 'italic',
             }}>
               Seated as: <strong style={{ color: 'var(--text)', fontStyle: 'normal' }}>{username}</strong>
+              {tier && <TierBadge tier={tier} style={{ marginLeft: 8, verticalAlign: 'middle' }} />}
             </div>
 
             <div>

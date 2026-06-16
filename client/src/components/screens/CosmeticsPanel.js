@@ -2,12 +2,16 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import { CloseIcon } from '../shared/CloseIcon';
+import { TierBadge } from '../shared/TierBadge';
+import { tierForLevel, tierMeta } from '../../lib/tiers';
 import {
   DEFAULT_EQUIPPED,
   cardBackFor,
   gunSkinFor,
   tableFeltFor,
 } from '../../lib/cosmetics';
+
+const MAX_LEVEL = 20;
 
 // ─── CosmeticsPanel — XP, level, and the cosmetic locker (#205) ───────────────
 // Opened from the global SettingsGear (signed-in, non-guest only). The server
@@ -140,10 +144,15 @@ export function CosmeticsPanel({ getProgression, setCosmetics, onClose }) {
     return map;
   }, [catalog]);
 
+  const tier = tierForLevel(level);
+  const tierStyle = tierMeta(tier);
+  const isMaxLevel = level >= MAX_LEVEL;
   const span = (progression?.nextLevelXp ?? 0) - (progression?.levelFloorXp ?? 0);
-  const progressPct = progression && span > 0
-    ? Math.max(0, Math.min(100, Math.round(((progression.xp - progression.levelFloorXp) / span) * 100)))
-    : 0;
+  const progressPct = isMaxLevel
+    ? 100
+    : progression && span > 0
+      ? Math.max(0, Math.min(100, Math.round(((progression.xp - progression.levelFloorXp) / span) * 100)))
+      : 0;
 
   const handleEquip = async (item) => {
     if (item.unlockLevel > level) return;
@@ -229,16 +238,23 @@ export function CosmeticsPanel({ getProgression, setCosmetics, onClose }) {
 
         {progression && (
           <>
-            {/* ── Level + XP bar ── */}
+            {/* ── Level + tier + XP bar ── */}
             <div style={{ marginBottom: 18 }}>
               <div style={{
-                display: 'flex', alignItems: 'baseline', justifyContent: 'space-between',
+                display: 'flex', alignItems: 'center', justifyContent: 'space-between',
                 fontFamily: "'Space Mono', monospace", fontSize: 10,
                 color: 'var(--text-dim)', letterSpacing: '0.12em',
-                textTransform: 'uppercase', marginBottom: 5,
+                textTransform: 'uppercase', marginBottom: 6,
               }}>
-                <span style={{ color: 'var(--accent)' }}>Level {level}</span>
-                <span>{progression.xp} XP{span > 0 ? ` · ${progression.nextLevelXp - progression.xp} to next` : ''}</span>
+                <span style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <span style={{ color: 'var(--accent)' }}>Level {level}</span>
+                  <TierBadge tier={tier} />
+                </span>
+                <span>
+                  {isMaxLevel
+                    ? `${progression.xp} XP`
+                    : `${progression.xp} XP${span > 0 ? ` · ${progression.nextLevelXp - progression.xp} to next` : ''}`}
+                </span>
               </div>
               <div style={{
                 height: 7, borderRadius: 4,
@@ -249,7 +265,10 @@ export function CosmeticsPanel({ getProgression, setCosmetics, onClose }) {
                 <div style={{
                   height: '100%',
                   width: `${progressPct}%`,
-                  background: 'linear-gradient(90deg, var(--accent), var(--alive))',
+                  // Bar fill is tinted by the current tier so crossing a boundary
+                  // is visible at a glance (Streets amber → Covenant gold).
+                  background: `linear-gradient(90deg, ${tierStyle.fill}, var(--accent))`,
+                  boxShadow: tierStyle.glow ? `0 0 8px ${tierStyle.glow}` : 'none',
                 }} />
               </div>
               <div style={{
@@ -259,8 +278,9 @@ export function CosmeticsPanel({ getProgression, setCosmetics, onClose }) {
                 color: 'var(--text-dim)',
                 marginTop: 6,
               }}>
-                Earn XP by finishing online games — surviving spins, calling bluffs
-                right, placing high, and winning.
+                {isMaxLevel
+                  ? 'Max level — The Covenant. You’ve reached the top of the ladder.'
+                  : 'Earn XP by finishing online games — surviving spins, calling bluffs right, defending bluffs, eliminating players, resolving power cards, and winning.'}
               </div>
             </div>
 

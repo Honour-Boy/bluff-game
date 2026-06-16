@@ -186,6 +186,55 @@ describe('PreGameSettingsPanel - player-count gating', () => {
   });
 });
 
+describe('PreGameSettingsPanel - tier gating (#308)', () => {
+  function expandTier(tier) {
+    render(<PreGameSettingsPanel config={DEFAULT_V2_CONFIG} onChange={vi.fn()} tier={tier} playerCount={6} />);
+    fireEvent.click(screen.getByText(/V2 GAME SETTINGS/i));
+  }
+
+  it('Streets: every mechanic toggle is disabled with the Backroads unlock hint', () => {
+    expandTier('streets');
+    expect(document.getElementById('pc-shield')).toBeDisabled();
+    expect(document.getElementById('risk-doubleBarrel')).toBeDisabled();
+    expect(document.getElementById('room-speedMode')).toBeDisabled();
+    expect(document.getElementById('sys-bounty')).toBeDisabled();
+    expect(document.getElementById('sys-betting')).toBeDisabled();
+    expect(screen.getAllByText(/Unlocks at Backroads \(Level 3\)/i).length).toBeGreaterThan(0);
+  });
+
+  it('Backroads: powers + bounty are enabled, but betting/DMH/Last Stand wait for Syndicate', () => {
+    expandTier('backroads');
+    expect(document.getElementById('pc-shield')).not.toBeDisabled();
+    expect(document.getElementById('risk-doubleBarrel')).not.toBeDisabled();
+    expect(document.getElementById('sys-bounty')).not.toBeDisabled();
+    expect(document.getElementById('sys-betting')).toBeDisabled();
+    expect(document.getElementById('sys-deadMansHand')).toBeDisabled();
+    expect(document.getElementById('sys-lastStand')).toBeDisabled();
+    expect(screen.getAllByText(/Unlocks at Syndicate \(Level 9\)/i).length).toBeGreaterThan(0);
+  });
+
+  it('Syndicate: all toggles enabled, no Covenant notice', () => {
+    expandTier('syndicate');
+    expect(document.getElementById('pc-shield')).not.toBeDisabled();
+    expect(document.getElementById('sys-betting')).not.toBeDisabled();
+    expect(document.getElementById('sys-lastStand')).not.toBeDisabled();
+    expect(screen.queryByText(/always active in Covenant rooms/i)).toBeNull();
+  });
+
+  it('Covenant: all toggles enabled and the Pact + Blood Debt notice shows', () => {
+    expandTier('covenant');
+    expect(document.getElementById('sys-lastStand')).not.toBeDisabled();
+    expect(screen.getByText(/always active in Covenant rooms/i)).toBeInTheDocument();
+  });
+
+  it('no tier prop: no tier gating (back-compat)', () => {
+    render(<PreGameSettingsPanel config={DEFAULT_V2_CONFIG} onChange={vi.fn()} playerCount={6} />);
+    fireEvent.click(screen.getByText(/V2 GAME SETTINGS/i));
+    expect(document.getElementById('pc-shield')).not.toBeDisabled();
+    expect(document.getElementById('sys-betting')).not.toBeDisabled();
+  });
+});
+
 describe('PreGameSettingsPanel - sandbox mode (Module 5)', () => {
   function expandSandbox() {
     const onChange = vi.fn();

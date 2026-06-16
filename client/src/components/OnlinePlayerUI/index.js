@@ -796,6 +796,7 @@ export function OnlinePlayerUI({
         onShowHowToPlay={() => ui.setShowHowToPlay(true)}
         isTutorial={isTutorial}
         onShowGuide={() => setGuideSignal((n) => n + 1)}
+        tier={roomState?.tier || null}
       />
 
       {/* Speed Mode - a turn countdown visible to ALL players (#speedMode). */}
