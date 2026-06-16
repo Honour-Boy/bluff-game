@@ -59,15 +59,34 @@ function register(io, socket, deps) {
 
     try {
       const roomMode = mode === engine.MODES.ONLINE ? engine.MODES.ONLINE : engine.MODES.PHYSICAL;
-      const room = await buildAdHocRoom(socket, roomMode, config, groupsRepo);
+
+      // ─── Tier gate (Progression & Covenant overhaul) ─────────
+      // The host's tier (derived from their level) decides which mechanics the
+      // room may use. Room creation is the SOLE gating point: the requested
+      // config is capped here and can't be re-escalated at runtime. Guests are
+      // always level 1 → Streets, so no DB fetch is needed for them.
+      let tier = 'streets';
+      if (!socket.isGuest && typeof leaderboardRepo?.getLevel === 'function') {
+        try {
+          tier = engine.tierForLevel(await leaderboardRepo.getLevel(socket.userId));
+        } catch (err) {
+          console.error('[Room] tier lookup failed, defaulting to streets', err);
+        }
+      }
+      const requestedConfig = engine.normalizeRoomConfig(config || engine.defaultRoomConfig());
+      const cappedConfig = engine.applyTierCapsToConfig(requestedConfig, tier);
+      const capsApplied = JSON.stringify(cappedConfig) !== JSON.stringify(requestedConfig);
+
+      const room = await buildAdHocRoom(socket, roomMode, cappedConfig, groupsRepo);
       room.hostUserId = socket.userId;
+      engine.applyTierFlags(room, tier);
       room.cardPlayedThisTurn = false;
       room.bluffUsedThisTurn = false;
       room.powerActivatedThisTurn = false;
       await saveRoom(room);
 
       socket.join(room.code);
-      console.log(`[Room ${room.code}] Created by ${socket.username} (mode: ${roomMode})`);
+      console.log(`[Room ${room.code}] Created by ${socket.username} (mode: ${roomMode}, tier: ${tier})`);
 
       if (roomMode === engine.MODES.ONLINE) {
         const player = engine.createPlayer(socket.userId, socket.username, socket.id);
@@ -76,9 +95,9 @@ function register(io, socket, deps) {
         // (non-blocking; pops in on the follow-up broadcast).
         stampCosmeticsInBackground(io, leaderboardRepo, room.code, player);
         await saveRoom(room);
-        callback({ success: true, roomCode: room.code, isHost: true, mode: roomMode, playerId: socket.userId });
+        callback({ success: true, roomCode: room.code, isHost: true, mode: roomMode, playerId: socket.userId, tier, capsApplied });
       } else {
-        callback({ success: true, roomCode: room.code, isHost: true, mode: roomMode });
+        callback({ success: true, roomCode: room.code, isHost: true, mode: roomMode, tier, capsApplied });
       }
 
       await broadcastRoomState(io, room.code);
@@ -394,7 +413,9 @@ function register(io, socket, deps) {
       if (room.phase !== 'lobby') return callback?.({ success: false, error: 'Game already started' });
       if (room.mode !== engine.MODES.ONLINE) return callback?.({ success: false, error: 'Online mode only' });
 
-      room.config = engine.normalizeRoomConfig(config);
+      // Re-cap on every config change so a host can't escalate past their tier
+      // after creation (room.tier is fixed at create time).
+      room.config = engine.applyTierCapsToConfig(config, engine.getRoomTier(room));
       await saveRoom(room);
       await broadcastRoomState(io, code);
       callback?.({ success: true });

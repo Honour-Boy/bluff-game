@@ -195,6 +195,10 @@ function defaultRoomConfig() {
       deadMansHand: false,
       lastStand: false,
     },
+    // Secret roles (Sheriff/Medic/Saboteur/…). Off by default; assignRoles
+    // is a no-op unless this is true. Gated to Syndicate+ tiers at room
+    // creation by applyTierCapsToConfig (forced on there, off below).
+    secretRoles: false,
   };
 }
 
@@ -229,7 +233,50 @@ function normalizeRoomConfig(input) {
     }
   });
 
+  base.secretRoles = pickBool(input.secretRoles, base.secretRoles);
+
   return base;
+}
+
+// ─── Tier caps (Progression & Covenant overhaul) ─────────────
+//
+// Room mechanics unlock with the host's tier. Room creation is the SOLE
+// gating point: a normalized config is run through applyTierCapsToConfig,
+// which forces every field a tier can't use to its off-value (and forces
+// secretRoles ON for Syndicate/Covenant — see roadmap R8). Returns a NEW
+// config; never mutates the input.
+//
+//   Streets   → no powers, no roles, no risk/room modifiers, no systems.
+//   Backroads → powers + risk modifiers + bounty; no roles, betting, DMH,
+//               Last Stand.
+//   Syndicate → everything; secret roles forced on.
+//   Covenant  → same caps as Syndicate (Pact + Blood Debt ride room.tier,
+//               not the config).
+function applyTierCapsToConfig(config, tier) {
+  const out = normalizeRoomConfig(config);
+
+  const offAll = (obj) => { for (const k of Object.keys(obj)) obj[k] = false; };
+
+  if (tier === 'streets') {
+    offAll(out.powerCards.enabled);
+    offAll(out.riskModifiers);
+    offAll(out.roomModifiers);
+    offAll(out.systems);
+    out.secretRoles = false;
+    return out;
+  }
+
+  if (tier === 'backroads') {
+    out.secretRoles = false;
+    out.systems.betting = false;
+    out.systems.deadMansHand = false;
+    out.systems.lastStand = false;
+    return out;
+  }
+
+  // Syndicate + Covenant: no caps, but secret roles are always on.
+  out.secretRoles = true;
+  return out;
 }
 
 module.exports = {
@@ -269,4 +316,5 @@ module.exports = {
   IDLE_TURN_TIMEOUT_MS,
   defaultRoomConfig,
   normalizeRoomConfig,
+  applyTierCapsToConfig,
 };

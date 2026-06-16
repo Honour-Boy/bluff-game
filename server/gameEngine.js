@@ -64,6 +64,7 @@ module.exports = {
   IDLE_TURN_TIMEOUT_MS: constants.IDLE_TURN_TIMEOUT_MS,
   defaultRoomConfig: constants.defaultRoomConfig,
   normalizeRoomConfig: constants.normalizeRoomConfig,
+  applyTierCapsToConfig: constants.applyTierCapsToConfig,
 
   // ─── Chamber ─────────────────────────────────────────────
   DEATH_CURVE: chamber.DEATH_CURVE,
@@ -173,6 +174,8 @@ module.exports = {
   startGame: room.startGame,
   appendChatMessage: room.appendChatMessage,
   resetRoomForReplay: room.resetRoomForReplay,
+  applyTierFlags: room.applyTierFlags,
+  getRoomTier: room.getRoomTier,
 
   // ─── Serialisation ───────────────────────────────────────
   serializeRoom: serialize.serializeRoom,

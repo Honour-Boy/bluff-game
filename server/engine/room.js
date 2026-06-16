@@ -74,6 +74,25 @@ function createRoom(hostSocketId, mode = MODES.PHYSICAL, config = null) {
   };
 }
 
+// ─── Tier flags (Progression & Covenant overhaul) ────────────
+//
+// The host's tier is fixed at room creation. Covenant rooms additionally
+// carry two structural flags that drive the in-game Covenant mechanics
+// (these are NOT config toggles — they ride the tier). Idempotent.
+function applyTierFlags(room, tier) {
+  room.tier = tier;
+  room.pactActive = false;
+  room.bloodDebtActive = tier === 'covenant';
+  return room;
+}
+
+// Null-guard for the tier field. Rooms created before the tier rollout (or
+// in code paths that never stamped one) default to the safest tier with no
+// advanced mechanics.
+function getRoomTier(room) {
+  return room?.tier || 'streets';
+}
+
 function appendChatMessage(room, { userId, username, text }) {
   if (!room.chatLog) room.chatLog = [];
   const trimmed = String(text || '').slice(0, CHAT_TEXT_MAX).trim();
@@ -212,6 +231,10 @@ function resetRoomForReplay(room) {
   // sandbox marker and the coaching-off flag so replay stays a plain online game.
   const sandbox      = !!room.sandbox;
   const tutorialCoaching = room.tutorialCoaching;
+  // The host's tier (and the Covenant structural flags it implies) is fixed at
+  // room creation from the host's level — it must survive a replay reset, or
+  // "play again" in a Covenant room would silently drop to Streets.
+  const tier         = room.tier || null;
 
   const playerIdentities = room.players.map(p => ({
     id: p.id,
@@ -239,6 +262,7 @@ function resetRoomForReplay(room) {
   if (tutorialLesson) room.tutorialLesson = tutorialLesson;
   if (sandbox) room.sandbox = true;
   if (typeof tutorialCoaching === 'boolean') room.tutorialCoaching = tutorialCoaching;
+  if (tier) applyTierFlags(room, tier);
 
   for (const ident of playerIdentities) {
     const player = createPlayer(ident.id, ident.username, ident.socketId);
@@ -256,4 +280,6 @@ module.exports = {
   appendChatMessage,
   startGame,
   resetRoomForReplay,
+  applyTierFlags,
+  getRoomTier,
 };

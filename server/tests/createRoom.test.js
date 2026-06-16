@@ -13,8 +13,13 @@ import {
   createPlayer,
   defaultRoomConfig,
   normalizeRoomConfig,
+  applyTierCapsToConfig,
+  applyTierFlags,
+  getRoomTier,
   resetRoomForReplay,
   serializeRoom,
+  startGame,
+  ROLES,
   MODES,
 } from '../gameEngine.js';
 
@@ -34,8 +39,11 @@ describe('defaultRoomConfig', () => {
     expect(Object.keys(cfg.powerCards.enabled).sort()).toEqual(expected.sort());
   });
 
-  it('does NOT include secretRoles — that auto-activates at 9+ players', () => {
+  it('includes a top-level secretRoles boolean, off by default', () => {
     const cfg = defaultRoomConfig();
+    // secretRoles is a top-level config field (not under systems), gated to
+    // Syndicate+ tiers at room creation. Off by default.
+    expect(cfg.secretRoles).toBe(false);
     expect(cfg.systems.secretRoles).toBeUndefined();
   });
 
@@ -261,5 +269,122 @@ describe('resetRoomForReplay', () => {
     resetRoomForReplay(room);
     expect(room.isTutorial).toBe(true);
     expect('sandbox' in room).toBe(false);
+  });
+
+  it('preserves the host tier + Covenant flags across replay', () => {
+    const room = buildFinishedRoom();
+    applyTierFlags(room, 'covenant');
+    resetRoomForReplay(room);
+    expect(room.tier).toBe('covenant');
+    expect(room.pactActive).toBe(false);
+    expect(room.bloodDebtActive).toBe(true);
+  });
+});
+
+// ─── Phase 2 — Tier validation & mechanic gating ─────────────
+describe('normalizeRoomConfig — secretRoles', () => {
+  it('reads input.secretRoles as a boolean, defaulting false', () => {
+    expect(normalizeRoomConfig({}).secretRoles).toBe(false);
+    expect(normalizeRoomConfig({ secretRoles: true }).secretRoles).toBe(true);
+    expect(normalizeRoomConfig({ secretRoles: 'yes' }).secretRoles).toBe(false);
+  });
+});
+
+describe('applyTierCapsToConfig', () => {
+  const fullOn = () => normalizeRoomConfig({
+    powerCards: { enabled: { shield: true, mirror: true, swap: true, peek: true, freeze: true, assassin: true } },
+    riskModifiers: { doubleBarrel: true, russianRoulette: true, hotPotato: true, redemptionSpin: true },
+    roomModifiers: { speedMode: true, suddenDeath: true, mirrorMatch: true, rouletteRotation: true },
+    systems: { bounty: true, betting: true, deadMansHand: true, lastStand: true },
+    secretRoles: true,
+  });
+
+  it('does not mutate the input config', () => {
+    const cfg = fullOn();
+    const snapshot = JSON.stringify(cfg);
+    applyTierCapsToConfig(cfg, 'streets');
+    expect(JSON.stringify(cfg)).toBe(snapshot);
+  });
+
+  it('Streets forces everything off', () => {
+    const out = applyTierCapsToConfig(fullOn(), 'streets');
+    expect(Object.values(out.powerCards.enabled).every(v => v === false)).toBe(true);
+    expect(Object.values(out.riskModifiers).every(v => v === false)).toBe(true);
+    expect(Object.values(out.roomModifiers).every(v => v === false)).toBe(true);
+    expect(Object.values(out.systems).every(v => v === false)).toBe(true);
+    expect(out.secretRoles).toBe(false);
+  });
+
+  it('Backroads keeps powers + risk + bounty; bans roles, betting, DMH, Last Stand', () => {
+    const out = applyTierCapsToConfig(fullOn(), 'backroads');
+    expect(out.powerCards.enabled.shield).toBe(true);
+    expect(out.riskModifiers.doubleBarrel).toBe(true);
+    expect(out.systems.bounty).toBe(true);
+    expect(out.secretRoles).toBe(false);
+    expect(out.systems.betting).toBe(false);
+    expect(out.systems.deadMansHand).toBe(false);
+    expect(out.systems.lastStand).toBe(false);
+  });
+
+  it('Syndicate keeps every mechanic and forces secretRoles on', () => {
+    const out = applyTierCapsToConfig(fullOn(), 'syndicate');
+    expect(out.systems.betting).toBe(true);
+    expect(out.systems.lastStand).toBe(true);
+    expect(out.secretRoles).toBe(true);
+  });
+
+  it('Syndicate forces secretRoles on even when the host left it off', () => {
+    const cfg = normalizeRoomConfig({ secretRoles: false, systems: { betting: true } });
+    expect(applyTierCapsToConfig(cfg, 'syndicate').secretRoles).toBe(true);
+  });
+
+  it('Covenant caps identically to Syndicate (config-wise)', () => {
+    const synd = applyTierCapsToConfig(fullOn(), 'syndicate');
+    const cov = applyTierCapsToConfig(fullOn(), 'covenant');
+    expect(cov).toEqual(synd);
+  });
+});
+
+describe('assignRoles gating + tier flags', () => {
+  function roomWith(secretRoles, count = 6) {
+    const room = createRoom('host', MODES.ONLINE, { ...defaultRoomConfig(), secretRoles });
+    for (let i = 0; i < count; i++) room.players.push(createPlayer(`p${i}`, `P${i}`, `s${i}`));
+    return room;
+  }
+
+  it('all players are Barehand when secretRoles is off', () => {
+    const room = roomWith(false);
+    startGame(room);
+    expect(room.players.every(p => p.role === ROLES.BAREHAND)).toBe(true);
+  });
+
+  it('deals specials when secretRoles is on', () => {
+    const room = roomWith(true);
+    startGame(room);
+    expect(room.players.some(p => p.role !== ROLES.BAREHAND)).toBe(true);
+  });
+
+  it('getRoomTier defaults to streets for rooms without a tier', () => {
+    const room = createRoom('host', MODES.ONLINE);
+    expect(getRoomTier(room)).toBe('streets');
+    applyTierFlags(room, 'syndicate');
+    expect(getRoomTier(room)).toBe('syndicate');
+  });
+
+  it('applyTierFlags only arms Blood Debt for Covenant', () => {
+    const synd = applyTierFlags(createRoom('h', MODES.ONLINE), 'syndicate');
+    expect(synd.bloodDebtActive).toBe(false);
+    const cov = applyTierFlags(createRoom('h', MODES.ONLINE), 'covenant');
+    expect(cov.bloodDebtActive).toBe(true);
+    expect(cov.pactActive).toBe(false);
+  });
+});
+
+describe('serializeRoom exposes tier', () => {
+  it('includes tier (defaulting to streets) in the payload', () => {
+    const room = createRoom('socket-1', MODES.ONLINE);
+    expect(serializeRoom(room).tier).toBe('streets');
+    applyTierFlags(room, 'covenant');
+    expect(serializeRoom(room).tier).toBe('covenant');
   });
 });

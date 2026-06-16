@@ -306,6 +306,11 @@ function applyBluffOutcome(room, outcome) {
   // correct/incorrect call for end-of-game XP.
   if (outcome.accuserId != null && typeof outcome.bluffIsCorrect === 'boolean') {
     engine.trackBluffOutcome(room, outcome.accuserId, outcome.bluffIsCorrect);
+    // Progression overhaul — a wrong call means the accused "defended" the
+    // bluff (the caller spins, the accused survives). Credit the accused.
+    if (outcome.bluffIsCorrect === false) {
+      engine.trackBluffDefended(room, outcome.accusedId);
+    }
   }
   room.phase = 'spin_pending';
   room.spinTargetId = outcome.spinTargetId;
@@ -485,6 +490,14 @@ async function applySpinAndBroadcast(io, code, room, player, leaderboardRepo) {
 
   // #205 — survived spins feed end-of-game XP.
   engine.trackSpinOutcome(room, player.id, spinResult.eliminated);
+
+  // Progression overhaul — a spin death that followed a CORRECT bluff call
+  // credits the caller with an elimination (the accused's lie cost them the
+  // round). Only correct-bluff spins count; survival and wrong-call self-spins
+  // don't. accuserId is carried on lastAction by applyBluffOutcome.
+  if (spinResult.eliminated && room.lastAction?.bluffCorrect === true) {
+    engine.trackPlayerEliminated(room, room.lastAction?.accuserId);
+  }
 
   // v2 Phase F — Bounty + Betting evaluation.
   const bountyEvents = [];

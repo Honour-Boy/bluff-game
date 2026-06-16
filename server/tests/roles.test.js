@@ -48,11 +48,14 @@ function configWith(enabled = {}, copiesPerDeck = 1) {
     cfg.powerCards.enabled[k] = !!enabled[k];
   }
   cfg.powerCards.copiesPerDeck = copiesPerDeck;
+  // These suites exercise the secret-role system, which is now gated behind
+  // config.secretRoles (off by default; forced on for Syndicate+ rooms).
+  cfg.secretRoles = true;
   return cfg;
 }
 
 function makeOnlineRoom(playerCount, configOverrides = null) {
-  const cfg = configOverrides || defaultRoomConfig();
+  const cfg = configOverrides || { ...defaultRoomConfig(), secretRoles: true };
   const room = createRoom('host-socket', MODES.ONLINE, cfg);
   for (let i = 0; i < playerCount; i++) {
     room.players.push(createPlayer(`p${i}`, `Player${i}`, `sock-${i}`));

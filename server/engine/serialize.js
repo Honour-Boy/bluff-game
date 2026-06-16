@@ -44,6 +44,10 @@ function serializeRoom(room, requestingPlayerId = null, opts = {}) {
     code: room.code,
     groupId: room.groupId || null,
     mode: room.mode,
+    // Host tier (Progression & Covenant overhaul). Drives client tier badges,
+    // config-panel gating, and gates the Covenant-only Pact / Blood Debt UI.
+    // Defaults to 'streets' for rooms created before the tier rollout.
+    tier: room.tier || 'streets',
     // Host identity. Exposed so clients can RE-DERIVE isHost on every state
     // push — host can change live (stand-in reclaim / hand-back / migration)
     // and that only arrives via room_state. `hostUserId` is the host's Supabase
