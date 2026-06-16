@@ -668,8 +668,12 @@ export function OnlinePlayerUI({
   const suppressTurnNotice = isTutorial || blockingOverlayActive || aBannerShowing;
 
   // Clinic progress for the in-flow top band (reserves its own height; the rest
-  // of the HUD sits below it, so nothing is obstructed).
-  const scenarioForBar = roomState?.tutorialScenario || null;
+  // of the HUD sits below it, so nothing is obstructed). The spotlight tour uses
+  // a different scenario shape (no index/total) — exclude it so the bar never
+  // renders a NaN width during the tour.
+  const scenarioForBar = (roomState?.tutorialScenario && !roomState.tutorialScenario.tour)
+    ? roomState.tutorialScenario
+    : null;
   const clinicComplete = !!roomState?.tutorialClinicComplete;
   const clinicProgressPct = clinicComplete
     ? 100
@@ -692,6 +696,25 @@ export function OnlinePlayerUI({
   const spinGunSkinId = ui.spinData
     ? (players?.find((p) => p.id === ui.spinData.spinTargetId)?.cosmetics?.gunSkin || null)
     : null;
+
+  // Spotlight tour — Part-B signals. Each `do-action` beat advances when the
+  // SERVER-confirmed effect (or a client overlay) reflects the action, NOT on the
+  // raw click. Keyed to the tourContent `waitFor` strings. The step transitions
+  // (turn-ended / spin-acknowledged) are driven by the director restaging.
+  const tourScenarioStep = roomState?.tutorialScenario?.tour ? roomState.tutorialScenario.step : null;
+  const tourSignals = useMemo(() => ({
+    'card-pending': !!ui.pendingCard,
+    'card-played': !!cardPlayedThisTurn,
+    'turn-ended': tourScenarioStep != null && tourScenarioStep !== 'play_card',
+    'bluff-called': !!bluffUsedThisTurn,
+    'spun': !!ui.spinData,
+    'spin-acknowledged': tourScenarioStep === 'activate_power',
+    'power-modal-open': !!ui.powerConfirmOpen,
+    'power-activated': !!ui.peekedCard || !!roomState?.powerActivatedThisTurn,
+  }), [
+    ui.pendingCard, cardPlayedThisTurn, tourScenarioStep, bluffUsedThisTurn,
+    ui.spinData, ui.powerConfirmOpen, ui.peekedCard, roomState?.powerActivatedThisTurn,
+  ]);
 
   return (
     <div
@@ -1030,8 +1053,10 @@ export function OnlinePlayerUI({
 
       <FlyingCardLayer flights={flights} />
 
-      {/* Tutorial / Practice - guided intro + live coach, gated to tutorial rooms. */}
-      {isTutorial && (
+      {/* Tutorial / Practice - guided intro + live coach, gated to tutorial rooms.
+          Suppressed during the spotlight tour (OnlineTourLayer owns the screen
+          then; the Basics/clinic coach must not compete with the spotlight). */}
+      {isTutorial && !tourActive && (
         <TutorialLayer
           roomState={roomState}
           myPlayerId={myPlayer?.id || null}
@@ -1059,6 +1084,7 @@ export function OnlinePlayerUI({
       {tourActive && (
         <OnlineTourLayer
           isGuest={isGuest}
+          partBSignals={tourSignals}
           onComplete={() => { /* Phase 4: congrats → tutorial_finish_tour */ }}
           onSkip={() => { /* Phase 4: tutorial_finish_tour */ }}
         />

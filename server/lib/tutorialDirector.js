@@ -19,6 +19,7 @@
 
 const engine = require('../gameEngine');
 const { POWER_CLINIC, stageScenario, scenarioComplete, BOT_ID } = require('../engine/tutorialScenarios');
+const { TOUR_STEPS, stageTourStep, tourStepComplete } = require('../engine/tourScenarios');
 const BOT_NAME = 'Dealer Bot';
 const {
   getRoom,
@@ -38,6 +39,10 @@ const DELAYS = {
   // bot (= you win) — holds longer so the victory coach + Eliminated card are fully
   // readable before the clinic-complete card / cleanup transitions.
   resolve_victory: 4200,
+  // Spotlight tour — short beats between staged Part-B instances (the tour is
+  // player-paced; the director only restages between steps).
+  tour_next: 700,
+  tour_finish: 700,
 };
 
 const ALL_POWERS_ON = {
@@ -56,6 +61,17 @@ const ALL_POWERS_ON = {
 function _pendingDirectorAction(room) {
   if (!room || !room.isTutorial) return null;
   const lesson = room.tutorialLesson || 'basics';
+
+  // Spotlight tour — advance between the staged Part-B instances. Step 0 is
+  // staged by the tutorial_start_tour handler; here we only restage the next
+  // step once the current one is complete, and flag tourComplete after the last.
+  if (lesson === 'tour') {
+    const sc = room.tutorialScenario;
+    if (!sc || !sc.tour || typeof sc.stepIndex !== 'number') return null;
+    if (!tourStepComplete(room, sc.stepIndex)) return null;
+    if (sc.stepIndex >= TOUR_STEPS.length - 1) return { kind: 'tour_finish' };
+    return { kind: 'tour_next', index: sc.stepIndex };
+  }
 
   // Basics finished (win OR lose) → hand off to the Power Clinic.
   if (lesson !== 'powers') {
@@ -99,6 +115,7 @@ function _directorKey(action, room) {
     room.tutorialLesson || 'basics',
     room.phase,
     sc?.index ?? -1,
+    sc?.stepIndex ?? -1, // tour step index (clinic scenarios leave this undefined)
     sc?.step || '',
     room.roundNumber || 0,
   ].join(':');
@@ -142,6 +159,28 @@ function armTutorialDirector(io, room) {
   }, delay);
   if (typeof handle.unref === 'function') handle.unref();
   tutorialTimers.set(room.code, handle);
+}
+
+// ─── Spotlight tour helpers ───────────────────────────────────────────────────
+// Enter the "Show me around" tour: enable powers (the activate_power instance
+// seeds a Peek), flag the lesson, and stage the first instance. The caller
+// (tutorial_start_tour) has already dealt the room.
+function _beginTour(room) {
+  room.tutorialLesson = 'tour';
+  room.tourComplete = false;
+  room.tutorialClinicComplete = false;
+  if (!room.config) room.config = engine.defaultRoomConfig();
+  room.config.powerCards = room.config.powerCards || {};
+  room.config.powerCards.enabled = { ...ALL_POWERS_ON };
+  stageTourStep(room, 0);
+}
+
+// Tour done — flag it (the client shows the congrats card) and clear the staged
+// scenario so no spotlight lingers. The phase stays 'playing'; the learner
+// proceeds via the congrats screen's "Begin Practice" (tutorial_finish_tour).
+function _finishTour(room) {
+  room.tutorialScenario = null;
+  room.tourComplete = true;
 }
 
 // Reconfigure a finished Basics room into the Power Clinic (drill 0). The seats
@@ -232,6 +271,15 @@ async function _onDirectorExpire(io, code, key) {
     case 'resolve':
       if (room.tutorialScenario) room.tutorialScenario.step = 'resolved';
       break;
+    case 'tour_next': {
+      // Current tour instance is complete — stage the next one.
+      const next = (room.tutorialScenario?.stepIndex ?? -1) + 1;
+      stageTourStep(room, next);
+      break;
+    }
+    case 'tour_finish':
+      _finishTour(room);
+      break;
     default:
       return;
   }
@@ -261,5 +309,7 @@ module.exports = {
   _pendingDirectorAction,
   _beginPowerClinic,
   _finishClinic,
+  _beginTour,
+  _finishTour,
   advanceClinic,
 };
