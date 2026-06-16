@@ -17,6 +17,7 @@ import SpeedModeTimer from './SpeedModeTimer';
 import { PreGameSelectionModal } from '../PreGameSelectionModal';
 import { SmokeLayer } from '../shared/SmokeLayer';
 import { TutorialLayer } from '../tutorial/TutorialLayer';
+import { OnlineTourLayer } from '../tutorial/OnlineTourLayer';
 import { isDefensivePreArmLocked, clinicEndTurnLock } from '../tutorial/tutorialContent';
 import {
   arcPlayers,
@@ -75,6 +76,9 @@ export function OnlinePlayerUI({
   chatUnread = 0,
   // #205 — this client's private end-of-game XP payload (useGame), if any.
   xpAward = null,
+  // Spotlight tour: whether THIS client is a guest (drops the profile / cosmetics
+  // beats, which guests don't have in the settings menu).
+  isGuest = false,
 }) {
   const wrapperRef = useRef(null);
   const { triggerShake, triggerAudio, startSpinAudio, stopSpinAudio } = useAtmosphere(wrapperRef);
@@ -455,6 +459,10 @@ export function OnlinePlayerUI({
   // plain online game vs the bot (no TutorialLayer / coach hints / clinic locks /
   // end-of-game replay POP-UP; header shows "Rules" not "? Guide"). See helpers.
   const isTutorial = coachingActive(roomState);
+  // Spotlight "Show me around" tour is the active practice lesson. Gated on the
+  // server-set lesson so normal rooms (and the Basics / Power-Clinic lessons)
+  // are untouched. Drives the OnlineTourLayer + suppressions below.
+  const tourActive = isTutorial && roomState?.tutorialLesson === 'tour';
   const isMySpinTurn = isSpinPending && spinTargetId === myPlayer.id;
   // (Module 3) The challenged card is face-up for the whole spin_pending window
   // and reverse-flips the moment the spin result lands (ui.spinData is set when
@@ -825,6 +833,7 @@ export function OnlinePlayerUI({
         isMyTurn={isMyTurn}
         currentPlayer={currentPlayer}
         revealFlipped={revealFlipped}
+        dragDisabled={tourActive}
       />
 
       <div style={{ flex: '0 0 auto', paddingBottom: 'env(safe-area-inset-bottom, 0px)' }}>
@@ -1040,6 +1049,18 @@ export function OnlinePlayerUI({
           preArmLockSignal={ui.preArmLockSignal}
           clinicActionHint={ui.clinicActionHint}
           lesson={roomState?.tutorialLesson || 'basics'}
+        />
+      )}
+
+      {/* Spotlight "Show me around" tour — runs over the live table during the
+          'tour' practice lesson. Part-B signals (card played, turn ended, spin
+          acknowledged…) are wired in Phase 3; Part A (the settings walk) works
+          off the menu's own DOM state. */}
+      {tourActive && (
+        <OnlineTourLayer
+          isGuest={isGuest}
+          onComplete={() => { /* Phase 4: congrats → tutorial_finish_tour */ }}
+          onSkip={() => { /* Phase 4: tutorial_finish_tour */ }}
         />
       )}
 

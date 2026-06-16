@@ -831,6 +831,7 @@ function HomeContent() {
           openChat={openChat}
           chatUnread={chatUnread}
           xpAward={xpAward}
+          isGuest={isGuest}
         />
       );
     }
@@ -896,6 +897,7 @@ function HomeContent() {
           openChat={openChat}
           chatUnread={chatUnread}
           xpAward={xpAward}
+          isGuest={isGuest}
         />
       );
     }
