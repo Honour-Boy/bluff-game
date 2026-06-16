@@ -6,9 +6,14 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 // IntroVideo — full-screen brand splash on a genuine game open
 // ============================================================
 //
-// Plays `/videos/intro.mp4` (the revolver-blast crimson-paint splash)
-// edge-to-edge, IN FULL, then calls `onDone`. Dismissal paths, all routed
-// through the same guarded `finish` so it fires once:
+// Plays the revolver-blast crimson-paint splash edge-to-edge, IN FULL, then
+// calls `onDone`. The 16:9 landscape clip (`/videos/intro.mp4`) gets heavily
+// cropped under `objectFit: cover` on a portrait phone, so phones play the
+// purpose-cut vertical clip (`/videos/intro_mobile.mp4`) instead. The source is
+// chosen ONCE at mount (lazy initializer) so it never swaps mid-playback —
+// IntroVideo only ever mounts client-side (the intro phase is set in an effect),
+// so reading matchMedia at first render is hydration-safe. Dismissal paths, all
+// routed through the same guarded `finish` so it fires once:
 //   • the clip ends (`onEnded`),
 //   • the player taps Skip, or
 //   • Escape.
@@ -28,6 +33,15 @@ export function IntroVideo({ onDone }) {
   const doneRef = useRef(false);
   const safetyRef = useRef(null);
   const [leaving, setLeaving] = useState(false);
+  // Pick the source once, at mount: phones (portrait, ≤640px — the project's
+  // mobile breakpoint) get the vertical cut so the 16:9 clip isn't cropped.
+  const [src] = useState(() => {
+    if (typeof window !== 'undefined' && typeof window.matchMedia === 'function'
+      && window.matchMedia('(max-width: 640px)').matches) {
+      return '/videos/intro_mobile.mp4';
+    }
+    return '/videos/intro.mp4';
+  });
 
   const finish = useCallback(() => {
     if (doneRef.current) return;
@@ -100,7 +114,7 @@ export function IntroVideo({ onDone }) {
     >
       <video
         ref={videoRef}
-        src="/videos/intro.mp4"
+        src={src}
         autoPlay
         playsInline
         preload="auto"
