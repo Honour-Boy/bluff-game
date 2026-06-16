@@ -342,6 +342,15 @@ function register(io, socket, deps) {
       room.tourComplete = false;
       room.tutorialClinicComplete = false;
       room.tourSpinAcked = false;
+      // Basics teaches the core loop WITHOUT powers. The tour turned powers ON to
+      // demo Peek (config is preserved across the reset), so turn them back OFF
+      // before dealing — otherwise a power card bleeds into the Basics hand the
+      // learner hasn't been taught yet.
+      if (room.config?.powerCards) {
+        room.config.powerCards.enabled = {
+          shield: false, mirror: false, swap: false, peek: false, freeze: false, assassin: false,
+        };
+      }
       engine.startGame(room);          // deal the fresh Basics game
 
       await saveRoom(room);

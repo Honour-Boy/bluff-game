@@ -1091,9 +1091,12 @@ export function OnlinePlayerUI({
       )}
 
       {/* Spotlight "Show me around" tour — runs over the live table during the
-          'tour' practice lesson. The walk shows until its last beat is done (or
-          the server flags tourComplete), then the congrats card takes over. */}
-      {tourActive && !tourDone && !roomState?.tourComplete && (
+          'tour' practice lesson. The congrats card is gated on the CLIENT
+          finishing the final beat (tourDone), NOT on the server's tourComplete:
+          the server flags complete the instant the last power is used, but the
+          learner still has the result beat to read — showing congrats then would
+          cut it off. */}
+      {tourActive && !tourDone && (
         <OnlineTourLayer
           isGuest={isGuest}
           partBSignals={tourSignals}
@@ -1101,7 +1104,7 @@ export function OnlinePlayerUI({
           onSkip={() => { if (typeof finishTour === 'function') finishTour(); }}
         />
       )}
-      {tourActive && (tourDone || roomState?.tourComplete) && (
+      {tourActive && tourDone && (
         <TourCongrats onBeginPractice={() => { if (typeof finishTour === 'function') finishTour(); }} />
       )}
 

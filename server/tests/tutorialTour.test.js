@@ -130,9 +130,11 @@ describe('tutorial_finish_tour', () => {
     const io = makeIo();
     const handlers = captureHandlers(io);
     const room = lobbyTourRoom();
-    // Put it mid-tour first.
+    // Put it mid-tour first, with powers turned ON (as _beginTour does).
     engine.startGame(room);
     room.tutorialLesson = 'tour';
+    if (!room.config.powerCards) room.config.powerCards = {};
+    room.config.powerCards.enabled = { shield: true, mirror: true, swap: true, peek: true, freeze: true, assassin: true };
     stageTourStep(room, 1);
     const cb = vi.fn();
 
@@ -143,6 +145,8 @@ describe('tutorial_finish_tour', () => {
     expect(room.tutorialScenario).toBeNull();
     expect(room.tourComplete).toBe(false);
     expect(room.phase).toBe('playing'); // dealt a fresh Basics game
+    // Powers turned back OFF so no power card bleeds into the Basics hand.
+    expect(Object.values(room.config.powerCards.enabled).every((v) => v === false)).toBe(true);
   });
 });
 
