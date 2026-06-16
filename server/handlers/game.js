@@ -12,12 +12,13 @@ const {
   pregameTimers,
   _clearPreGameTimer,
   _clearGameOverTimer,
+  _clearBloodDebtTimer,
   logTurnState,
 } = require('../lib/state');
 const { broadcastRoomState } = require('../lib/broadcast');
 const { socketRateLimit } = require('../lib/rateLimiter');
 const { maybeRecordGroupWinner } = require('../lib/roomBuilders');
-const { runMirrorMatchSpin, resolvePendingGameOver, beginRedemption } = require('../lib/orchestration');
+const { runMirrorMatchSpin, resolvePendingGameOver, beginRedemption, applySpinAndBroadcast } = require('../lib/orchestration');
 const { _beginPowerClinic, advanceClinic, _beginTour } = require('../lib/tutorialDirector');
 const { clinicEndTurnBlock, clinicActionBlock } = require('../engine/tutorialScenarios');
 
@@ -667,6 +668,27 @@ function register(io, socket, deps) {
       return;
     }
 
+    // Covenant — Blood Debt. The caller carried a debt, so an extra "debt spin"
+    // fires on them AFTER the primary resolution (mirrors the Mirror Match queue:
+    // resume from the ack so it never interleaves with the primary overlay).
+    // Inserted after Mirror Match but before Redemption (roadmap R3).
+    if (room?.pendingBloodDebtSpin) {
+      const { debtorId } = room.pendingBloodDebtSpin;
+      delete room.pendingBloodDebtSpin;
+      // Consumed exactly once whether or not the spin actually fires.
+      engine.consumeBloodDebt(room, debtorId);
+      const debtor = room.players.find(p => p.id === debtorId);
+      if (debtor && debtor.status === 'alive') {
+        // Clear the primary overlay first, then animate the debt spin fresh.
+        io.to(code).emit('spin_acknowledged');
+        await applySpinAndBroadcast(io, code, room, debtor, leaderboardRepo, { spinReason: 'blood_debt' });
+        return;
+      }
+      // R3 — the debtor died on the primary spin; cancel the debt spin silently
+      // and continue the normal ack flow.
+      await saveRoom(room);
+    }
+
     // Redemption Spin (Phase E1) — the eliminating spin's overlay has been
     // dismissed; now open the redemption_pending offer to the eliminated player.
     if (room?.pendingRedemption) {
@@ -685,6 +707,35 @@ function register(io, socket, deps) {
       room.tourSpinAcked = true;
       await saveRoom(room);
       await broadcastRoomState(io, code);
+    }
+  });
+
+  // ─── Covenant — Blood Debt target pick ───────────────────
+  // The just-eliminated player (from a correct-bluff spin in a Covenant room)
+  // names which alive player carries their blood debt, inside the 10s window.
+  // On expiry with no pick the server defaults to the bluff caller (see
+  // _onBloodDebtExpire in orchestration).
+  socket.on('blood_debt_target', async ({ roomCode, targetUserId } = {}, callback) => {
+    try {
+      if (!socket.userId) return callback?.({ success: false, error: 'Not authenticated' });
+      const code = roomCode?.toUpperCase();
+      const room = await getRoom(code);
+      if (!room) return callback?.({ success: false, error: 'Room not found' });
+      const pending = room.pendingBloodDebt;
+      if (!pending || pending.eliminatedId !== socket.userId) {
+        return callback?.({ success: false, error: 'No blood debt to assign' });
+      }
+      const target = room.players.find(p => p.id === targetUserId && p.status === 'alive');
+      if (!target) return callback?.({ success: false, error: 'Invalid target' });
+
+      _clearBloodDebtTimer(code);
+      engine.assignBloodDebt(room, targetUserId);
+      room.pendingBloodDebt = null;
+      await saveRoom(room);
+      await broadcastRoomState(io, code);
+      callback?.({ success: true });
+    } catch (err) {
+      callback?.({ success: false, error: err.message });
     }
   });
 }

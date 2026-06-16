@@ -209,6 +209,11 @@ export function useGameActions({
     return emitPromiseAction(socket, 'sniper_redirect', { roomCode, newTargetId: newTargetId || null }, failError);
   }, [failError, roomCode, socket]);
 
+  // Covenant — the just-eliminated player names who carries their blood debt.
+  const bloodDebtTarget = useCallback((targetUserId) => {
+    return emitPromiseAction(socket, 'blood_debt_target', { roomCode, targetUserId }, failError);
+  }, [failError, roomCode, socket]);
+
   // §1.1 — accused responds to a bluff during the interception window: arm a
   // defensive card (cardId set) or pass (cardId null). Either closes the window.
   const bluffIntercept = useCallback((cardId = null) => {
@@ -351,6 +356,7 @@ export function useGameActions({
     medicDecide,
     saboteurTransfer,
     sniperRedirect,
+    bloodDebtTarget,
     bluffIntercept,
     placeBet,
     ghostVote,

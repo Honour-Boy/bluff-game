@@ -160,9 +160,12 @@ function HomeContent() {
     medicDecide,
     saboteurTransfer,
     sniperRedirect,
+    bloodDebtTarget,
     bluffIntercept,
     medicPrompt,
     sniperPrompt,
+    bloodDebtPrompt,
+    setBloodDebtPrompt,
     pregame,
     powerEventQueue,
     consumePowerEvent,
@@ -819,9 +822,12 @@ function HomeContent() {
           medicDecide={medicDecide}
           saboteurTransfer={saboteurTransfer}
           sniperRedirect={sniperRedirect}
+          bloodDebtTarget={bloodDebtTarget}
           bluffIntercept={bluffIntercept}
           medicPrompt={medicPrompt}
           sniperPrompt={sniperPrompt}
+          bloodDebtPrompt={bloodDebtPrompt}
+          setBloodDebtPrompt={setBloodDebtPrompt}
           pregame={pregame}
           powerEventQueue={powerEventQueue}
           consumePowerEvent={consumePowerEvent}
@@ -887,9 +893,12 @@ function HomeContent() {
           medicDecide={medicDecide}
           saboteurTransfer={saboteurTransfer}
           sniperRedirect={sniperRedirect}
+          bloodDebtTarget={bloodDebtTarget}
           bluffIntercept={bluffIntercept}
           medicPrompt={medicPrompt}
           sniperPrompt={sniperPrompt}
+          bloodDebtPrompt={bloodDebtPrompt}
+          setBloodDebtPrompt={setBloodDebtPrompt}
           pregame={pregame}
           powerEventQueue={powerEventQueue}
           consumePowerEvent={consumePowerEvent}

@@ -7,6 +7,7 @@ export function usePromptEvents({
   sniperPrompt,
   setMedicPrompt,
   setSniperPrompt,
+  setBloodDebtPrompt,
 }) {
   useEffect(() => {
     const onMedicSavePending = (payload) => {
@@ -15,14 +16,22 @@ export function usePromptEvents({
     const onSniperRedirectPending = (payload) => {
       setSniperPrompt(payload || null);
     };
+    // Covenant — private prompt to the just-eliminated player to name their
+    // blood-debt target. The overlay self-dismisses on its own countdown (and
+    // on pick), so no phase-based teardown is needed here.
+    const onBloodDebtAssign = (payload) => {
+      setBloodDebtPrompt?.(payload || null);
+    };
 
     socket.on('medic_save_pending', onMedicSavePending);
     socket.on('sniper_redirect_pending', onSniperRedirectPending);
+    socket.on('blood_debt_assign', onBloodDebtAssign);
     return () => {
       socket.off('medic_save_pending', onMedicSavePending);
       socket.off('sniper_redirect_pending', onSniperRedirectPending);
+      socket.off('blood_debt_assign', onBloodDebtAssign);
     };
-  }, [setMedicPrompt, setSniperPrompt, socket]);
+  }, [setMedicPrompt, setSniperPrompt, setBloodDebtPrompt, socket]);
 
   useEffect(() => {
     if (roomPhase !== 'medic_pending' && medicPrompt) setMedicPrompt(null);

@@ -34,6 +34,10 @@ function createPlayer(id, username, socketId) {
     hasBounty: false,
     // v2 Phase F — Betting system.
     consecutiveCorrectBets: 0,
+    // Covenant — Blood Debt. Set true on a player named as the revenge target
+    // by someone eliminated via a correct-bluff spin; consumed on their next
+    // call_bluff (an extra debt spin fires). Covenant rooms only.
+    hasBloodDebt: false,
   };
 }
 

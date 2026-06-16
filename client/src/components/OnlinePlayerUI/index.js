@@ -14,6 +14,7 @@ import { SystemsLayer } from './SystemsLayer';
 import { BluffInterceptOverlay } from './BluffInterceptOverlay';
 import RedemptionOverlay from './RedemptionOverlay';
 import SpeedModeTimer from './SpeedModeTimer';
+import { BloodDebtOverlay } from '../BloodDebtOverlay';
 import { PreGameSelectionModal } from '../PreGameSelectionModal';
 import { SmokeLayer } from '../shared/SmokeLayer';
 import { TutorialLayer } from '../tutorial/TutorialLayer';
@@ -65,9 +66,12 @@ export function OnlinePlayerUI({
   medicDecide,
   saboteurTransfer,
   sniperRedirect,
+  bloodDebtTarget,
   bluffIntercept,
   medicPrompt,
   sniperPrompt,
+  bloodDebtPrompt,
+  setBloodDebtPrompt,
   powerEventQueue,
   consumePowerEvent,
   placeBet,
@@ -992,6 +996,16 @@ export function OnlinePlayerUI({
           isMine={roomState.redemption.playerId === myPlayer?.id}
           onSpin={handleRedemptionSpin}
           busy={redemptionBusy}
+        />
+      )}
+
+      {/* Covenant — Blood Debt target picker (private to the just-eliminated
+          player). Gated to Covenant rooms; no Blood Debt UI elsewhere. */}
+      {roomState?.tier === 'covenant' && bloodDebtPrompt && (
+        <BloodDebtOverlay
+          prompt={bloodDebtPrompt}
+          onPick={(targetUserId) => bloodDebtTarget?.(targetUserId)}
+          onDismiss={() => setBloodDebtPrompt?.(null)}
         />
       )}
 

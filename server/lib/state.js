@@ -37,6 +37,11 @@ const gameOverTimers = new Map();     // roomCode → setTimeout handle
 // redemption_pending. One handle per room.
 const redemptionTimers = new Map();   // roomCode → setTimeout handle
 
+// Covenant — Blood Debt assignment window. Armed when a correct-bluff spin
+// eliminates a player in a Covenant room; on expiry the debt defaults to the
+// bluff caller. One handle per room.
+const bloodDebtTimers = new Map();    // roomCode → setTimeout handle
+
 // Speed Mode — one per-turn countdown handle per room. Stamped when a new
 // player's turn opens (online + roomModifiers.speedMode); on expiry the server
 // auto-ends that player's turn. Re-armed on every turn change, paused whenever
@@ -101,6 +106,10 @@ function _clearGameOverTimer(code) {
 function _clearRedemptionTimer(code) {
   const t = redemptionTimers.get(code);
   if (t) { clearTimeout(t); redemptionTimers.delete(code); }
+}
+function _clearBloodDebtTimer(code) {
+  const t = bloodDebtTimers.get(code);
+  if (t) { clearTimeout(t); bloodDebtTimers.delete(code); }
 }
 function _clearSpeedModeTimer(code) {
   const t = speedModeTimers.get(code);
@@ -173,6 +182,7 @@ module.exports = {
   spinPendingTimers,
   gameOverTimers,
   redemptionTimers,
+  bloodDebtTimers,
   speedModeTimers,
   idleTurnTimers,
   botTimers,
@@ -187,6 +197,7 @@ module.exports = {
   _clearSpinPendingTimer,
   _clearGameOverTimer,
   _clearRedemptionTimer,
+  _clearBloodDebtTimer,
   _clearSpeedModeTimer,
   _clearIdleTurnTimer,
   _clearBotTimer,

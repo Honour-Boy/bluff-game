@@ -16,6 +16,7 @@ const {
   _clearSpinPendingTimer,
   _clearGameOverTimer,
   _clearRedemptionTimer,
+  _clearBloodDebtTimer,
   _clearSpeedModeTimer,
   _clearIdleTurnTimer,
   _clearBotTimer,
@@ -464,6 +465,7 @@ function register(io, socket, deps) {
         _clearSpinPendingTimer(code);
         _clearGameOverTimer(code);
         _clearRedemptionTimer(code);
+        _clearBloodDebtTimer(code);
         _clearSpeedModeTimer(code);
         _clearIdleTurnTimer(code);
         _clearBotTimer(code);
@@ -543,6 +545,7 @@ function register(io, socket, deps) {
         _clearSpinPendingTimer(code);
         _clearGameOverTimer(code);
         _clearRedemptionTimer(code);
+        _clearBloodDebtTimer(code);
         _clearSpeedModeTimer(code);
         _clearIdleTurnTimer(code);
         discardLobbyIdleState(code);
@@ -752,6 +755,7 @@ function register(io, socket, deps) {
       _clearSpinPendingTimer(code);
       _clearGameOverTimer(code);
       _clearRedemptionTimer(code);
+      _clearBloodDebtTimer(code);
       _clearSpeedModeTimer(code);
       _clearIdleTurnTimer(code);
       discardLobbyIdleState(code);

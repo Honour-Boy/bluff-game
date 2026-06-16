@@ -13,6 +13,7 @@ const {
   _clearSpinPendingTimer,
   _clearGameOverTimer,
   _clearRedemptionTimer,
+  _clearBloodDebtTimer,
   _clearSpeedModeTimer,
   _clearIdleTurnTimer,
   logRoomDeletion,
@@ -67,6 +68,7 @@ function startInactivitySweep(io) {
       _clearSpinPendingTimer(code);
       _clearGameOverTimer(code);
       _clearRedemptionTimer(code);
+      _clearBloodDebtTimer(code);
       _clearSpeedModeTimer(code);
       _clearIdleTurnTimer(code);
       const hostTimer = hostDisconnectTimers.get(code);
@@ -243,6 +245,7 @@ async function dismissIdleLobby(io, code, reason) {
   _clearSpinPendingTimer(code);
   _clearGameOverTimer(code);
   _clearRedemptionTimer(code);
+  _clearBloodDebtTimer(code);
   _clearSpeedModeTimer(code);
   _clearIdleTurnTimer(code);
   const hostTimer = hostDisconnectTimers.get(code);

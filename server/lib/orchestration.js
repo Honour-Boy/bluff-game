@@ -13,6 +13,7 @@ const {
   spinPendingTimers,
   gameOverTimers,
   redemptionTimers,
+  bloodDebtTimers,
   bluffInterceptTimers,
   getRoom,
   saveRoom,
@@ -22,6 +23,7 @@ const {
   _clearSpinPendingTimer,
   _clearGameOverTimer,
   _clearRedemptionTimer,
+  _clearBloodDebtTimer,
   logTurnState,
 } = require('./state');
 const { broadcastRoomState, emitPowerCardEvents } = require('./broadcast');
@@ -423,7 +425,15 @@ function _maybeAutoEndTurnAfterImmediateSpin(room, onTurnIdBefore) {
   return { freezeTrigger, suddenDeathBanner };
 }
 
-async function applySpinAndBroadcast(io, code, room, player, leaderboardRepo) {
+async function applySpinAndBroadcast(io, code, room, player, leaderboardRepo, opts = {}) {
+  // Covenant — capture the bluff verdict BEFORE lastAction is overwritten with
+  // the spin_result below. A spin death that followed a CORRECT bluff call is
+  // the only trigger for assigning a Blood Debt. `opts.spinReason === 'blood_debt'`
+  // marks the debt spin itself, which must never spawn a fresh debt (no chains).
+  const spinReason = opts.spinReason || null;
+  const bluffWasCorrect = room.lastAction?.bluffCorrect === true;
+  const bluffAccuserId = room.lastAction?.accuserId || null;
+
   // Auto-spin path: a betting window may still be open (the 10s window is
   // shorter than the spin timeout, but close it defensively so the spin can
   // proceed exactly as the interactive handler does once betting clears).
@@ -597,11 +607,47 @@ async function applySpinAndBroadcast(io, code, room, player, leaderboardRepo) {
     riskLevel: spinResult.riskLevel,
     riskLevelBefore,
     medicPending: medicPaused,
+    // Covenant — flags the debt spin so the client shows different flavour text.
+    ...(spinReason ? { spinReason } : {}),
     ...(redemptionPending ? { redemptionPending: true } : {}),
     ...(reshuffle.reshuffled
       ? { globalReshuffle: true, newCardType: reshuffle.cardType }
       : (spinResult.eliminated && !medicPaused ? { newCardType: room.currentCardType } : {})),
   };
+
+  // Covenant — Blood Debt. A correct-bluff spin death lets the fallen player
+  // name a revenge target (10s window; defaults to the bluff caller on expiry).
+  // Set the pending state BEFORE save so it persists; the private prompt is
+  // emitted AFTER the broadcast so the client already has the fresh room state.
+  let bloodDebtPrompt = null;
+  if (
+    spinResult.eliminated
+    && !medicPaused
+    && spinReason !== 'blood_debt'   // the debt spin itself never spawns a debt
+    && bluffWasCorrect
+    && engine.getRoomTier(room) === 'covenant'
+    && !room.pendingGameOver         // game's decided — nobody left to collect
+    && !room.pendingBloodDebt        // one assignment at a time
+  ) {
+    const eligible = room.players.filter(p => p.status === 'alive' && p.id !== player.id);
+    if (eligible.length > 0) {
+      room.pendingBloodDebt = {
+        eliminatedId: player.id,
+        callerId: bluffAccuserId,
+        deadline: Date.now() + engine.BLOOD_DEBT_WINDOW_MS,
+      };
+      _clearBloodDebtTimer(code);
+      bloodDebtTimers.set(code, setTimeout(() => _onBloodDebtExpire(io, code), engine.BLOOD_DEBT_WINDOW_MS));
+      bloodDebtPrompt = {
+        socketId: player.socketId,
+        payload: {
+          alivePlayerIds: eligible.map(p => p.id),
+          alivePlayerNames: eligible.map(p => ({ id: p.id, username: p.username })),
+          deadline: room.pendingBloodDebt.deadline,
+        },
+      };
+    }
+  }
 
   // #6 — highlight callouts (first blood / survival streak). Computed before
   // save so the streak counter + first-blood flag persist; emitted after.
@@ -618,7 +664,25 @@ async function applySpinAndBroadcast(io, code, room, player, leaderboardRepo) {
   // skip / sudden-death tick), emitted on the same channel as the other banners.
   if (autoEnd?.freezeTrigger) io.to(code).emit('power_card_triggered', autoEnd.freezeTrigger);
   if (autoEnd?.suddenDeathBanner) io.to(code).emit('power_card_triggered', autoEnd.suddenDeathBanner);
+  // Covenant — private Blood Debt prompt to the just-eliminated player (after
+  // the broadcast so their client already sees the spin result / spectator view).
+  if (bloodDebtPrompt?.socketId) {
+    io.to(bloodDebtPrompt.socketId).emit('blood_debt_assign', bloodDebtPrompt.payload);
+  }
   return spinResult;
+}
+
+// Covenant — Blood Debt window expired with no pick: the debt defaults to the
+// bluff caller (the one who pulled the trigger on the fallen player).
+async function _onBloodDebtExpire(io, code) {
+  _clearBloodDebtTimer(code);
+  const room = await getRoom(code);
+  if (!room || !room.pendingBloodDebt) return;
+  const { callerId } = room.pendingBloodDebt;
+  if (callerId) engine.assignBloodDebt(room, callerId);
+  room.pendingBloodDebt = null;
+  await saveRoom(room);
+  await broadcastRoomState(io, code);
 }
 
 /**

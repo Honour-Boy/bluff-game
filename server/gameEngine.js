@@ -27,6 +27,7 @@ const betting = require('./engine/betting');
 const room = require('./engine/room');
 const serialize = require('./engine/serialize');
 const progression = require('./engine/progression');
+const bloodDebt = require('./engine/bloodDebt');
 
 module.exports = {
   // ─── Constants & config ──────────────────────────────────
@@ -60,6 +61,7 @@ module.exports = {
   SPIN_PENDING_TIMEOUT_MS: constants.SPIN_PENDING_TIMEOUT_MS,
   PENDING_GAME_OVER_TIMEOUT_MS: constants.PENDING_GAME_OVER_TIMEOUT_MS,
   REDEMPTION_PENDING_TIMEOUT_MS: constants.REDEMPTION_PENDING_TIMEOUT_MS,
+  BLOOD_DEBT_WINDOW_MS: constants.BLOOD_DEBT_WINDOW_MS,
   SPEED_MODE_TURN_MS: constants.SPEED_MODE_TURN_MS,
   IDLE_TURN_TIMEOUT_MS: constants.IDLE_TURN_TIMEOUT_MS,
   defaultRoomConfig: constants.defaultRoomConfig,
@@ -200,4 +202,9 @@ module.exports = {
   trackLastStandWin: progression.trackLastStandWin,
   computeStandings: progression.computeStandings,
   computeXpAward: progression.computeXpAward,
+
+  // ─── Covenant — Blood Debt ───────────────────────────────
+  assignBloodDebt: bloodDebt.assignBloodDebt,
+  checkCallerHasBloodDebt: bloodDebt.checkCallerHasBloodDebt,
+  consumeBloodDebt: bloodDebt.consumeBloodDebt,
 };

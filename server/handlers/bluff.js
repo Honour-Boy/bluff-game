@@ -157,6 +157,14 @@ function register(io, socket, deps) {
         return callback({ success: false, error: 'Not part of this lesson step' });
       }
 
+      // Covenant — Blood Debt. A caller carrying a debt fires an EXTRA "debt
+      // spin" on themselves after the primary resolution. Queue it now (don't
+      // consume the flag yet — that happens when the debt spin actually fires,
+      // from spin_acknowledged). Online only; the flag is Covenant-exclusive.
+      if (room.mode === engine.MODES.ONLINE && engine.checkCallerHasBloodDebt(room, playerId)) {
+        room.pendingBloodDebtSpin = { debtorId: playerId };
+      }
+
       room.bluffUsedThisTurn = true;
       const callerPlayer = room.players.find(p => p.id === playerId);
       logTurnState(code, playerId, 'call_bluff', room, { accusedId: engine.getPreviousTurnPlayerId(room) });

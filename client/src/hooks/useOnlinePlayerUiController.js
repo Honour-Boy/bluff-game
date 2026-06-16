@@ -98,7 +98,7 @@ export function useOnlinePlayerUiController({
     if (seenSpinKeysRef.current.has(key)) return;
     seenSpinKeysRef.current.add(key);
 
-    const { spinIndex, eliminated, spinTargetName, spinTargetId: targetId, chamber, chamberAfter } = action;
+    const { spinIndex, eliminated, spinTargetName, spinTargetId: targetId, chamber, chamberAfter, spinReason } = action;
     const landingChamberIndex = spinIndex ?? 0;
     const toBulletSet = (slots) => new Set(
       (slots || []).map((value, index) => (value === 'bullet' ? index : -1)).filter((index) => index !== -1),
@@ -115,6 +115,7 @@ export function useOnlinePlayerUiController({
       eliminated,
       spinTargetName,
       spinTargetId: targetId,
+      spinReason: spinReason || null,
       targetIsBot: !!roomState?.players?.find((p) => p.id === targetId)?.isBot,
       bulletChambers: toBulletSet(chamber),
       bulletChambersAfter,

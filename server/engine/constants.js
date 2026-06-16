@@ -149,6 +149,11 @@ const PENDING_GAME_OVER_TIMEOUT_MS = 10_000;
 // their behalf after this window so the room can't park in redemption_pending.
 const REDEMPTION_PENDING_TIMEOUT_MS = 30_000;
 
+// Covenant — Blood Debt assignment window. When a correct-bluff spin kills a
+// player in a Covenant room, they get this long to name their debt target; on
+// expiry the debt defaults to the bluff caller.
+const BLOOD_DEBT_WINDOW_MS = 10_000;
+
 // Speed Mode (roomModifiers.speedMode) — each player's turn is capped at this
 // many ms. When the deadline passes the server auto-ENDS the turn (no auto-spin
 // — #79 bans auto-spin in every mode). The lobby advertises a 25s turn timer.

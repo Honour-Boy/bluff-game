@@ -44,6 +44,7 @@ export function useGame(getAccessToken, getGuestAuth, authIdentityKey = null, on
   const [powerEventQueue, setPowerEventQueue] = useState([]);
   const [medicPrompt, setMedicPrompt] = useState(null);
   const [sniperPrompt, setSniperPrompt] = useState(null);
+  const [bloodDebtPrompt, setBloodDebtPrompt] = useState(null);
   const [pregame, setPregame] = useState(null);
   // #205 — this client's private end-of-game XP payload. Set by `xp_awarded`,
   // cleared whenever the room moves off game_over (next deal / reset).
@@ -240,6 +241,7 @@ export function useGame(getAccessToken, getGuestAuth, authIdentityKey = null, on
     sniperPrompt,
     setMedicPrompt,
     setSniperPrompt,
+    setBloodDebtPrompt,
   });
   usePreGameEvents({
     socket,
@@ -323,6 +325,8 @@ export function useGame(getAccessToken, getGuestAuth, authIdentityKey = null, on
     ...gameActions,
     medicPrompt,
     sniperPrompt,
+    bloodDebtPrompt,
+    setBloodDebtPrompt,
     pregame,
     powerEventQueue,
     consumePowerEvent,
