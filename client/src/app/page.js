@@ -26,6 +26,7 @@ import { LeaderboardPanel } from '../components/LeaderboardPanel';
 import { IntroVideo } from '../components/shared/IntroVideo';
 import { IntroLoading } from '../components/shared/IntroLoading';
 import { ChamberSpinner } from '../components/shared/ChamberSpinner';
+import { LoadingSplash } from '../components/shared/LoadingScreen';
 import { useIsMobile } from '../hooks/useIsMobile';
 import { shouldShowIntro, markIntroSeen, rearmIntro } from '../lib/intro';
 
@@ -594,21 +595,7 @@ function HomeContent() {
 
   // ─── Loading splash ────────────────────────────────────────
   if (loading) {
-    return (
-      <div style={{
-        minHeight: '100vh', display: 'flex',
-        alignItems: 'center', justifyContent: 'center',
-        flexDirection: 'column', gap: 16,
-      }}>
-        <div style={{
-          fontFamily: "'Bebas Neue', sans-serif",
-          fontSize: 64, color: 'var(--accent)', lineHeight: 1,
-        }}>
-          BLUFF
-        </div>
-        <ChamberSpinner size={56} />
-      </div>
-    );
+    return <LoadingSplash />;
   }
 
   // ─── Auth gate ─────────────────────────────────────────────
@@ -686,6 +673,9 @@ function HomeContent() {
         leaveDisabled={leaveDisabled}
         voice={inRoomOnline ? voice : undefined}
         topOffset={clinicBarVisible ? 22 : 0}
+        // Landing redesign: the gear becomes a pill name chip that pairs with
+        // the top-left level chip. Everywhere else keeps the compact gear.
+        triggerVariant={!roomCode && homeView === 'landing' ? 'chip' : 'gear'}
       />
       {/* Game settings - host edits in the lobby, everyone else sees a summary */}
       {inRoomOnline && gameSettingsOpen && (
@@ -995,18 +985,7 @@ function HomeContent() {
 
 // Loading fallback shown while useSearchParams resolves
 function PageLoading() {
-  return (
-    <div style={{
-      minHeight: '100vh', display: 'flex',
-      alignItems: 'center', justifyContent: 'center',
-      flexDirection: 'column', gap: 16,
-    }}>
-      <div style={{ fontFamily: "'Bebas Neue', sans-serif", fontSize: 64, color: 'var(--accent)', lineHeight: 1 }}>
-        BLUFF
-      </div>
-      <ChamberSpinner size={56} />
-    </div>
-  );
+  return <LoadingSplash />;
 }
 
 export default function Home() {

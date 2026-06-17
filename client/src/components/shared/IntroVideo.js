@@ -32,7 +32,11 @@ export function IntroVideo({ onDone }) {
   const videoRef = useRef(null);
   const doneRef = useRef(false);
   const safetyRef = useRef(null);
+  const soundedPauseRef = useRef(false); // saw a pause while sound was on
   const [leaving, setLeaving] = useState(false);
+  // True once we've had to fall back to muted because the browser blocked
+  // sound-on autoplay — surfaces the "tap for sound" pill.
+  const [needsTap, setNeedsTap] = useState(false);
   // Pick the source once, at mount: phones (portrait, ≤640px — the project's
   // mobile breakpoint) get the vertical cut so the 16:9 clip isn't cropped.
   const [src] = useState(() => {
@@ -61,29 +65,52 @@ export function IntroVideo({ onDone }) {
     if (!el) return undefined;
     let cancelled = false;
 
+    // Bring sound back and keep playing — invoked on the first user gesture (or
+    // the "tap for sound" pill) after the browser blocked sound-on autoplay.
+    const enableSound = () => {
+      if (doneRef.current || cancelled) return;
+      el.muted = false;
+      soundedPauseRef.current = false;
+      setNeedsTap(false);
+      el.play().catch(() => {});
+    };
+
     // On a FRESH (cold-cache) open the clip often isn't buffered when the mount
     // fires, so a single play() at mount silently no-ops or rejects and the
     // splash sits on a black frame. Retry play() whenever new data arrives
-    // (canplay / loadeddata) and fall back to muted autoplay (always allowed)
-    // if sound-on autoplay is blocked. Idempotent — once it's running, the
+    // (canplay / loadeddata). We ask for SOUND first; only if the browser
+    // refuses sound-on autoplay do we fall back to muted (always allowed) and
+    // surface a tap-to-unmute affordance. Idempotent — once it's running, the
     // extra attempts are harmless.
     const tryPlay = () => {
       if (doneRef.current || cancelled || !el.paused) return;
+      el.muted = false;
       const p = el.play();
       if (p && typeof p.catch === 'function') {
         p.catch(() => {
           if (doneRef.current || cancelled) return;
           el.muted = true;
+          setNeedsTap(true);
           el.play().catch(() => { /* onEnded / safety still dismiss */ });
         });
       }
     };
 
-    // If an unmuted autoplay gets paused before the clip ends, mute and resume
-    // so the full video always plays (the "plays half" fix).
+    // If playback gets paused before the clip ends, resume. We PREFER sound:
+    // a sounded playback that the browser pauses is resumed with sound once;
+    // if it's paused with sound *again* (the "plays half" browsers), we mute to
+    // guarantee the full clip and invite a tap to bring sound back. A muted
+    // playback simply resumes muted.
     const onPause = () => {
       if (doneRef.current || el.ended) return;
-      el.muted = true;
+      if (!el.muted) {
+        if (soundedPauseRef.current) {
+          el.muted = true;
+          setNeedsTap(true);
+        } else {
+          soundedPauseRef.current = true;
+        }
+      }
       el.play().catch(() => {});
     };
     // Once we know the real length, size the safety net to it (+buffer).
@@ -96,6 +123,11 @@ export function IntroVideo({ onDone }) {
     el.addEventListener('loadedmetadata', onMeta);
     el.addEventListener('canplay', tryPlay);
     el.addEventListener('loadeddata', tryPlay);
+    // First real interaction anywhere unmutes — covers the common case where
+    // sound-on autoplay is blocked but the user taps/clicks/keys while watching.
+    window.addEventListener('pointerdown', enableSound, { once: true });
+    window.addEventListener('touchstart', enableSound, { once: true });
+    window.addEventListener('keydown', enableSound, { once: true });
     armSafety(FALLBACK_SAFETY_MS); // until metadata loads
     // Kick off loading explicitly (SPA mounts can race the autoplay attribute),
     // then attempt to play right away in case data is already there.
@@ -109,6 +141,9 @@ export function IntroVideo({ onDone }) {
       el.removeEventListener('loadedmetadata', onMeta);
       el.removeEventListener('canplay', tryPlay);
       el.removeEventListener('loadeddata', tryPlay);
+      window.removeEventListener('pointerdown', enableSound);
+      window.removeEventListener('touchstart', enableSound);
+      window.removeEventListener('keydown', enableSound);
       if (safetyRef.current) clearTimeout(safetyRef.current);
       // De-load the clip once the splash is done so its buffer is freed and the
       // game stays light (the splash only ever plays once per open).
@@ -119,6 +154,17 @@ export function IntroVideo({ onDone }) {
       } catch (_) { /* element already gone */ }
     };
   }, [armSafety]);
+
+  // Bring sound back from the "tap for sound" pill (the gesture also satisfies
+  // the browser's autoplay policy, so the unmuted resume is allowed).
+  const handleUnmute = useCallback(() => {
+    const el = videoRef.current;
+    if (!el) return;
+    el.muted = false;
+    soundedPauseRef.current = false;
+    setNeedsTap(false);
+    el.play().catch(() => {});
+  }, []);
 
   // Esc to skip.
   useEffect(() => {
@@ -155,6 +201,39 @@ export function IntroVideo({ onDone }) {
           objectFit: 'cover',
         }}
       />
+      {needsTap && (
+        <button
+          type="button"
+          onClick={handleUnmute}
+          aria-label="Enable sound"
+          style={{
+            position: 'fixed',
+            bottom: 24,
+            left: 24,
+            display: 'flex',
+            alignItems: 'center',
+            gap: 8,
+            padding: '8px 16px',
+            borderRadius: 999,
+            background: 'rgba(16,12,8,0.7)',
+            border: '1px solid rgba(240,181,74,0.5)',
+            color: 'var(--accent)',
+            fontSize: 12,
+            fontFamily: "'Space Mono', monospace",
+            letterSpacing: '0.12em',
+            textTransform: 'uppercase',
+            cursor: 'pointer',
+            backdropFilter: 'blur(4px)',
+            animation: 'pulse 1.8s ease-in-out infinite',
+          }}
+        >
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+            <path d="M4 9v6h4l5 4V5L8 9H4z" fill="currentColor" />
+            <path d="M16 8.5c1.5 1 1.5 6 0 7M18.5 6c2.6 2.2 2.6 9.8 0 12" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
+          </svg>
+          Tap for sound
+        </button>
+      )}
       <button
         type="button"
         onClick={finish}
