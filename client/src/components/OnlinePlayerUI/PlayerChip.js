@@ -1,5 +1,6 @@
 import { VoiceIndicator } from '../VoicePanel';
 import { cardBackFor } from '../../lib/cosmetics';
+import { PactSigil } from '../pact/PactSigil';
 
 // ─── Mini deck-skin card — the player's OWN equipped card back (#205) ─────────
 // Deliberately resolved from player.cosmetics (broadcast to everyone), NOT the
@@ -129,17 +130,9 @@ export function PlayerChip({
       {alive && isPactPartner && (
         <span
           title="Your pact partner"
-          style={{
-            position: 'absolute',
-            top: 2,
-            left: 4,
-            fontSize: compact ? 9 : 11,
-            color: 'var(--accent)',
-            lineHeight: 1,
-            textShadow: '0 0 6px var(--glow-gold, rgba(212,175,55,0.6))',
-          }}
+          style={{ position: 'absolute', top: 3, left: 4, lineHeight: 0 }}
         >
-          🜂
+          <PactSigil size={compact ? 13 : 15} withSeal={false} />
         </span>
       )}
 

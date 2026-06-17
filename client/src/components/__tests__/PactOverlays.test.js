@@ -10,16 +10,16 @@ describe('PactOfferOverlay', () => {
   it('shows the proposer and routes accept/refuse', () => {
     const onRespond = vi.fn(() => Promise.resolve());
     render(<PactOfferOverlay selectorName="Alice" onRespond={onRespond} />);
-    expect(screen.getByText(/A PACT IS OFFERED/)).toBeInTheDocument();
+    expect(screen.getByText(/A Pact is Offered/i)).toBeInTheDocument();
     expect(screen.getByText('Alice')).toBeInTheDocument();
-    fireEvent.click(screen.getByText('ACCEPT'));
+    fireEvent.click(screen.getByText(/Seal the Pact/i));
     expect(onRespond).toHaveBeenCalledWith(true);
   });
 
   it('refuse passes false', () => {
     const onRespond = vi.fn(() => Promise.resolve());
     render(<PactOfferOverlay selectorName="Alice" onRespond={onRespond} />);
-    fireEvent.click(screen.getByText('REFUSE'));
+    fireEvent.click(screen.getByText(/^Refuse$/i));
     expect(onRespond).toHaveBeenCalledWith(false);
   });
 });
@@ -40,9 +40,9 @@ describe('PactVolunteerOverlay', () => {
         onDismiss={onDismiss}
       />,
     );
-    expect(screen.getByText(/TAKE THE BULLET/)).toBeInTheDocument();
+    expect(screen.getByText(/Take the Bullet/i)).toBeInTheDocument();
     expect(screen.getByText('Bob')).toBeInTheDocument();
-    fireEvent.click(screen.getByText(/VOLUNTEER/));
+    fireEvent.click(screen.getByText(/Volunteer/i));
     expect(onVolunteer).toHaveBeenCalled();
   });
 
@@ -72,7 +72,7 @@ describe('PactSelectorOverlay', () => {
         onDismiss={onDismiss}
       />,
     );
-    expect(screen.getByText(/FORGE A PACT/)).toBeInTheDocument();
+    expect(screen.getByText(/Forge a Pact/i)).toBeInTheDocument();
     fireEvent.click(screen.getByText('Bob'));
     expect(onChoose).toHaveBeenCalledWith('p2');
   });
