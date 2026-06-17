@@ -61,11 +61,15 @@ html, body {
   font-size: 16px;
   line-height: 1.65;
   min-height: 100vh;
-  overflow-x: hidden;
+  /* `clip` (not `hidden`) kills horizontal overflow WITHOUT turning html/body
+     into scroll containers — `hidden` on both axes' roots breaks wheel/track
+     scrolling on tall pages (e.g. the Groups list). Vertical page scroll stays
+     on the normal document scroller. */
+  overflow-x: clip;
   /* (Module 1) Kill the native rubber-band / pull-to-refresh so it can't fight
      the pannable table canvas or bounce padded screens. Vertical content on the
      landing/groups screens still scrolls normally. */
-  overscroll-behavior: none;
+  overscroll-behavior-y: none;
 }
 
 /* (Module 1) Hard scroll-lock while inside the online game shell. Toggled on

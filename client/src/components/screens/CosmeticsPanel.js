@@ -279,8 +279,8 @@ export function CosmeticsPanel({ getProgression, setCosmetics, onClose }) {
                 marginTop: 6,
               }}>
                 {isMaxLevel
-                  ? 'Max level — The Covenant. You’ve reached the top of the ladder.'
-                  : 'Earn XP by finishing online games — surviving spins, calling bluffs right, defending bluffs, eliminating players, resolving power cards, and winning.'}
+                  ? 'Max level — The Covenant. Every cosmetic set is yours.'
+                  : 'Earn XP by finishing online games — surviving spins, calling bluffs right, defending bluffs, eliminating players, resolving power cards, and winning. Reach a new tier to unlock its whole cosmetic set.'}
               </div>
             </div>
 
@@ -301,13 +301,14 @@ export function CosmeticsPanel({ getProgression, setCosmetics, onClose }) {
                   {(bySlot[slot] || []).map((item) => {
                     const locked = item.unlockLevel > level;
                     const selected = equipped?.[slot] === item.id;
+                    const unlockTier = tierMeta(tierForLevel(item.unlockLevel));
                     return (
                       <button
                         key={item.id}
                         type="button"
                         onClick={() => handleEquip(item)}
                         disabled={locked}
-                        title={locked ? `Unlocks at level ${item.unlockLevel}` : item.label}
+                        title={locked ? `Unlocks at ${unlockTier.name} (Level ${item.unlockLevel})` : item.label}
                         style={{
                           display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 5,
                           padding: '9px 10px 7px',
@@ -333,9 +334,9 @@ export function CosmeticsPanel({ getProgression, setCosmetics, onClose }) {
                           fontFamily: "'Space Mono', monospace",
                           fontSize: 8,
                           letterSpacing: '0.1em',
-                          color: locked ? 'var(--warning)' : 'var(--text-dim)',
+                          color: locked ? unlockTier.color : (selected ? 'var(--accent)' : 'var(--text-dim)'),
                         }}>
-                          {locked ? `Lv ${item.unlockLevel}` : (selected ? 'Equipped' : `Lv ${item.unlockLevel}`)}
+                          {selected ? 'Equipped' : unlockTier.label}
                         </span>
                       </button>
                     );

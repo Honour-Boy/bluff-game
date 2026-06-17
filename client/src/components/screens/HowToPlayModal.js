@@ -4,6 +4,48 @@ import { useState } from "react";
 import { PowerCard, POWER_META } from "../shared/PowerCard";
 import { ROLE_META } from "../RoleRevealOverlay";
 import { CloseIcon } from "../shared/CloseIcon";
+import { TierBadge } from "../shared/TierBadge";
+
+// ─── Rank & progression reference ─────────────────────────────
+// Four tiers gate which mechanics a host's room may use AND which cosmetic set
+// is unlocked. Levels 1–20 group into the tiers.
+const TIERS = [
+  {
+    tier: "streets",
+    levels: "Levels 1–2",
+    unlocks: "The core game — play cards, call bluffs, spin the chamber.",
+    cosmetics: "Steel · Classic Leather · Emerald (the base set).",
+  },
+  {
+    tier: "backroads",
+    levels: "Levels 3–8",
+    unlocks: "Power cards, risk modifiers, room modifiers, and Bounty.",
+    cosmetics: "The Noir set.",
+  },
+  {
+    tier: "syndicate",
+    levels: "Levels 9–13",
+    unlocks: "Secret roles, Betting, Dead Man's Hand, and Last Stand.",
+    cosmetics: "The Crimson + Neon sets.",
+  },
+  {
+    tier: "covenant",
+    levels: "Levels 14–20",
+    unlocks: "The Pact and Blood Debt — always on in a Covenant room.",
+    cosmetics: "The Kente + Cosmos sets.",
+  },
+];
+
+const XP_SOURCES = [
+  ["Victory", "Win the game (a shared win for a sealed Pact counts for both)."],
+  ["Survived spins", "Every spin you walk away from."],
+  ["Bluffs called right", "Catch a liar."],
+  ["Bluffs defended", "Survive a wrong call against you."],
+  ["Players eliminated", "Send someone to the spin that ends them."],
+  ["Power cards resolved", "Land a power card's effect (Backroads+)."],
+  ["Last Stand win", "Take the final duel (Syndicate+)."],
+  ["Participation", "Play at least one card — no AFK farming."],
+];
 
 // ─── HowToPlayModal ───────────────────────────────────────────
 // Reference for the full v2 ruleset. Collapsible accordion so the
@@ -432,6 +474,97 @@ function SystemsContent() {
   );
 }
 
+function ProgressionContent() {
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+      <div
+        style={{
+          fontSize: 12,
+          color: "var(--text-dim)",
+          lineHeight: 1.6,
+          padding: "8px 10px",
+          background: "var(--surface2)",
+          borderRadius: "var(--radius)",
+          border: "1px solid var(--border)",
+        }}
+      >
+        Finishing online games earns XP. XP raises your <strong style={{ color: "var(--text)" }}>Level</strong> (1–20),
+        and levels group into four <strong style={{ color: "var(--text)" }}>Tiers</strong>. Your tier sets which
+        mechanics a room you host can switch on — and unlocks a matching cosmetic set.
+      </div>
+
+      {TIERS.map((t) => (
+        <div
+          key={t.tier}
+          style={{
+            padding: "10px 12px",
+            background: "var(--surface2)",
+            border: "1px solid var(--border)",
+            borderRadius: "var(--radius)",
+            display: "flex",
+            flexDirection: "column",
+            gap: 6,
+          }}
+        >
+          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+            <TierBadge tier={t.tier} size="lg" />
+            <span
+              style={{
+                fontFamily: "'Space Mono', monospace",
+                fontSize: 10,
+                letterSpacing: "0.1em",
+                color: "var(--text-dim)",
+                textTransform: "uppercase",
+              }}
+            >
+              {t.levels}
+            </span>
+          </div>
+          <div style={{ fontSize: 12, color: "var(--text-dim)", lineHeight: 1.55 }}>
+            <strong style={{ color: "var(--text)" }}>Unlocks:</strong> {t.unlocks}
+          </div>
+          <div style={{ fontSize: 12, color: "var(--text-dim)", lineHeight: 1.55 }}>
+            <strong style={{ color: "var(--text)" }}>Cosmetics:</strong> {t.cosmetics}
+          </div>
+        </div>
+      ))}
+
+      <div style={{ ...TITLE_ICON_STYLE, marginTop: 4 }}>HOW XP IS EARNED</div>
+      <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+        {XP_SOURCES.map(([label, desc]) => (
+          <div
+            key={label}
+            style={{
+              padding: "7px 10px",
+              background: "var(--surface2)",
+              border: "1px solid var(--border)",
+              borderLeft: "3px solid var(--accent)",
+              borderRadius: "var(--radius)",
+            }}
+          >
+            <span
+              style={{
+                fontFamily: "'Bebas Neue', sans-serif",
+                fontSize: 13,
+                letterSpacing: "0.08em",
+                color: "var(--accent)",
+              }}
+            >
+              {label.toUpperCase()}
+            </span>
+            <span style={{ fontSize: 12, color: "var(--text-dim)", lineHeight: 1.5, marginLeft: 8 }}>
+              {desc}
+            </span>
+          </div>
+        ))}
+        <div style={{ fontSize: 11, color: "var(--text-dim)", fontStyle: "italic", lineHeight: 1.6, marginTop: 2 }}>
+          Higher tiers pay more XP per event — and unlock event types lower tiers can't earn from.
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function OnlineVsPhysicalContent() {
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
@@ -450,6 +583,7 @@ function OnlineVsPhysicalContent() {
 // ─── Section list (in display order) ──────────────────────────
 const SECTION_KEYS = [
   "basics",
+  "progression",
   "power",
   "roles",
   "risk",
@@ -460,6 +594,7 @@ const SECTION_KEYS = [
 
 const SECTIONS = {
   basics: { label: "The Basics", render: BasicsContent },
+  progression: { label: "Rank & Progression", render: ProgressionContent },
   power: { label: "Power Cards", render: PowerCardsContent },
   roles: { label: "Secret Roles", render: RolesContent },
   risk: { label: "Risk Modifiers", render: RiskModsContent },

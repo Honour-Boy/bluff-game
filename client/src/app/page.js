@@ -759,6 +759,7 @@ function HomeContent() {
       return wrap(
         <GroupsScreen
           username={username}
+          getProgression={getProgression}
           groups={groupsList}
           invites={groupInvites}
           loading={groupsLoading}

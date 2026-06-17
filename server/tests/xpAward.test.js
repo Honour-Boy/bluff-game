@@ -128,10 +128,11 @@ describe('#205 â€” maybeAwardGameXp', () => {
 
   it('flags newly-crossed unlock tiers on a level-up', async () => {
     const io = makeIo();
-    // 90 existing XP: any gain â‰¥10 crosses into level 2 (felt_noir unlocks).
+    // 235 existing XP (level 2): the ~115 streets award crosses into level 3
+    // (Backroads), which unlocks the Noir set (felt_noir et al.).
     const repo = makeRepo({
       addXp: vi.fn().mockImplementation(async (userId, amount) => ({
-        userId, xp: 90 + amount, gamesPlayed: 2, equipped: {},
+        userId, xp: 235 + amount, gamesPlayed: 2, equipped: {},
       })),
     });
     const room = finishedRoom();
@@ -178,8 +179,8 @@ describe('#205 â€” progression handlers', () => {
   it('get_progression returns xp/level/catalog with validated equipped set', async () => {
     const repo = makeRepo({
       getProgression: vi.fn().mockResolvedValue({
-        xp: 150, gamesPlayed: 3,
-        equipped: { tableFelt: 'felt_noir', cardBack: 'back_kente' }, // kente needs L9
+        xp: 350, gamesPlayed: 3, // level 3 (Backroads) — felt_noir unlocked
+        equipped: { tableFelt: 'felt_noir', cardBack: 'back_kente' }, // kente needs Covenant (L14)
       }),
     });
     const handlers = captureHandlers(makeIo(), { id: 'sock-1', userId: U1, isGuest: false }, repo);
@@ -189,7 +190,7 @@ describe('#205 â€” progression handlers', () => {
 
     const res = cb.mock.calls[0][0];
     expect(res.success).toBe(true);
-    expect(res.progression.level).toBe(2);
+    expect(res.progression.level).toBe(3);
     expect(res.progression.equipped.tableFelt).toBe('felt_noir');
     expect(res.progression.equipped.cardBack).toBe(DEFAULT_COSMETICS.cardBack); // locked â†’ default
     expect(Array.isArray(res.progression.catalog)).toBe(true);
@@ -212,7 +213,7 @@ describe('#205 â€” progression handlers', () => {
   it('set_cosmetics persists only owned items and live-updates the seated player', async () => {
     const io = makeIo();
     const repo = makeRepo({
-      getProgression: vi.fn().mockResolvedValue({ xp: 150, gamesPlayed: 1, equipped: {} }), // level 2
+      getProgression: vi.fn().mockResolvedValue({ xp: 350, gamesPlayed: 1, equipped: {} }), // level 3 (Backroads)
     });
     // Seat the player at a live table so the equip propagates.
     const room = createRoom('sock-1', MODES.ONLINE, defaultRoomConfig());
@@ -223,7 +224,7 @@ describe('#205 â€” progression handlers', () => {
     const handlers = captureHandlers(io, { id: 'sock-1', userId: U1, isGuest: false }, repo);
     const cb = vi.fn();
     await handlers['set_cosmetics']({
-      equipped: { tableFelt: 'felt_noir', gunSkin: 'gun_cosmos' }, // cosmos needs L10
+      equipped: { tableFelt: 'felt_noir', gunSkin: 'gun_cosmos' }, // cosmos needs Covenant (L14)
     }, cb);
 
     const res = cb.mock.calls[0][0];

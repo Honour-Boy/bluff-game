@@ -108,22 +108,24 @@ describe('cosmetics catalog + equip validation', () => {
     }
   });
 
-  it('unlock gating follows the level curve', () => {
-    expect(isCosmeticUnlocked('felt_noir', 0)).toBe(false);   // needs level 2
-    expect(isCosmeticUnlocked('felt_noir', 150)).toBe(true);  // level 2 (150 xp)
-    expect(isCosmeticUnlocked('gun_cosmos', 150)).toBe(false); // needs level 10
-    expect(isCosmeticUnlocked('gun_cosmos', 4900)).toBe(true); // level 10
+  it('unlock gating follows the tier curve', () => {
+    // Noir set unlocks at Backroads (level 3 = 350 xp).
+    expect(isCosmeticUnlocked('felt_noir', 150)).toBe(false); // level 2 (Streets)
+    expect(isCosmeticUnlocked('felt_noir', 350)).toBe(true);  // level 3 (Backroads)
+    // Cosmos set unlocks at Covenant (level 14 = 11500 xp).
+    expect(isCosmeticUnlocked('gun_cosmos', 4900)).toBe(false);  // level 10 (Syndicate)
+    expect(isCosmeticUnlocked('gun_cosmos', 11500)).toBe(true);  // level 14 (Covenant)
     expect(isCosmeticUnlocked('nope', 999999)).toBe(false);
   });
 
   it('validateEquipped keeps unlocked picks and resets locked/unknown/wrong-slot ids', () => {
     const out = validateEquipped(
       {
-        tableFelt: 'felt_noir',     // unlocked at level 2
-        cardBack: 'back_kente',     // needs level 9 — locked
+        tableFelt: 'felt_noir',     // unlocked at Backroads (level 3)
+        cardBack: 'back_kente',     // needs Covenant (level 14) — locked
         gunSkin: 'felt_kente',      // wrong slot
       },
-      150, // level 2
+      350, // level 3 (Backroads)
     );
     expect(out.tableFelt).toBe('felt_noir');
     expect(out.cardBack).toBe(DEFAULT_COSMETICS.cardBack);
