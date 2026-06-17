@@ -56,7 +56,7 @@ const PART_A = [
   {
     id: 'A7', part: 'A', anchorId: TOUR_IDS.settingsCosmetics,
     shape: 'rect', advance: 'next', nonGuestOnly: true,
-    copy: 'Cosmetics & XP — your level and unlocks: deck skins, table felts and chamber skins.',
+    copy: 'Cosmetics & XP — your rank lives here. Win online games to earn XP, climb the four tiers (Streets → Backroads → Syndicate → Covenant), and unlock each tier’s cosmetic set: deck skins, table felts and chamber skins.',
   },
   {
     id: 'A8', part: 'A', anchorId: TOUR_IDS.settingsAudio,

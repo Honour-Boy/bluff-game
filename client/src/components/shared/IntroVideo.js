@@ -59,12 +59,25 @@ export function IntroVideo({ onDone }) {
   useEffect(() => {
     const el = videoRef.current;
     if (!el) return undefined;
+    let cancelled = false;
 
-    // Try sound-on; fall back to a muted autoplay if the browser blocks it.
-    el.play().catch(() => {
-      el.muted = true;
-      el.play().catch(() => { /* give up silently — onEnded / safety still dismiss */ });
-    });
+    // On a FRESH (cold-cache) open the clip often isn't buffered when the mount
+    // fires, so a single play() at mount silently no-ops or rejects and the
+    // splash sits on a black frame. Retry play() whenever new data arrives
+    // (canplay / loadeddata) and fall back to muted autoplay (always allowed)
+    // if sound-on autoplay is blocked. Idempotent — once it's running, the
+    // extra attempts are harmless.
+    const tryPlay = () => {
+      if (doneRef.current || cancelled || !el.paused) return;
+      const p = el.play();
+      if (p && typeof p.catch === 'function') {
+        p.catch(() => {
+          if (doneRef.current || cancelled) return;
+          el.muted = true;
+          el.play().catch(() => { /* onEnded / safety still dismiss */ });
+        });
+      }
+    };
 
     // If an unmuted autoplay gets paused before the clip ends, mute and resume
     // so the full video always plays (the "plays half" fix).
@@ -81,13 +94,29 @@ export function IntroVideo({ onDone }) {
 
     el.addEventListener('pause', onPause);
     el.addEventListener('loadedmetadata', onMeta);
+    el.addEventListener('canplay', tryPlay);
+    el.addEventListener('loadeddata', tryPlay);
     armSafety(FALLBACK_SAFETY_MS); // until metadata loads
+    // Kick off loading explicitly (SPA mounts can race the autoplay attribute),
+    // then attempt to play right away in case data is already there.
+    try { el.load(); } catch (_) { /* not fatal */ }
+    tryPlay();
     if (el.readyState >= 1) onMeta(); // metadata already available
 
     return () => {
+      cancelled = true;
       el.removeEventListener('pause', onPause);
       el.removeEventListener('loadedmetadata', onMeta);
+      el.removeEventListener('canplay', tryPlay);
+      el.removeEventListener('loadeddata', tryPlay);
       if (safetyRef.current) clearTimeout(safetyRef.current);
+      // De-load the clip once the splash is done so its buffer is freed and the
+      // game stays light (the splash only ever plays once per open).
+      try {
+        el.pause();
+        el.removeAttribute('src');
+        el.load();
+      } catch (_) { /* element already gone */ }
     };
   }, [armSafety]);
 

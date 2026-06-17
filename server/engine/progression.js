@@ -73,41 +73,42 @@ const XP_TABLE = {
 // Ids are the wire contract with the client (lib/cosmetics.js renders
 // them); never rename one once shipped — players' equipped rows persist
 // the id. unlockLevel gates equipping server-side (validateEquipped).
+//
+// Cosmetics now unlock by TIER, not arbitrary levels — each cosmetic SET maps
+// to a tier and its unlockLevel is that tier's MIN level (LEVEL_XP_THRESHOLDS /
+// TIER_LEVELS), so reaching a tier unlocks its whole set at once:
+//   Streets   (Lv 1)  → Steel · Classic Leather · Emerald   (the base set)
+//   Backroads (Lv 3)  → Noir set
+//   Syndicate (Lv 9)  → Crimson set + Neon set
+//   Covenant  (Lv 14) → Kente set + Cosmos set
 const COSMETIC_SLOTS = ['gunSkin', 'cardBack', 'tableFelt'];
 
 const COSMETICS = [
-  // Gun / cylinder skins (the spin overlay's revolver): the original steel
-  // + the five owner-art identities, which share an unlock level with their
-  // deck + felt counterparts — levelling unlocks the matching SET in one go.
-  // (The interim brass/obsidian/gilded recolors were cut before ever
-  // shipping — no equipped rows can reference them.)
-  { id: 'gun_steel', slot: 'gunSkin', label: 'Steel', unlockLevel: 1 },
-  { id: 'gun_noir', slot: 'gunSkin', label: 'Noir', unlockLevel: 2 },
-  { id: 'gun_crimson', slot: 'gunSkin', label: 'Crimson', unlockLevel: 3 },
-  { id: 'gun_neon', slot: 'gunSkin', label: 'Neon', unlockLevel: 6 },
-  { id: 'gun_kente', slot: 'gunSkin', label: 'Kente', unlockLevel: 9 },
-  { id: 'gun_cosmos', slot: 'gunSkin', label: 'Cosmos', unlockLevel: 10 },
+  // Gun / cylinder skins (the spin overlay's revolver).
+  { id: 'gun_steel', slot: 'gunSkin', label: 'Steel', unlockLevel: 1 },     // Streets
+  { id: 'gun_noir', slot: 'gunSkin', label: 'Noir', unlockLevel: 3 },       // Backroads
+  { id: 'gun_crimson', slot: 'gunSkin', label: 'Crimson', unlockLevel: 9 }, // Syndicate
+  { id: 'gun_neon', slot: 'gunSkin', label: 'Neon', unlockLevel: 9 },       // Syndicate
+  { id: 'gun_kente', slot: 'gunSkin', label: 'Kente', unlockLevel: 14 },    // Covenant
+  { id: 'gun_cosmos', slot: 'gunSkin', label: 'Cosmos', unlockLevel: 14 },  // Covenant
   // Deck skins — theme the card BACKS (deck / played pile / reveal / flights)
   // AND the player's own hand's card faces (frame + shape/number). Rendered
   // from framed SVG art in client/public/cosmetics (built by
   // client/scripts/build-cosmetic-decks.mjs); 'back_leather' stays the
   // CSS-only original look.
-  { id: 'back_leather', slot: 'cardBack', label: 'Classic Leather', unlockLevel: 1 },
-  { id: 'back_noir', slot: 'cardBack', label: 'Noir Filigree', unlockLevel: 2 },
-  { id: 'back_crimson', slot: 'cardBack', label: 'Royal Crimson', unlockLevel: 3 },
-  { id: 'back_neon', slot: 'cardBack', label: 'Neon Circuit', unlockLevel: 6 },
-  { id: 'back_kente', slot: 'cardBack', label: 'Kente Royale', unlockLevel: 9 },
-  { id: 'back_cosmos', slot: 'cardBack', label: 'Cosmos', unlockLevel: 10 },
-  // Table felts (the oval's cloth): the original emerald + the five art
-  // felts (frame SVG underlays, same build pipeline as the deck skins) at
-  // the matching set levels. (The interim wine/midnight/ocean recolors were
-  // cut before ever shipping — no equipped rows can reference them.)
-  { id: 'felt_emerald', slot: 'tableFelt', label: 'Emerald', unlockLevel: 1 },
-  { id: 'felt_noir', slot: 'tableFelt', label: 'Noir', unlockLevel: 2 },
-  { id: 'felt_crimson', slot: 'tableFelt', label: 'Crimson', unlockLevel: 3 },
-  { id: 'felt_neon', slot: 'tableFelt', label: 'Neon', unlockLevel: 6 },
-  { id: 'felt_kente', slot: 'tableFelt', label: 'Kente', unlockLevel: 9 },
-  { id: 'felt_cosmos', slot: 'tableFelt', label: 'Cosmos', unlockLevel: 10 },
+  { id: 'back_leather', slot: 'cardBack', label: 'Classic Leather', unlockLevel: 1 }, // Streets
+  { id: 'back_noir', slot: 'cardBack', label: 'Noir Filigree', unlockLevel: 3 },      // Backroads
+  { id: 'back_crimson', slot: 'cardBack', label: 'Royal Crimson', unlockLevel: 9 },   // Syndicate
+  { id: 'back_neon', slot: 'cardBack', label: 'Neon Circuit', unlockLevel: 9 },       // Syndicate
+  { id: 'back_kente', slot: 'cardBack', label: 'Kente Royale', unlockLevel: 14 },     // Covenant
+  { id: 'back_cosmos', slot: 'cardBack', label: 'Cosmos', unlockLevel: 14 },          // Covenant
+  // Table felts (the oval's cloth): the original emerald + the five art felts.
+  { id: 'felt_emerald', slot: 'tableFelt', label: 'Emerald', unlockLevel: 1 },  // Streets
+  { id: 'felt_noir', slot: 'tableFelt', label: 'Noir', unlockLevel: 3 },        // Backroads
+  { id: 'felt_crimson', slot: 'tableFelt', label: 'Crimson', unlockLevel: 9 },  // Syndicate
+  { id: 'felt_neon', slot: 'tableFelt', label: 'Neon', unlockLevel: 9 },        // Syndicate
+  { id: 'felt_kente', slot: 'tableFelt', label: 'Kente', unlockLevel: 14 },     // Covenant
+  { id: 'felt_cosmos', slot: 'tableFelt', label: 'Cosmos', unlockLevel: 14 },   // Covenant
 ];
 
 const DEFAULT_COSMETICS = {

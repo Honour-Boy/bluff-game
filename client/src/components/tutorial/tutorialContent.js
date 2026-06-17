@@ -68,6 +68,16 @@ export const INTRO_SLIDES = [
     ],
   },
   {
+    id: 'rank',
+    title: 'Rank & XP',
+    body: 'Practice is free and nothing here counts. Real online games earn XP — which raises your Level and Tier:',
+    points: [
+      'Earn XP for winning, surviving spins, calling bluffs right, defending bluffs, and eliminating players.',
+      'Four tiers: Streets → Backroads → Syndicate → Covenant.',
+      'Climb tiers to unlock new mechanics to host and new cosmetic sets to wear.',
+    ],
+  },
+  {
     id: 'ready',
     title: "You're Ready",
     body: `Press Begin and we'll deal you in against ${BOT_NAME}. A guide at the top of the table will tell you what to do at each step. You can reopen these notes any time from the “Guide” button.`,
@@ -314,7 +324,7 @@ export const CLINIC_COMPLETE_COACH = {
   key: 'clinic-complete',
   tone: 'win',
   title: 'You’ve learned the powers! 🎉',
-  body: 'Peek, Freeze, Shield, Mirror, Swap, Assassin - you’ve used them all. Play again to practise, or jump into a real game.',
+  body: 'Peek, Freeze, Shield, Mirror, Swap, Assassin - you’ve used them all. Jump into a real game to start earning XP and climbing the tiers - or play again to practise.',
 };
 
 // The intro deck for a given lesson. 'powers' splices the Power Cards slide in

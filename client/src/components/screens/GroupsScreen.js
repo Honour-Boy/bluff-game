@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { getSocket } from '../../lib/socket';
 import { TierBadge } from '../shared/TierBadge';
+import { RankIdentity } from '../shared/RankIdentity';
 
 function formatInviteDate(value) {
   if (!value) return 'Pending';
@@ -65,6 +66,7 @@ function RefreshButton({ onRefresh, loading, label = 'Refresh' }) {
 // ─── GroupsScreen — the tavern bulletin board ─────────────────────────────────
 export function GroupsScreen({
   username,
+  getProgression,
   groups,
   invites,
   loading,
@@ -78,6 +80,16 @@ export function GroupsScreen({
   const [groupName, setGroupName] = useState('');
   const [busyAction, setBusyAction] = useState(null);
   const [liveOverrides, setLiveOverrides] = useState({});
+  const [progression, setProgression] = useState(null);
+
+  useEffect(() => {
+    if (!getProgression) return undefined;
+    let alive = true;
+    getProgression().then((res) => {
+      if (alive && res?.success && res.progression) setProgression(res.progression);
+    }).catch(() => { /* rank chip is cosmetic */ });
+    return () => { alive = false; };
+  }, [getProgression]);
 
   useEffect(() => {
     const socket = getSocket();
@@ -178,6 +190,7 @@ export function GroupsScreen({
           }}>
             Signed in as <strong style={{ color: 'var(--text)', fontStyle: 'normal' }}>{username}</strong>
           </div>
+          {progression && <RankIdentity progression={progression} variant="chip" />}
           <button
             type="button"
             onClick={onBack}

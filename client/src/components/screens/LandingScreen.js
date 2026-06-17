@@ -7,6 +7,7 @@ const HowToPlayModal = lazy(() =>
 );
 import { ShapeIcon } from '../shared/ShapeIcon';
 import { TierBadge } from '../shared/TierBadge';
+import { RankIdentity } from '../shared/RankIdentity';
 import { tierForLevel } from '../../lib/tiers';
 import { useIsMobile } from '../../hooks/useIsMobile';
 
@@ -71,21 +72,31 @@ export function LandingScreen({
   getProgression,
 }) {
   const [mode, setMode] = useState(null);              // null | 'play' | 'host' | 'join' | 'practice'
-  // Phase 5 (#305): the player's progression tier, shown as a chip beside their
-  // name. Derived from level; fetched once for signed-in players (guests are
-  // always Streets and get no badge).
-  const [tier, setTier] = useState(null);
+  // The player's full progression (rank/level/XP), surfaced on the landing as a
+  // prominent identity panel — fetched for everyone (guests read as Streets/Lv1,
+  // shown with a sign-in nudge). `tier` is derived for the inline seat badges.
+  const [progression, setProgression] = useState(null);
   useEffect(() => {
-    if (isGuest || !getProgression) { setTier(null); return; }
+    if (!getProgression) { setProgression(null); return undefined; }
     let alive = true;
-    getProgression().then((res) => {
-      if (!alive) return;
-      if (res?.success && res.progression) {
-        setTier(tierForLevel(res.progression.level));
-      }
-    }).catch(() => { /* badge is cosmetic — ignore fetch errors */ });
-    return () => { alive = false; };
-  }, [isGuest, getProgression]);
+    let attempts = 0;
+    let timer = null;
+    // The landing can mount a beat before the socket finishes authenticating,
+    // so a single fetch may come back "not authenticated". Retry a few times
+    // until the rank resolves (identity panel is best-effort, never blocking).
+    const load = () => {
+      getProgression().then((res) => {
+        if (!alive) return;
+        if (res?.success && res.progression) { setProgression(res.progression); return; }
+        if (attempts++ < 6) timer = setTimeout(load, 700);
+      }).catch(() => {
+        if (alive && attempts++ < 6) timer = setTimeout(load, 700);
+      });
+    };
+    load();
+    return () => { alive = false; if (timer) clearTimeout(timer); };
+  }, [getProgression]);
+  const tier = progression ? tierForLevel(progression.level) : null;
   const isMobile = useIsMobile();
   const [showHowToPlay, setShowHowToPlay] = useState(false);
   const [roomCode, setRoomCode] = useState('');
@@ -308,6 +319,10 @@ export function LandingScreen({
         {/* ── Main menu ── */}
         {!mode && (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+            {/* Player rank/level/XP — surfaced up front, not buried in Cosmetics. */}
+            {progression && (
+              <RankIdentity progression={progression} isGuest={isGuest} style={{ marginBottom: 4 }} />
+            )}
             {/* ONE "Play" entry — like Practice, it opens a choice (Open Game /
                 Join Game) instead of two separate landing buttons, so the
                 landing stays short enough to fit a phone screen unscrolled. */}
