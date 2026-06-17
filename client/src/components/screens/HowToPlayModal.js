@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { PowerCard, POWER_META } from "../shared/PowerCard";
 import { ROLE_META } from "../RoleRevealOverlay";
 import { CloseIcon } from "../shared/CloseIcon";
@@ -603,78 +603,66 @@ const SECTIONS = {
   modes: { label: "Online vs Physical", render: OnlineVsPhysicalContent },
 };
 
-// ─── Accordion section ────────────────────────────────────────
-function AccordionSection({ sectionKey, isOpen, onToggle }) {
-  const section = SECTIONS[sectionKey];
-  if (!section) return null;
-  const Render = section.render;
+// ─── Jump tab (one per section, in the quick-nav strip) ───────
+function JumpTab({ label, active, onClick }) {
   return (
-    <div
+    <button
+      type="button"
+      onClick={onClick}
+      aria-current={active ? "true" : undefined}
       style={{
-        border: "1px solid var(--border)",
-        borderRadius: "var(--radius)",
-        background: "var(--surface)",
-        overflow: "hidden",
+        flex: "0 0 auto",
+        padding: "6px 12px",
+        minHeight: 0,
+        borderRadius: 999,
+        border: `1px solid ${active ? "var(--accent)" : "var(--border)"}`,
+        background: active ? "rgba(240,181,74,0.12)" : "transparent",
+        color: active ? "var(--accent)" : "var(--text-dim)",
+        fontFamily: "'Space Mono', monospace",
+        fontSize: 10,
+        letterSpacing: "0.08em",
+        textTransform: "uppercase",
+        whiteSpace: "nowrap",
+        cursor: "pointer",
+        transition: "color 0.15s, border-color 0.15s, background 0.15s",
       }}
     >
-      <button
-        type="button"
-        onClick={onToggle}
-        aria-expanded={isOpen}
-        style={{
-          width: "100%",
-          minHeight: 48,
-          padding: "12px 14px",
-          background: isOpen ? "var(--surface2)" : "transparent",
-          border: "none",
-          borderBottom: isOpen ? "1px solid var(--border)" : "none",
-          color: isOpen ? "var(--accent)" : "var(--text)",
-          fontFamily: "'Bebas Neue', sans-serif",
-          fontSize: 16,
-          letterSpacing: "0.14em",
-          textAlign: "left",
-          textTransform: "uppercase",
-          cursor: "pointer",
-          display: "flex",
-          justifyContent: "space-between",
-          alignItems: "center",
-          gap: 8,
-          transition: "background 0.15s, color 0.15s",
-        }}
-      >
-        <span>{section.label}</span>
-        <span
-          aria-hidden
-          style={{
-            fontFamily: "'Space Mono', monospace",
-            fontSize: 14,
-            color: "var(--text-dim)",
-            transform: isOpen ? "rotate(90deg)" : "rotate(0deg)",
-            transition: "transform 0.18s ease",
-            display: "inline-block",
-          }}
-        >
-          ›
-        </span>
-      </button>
-      {isOpen && (
-        <div style={{ padding: 14 }}>
-          <Render />
-        </div>
-      )}
-    </div>
+      {label}
+    </button>
   );
 }
 
-// ─── Modal ────────────────────────────────────────────────────
+// ─── Modal — paged wizard ─────────────────────────────────────
+// One section per page with Back / Next at the foot (Basics → Rank &
+// Progression → Power Cards → …). A quick-nav pill strip lets you jump, and
+// ←/→ page through; Esc closes. `initialTab` picks the opening page:
+//   'physical' → Basics (the original rules)
+//   'online'   → Power Cards (the v2 surface people in an online room want)
 export function HowToPlayModal({ onClose, initialTab = "physical" }) {
-  // Map legacy `initialTab` to which accordion section opens first.
-  // 'physical' → Basics (people read the original rules)
-  // 'online'   → Power Cards (people in an online room want v2)
   const initialKey = initialTab === "online" ? "power" : "basics";
-  const [openKey, setOpenKey] = useState(initialKey);
+  const total = SECTION_KEYS.length;
+  const [index, setIndex] = useState(
+    Math.max(0, SECTION_KEYS.indexOf(initialKey)),
+  );
 
-  const toggle = (key) => setOpenKey((current) => (current === key ? null : key));
+  const go = (i) => setIndex(Math.max(0, Math.min(total - 1, i)));
+  const key = SECTION_KEYS[index];
+  const section = SECTIONS[key];
+  const Render = section.render;
+  const isFirst = index === 0;
+  const isLast = index === total - 1;
+  const nextLabel = isLast ? null : SECTIONS[SECTION_KEYS[index + 1]].label;
+
+  // Esc closes; ←/→ page through the sections.
+  useEffect(() => {
+    const onKey = (e) => {
+      if (e.key === "Escape") onClose?.();
+      else if (e.key === "ArrowRight") setIndex((v) => Math.min(total - 1, v + 1));
+      else if (e.key === "ArrowLeft") setIndex((v) => Math.max(0, v - 1));
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [onClose, total]);
 
   return (
     <div
@@ -693,10 +681,11 @@ export function HowToPlayModal({ onClose, initialTab = "physical" }) {
       <div
         className="card fade-in"
         style={{
-          maxWidth: 520,
+          maxWidth: 540,
           width: "100%",
-          maxHeight: "85vh",
-          overflowY: "auto",
+          maxHeight: "88vh",
+          display: "flex",
+          flexDirection: "column",
         }}
         onClick={(e) => e.stopPropagation()}
       >
@@ -706,13 +695,14 @@ export function HowToPlayModal({ onClose, initialTab = "physical" }) {
             display: "flex",
             justifyContent: "space-between",
             alignItems: "center",
-            marginBottom: 8,
+            marginBottom: 12,
+            flexShrink: 0,
           }}
         >
           <div
             style={{
               fontFamily: "'Bebas Neue', sans-serif",
-              fontSize: 28,
+              fontSize: 26,
               color: "var(--accent)",
               letterSpacing: "0.1em",
             }}
@@ -740,39 +730,103 @@ export function HowToPlayModal({ onClose, initialTab = "physical" }) {
           </button>
         </div>
 
-        {/* Subtitle */}
+        {/* Quick-nav pill strip (jump to any section) */}
         <div
           style={{
-            fontFamily: "'Space Mono', monospace",
-            fontSize: 11,
-            color: "var(--text-dim)",
-            letterSpacing: "0.12em",
-            textTransform: "uppercase",
-            marginBottom: 18,
+            display: "flex",
+            gap: 6,
+            overflowX: "auto",
+            paddingBottom: 6,
+            marginBottom: 14,
+            borderBottom: "1px solid var(--border)",
+            flexShrink: 0,
           }}
         >
-          Tap a section to open
-        </div>
-
-        {/* Accordion */}
-        <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-          {SECTION_KEYS.map((key) => (
-            <AccordionSection
-              key={key}
-              sectionKey={key}
-              isOpen={openKey === key}
-              onToggle={() => toggle(key)}
+          {SECTION_KEYS.map((k, i) => (
+            <JumpTab
+              key={k}
+              label={SECTIONS[k].label}
+              active={i === index}
+              onClick={() => go(i)}
             />
           ))}
         </div>
 
-        <button
-          onClick={onClose}
-          className="primary"
-          style={{ width: "100%", marginTop: 24, minHeight: 44 }}
+        {/* Current section heading + position */}
+        <div
+          style={{
+            display: "flex",
+            alignItems: "baseline",
+            justifyContent: "space-between",
+            gap: 10,
+            marginBottom: 12,
+            flexShrink: 0,
+          }}
         >
-          Got it
-        </button>
+          <div
+            style={{
+              fontFamily: "'Bebas Neue', sans-serif",
+              fontSize: 22,
+              color: "var(--text)",
+              letterSpacing: "0.12em",
+              textTransform: "uppercase",
+            }}
+          >
+            {section.label}
+          </div>
+          <div
+            style={{
+              fontFamily: "'Space Mono', monospace",
+              fontSize: 11,
+              color: "var(--text-dim)",
+              letterSpacing: "0.1em",
+              whiteSpace: "nowrap",
+            }}
+          >
+            {index + 1} / {total}
+          </div>
+        </div>
+
+        {/* Section content — the only scrolling region, so the nav stays put.
+            Keyed on the section so each page fades in fresh. */}
+        <div
+          key={key}
+          className="fade-in"
+          style={{ flex: 1, minHeight: 0, overflowY: "auto", paddingRight: 4 }}
+        >
+          <Render />
+        </div>
+
+        {/* Footer nav — Back / Next (last page closes). */}
+        <div style={{ display: "flex", gap: 10, marginTop: 16, flexShrink: 0 }}>
+          <button
+            type="button"
+            onClick={() => go(index - 1)}
+            disabled={isFirst}
+            style={{ flex: 1, minHeight: 46 }}
+          >
+            ‹ Back
+          </button>
+          {isLast ? (
+            <button
+              type="button"
+              onClick={onClose}
+              className="primary"
+              style={{ flex: 2, minHeight: 46 }}
+            >
+              Got it
+            </button>
+          ) : (
+            <button
+              type="button"
+              onClick={() => go(index + 1)}
+              className="primary"
+              style={{ flex: 2, minHeight: 46 }}
+            >
+              Next: {nextLabel} ›
+            </button>
+          )}
+        </div>
       </div>
     </div>
   );

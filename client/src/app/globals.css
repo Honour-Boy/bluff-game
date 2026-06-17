@@ -225,6 +225,28 @@ button.ember:focus-visible {
   box-shadow: 0 0 0 2px rgba(212,81,58,0.55), 0 4px 22px var(--glow-ember);
 }
 
+/* Bronze — aged metal: the dominant Play CTA, paired with the gold Practice
+   button so the two read as one warm family (darker slab + amber text vs the
+   brighter gold). */
+button.bronze {
+  background: linear-gradient(160deg, #3f3016 0%, #5e4a28 48%, #3f3016 100%);
+  border-color: #7a5f3e;
+  color: var(--accent);
+  font-weight: 700;
+  text-shadow: 0 1px 0 rgba(0,0,0,0.55), 0 0 14px rgba(240,181,74,0.25);
+  box-shadow: 0 2px 12px rgba(0,0,0,0.55), inset 0 1px 0 rgba(240,181,74,0.12);
+}
+button.bronze:hover:not(:disabled) {
+  background: linear-gradient(160deg, #4a3a1c 0%, #735a32 48%, #4a3a1c 100%);
+  border-color: var(--accent-dim);
+  color: #ffd877;
+  box-shadow: 0 4px 20px rgba(0,0,0,0.5), 0 0 22px var(--glow-gold), inset 0 1px 0 rgba(240,181,74,0.18);
+  /* No hover lift — see button:hover note (prevents cursor flicker). */
+}
+button.bronze:focus-visible {
+  box-shadow: 0 0 0 2px rgba(240,181,74,0.4), 0 4px 20px var(--glow-gold);
+}
+
 /* Danger — crimson wax */
 button.danger {
   border-color: #6b1818;
@@ -473,9 +495,24 @@ body.phase-spin-pending::after {
   0%, 100% { transform: rotate(-1.1deg); }
   50%       { transform: rotate(1.1deg); }
 }
+
 .hanging-sign {
   transform-origin: top center;
   animation: sign-sway 6s ease-in-out infinite;
+}
+
+/* Ambient looping backdrop — large, faint Whot suits drift up and slowly rotate
+   forever behind the content. The landing's always-on background motion
+   (distinct from the rising ember sparks). 0% and 100% match so it loops
+   seamlessly; disabled under reduced motion. */
+@keyframes bg-suit-drift {
+  0%   { transform: translateY(0) rotate(0deg); }
+  50%  { transform: translateY(-34px) rotate(180deg); }
+  100% { transform: translateY(0) rotate(360deg); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .bg-suit-layer * { animation: none !important; }
+  .hanging-sign { animation: none; }
 }
 
 /* Subtle wood-grain / smoke texture overlay — drop inside a position:relative

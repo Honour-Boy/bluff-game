@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from 'react';
 import { ChamberSpinner } from './ChamberSpinner';
+import { useCyclingLabel } from './LoadingScreen';
 
 // ============================================================
 // IntroLoading — branded 3s progress beat after the intro video
@@ -20,6 +21,7 @@ const HOLD_MS = 3000;
 export function IntroLoading({ onDone }) {
   const doneRef = useRef(false);
   const [pct, setPct] = useState(1); // sweeps 1 → 100 over HOLD_MS
+  const label = useCyclingLabel();
 
   useEffect(() => {
     let raf;
@@ -68,6 +70,19 @@ export function IntroLoading({ onDone }) {
         textShadow: '0 0 24px rgba(240,181,74,0.35)',
       }}>
         BLUFF
+      </div>
+
+      {/* Rotating flavour line so the held beat reads as "working". */}
+      <div style={{
+        fontFamily: "'Space Mono', monospace",
+        fontSize: 12,
+        color: 'var(--text-dim)',
+        letterSpacing: '0.2em',
+        textTransform: 'uppercase',
+        minHeight: 16,
+        marginTop: -6,
+      }} aria-live="polite">
+        {label}
       </div>
 
       {/* Fancy determinate bar — gradient fill + travelling sheen, width driven

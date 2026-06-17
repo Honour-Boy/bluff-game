@@ -32,6 +32,18 @@ function GearIcon() {
   );
 }
 
+// Down-caret for the chip trigger; rotates when the menu is open.
+function Caret({ open }) {
+  return (
+    <svg
+      width="9" height="9" viewBox="0 0 24 24" fill="none" aria-hidden="true"
+      style={{ opacity: 0.55, transform: open ? 'rotate(180deg)' : 'none', transition: 'transform 0.18s' }}
+    >
+      <path d="M6 9l6 6 6-6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  );
+}
+
 // Prev / next track skip button — sits under the volume slider for the
 // continuous playlist. Icon-only (matches the rest of the gear's SVG controls).
 function TrackSkipButton({ dir, onClick }) {
@@ -150,10 +162,16 @@ export function SettingsGear({
   // top of the screen — currently the practice Power-Clinic progress bar, whose
   // right edge the gear button would otherwise overlap.
   topOffset = 0,
+  // Trigger look. 'gear' (default) is the compact icon+name button used in-game
+  // and on Groups. 'chip' is the landing redesign's pill — a borderless-feeling
+  // name chip (no gear icon, name + caret) that pairs symmetrically with the
+  // top-left level chip. The dropdown internals are identical in both modes.
+  triggerVariant = 'gear',
 }) {
   const [open, setOpen] = useState(false);
   const [showProfile, setShowProfile] = useState(false);
   const [showCosmetics, setShowCosmetics] = useState(false);
+  const isChip = triggerVariant === 'chip';
 
   // Nothing to manage if we have no identity at all.
   if (!username && !onSignOut && !onSignOutGuest) return null;
@@ -161,7 +179,9 @@ export function SettingsGear({
   return (
     <>
       {/* Hide the inline name on small screens so it never crowds the centred
-          header status; the name still shows inside the opened menu. */}
+          header status; the name still shows inside the opened menu. The chip
+          trigger (landing) keeps its name at all widths — it's the identity
+          anchor there, not a utility button. */}
       <style>{`@media (max-width: 520px){.settings-gear-name{display:none !important;}}`}</style>
       <div style={{
         position: 'fixed',
@@ -172,50 +192,98 @@ export function SettingsGear({
         // modal cleanly covers it (avoids two top-right close targets on mobile).
         zIndex: 9200,
       }}>
-        <button
-          type="button"
-          onClick={() => setOpen((v) => !v)}
-          aria-haspopup="menu"
-          aria-expanded={open}
-          aria-label="Settings"
-          title="Settings"
-          data-tour-id={TOUR_IDS.settingsGear}
-          style={{
-            height: 40,
-            display: 'flex', alignItems: 'center', gap: 7,
-            padding: '0 11px',
-            color: open ? 'var(--accent)' : 'var(--text-mid)',
-            border: `1px solid ${open ? 'var(--accent-dim)' : 'var(--border-lit)'}`,
-            background: 'rgba(20,15,10,0.9)',
-            borderRadius: 'var(--radius)',
-            cursor: 'pointer',
-            boxShadow: '0 4px 14px rgba(0,0,0,0.45)',
-            fontFamily: "'Cinzel', serif",
-            fontSize: 10,
-            letterSpacing: '0.08em',
-            WebkitTapHighlightColor: 'transparent',
-          }}
-        >
-          <GearIcon />
-          {username && (
-            <span className="settings-gear-name" style={{ maxWidth: 130, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-              {username}
-            </span>
-          )}
-          {isGuest && (
-            <span style={{
-              fontSize: 8,
-              padding: '2px 6px',
-              borderRadius: 2,
-              background: 'rgba(200,146,46,0.1)',
-              border: '1px solid rgba(200,146,46,0.35)',
-              color: 'var(--accent)',
-              letterSpacing: '0.14em',
-            }}>
-              GUEST
-            </span>
-          )}
-        </button>
+        {isChip ? (
+          <button
+            type="button"
+            onClick={() => setOpen((v) => !v)}
+            aria-haspopup="menu"
+            aria-expanded={open}
+            aria-label="Account and settings"
+            title="Account and settings"
+            data-tour-id={TOUR_IDS.settingsGear}
+            style={{
+              display: 'inline-flex', alignItems: 'center', gap: 7,
+              padding: '7px 12px',
+              color: open ? 'var(--accent)' : 'var(--text-mid)',
+              border: `1px solid ${open ? 'var(--accent-dim)' : 'var(--border-lit)'}`,
+              background: 'rgba(8,6,4,0.9)',
+              backdropFilter: 'blur(10px)',
+              WebkitBackdropFilter: 'blur(10px)',
+              borderRadius: 999,
+              cursor: 'pointer',
+              boxShadow: '0 4px 14px rgba(0,0,0,0.45)',
+              fontFamily: "'Cinzel', serif",
+              fontSize: 11,
+              letterSpacing: '0.06em',
+              WebkitTapHighlightColor: 'transparent',
+            }}
+          >
+            {username && (
+              <span style={{ maxWidth: 150, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                {username}
+              </span>
+            )}
+            {isGuest && (
+              <span style={{
+                fontSize: 8,
+                padding: '2px 6px',
+                borderRadius: 999,
+                background: 'rgba(200,146,46,0.1)',
+                border: '1px solid rgba(200,146,46,0.35)',
+                color: 'var(--accent)',
+                letterSpacing: '0.14em',
+              }}>
+                GUEST
+              </span>
+            )}
+            <Caret open={open} />
+          </button>
+        ) : (
+          <button
+            type="button"
+            onClick={() => setOpen((v) => !v)}
+            aria-haspopup="menu"
+            aria-expanded={open}
+            aria-label="Settings"
+            title="Settings"
+            data-tour-id={TOUR_IDS.settingsGear}
+            style={{
+              height: 40,
+              display: 'flex', alignItems: 'center', gap: 7,
+              padding: '0 11px',
+              color: open ? 'var(--accent)' : 'var(--text-mid)',
+              border: `1px solid ${open ? 'var(--accent-dim)' : 'var(--border-lit)'}`,
+              background: 'rgba(20,15,10,0.9)',
+              borderRadius: 'var(--radius)',
+              cursor: 'pointer',
+              boxShadow: '0 4px 14px rgba(0,0,0,0.45)',
+              fontFamily: "'Cinzel', serif",
+              fontSize: 10,
+              letterSpacing: '0.08em',
+              WebkitTapHighlightColor: 'transparent',
+            }}
+          >
+            <GearIcon />
+            {username && (
+              <span className="settings-gear-name" style={{ maxWidth: 130, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                {username}
+              </span>
+            )}
+            {isGuest && (
+              <span style={{
+                fontSize: 8,
+                padding: '2px 6px',
+                borderRadius: 2,
+                background: 'rgba(200,146,46,0.1)',
+                border: '1px solid rgba(200,146,46,0.35)',
+                color: 'var(--accent)',
+                letterSpacing: '0.14em',
+              }}>
+                GUEST
+              </span>
+            )}
+          </button>
+        )}
 
         {open && (
           <>
