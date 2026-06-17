@@ -133,6 +133,18 @@ function createLeaderboardRepo(supabase) {
     return _mapProgressionRow(row);
   }
 
+  // Convenience for the tier gate at room creation: the host's current level
+  // derived from their stored XP. Defaults to level 1 on any read failure.
+  async function getLevel(userId) {
+    const { levelForXp } = require('./engine/progression');
+    try {
+      const row = await getProgression(userId);
+      return levelForXp(row.xp);
+    } catch {
+      return 1;
+    }
+  }
+
   async function addXp(userId, amount, now = new Date().toISOString()) {
     const result = await supabase.rpc('player_progression_add_xp', {
       p_user_id: userId,
@@ -166,6 +178,7 @@ function createLeaderboardRepo(supabase) {
     recordWinner,
     getLeaderboard,
     getProgression,
+    getLevel,
     addXp,
     setEquippedCosmetics,
   };

@@ -1,15 +1,22 @@
-// ─── XpSummary — the end-of-game XP strip (#205) ──────────────────────────────
+// ─── XpSummary — the end-of-game XP strip (#205, #307) ────────────────────────
 // Rendered under the victory declaration at game_over when the server sent
 // this client a private `xp_awarded` payload. Shows the gain, an animated
-// level-progress bar, any newly-unlocked cosmetics, and a sign-in nudge for
-// guests (whose XP isn't persisted).
+// level-progress bar, level-up + tier-promotion banners, any newly-unlocked
+// cosmetics, and a sign-in nudge for guests (whose XP isn't persisted).
 
+import { tierMeta } from '../../lib/tiers';
+
+// Ordered so the breakdown reads top-to-bottom by significance. Keys mirror
+// the server's `computeXpAward` breakdown shape (all eight action types).
 const BREAKDOWN_LABELS = {
-  participation: 'Played',
+  win: 'Victory',
   spinsSurvived: 'Spins survived',
   correctBluffCalls: 'Bluffs called right',
-  placement: 'Placement',
-  win: 'Victory',
+  bluffDefended: 'Bluffs defended',
+  playersEliminated: 'Players eliminated',
+  powerCardsResolved: 'Power cards resolved',
+  lastStandWin: 'Last Stand win',
+  participation: 'Played',
 };
 
 export function XpSummary({ xpAward, isMobile = false }) {
@@ -18,11 +25,17 @@ export function XpSummary({ xpAward, isMobile = false }) {
     gained, breakdown, guest,
     totalXp, level, leveledUp, unlocked,
     levelFloorXp, nextLevelXp,
+    newLevel, newTier, previousTier,
   } = xpAward;
 
-  const parts = Object.entries(breakdown || {})
-    .filter(([, v]) => v > 0)
-    .map(([k, v]) => `${BREAKDOWN_LABELS[k] || k} +${v}`);
+  // Render breakdown rows in the canonical order, non-zero only.
+  const parts = Object.keys(BREAKDOWN_LABELS)
+    .filter((k) => (breakdown?.[k] || 0) > 0)
+    .map((k) => `${BREAKDOWN_LABELS[k]} +${breakdown[k]}`);
+
+  // A tier promotion happened if the award crossed a tier boundary.
+  const tierUp = !guest && newTier && previousTier && newTier !== previousTier;
+  const newTierStyle = newTier ? tierMeta(newTier) : null;
 
   const span = (nextLevelXp ?? 0) - (levelFloorXp ?? 0);
   const progressPct = !guest && span > 0
@@ -95,8 +108,21 @@ export function XpSummary({ xpAward, isMobile = false }) {
             textTransform: 'uppercase',
             color: leveledUp ? 'var(--accent)' : 'var(--text-dim)',
           }}>
-            {leveledUp ? `Level up! Now level ${level}` : `Level ${level} · ${totalXp} XP`}
+            {leveledUp ? `Level up! → Level ${newLevel ?? level}` : `Level ${level} · ${totalXp} XP`}
           </div>
+          {tierUp && (
+            <div style={{
+              fontFamily: "'Cinzel', serif",
+              fontSize: isMobile ? 11 : 12,
+              fontWeight: 700,
+              letterSpacing: '0.12em',
+              textTransform: 'uppercase',
+              color: newTierStyle.color,
+              textShadow: newTierStyle.glow ? `0 0 12px ${newTierStyle.glow}` : 'none',
+            }}>
+              Welcome to {newTierStyle.name}!
+            </div>
+          )}
           {(unlocked?.length || 0) > 0 && (
             <div style={{
               fontFamily: "'Cinzel', serif",

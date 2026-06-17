@@ -1,5 +1,6 @@
 import { VoiceIndicator } from '../VoicePanel';
 import { cardBackFor } from '../../lib/cosmetics';
+import { PactSigil } from '../pact/PactSigil';
 
 // ─── Mini deck-skin card — the player's OWN equipped card back (#205) ─────────
 // Deliberately resolved from player.cosmetics (broadcast to everyone), NOT the
@@ -65,6 +66,7 @@ export function PlayerChip({
   onClick,
   compact = false,
   bettingEnabled = false,
+  isPactPartner = false,
 }) {
   const alive = player.status === 'alive';
   const width = compact ? 64 : 80;
@@ -171,6 +173,13 @@ export function PlayerChip({
             voiceConnected={voice.isConnected}
             size={compact ? 6 : 7}
           />
+        )}
+        {/* Covenant — Pact partner marker, inline so it never overlaps the name.
+            Only the two bonded partners ever receive isPactPartner. */}
+        {alive && isPactPartner && (
+          <span title="Your pact partner" style={{ lineHeight: 0, flexShrink: 0 }}>
+            <PactSigil size={compact ? 11 : 13} withSeal={false} glow={false} />
+          </span>
         )}
         <span style={{ overflow: 'hidden', textOverflow: 'ellipsis' }}>
           {truncated}

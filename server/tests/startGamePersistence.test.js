@@ -81,7 +81,7 @@ describe('start_game group settings persistence', () => {
       getLeaderboard: vi.fn(),
     };
 
-    registerSocketHandlers(io, socket, { groupSettingsRepo, leaderboardRepo });
+    registerSocketHandlers(io, socket, { groupSettingsRepo, leaderboardRepo, groupsRepo: { getActiveGroupById: async () => null } });
     const startGame = socket.handlers.get('start_game');
     const cb = vi.fn();
 
@@ -129,7 +129,7 @@ describe('start_game group settings persistence', () => {
       getLeaderboard: vi.fn(),
     };
 
-    registerSocketHandlers(io, socket, { groupSettingsRepo, leaderboardRepo });
+    registerSocketHandlers(io, socket, { groupSettingsRepo, leaderboardRepo, groupsRepo: { getActiveGroupById: async () => null } });
     const startGame = socket.handlers.get('start_game');
     const cb = vi.fn();
 
@@ -163,7 +163,7 @@ describe('start_game group settings persistence', () => {
     };
     const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
 
-    registerSocketHandlers(io, socket, { groupSettingsRepo, leaderboardRepo });
+    registerSocketHandlers(io, socket, { groupSettingsRepo, leaderboardRepo, groupsRepo: { getActiveGroupById: async () => null } });
     const startGame = socket.handlers.get('start_game');
     const cb = vi.fn();
 

@@ -149,6 +149,16 @@ const PENDING_GAME_OVER_TIMEOUT_MS = 10_000;
 // their behalf after this window so the room can't park in redemption_pending.
 const REDEMPTION_PENDING_TIMEOUT_MS = 30_000;
 
+// Covenant — Blood Debt assignment window. When a correct-bluff spin kills a
+// player in a Covenant room, they get this long to name their debt target; on
+// expiry the debt defaults to the bluff caller.
+const BLOOD_DEBT_WINDOW_MS = 10_000;
+
+// Covenant — The Pact volunteer-pull window. When a spin would fall on one Pact
+// partner, the OTHER partner gets this long to volunteer to take the bullet in
+// their place; on expiry the original target spins.
+const PACT_VOLUNTEER_WINDOW_MS = 6_000;
+
 // Speed Mode (roomModifiers.speedMode) — each player's turn is capped at this
 // many ms. When the deadline passes the server auto-ENDS the turn (no auto-spin
 // — #79 bans auto-spin in every mode). The lobby advertises a 25s turn timer.
@@ -195,6 +205,10 @@ function defaultRoomConfig() {
       deadMansHand: false,
       lastStand: false,
     },
+    // Secret roles (Sheriff/Medic/Saboteur/…). Off by default; assignRoles
+    // is a no-op unless this is true. Gated to Syndicate+ tiers at room
+    // creation by applyTierCapsToConfig (forced on there, off below).
+    secretRoles: false,
   };
 }
 
@@ -229,7 +243,50 @@ function normalizeRoomConfig(input) {
     }
   });
 
+  base.secretRoles = pickBool(input.secretRoles, base.secretRoles);
+
   return base;
+}
+
+// ─── Tier caps (Progression & Covenant overhaul) ─────────────
+//
+// Room mechanics unlock with the host's tier. Room creation is the SOLE
+// gating point: a normalized config is run through applyTierCapsToConfig,
+// which forces every field a tier can't use to its off-value (and forces
+// secretRoles ON for Syndicate/Covenant — see roadmap R8). Returns a NEW
+// config; never mutates the input.
+//
+//   Streets   → no powers, no roles, no risk/room modifiers, no systems.
+//   Backroads → powers + risk modifiers + bounty; no roles, betting, DMH,
+//               Last Stand.
+//   Syndicate → everything; secret roles forced on.
+//   Covenant  → same caps as Syndicate (Pact + Blood Debt ride room.tier,
+//               not the config).
+function applyTierCapsToConfig(config, tier) {
+  const out = normalizeRoomConfig(config);
+
+  const offAll = (obj) => { for (const k of Object.keys(obj)) obj[k] = false; };
+
+  if (tier === 'streets') {
+    offAll(out.powerCards.enabled);
+    offAll(out.riskModifiers);
+    offAll(out.roomModifiers);
+    offAll(out.systems);
+    out.secretRoles = false;
+    return out;
+  }
+
+  if (tier === 'backroads') {
+    out.secretRoles = false;
+    out.systems.betting = false;
+    out.systems.deadMansHand = false;
+    out.systems.lastStand = false;
+    return out;
+  }
+
+  // Syndicate + Covenant: no caps, but secret roles are always on.
+  out.secretRoles = true;
+  return out;
 }
 
 module.exports = {
@@ -265,8 +322,11 @@ module.exports = {
   SPIN_PENDING_TIMEOUT_MS,
   PENDING_GAME_OVER_TIMEOUT_MS,
   REDEMPTION_PENDING_TIMEOUT_MS,
+  BLOOD_DEBT_WINDOW_MS,
+  PACT_VOLUNTEER_WINDOW_MS,
   SPEED_MODE_TURN_MS,
   IDLE_TURN_TIMEOUT_MS,
   defaultRoomConfig,
   normalizeRoomConfig,
+  applyTierCapsToConfig,
 };

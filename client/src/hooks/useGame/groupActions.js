@@ -61,6 +61,15 @@ export function useGroupActions({
     return emitPromiseAction(socket, 'hand_back_host', { groupId }, () => setError(null), failError);
   }, [failError, setError, socket]);
 
+  // Phase 6 (G5) — owner tier-mismatch resolution.
+  const transferOwnership = useCallback((groupId, newOwnerUserId) => {
+    return emitPromiseAction(socket, 'transfer_ownership', { groupId, newOwnerUserId }, () => setError(null), failError);
+  }, [failError, setError, socket]);
+
+  const regroupRetier = useCallback((groupId) => {
+    return emitPromiseAction(socket, 'regroup_retier', { groupId }, () => setError(null), failError);
+  }, [failError, setError, socket]);
+
   const deleteGroup = useCallback((groupId) => {
     return emitPromiseAction(socket, 'delete_group', { groupId }, () => setError(null), failError);
   }, [failError, setError, socket]);
@@ -105,6 +114,8 @@ export function useGroupActions({
     transferHost,
     reclaimHost,
     handBackHost,
+    transferOwnership,
+    regroupRetier,
     deleteGroup,
     leaveGroup,
     getGroupLeaderboard,

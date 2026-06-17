@@ -243,6 +243,36 @@ function gatingFor(playerCount) {
   return gate;
 }
 
+// ─── Tier gating (Phase 5, #308) ──────────────────────────────────────────────
+// Mirrors the server's `applyTierCapsToConfig`: a host can only enable the
+// mechanics their progression tier has unlocked. The client gate is purely
+// informational (the server forces disallowed flags off at create_room anyway)
+// — it greys the row and tells the host which tier unlocks it. Keyed by toggle
+// key (unique across all four sections). When `tier` is null (e.g. the standalone
+// tests, or an in-flight room without a tier), no tier gating is applied.
+const ALL_POWER_KEYS = ['shield', 'mirror', 'swap', 'peek', 'freeze', 'assassin'];
+const ALL_RISK_KEYS = ['doubleBarrel', 'russianRoulette', 'hotPotato', 'redemptionSpin'];
+const ALL_ROOM_KEYS = ['speedMode', 'suddenDeath', 'mirrorMatch', 'rouletteRotation'];
+
+function tierGateFor(tier) {
+  if (!tier) return {};
+  const gate = {};
+  const lock = (keys, reason) => { for (const k of keys) gate[k] = { reason }; };
+  if (tier === 'streets') {
+    const reason = 'Unlocks at Backroads (Level 3)';
+    lock(ALL_POWER_KEYS, reason);
+    lock(ALL_RISK_KEYS, reason);
+    lock(ALL_ROOM_KEYS, reason);
+    lock(['bounty', 'betting', 'deadMansHand', 'lastStand'], reason);
+  } else if (tier === 'backroads') {
+    // Powers / risk / room / bounty are free at Backroads; only the high-stakes
+    // systems wait for Syndicate.
+    lock(['betting', 'deadMansHand', 'lastStand'], 'Unlocks at Syndicate (Level 9)');
+  }
+  // syndicate + covenant: nothing locked.
+  return gate;
+}
+
 function formatSavedMeta(savedMeta) {
   if (!savedMeta?.updatedAt) return null;
   try {
@@ -260,28 +290,50 @@ function formatSavedMeta(savedMeta) {
 }
 
 // ─── Main component ───────────────────────────────────────
-export function PreGameSettingsPanel({ config, onChange, isGroupRoom = false, savedMeta = null, playerCount = null, sandbox = false }) {
+export function PreGameSettingsPanel({ config, onChange, isGroupRoom = false, savedMeta = null, playerCount = null, sandbox = false, tier = null }) {
   const [open, setOpen] = useState(false);
   const gating = gatingFor(playerCount);
+  const tierGate = tierGateFor(tier);
 
-  // Render a toggle row, applying player-count gating: hidden rows return
-  // null; disabled rows render greyed-out with the reason in place of desc.
-  // (Module 5) In the sandbox, the non-power categories aren't wired for the bot
-  // yet, so every row is force-disabled with a "Coming soon" reason (and the
-  // hide-gating is ignored so they're all visible-but-greyed).
+  // Render a toggle row, applying tier + player-count gating: hidden rows
+  // return null; disabled rows render greyed-out with the reason in place of
+  // desc. Tier gating takes precedence (it always shows the row disabled with
+  // the unlock hint, never hides it). (Module 5) In the sandbox, the non-power
+  // categories aren't wired for the bot yet, so every row is force-disabled
+  // with a "Coming soon" reason (and the hide-gating is ignored so they're all
+  // visible-but-greyed).
   const renderToggle = (idPrefix, { key, label, desc }, checked, onToggle) => {
+    const tg = tierGate[key];
     const g = gating[key];
-    if (g?.mode === 'hide' && !sandbox) return null;
+    if (!tg && g?.mode === 'hide' && !sandbox) return null;
     return (
       <ToggleRow
         key={key}
         id={`${idPrefix}-${key}`}
         label={label}
         desc={desc}
-        checked={sandbox ? false : checked}
+        checked={(sandbox || tg) ? false : checked}
         onChange={(v) => onToggle(key, v)}
-        disabled={sandbox || g?.mode === 'disable'}
-        disabledReason={sandbox ? 'Coming soon' : (g?.reason || null)}
+        disabled={sandbox || !!tg || g?.mode === 'disable'}
+        disabledReason={sandbox ? 'Coming soon' : (tg?.reason || g?.reason || null)}
+      />
+    );
+  };
+
+  // Power cards render directly (not through renderToggle); this applies the
+  // same tier gate to them.
+  const renderPowerToggle = ({ key, label, desc }) => {
+    const tg = tierGate[key];
+    return (
+      <ToggleRow
+        key={key}
+        id={`pc-${key}`}
+        label={label}
+        desc={desc}
+        checked={tg ? false : config.powerCards.enabled[key]}
+        onChange={(v) => setPowerCard(key, v)}
+        disabled={!!tg}
+        disabledReason={tg?.reason || null}
       />
     );
   };
@@ -501,16 +553,7 @@ export function PreGameSettingsPanel({ config, onChange, isGroupRoom = false, sa
               </div>
             }
           >
-            {POWER_CARDS.map(({ key, label, desc }) => (
-              <ToggleRow
-                key={key}
-                id={`pc-${key}`}
-                label={label}
-                desc={desc}
-                checked={config.powerCards.enabled[key]}
-                onChange={(v) => setPowerCard(key, v)}
-              />
-            ))}
+            {POWER_CARDS.map((item) => renderPowerToggle(item))}
           </Section>
 
           {/* Risk Modifiers */}
@@ -562,6 +605,24 @@ export function PreGameSettingsPanel({ config, onChange, isGroupRoom = false, sa
               renderToggle('sys', item, config.systems[item.key], setSystem),
             )}
           </Section>
+
+          {/* Covenant rooms get the two exclusive mechanics for free — they
+              ride room.tier and aren't host-toggleable (#308). */}
+          {tier === 'covenant' && (
+            <div style={{
+              fontSize: 10,
+              color: 'var(--accent)',
+              lineHeight: 1.6,
+              letterSpacing: '0.06em',
+              padding: '9px 12px',
+              background: 'rgba(240,181,74,0.06)',
+              border: '1px solid var(--accent)',
+              borderRadius: 'var(--radius)',
+              boxShadow: '0 0 10px var(--glow-gold)',
+            }}>
+              THE PACT &amp; BLOOD DEBT are always active in Covenant rooms — no toggle needed.
+            </div>
+          )}
           {isGroupRoom && (
             <div style={{
               display: 'flex',

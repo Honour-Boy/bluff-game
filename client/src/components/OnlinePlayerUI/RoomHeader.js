@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { TierBadge } from '../shared/TierBadge';
 
 // ─── Share dropdown — tavern-styled ──────────────────────────────────────────
 function ShareButton({ roomCode, senderName }) {
@@ -112,6 +113,7 @@ export function RoomHeader({
   onShowHowToPlay,
   isTutorial = false,
   onShowGuide,
+  tier = null,
 }) {
   return (
     <div style={{
@@ -176,6 +178,9 @@ export function RoomHeader({
         }}>
           Round {roundNumber} · tap to copy
         </div>
+        {isLobby && !isTutorial && tier && (
+          <TierBadge tier={tier} style={{ alignSelf: 'flex-start' }} />
+        )}
         {isLobby && myPlayer && (
           <ShareButton roomCode={roomCode} senderName={myPlayer.username} />
         )}

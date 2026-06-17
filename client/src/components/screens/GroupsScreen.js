@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import { getSocket } from '../../lib/socket';
+import { TierBadge } from '../shared/TierBadge';
 
 function formatInviteDate(value) {
   if (!value) return 'Pending';
@@ -307,6 +308,11 @@ export function GroupsScreen({
                       }}>
                         Cipher: {group.code}
                       </div>
+                      {group.requiredTier && (
+                        <div style={{ marginTop: 8 }}>
+                          <TierBadge tier={group.requiredTier} />
+                        </div>
+                      )}
                       {liveLabel && (
                         <div style={{
                           marginTop: 8,
@@ -390,6 +396,16 @@ export function GroupsScreen({
                   placeholder="Friday Night Bluff"
 
                 />
+              </div>
+              <div style={{
+                fontFamily: "'Crimson Text', serif",
+                fontSize: 12,
+                fontStyle: 'italic',
+                color: 'var(--text-dim)',
+                lineHeight: 1.5,
+              }}>
+                The guild is bound to your current tier — only players of the same
+                tier can join. Climb higher and you’ll re-tier the crew or hand it on.
               </div>
               <button
                 type="submit"

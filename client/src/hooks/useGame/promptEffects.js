@@ -7,6 +7,7 @@ export function usePromptEvents({
   sniperPrompt,
   setMedicPrompt,
   setSniperPrompt,
+  setBloodDebtPrompt,
 }) {
   useEffect(() => {
     const onMedicSavePending = (payload) => {
@@ -15,19 +16,59 @@ export function usePromptEvents({
     const onSniperRedirectPending = (payload) => {
       setSniperPrompt(payload || null);
     };
+    // Covenant — private prompt to the just-eliminated player to name their
+    // blood-debt target. The overlay self-dismisses on its own countdown (and
+    // on pick), so no phase-based teardown is needed here.
+    const onBloodDebtAssign = (payload) => {
+      setBloodDebtPrompt?.(payload || null);
+    };
 
     socket.on('medic_save_pending', onMedicSavePending);
     socket.on('sniper_redirect_pending', onSniperRedirectPending);
+    socket.on('blood_debt_assign', onBloodDebtAssign);
     return () => {
       socket.off('medic_save_pending', onMedicSavePending);
       socket.off('sniper_redirect_pending', onSniperRedirectPending);
+      socket.off('blood_debt_assign', onBloodDebtAssign);
     };
-  }, [setMedicPrompt, setSniperPrompt, socket]);
+  }, [setMedicPrompt, setSniperPrompt, setBloodDebtPrompt, socket]);
 
   useEffect(() => {
     if (roomPhase !== 'medic_pending' && medicPrompt) setMedicPrompt(null);
     if (roomPhase !== 'sniper_pending' && sniperPrompt) setSniperPrompt(null);
   }, [medicPrompt, roomPhase, setMedicPrompt, setSniperPrompt, sniperPrompt]);
+}
+
+// ─── Covenant — The Pact ──────────────────────────────────────
+// The secret bond's offer + partner badge are reconnect-safe via the serialized
+// `room_state.pact` block, so only the TIMED volunteer-pull prompt needs transient
+// event state. The confirm / deny / bluff-blocked events surface as quick toasts.
+export function usePactEvents({ socket, roomPhase, pactVolunteer, setPactVolunteer, notify }) {
+  useEffect(() => {
+    const onVolunteerPrompt = (payload) => setPactVolunteer?.(payload || null);
+    const onConfirmed = (payload) => {
+      notify?.(payload?.partnerName ? `Pact sealed with ${payload.partnerName}.` : 'The Pact is sealed.', 'success');
+    };
+    const onDenied = () => notify?.('Your pact offer was refused.', 'warn');
+    const onBluffBlocked = () => notify?.("You can't turn on your pact partner.", 'warn');
+
+    socket.on('pact_volunteer_prompt', onVolunteerPrompt);
+    socket.on('pact_confirmed', onConfirmed);
+    socket.on('pact_denied', onDenied);
+    socket.on('pact_bluff_blocked', onBluffBlocked);
+    return () => {
+      socket.off('pact_volunteer_prompt', onVolunteerPrompt);
+      socket.off('pact_confirmed', onConfirmed);
+      socket.off('pact_denied', onDenied);
+      socket.off('pact_bluff_blocked', onBluffBlocked);
+    };
+  }, [socket, setPactVolunteer, notify]);
+
+  // The volunteer window only lives during spin_pending; drop a stale prompt the
+  // instant the table moves on (spin resolved, someone else volunteered, etc.).
+  useEffect(() => {
+    if (roomPhase !== 'spin_pending' && pactVolunteer) setPactVolunteer(null);
+  }, [roomPhase, pactVolunteer, setPactVolunteer]);
 }
 
 // ─── Pre-game selection & role reveal (#116) ──────────────────

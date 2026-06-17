@@ -144,6 +144,7 @@ function HomeContent() {
     inviteToGroup, listMyInvites, respondToInvite,
     revokeInvite, removeMember, transferHost,
     reclaimHost, handBackHost,
+    transferOwnership, regroupRetier,
     deleteGroup, leaveGroup, getGroupLeaderboard,
     nextTurn, resolveBluff,
     playCard, endTurn, playerSpin,
@@ -160,9 +161,17 @@ function HomeContent() {
     medicDecide,
     saboteurTransfer,
     sniperRedirect,
+    bloodDebtTarget,
+    pactChoose,
+    pactRespond,
+    volunteerForPact,
+    pactVolunteer,
+    setPactVolunteer,
     bluffIntercept,
     medicPrompt,
     sniperPrompt,
+    bloodDebtPrompt,
+    setBloodDebtPrompt,
     pregame,
     powerEventQueue,
     consumePowerEvent,
@@ -428,6 +437,33 @@ function HomeContent() {
     return res;
   }, [fetchGroupDetail, invalidateGroupsCache, refreshGroupsHome, selectedGroup?.id, handBackHost]);
 
+  // Phase 6 (G5) — owner tier-mismatch resolution.
+  const handleTransferOwnership = useCallback(async (newOwnerUserId) => {
+    if (!selectedGroup?.id) return { success: false, error: 'Group not found' };
+    const res = await transferOwnership(selectedGroup.id, newOwnerUserId);
+    if (res?.success) {
+      invalidateGroupsCache('all', selectedGroup.id);
+      await Promise.all([
+        refreshGroupsHome(),
+        fetchGroupDetail(selectedGroup.id),
+      ]);
+    }
+    return res;
+  }, [fetchGroupDetail, invalidateGroupsCache, refreshGroupsHome, selectedGroup?.id, transferOwnership]);
+
+  const handleRegroupRetier = useCallback(async () => {
+    if (!selectedGroup?.id) return { success: false, error: 'Group not found' };
+    const res = await regroupRetier(selectedGroup.id);
+    if (res?.success) {
+      invalidateGroupsCache('all', selectedGroup.id);
+      await Promise.all([
+        refreshGroupsHome(),
+        fetchGroupDetail(selectedGroup.id),
+      ]);
+    }
+    return res;
+  }, [fetchGroupDetail, invalidateGroupsCache, refreshGroupsHome, selectedGroup?.id, regroupRetier]);
+
   const handleRemoveMember = useCallback(async (userId) => {
     if (!selectedGroup?.id) return { success: false, error: 'Group not found' };
     const res = await removeMember(selectedGroup.id, userId);
@@ -661,6 +697,10 @@ function HomeContent() {
               isGroupRoom={!!roomState?.groupId}
               savedMeta={roomState?.groupSettingsMeta}
               playerCount={aliveCount}
+              // Phase 5 (#308): tier-gate the toggles to the room's tier
+              // (host's tier at creation). Informational only — the server
+              // enforces caps at create_room.
+              tier={roomState?.tier || null}
               // (Module 5) Sandbox: only power cards are configurable today; the
               // rest render with a "Coming Soon" tag.
               sandbox={!!roomState?.sandbox}
@@ -753,6 +793,8 @@ function HomeContent() {
           onTransferHost={handleTransferHost}
           onReclaimHost={handleReclaimHost}
           onHandBackHost={handleHandBackHost}
+          onTransferOwnership={handleTransferOwnership}
+          onRegroupRetier={handleRegroupRetier}
           onRemoveMember={handleRemoveMember}
           onDeleteGroup={handleDeleteGroup}
           onLeaveGroup={handleLeaveGroup}
@@ -781,6 +823,7 @@ function HomeContent() {
         connected={connected}
         musicEnabled={musicEnabled}
         onToggleMusic={toggleMusic}
+        getProgression={getProgression}
       />
     );
   }
@@ -819,9 +862,17 @@ function HomeContent() {
           medicDecide={medicDecide}
           saboteurTransfer={saboteurTransfer}
           sniperRedirect={sniperRedirect}
+          bloodDebtTarget={bloodDebtTarget}
+          pactChoose={pactChoose}
+          pactRespond={pactRespond}
+          volunteerForPact={volunteerForPact}
+          pactVolunteer={pactVolunteer}
+          setPactVolunteer={setPactVolunteer}
           bluffIntercept={bluffIntercept}
           medicPrompt={medicPrompt}
           sniperPrompt={sniperPrompt}
+          bloodDebtPrompt={bloodDebtPrompt}
+          setBloodDebtPrompt={setBloodDebtPrompt}
           pregame={pregame}
           powerEventQueue={powerEventQueue}
           consumePowerEvent={consumePowerEvent}
@@ -887,9 +938,17 @@ function HomeContent() {
           medicDecide={medicDecide}
           saboteurTransfer={saboteurTransfer}
           sniperRedirect={sniperRedirect}
+          bloodDebtTarget={bloodDebtTarget}
+          pactChoose={pactChoose}
+          pactRespond={pactRespond}
+          volunteerForPact={volunteerForPact}
+          pactVolunteer={pactVolunteer}
+          setPactVolunteer={setPactVolunteer}
           bluffIntercept={bluffIntercept}
           medicPrompt={medicPrompt}
           sniperPrompt={sniperPrompt}
+          bloodDebtPrompt={bloodDebtPrompt}
+          setBloodDebtPrompt={setBloodDebtPrompt}
           pregame={pregame}
           powerEventQueue={powerEventQueue}
           consumePowerEvent={consumePowerEvent}

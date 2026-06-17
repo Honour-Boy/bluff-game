@@ -49,6 +49,12 @@ function _roleAssignmentFor(aliveCount, { collectorEligible = true } = {}) {
 }
 
 function assignRoles(room) {
+  // Secret roles are off unless the room config opts in (Syndicate+ tiers).
+  // Below that every player is Barehand — no specials in play.
+  if (!room.config?.secretRoles) {
+    for (const p of room.players) p.role = ROLES.BAREHAND;
+    return room;
+  }
   const alivePlayers = room.players.filter(p => p.status === 'alive');
   const assignment = _roleAssignmentFor(alivePlayers.length, {
     collectorEligible: _anyPowerCardEnabled(room),

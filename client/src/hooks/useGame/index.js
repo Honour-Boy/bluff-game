@@ -11,7 +11,7 @@ import { getDeviceId, getDeviceName } from '../../lib/device';
 import { useGameBrowserEffects, useSocketAuthenticationEffect } from './browserEffects';
 import { useGameActions } from './gameActions';
 import { useGroupActions } from './groupActions';
-import { usePromptEvents, usePreGameEvents } from './promptEffects';
+import { usePromptEvents, usePreGameEvents, usePactEvents } from './promptEffects';
 import { useGameSocketEvents } from './socketEvents';
 
 export function useGame(getAccessToken, getGuestAuth, authIdentityKey = null, onForceSignOut = null) {
@@ -44,6 +44,10 @@ export function useGame(getAccessToken, getGuestAuth, authIdentityKey = null, on
   const [powerEventQueue, setPowerEventQueue] = useState([]);
   const [medicPrompt, setMedicPrompt] = useState(null);
   const [sniperPrompt, setSniperPrompt] = useState(null);
+  const [bloodDebtPrompt, setBloodDebtPrompt] = useState(null);
+  // Covenant — The Pact. Only the timed volunteer-pull prompt needs transient
+  // state; the offer + partner badge ride the serialized room_state.pact block.
+  const [pactVolunteer, setPactVolunteer] = useState(null);
   const [pregame, setPregame] = useState(null);
   // #205 — this client's private end-of-game XP payload. Set by `xp_awarded`,
   // cleared whenever the room moves off game_over (next deal / reset).
@@ -240,12 +244,20 @@ export function useGame(getAccessToken, getGuestAuth, authIdentityKey = null, on
     sniperPrompt,
     setMedicPrompt,
     setSniperPrompt,
+    setBloodDebtPrompt,
   });
   usePreGameEvents({
     socket,
     roomPhase: roomState?.phase,
     serializedPregame: roomState?.pregame,
     setPregame,
+  });
+  usePactEvents({
+    socket,
+    roomPhase: roomState?.phase,
+    pactVolunteer,
+    setPactVolunteer,
+    notify,
   });
 
   const groupActions = useGroupActions({
@@ -323,6 +335,10 @@ export function useGame(getAccessToken, getGuestAuth, authIdentityKey = null, on
     ...gameActions,
     medicPrompt,
     sniperPrompt,
+    bloodDebtPrompt,
+    setBloodDebtPrompt,
+    pactVolunteer,
+    setPactVolunteer,
     pregame,
     powerEventQueue,
     consumePowerEvent,

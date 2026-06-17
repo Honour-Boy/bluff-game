@@ -400,6 +400,7 @@ describe('startGame guarantees ≥1 power card per player (#77)', () => {
       const cfg = configWith({
         shield: true, mirror: true, swap: true, peek: true, freeze: true, assassin: true,
       }, 2);
+      cfg.secretRoles = true; // Collector only exists when secret roles are on
       const room = makeOnlineRoomWithPlayers(10, cfg);
       startGame(room);
       const collector = room.players.find(p => p.role === 'collector');

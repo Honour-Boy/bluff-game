@@ -13,6 +13,8 @@ const {
   spinPendingTimers,
   gameOverTimers,
   redemptionTimers,
+  bloodDebtTimers,
+  pactVolunteerTimers,
   bluffInterceptTimers,
   getRoom,
   saveRoom,
@@ -22,6 +24,8 @@ const {
   _clearSpinPendingTimer,
   _clearGameOverTimer,
   _clearRedemptionTimer,
+  _clearBloodDebtTimer,
+  _clearPactVolunteerTimer,
   logTurnState,
 } = require('./state');
 const { broadcastRoomState, emitPowerCardEvents } = require('./broadcast');
@@ -143,7 +147,8 @@ function finaliseAssassinElimination(room, outcome) {
   const gameOverWinner = engine.checkGameOver(room);
   if (gameOverWinner) {
     room.phase = 'game_over';
-    room.lastAction = { type: 'game_over', winnerId: gameOverWinner.id, winnerName: gameOverWinner.username };
+    room.lastAction = engine.buildGameOverLastAction(gameOverWinner);
+    engine.markDualWinners(room, gameOverWinner);
   }
 }
 
@@ -306,6 +311,11 @@ function applyBluffOutcome(room, outcome) {
   // correct/incorrect call for end-of-game XP.
   if (outcome.accuserId != null && typeof outcome.bluffIsCorrect === 'boolean') {
     engine.trackBluffOutcome(room, outcome.accuserId, outcome.bluffIsCorrect);
+    // Progression overhaul — a wrong call means the accused "defended" the
+    // bluff (the caller spins, the accused survives). Credit the accused.
+    if (outcome.bluffIsCorrect === false) {
+      engine.trackBluffDefended(room, outcome.accusedId);
+    }
   }
   room.phase = 'spin_pending';
   room.spinTargetId = outcome.spinTargetId;
@@ -338,7 +348,8 @@ function applyPostElimSystemHooks(io, room) {
   const winner = engine.checkGameOver(room);
   if (winner) {
     room.phase = 'game_over';
-    room.lastAction = { type: 'game_over', winnerId: winner.id, winnerName: winner.username };
+    room.lastAction = engine.buildGameOverLastAction(winner);
+    engine.markDualWinners(room, winner);
     return { transitioned: 'game_over' };
   }
   const decision = _decidePostElimSystemPhase(room);
@@ -418,7 +429,53 @@ function _maybeAutoEndTurnAfterImmediateSpin(room, onTurnIdBefore) {
   return { freezeTrigger, suddenDeathBanner };
 }
 
-async function applySpinAndBroadcast(io, code, room, player, leaderboardRepo) {
+async function applySpinAndBroadcast(io, code, room, player, leaderboardRepo, opts = {}) {
+  // Covenant — capture the bluff verdict BEFORE lastAction is overwritten with
+  // the spin_result below. A spin death that followed a CORRECT bluff call is
+  // the only trigger for assigning a Blood Debt. `opts.spinReason === 'blood_debt'`
+  // marks the debt spin itself, which must never spawn a fresh debt (no chains).
+  const spinReason = opts.spinReason || null;
+  const bluffWasCorrect = room.lastAction?.bluffCorrect === true;
+  const bluffAccuserId = room.lastAction?.accuserId || null;
+
+  // Covenant — The Pact volunteer pull. If the spin would fall on one pact
+  // partner and the other is alive, PAUSE: privately offer the partner a 6s
+  // window to take the bullet instead. Skipped for follow-up spins (debt /
+  // volunteer resume) and outside spin_pending. Resumes via the pact_volunteer
+  // event (volunteer spins) or the volunteer timer (original target spins).
+  if (
+    !spinReason
+    && !opts._pactVolunteerResume
+    && room.mode === engine.MODES.ONLINE
+    && room.phase === 'spin_pending'
+  ) {
+    const partnerId = engine.checkPactVolunteerEligible(room, player.id);
+    if (partnerId) {
+      const partner = room.players.find(p => p.id === partnerId);
+      room.pendingPactVolunteer = {
+        spinTargetId: player.id,
+        partnerId,
+        deadline: Date.now() + engine.PACT_VOLUNTEER_WINDOW_MS,
+      };
+      _clearSpinPendingTimer(code);        // the volunteer timer owns the resume
+      _clearPactVolunteerTimer(code);
+      pactVolunteerTimers.set(
+        code,
+        setTimeout(() => _onPactVolunteerExpire(io, code, leaderboardRepo), engine.PACT_VOLUNTEER_WINDOW_MS),
+      );
+      await saveRoom(room);
+      await broadcastRoomState(io, code);
+      if (partner?.socketId) {
+        io.to(partner.socketId).emit('pact_volunteer_prompt', {
+          spinTargetId: player.id,
+          spinTargetName: player.username,
+          deadline: room.pendingPactVolunteer.deadline,
+        });
+      }
+      return null; // spin is paused; a resume path runs it
+    }
+  }
+
   // Auto-spin path: a betting window may still be open (the 10s window is
   // shorter than the spin timeout, but close it defensively so the spin can
   // proceed exactly as the interactive handler does once betting clears).
@@ -486,6 +543,14 @@ async function applySpinAndBroadcast(io, code, room, player, leaderboardRepo) {
   // #205 — survived spins feed end-of-game XP.
   engine.trackSpinOutcome(room, player.id, spinResult.eliminated);
 
+  // Progression overhaul — a spin death that followed a CORRECT bluff call
+  // credits the caller with an elimination (the accused's lie cost them the
+  // round). Only correct-bluff spins count; survival and wrong-call self-spins
+  // don't. accuserId is carried on lastAction by applyBluffOutcome.
+  if (spinResult.eliminated && room.lastAction?.bluffCorrect === true) {
+    engine.trackPlayerEliminated(room, room.lastAction?.accuserId);
+  }
+
   // v2 Phase F — Bounty + Betting evaluation.
   const bountyEvents = [];
   if (spinResult.eliminated) {
@@ -519,10 +584,28 @@ async function applySpinAndBroadcast(io, code, room, player, leaderboardRepo) {
     if (!medicPaused) finalise();
   }
 
+  // Covenant — The Pact. If the fallen player was one of two pact partners, the
+  // bond breaks and the surviving partner loses one chamber bullet (the price of
+  // the broken pact). Done before the last-stand snapshot so the dock is in force.
+  let pactPartnerDeathEvent = null;
+  if (spinResult.eliminated && !medicPaused) {
+    const pd = engine.applyPactPartnerDeath(room, player.id);
+    if (pd.ok) {
+      const survivor = room.players.find(p => p.id === pd.survivorId);
+      pactPartnerDeathEvent = {
+        kind: 'pact_partner_death',
+        survivorId: pd.survivorId,
+        survivorName: survivor?.username || null,
+      };
+    }
+  }
+
   if (!medicPaused) {
     room.phase = 'playing';
-    // v2 Phase F — post-elim system check.
-    if (spinResult.eliminated && room.mode === engine.MODES.ONLINE) {
+    // v2 Phase F — post-elim system check. Skipped on a decided match: a Covenant
+    // Pact dual win (both partners last standing) sets pendingGameOver in finalise
+    // above and must take precedence over a Last Stand duel between them.
+    if (spinResult.eliminated && room.mode === engine.MODES.ONLINE && !room.pendingGameOver) {
       if (engine.shouldEnterLastStand(room)) {
         _enterLastStand(io, room);
       } else if (engine.shouldOpenGhostVote(room)) {
@@ -584,11 +667,47 @@ async function applySpinAndBroadcast(io, code, room, player, leaderboardRepo) {
     riskLevel: spinResult.riskLevel,
     riskLevelBefore,
     medicPending: medicPaused,
+    // Covenant — flags the debt spin so the client shows different flavour text.
+    ...(spinReason ? { spinReason } : {}),
     ...(redemptionPending ? { redemptionPending: true } : {}),
     ...(reshuffle.reshuffled
       ? { globalReshuffle: true, newCardType: reshuffle.cardType }
       : (spinResult.eliminated && !medicPaused ? { newCardType: room.currentCardType } : {})),
   };
+
+  // Covenant — Blood Debt. A correct-bluff spin death lets the fallen player
+  // name a revenge target (10s window; defaults to the bluff caller on expiry).
+  // Set the pending state BEFORE save so it persists; the private prompt is
+  // emitted AFTER the broadcast so the client already has the fresh room state.
+  let bloodDebtPrompt = null;
+  if (
+    spinResult.eliminated
+    && !medicPaused
+    && spinReason !== 'blood_debt'   // the debt spin itself never spawns a debt
+    && bluffWasCorrect
+    && engine.getRoomTier(room) === 'covenant'
+    && !room.pendingGameOver         // game's decided — nobody left to collect
+    && !room.pendingBloodDebt        // one assignment at a time
+  ) {
+    const eligible = room.players.filter(p => p.status === 'alive' && p.id !== player.id);
+    if (eligible.length > 0) {
+      room.pendingBloodDebt = {
+        eliminatedId: player.id,
+        callerId: bluffAccuserId,
+        deadline: Date.now() + engine.BLOOD_DEBT_WINDOW_MS,
+      };
+      _clearBloodDebtTimer(code);
+      bloodDebtTimers.set(code, setTimeout(() => _onBloodDebtExpire(io, code), engine.BLOOD_DEBT_WINDOW_MS));
+      bloodDebtPrompt = {
+        socketId: player.socketId,
+        payload: {
+          alivePlayerIds: eligible.map(p => p.id),
+          alivePlayerNames: eligible.map(p => ({ id: p.id, username: p.username })),
+          deadline: room.pendingBloodDebt.deadline,
+        },
+      };
+    }
+  }
 
   // #6 — highlight callouts (first blood / survival streak). Computed before
   // save so the streak counter + first-blood flag persist; emitted after.
@@ -605,7 +724,45 @@ async function applySpinAndBroadcast(io, code, room, player, leaderboardRepo) {
   // skip / sudden-death tick), emitted on the same channel as the other banners.
   if (autoEnd?.freezeTrigger) io.to(code).emit('power_card_triggered', autoEnd.freezeTrigger);
   if (autoEnd?.suddenDeathBanner) io.to(code).emit('power_card_triggered', autoEnd.suddenDeathBanner);
+  // Covenant — broken-pact banner (survivor lost a bullet).
+  if (pactPartnerDeathEvent) io.to(code).emit('power_card_triggered', pactPartnerDeathEvent);
+  // Covenant — private Blood Debt prompt to the just-eliminated player (after
+  // the broadcast so their client already sees the spin result / spectator view).
+  if (bloodDebtPrompt?.socketId) {
+    io.to(bloodDebtPrompt.socketId).emit('blood_debt_assign', bloodDebtPrompt.payload);
+  }
   return spinResult;
+}
+
+// Covenant — Pact volunteer window expired with no volunteer: the ORIGINAL spin
+// target takes the bullet after all. Resumes the paused spin server-side.
+async function _onPactVolunteerExpire(io, code, leaderboardRepo) {
+  _clearPactVolunteerTimer(code);
+  const room = await getRoom(code);
+  if (!room || !room.pendingPactVolunteer) return;
+  const { spinTargetId } = room.pendingPactVolunteer;
+  room.pendingPactVolunteer = null;
+  const player = room.players.find(p => p.id === spinTargetId);
+  if (!player || player.status !== 'alive' || room.phase !== 'spin_pending') {
+    await saveRoom(room);
+    await broadcastRoomState(io, code);
+    return;
+  }
+  room.spinTargetId = player.id;
+  await applySpinAndBroadcast(io, code, room, player, leaderboardRepo, { _pactVolunteerResume: true });
+}
+
+// Covenant — Blood Debt window expired with no pick: the debt defaults to the
+// bluff caller (the one who pulled the trigger on the fallen player).
+async function _onBloodDebtExpire(io, code) {
+  _clearBloodDebtTimer(code);
+  const room = await getRoom(code);
+  if (!room || !room.pendingBloodDebt) return;
+  const { callerId } = room.pendingBloodDebt;
+  if (callerId) engine.assignBloodDebt(room, callerId);
+  room.pendingBloodDebt = null;
+  await saveRoom(room);
+  await broadcastRoomState(io, code);
 }
 
 /**
@@ -640,7 +797,17 @@ function _scheduleSpinPendingTimeout(io, code, leaderboardRepo) {
  * ack never arrives.
  */
 function _stampPendingGameOver(io, room, winner, leaderboardRepo) {
-  room.pendingGameOver = { id: winner.id, name: winner.username };
+  // Covenant — a Pact dual win carries both partners through to resolve.
+  engine.markDualWinners(room, winner);
+  room.pendingGameOver = winner?.dualWin && Array.isArray(winner.dualWinners)
+    ? {
+        id: winner.dualWinners[0]?.id || null,
+        name: winner.dualWinners[0]?.username || null,
+        dualWin: true,
+        winnerIds: winner.dualWinners.map(p => p.id),
+        winnerNames: winner.dualWinners.map(p => p.username),
+      }
+    : { id: winner.id, name: winner.username };
   _scheduleGameOverTimeout(io, room.code, leaderboardRepo);
 }
 
@@ -669,9 +836,18 @@ function _scheduleGameOverTimeout(io, code, leaderboardRepo) {
 async function resolvePendingGameOver(io, room, leaderboardRepo) {
   const code = room.code;
   _clearGameOverTimer(code);
-  const { id, name } = room.pendingGameOver;
+  const pg = room.pendingGameOver;
   room.phase = 'game_over';
-  room.lastAction = { type: 'game_over', winnerId: id, winnerName: name };
+  room.lastAction = pg.dualWin
+    ? {
+        type: 'game_over',
+        dualWin: true,
+        winnerIds: pg.winnerIds,
+        winnerNames: pg.winnerNames,
+        winnerId: pg.id,
+        winnerName: pg.name,
+      }
+    : { type: 'game_over', winnerId: pg.id, winnerName: pg.name };
   delete room.pendingGameOver;
   delete room.pendingMirrorMatchSpin;
   await maybeRecordGroupWinner(io, room, leaderboardRepo);

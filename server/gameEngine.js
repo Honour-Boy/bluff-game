@@ -27,6 +27,8 @@ const betting = require('./engine/betting');
 const room = require('./engine/room');
 const serialize = require('./engine/serialize');
 const progression = require('./engine/progression');
+const bloodDebt = require('./engine/bloodDebt');
+const pact = require('./engine/pact');
 
 module.exports = {
   // ─── Constants & config ──────────────────────────────────
@@ -60,10 +62,13 @@ module.exports = {
   SPIN_PENDING_TIMEOUT_MS: constants.SPIN_PENDING_TIMEOUT_MS,
   PENDING_GAME_OVER_TIMEOUT_MS: constants.PENDING_GAME_OVER_TIMEOUT_MS,
   REDEMPTION_PENDING_TIMEOUT_MS: constants.REDEMPTION_PENDING_TIMEOUT_MS,
+  BLOOD_DEBT_WINDOW_MS: constants.BLOOD_DEBT_WINDOW_MS,
+  PACT_VOLUNTEER_WINDOW_MS: constants.PACT_VOLUNTEER_WINDOW_MS,
   SPEED_MODE_TURN_MS: constants.SPEED_MODE_TURN_MS,
   IDLE_TURN_TIMEOUT_MS: constants.IDLE_TURN_TIMEOUT_MS,
   defaultRoomConfig: constants.defaultRoomConfig,
   normalizeRoomConfig: constants.normalizeRoomConfig,
+  applyTierCapsToConfig: constants.applyTierCapsToConfig,
 
   // ─── Chamber ─────────────────────────────────────────────
   DEATH_CURVE: chamber.DEATH_CURVE,
@@ -107,6 +112,8 @@ module.exports = {
   eliminatePlayer: players.eliminatePlayer,
   handleDisconnect: players.handleDisconnect,
   checkGameOver: players.checkGameOver,
+  buildGameOverLastAction: players.buildGameOverLastAction,
+  markDualWinners: players.markDualWinners,
   declareRoundWinner: players.declareRoundWinner,
   reconnectPlayer: players.reconnectPlayer,
   pickReplacementHost: players.pickReplacementHost,
@@ -173,14 +180,17 @@ module.exports = {
   startGame: room.startGame,
   appendChatMessage: room.appendChatMessage,
   resetRoomForReplay: room.resetRoomForReplay,
+  applyTierFlags: room.applyTierFlags,
+  getRoomTier: room.getRoomTier,
 
   // ─── Serialisation ───────────────────────────────────────
   serializeRoom: serialize.serializeRoom,
 
   // ─── Meta-progression: XP + cosmetics (#205) ─────────────
-  XP_RULES: progression.XP_RULES,
+  XP_TABLE: progression.XP_TABLE,
   levelForXp: progression.levelForXp,
   xpForLevel: progression.xpForLevel,
+  tierForLevel: progression.tierForLevel,
   COSMETIC_SLOTS: progression.COSMETIC_SLOTS,
   COSMETICS: progression.COSMETICS,
   DEFAULT_COSMETICS: progression.DEFAULT_COSMETICS,
@@ -190,6 +200,25 @@ module.exports = {
   trackCardPlayed: progression.trackCardPlayed,
   trackSpinOutcome: progression.trackSpinOutcome,
   trackBluffOutcome: progression.trackBluffOutcome,
+  trackBluffDefended: progression.trackBluffDefended,
+  trackPlayerEliminated: progression.trackPlayerEliminated,
+  trackPowerCardResolved: progression.trackPowerCardResolved,
+  trackLastStandWin: progression.trackLastStandWin,
   computeStandings: progression.computeStandings,
   computeXpAward: progression.computeXpAward,
+
+  // ─── Covenant — Blood Debt ───────────────────────────────
+  assignBloodDebt: bloodDebt.assignBloodDebt,
+  checkCallerHasBloodDebt: bloodDebt.checkCallerHasBloodDebt,
+  consumeBloodDebt: bloodDebt.consumeBloodDebt,
+
+  // ─── Covenant — The Pact ─────────────────────────────────
+  assignPactRoles: pact.assignPactRoles,
+  pactSelectorAutoAssignPower: pact.pactSelectorAutoAssignPower,
+  grantPactSelectorCard: pact.grantPactSelectorCard,
+  applyPactResponse: pact.applyPactResponse,
+  isPactBluffBlocked: pact.isPactBluffBlocked,
+  checkPactVolunteerEligible: pact.checkPactVolunteerEligible,
+  applyPactPartnerDeath: pact.applyPactPartnerDeath,
+  checkDualWin: pact.checkDualWin,
 };

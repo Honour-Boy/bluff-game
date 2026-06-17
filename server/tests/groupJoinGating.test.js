@@ -56,7 +56,7 @@ describe('join_room group gating', () => {
       getGroupSettings: vi.fn(),
     };
 
-    registerSocketHandlers(io, socket, { groupsRepo, groupSettingsRepo });
+    registerSocketHandlers(io, socket, { groupsRepo, groupSettingsRepo, leaderboardRepo: { getLevel: async () => 1 } });
     const joinRoom = socket.handlers.get('join_room');
     const cb = vi.fn();
 
@@ -97,7 +97,7 @@ describe('join_room group gating', () => {
       getGroupSettings: vi.fn().mockResolvedValue(null),
     };
 
-    registerSocketHandlers(io, socket, { groupsRepo, groupSettingsRepo });
+    registerSocketHandlers(io, socket, { groupsRepo, groupSettingsRepo, leaderboardRepo: { getLevel: async () => 1 } });
     const joinRoom = socket.handlers.get('join_room');
     const cb = vi.fn();
 
@@ -137,7 +137,7 @@ describe('join_room group gating', () => {
       getGroupSettings: vi.fn().mockResolvedValue(null),
     };
 
-    registerSocketHandlers(io, socket, { groupsRepo, groupSettingsRepo });
+    registerSocketHandlers(io, socket, { groupsRepo, groupSettingsRepo, leaderboardRepo: { getLevel: async () => 1 } });
     const joinRoom = socket.handlers.get('join_room');
     const cb = vi.fn();
 
@@ -170,7 +170,7 @@ describe('join_room group gating', () => {
       getGroupSettings: vi.fn().mockResolvedValue(null),
     };
 
-    registerSocketHandlers(io, socket, { groupsRepo, groupSettingsRepo });
+    registerSocketHandlers(io, socket, { groupsRepo, groupSettingsRepo, leaderboardRepo: { getLevel: async () => 1 } });
     const joinRoom = socket.handlers.get('join_room');
     const cb = vi.fn();
 
@@ -188,11 +188,15 @@ describe('join_room group gating', () => {
       userId: '66666666-6666-6666-6666-666666666666',
       username: 'PersistedBob',
     });
+    // Syndicate-tier group so the persisted powers/betting survive the Phase 6
+    // tier caps (Streets would strip them). The joiner is level 9 = Syndicate,
+    // so the tier entry gate lets them in.
     const groupsRepo = {
       getActiveGroupByCode: vi.fn().mockResolvedValue({
         id: 'group-4',
         code: 'SAVE44',
         host_user_id: '77777777-7777-7777-7777-777777777777',
+        required_tier: 'syndicate',
       }),
       isGroupMember: vi.fn().mockResolvedValue(true),
     };
@@ -236,7 +240,7 @@ describe('join_room group gating', () => {
       }),
     };
 
-    registerSocketHandlers(io, socket, { groupsRepo, groupSettingsRepo });
+    registerSocketHandlers(io, socket, { groupsRepo, groupSettingsRepo, leaderboardRepo: { getLevel: async () => 9 } });
     const joinRoom = socket.handlers.get('join_room');
     const cb = vi.fn();
 

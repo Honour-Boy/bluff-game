@@ -16,35 +16,57 @@
 //   server stays authoritative over WHAT is unlocked/equipped and never
 //   ships style payloads.
 
-// ─── XP formula ───────────────────────────────────────────────
+// ─── Level curve + tiers (Progression & Covenant overhaul) ────
 //
-// participation — flat, only when the player actively played ≥1 card.
-// spins survived / correct bluff calls — small per-event bonuses, capped
-//   so a deliberately dragged-out game can't farm unbounded XP.
-// placement — a pool scaled by finishing position (winner full, last 0).
-// win — flat on top of first placement.
-const XP_RULES = {
-  participation: 20,
-  perSpinSurvived: 5,
-  spinsSurvivedCap: 50,
-  perCorrectBluffCall: 10,
-  correctBluffCallsCap: 50,
-  placementPool: 30,
-  win: 60,
-};
+// The flat XP formula + unlimited quadratic curve are replaced by a fixed
+// 20-level lookup table grouped into four tiers (Streets → Backroads →
+// Syndicate → Covenant). The tier a player sits in gates which room
+// mechanics they can host and which per-event XP rates they earn.
+//
+// LEVEL_XP_THRESHOLDS[level-1] = cumulative XP at which that level begins.
+const LEVEL_XP_THRESHOLDS = [
+  0, 150, 350, 650, 1050, 1550, 2150, 2900,
+  3800, 4900, 6200, 7700, 9500,
+  11500, 14000, 17000, 20500, 24500, 29000, 34000,
+];
+const MAX_LEVEL = 20;
 
-// Level curve: cumulative XP for level L starts at 100·(L-1)².
-// level(0 xp)=1, level(100)=2, level(400)=3, level(900)=4, …
+// Cumulative XP → level (1..20, capped). Defensive: garbage → 1.
 function levelForXp(xp) {
   const safe = Math.max(0, Number(xp) || 0);
-  return 1 + Math.floor(Math.sqrt(safe / 100));
+  for (let l = MAX_LEVEL; l >= 1; l--) {
+    if (safe >= LEVEL_XP_THRESHOLDS[l - 1]) return l;
+  }
+  return 1;
 }
 
-// Cumulative XP at which `level` begins (inverse of levelForXp).
+// Cumulative XP at which `level` begins (inverse of levelForXp, capped).
 function xpForLevel(level) {
-  const l = Math.max(1, Math.floor(level) || 1);
-  return 100 * (l - 1) * (l - 1);
+  const l = Math.min(MAX_LEVEL, Math.max(1, Math.floor(level) || 1));
+  return LEVEL_XP_THRESHOLDS[l - 1];
 }
+
+// Level → tier name. Never throws for out-of-range input (guests → 'streets').
+const TIER_LEVELS = { streets: [1, 2], backroads: [3, 8], syndicate: [9, 13], covenant: [14, 20] };
+
+function tierForLevel(level) {
+  const l = Math.max(1, Math.min(MAX_LEVEL, Math.floor(level) || 1));
+  if (l <= 2) return 'streets';
+  if (l <= 8) return 'backroads';
+  if (l <= 13) return 'syndicate';
+  return 'covenant';
+}
+
+// Per-tier XP rates, keyed by tier then by action type. Higher tiers earn
+// more per event AND unlock event types that lower tiers can't (power-card
+// resolution, Last Stand wins). All eight action types appear in every tier
+// (some at 0) so the breakdown shape is stable across tiers.
+const XP_TABLE = {
+  streets:   { win: 100, spinSurvived: 30,  correctBluffCall: 40,  bluffDefended: 25, playerEliminated: 20, powerCardResolved: 0,  lastStandWin: 0,   participation: 15 },
+  backroads: { win: 150, spinSurvived: 50,  correctBluffCall: 60,  bluffDefended: 40, playerEliminated: 35, powerCardResolved: 20, lastStandWin: 0,   participation: 20 },
+  syndicate: { win: 200, spinSurvived: 75,  correctBluffCall: 90,  bluffDefended: 60, playerEliminated: 50, powerCardResolved: 30, lastStandWin: 150, participation: 25 },
+  covenant:  { win: 250, spinSurvived: 100, correctBluffCall: 120, bluffDefended: 80, playerEliminated: 65, powerCardResolved: 40, lastStandWin: 200, participation: 30 },
+};
 
 // ─── Cosmetics catalog ────────────────────────────────────────
 //
@@ -135,6 +157,10 @@ function initGameStats(room) {
       spinsSurvived: 0,
       bluffCallsMade: 0,
       correctBluffCalls: 0,
+      bluffDefended: 0,
+      playersEliminated: 0,
+      powerCardsResolved: 0,
+      lastStandWin: false,
     };
   }
   return room;
@@ -161,6 +187,32 @@ function trackBluffOutcome(room, accuserId, bluffCorrect) {
   if (bluffCorrect) p.gameStats.correctBluffCalls++;
 }
 
+// The accused survived a wrong bluff call — they "defended" the bluff.
+function trackBluffDefended(room, accusedId) {
+  const p = room.players.find(pl => pl.id === accusedId);
+  if (p?.gameStats) p.gameStats.bluffDefended++;
+}
+
+// `killerPlayerId` caused another player's elimination (correct-bluff spin
+// death, assassin strike, etc.). No-op when the killer is unknown/null.
+function trackPlayerEliminated(room, killerPlayerId) {
+  if (!killerPlayerId) return;
+  const p = room.players.find(pl => pl.id === killerPlayerId);
+  if (p?.gameStats) p.gameStats.playersEliminated++;
+}
+
+// One of this player's power cards had an effect (resolved a tier).
+function trackPowerCardResolved(room, playerId) {
+  const p = room.players.find(pl => pl.id === playerId);
+  if (p?.gameStats) p.gameStats.powerCardsResolved++;
+}
+
+// This player won a Last Stand duel.
+function trackLastStandWin(room, playerId) {
+  const p = room.players.find(pl => pl.id === playerId);
+  if (p?.gameStats) p.gameStats.lastStandWin = true;
+}
+
 // ─── Placement + award computation ────────────────────────────
 
 // Finishing order at game_over, best → worst. Survivors first (the winner),
@@ -176,49 +228,49 @@ function computeStandings(room) {
 }
 
 /**
- * Compute one player's XP for the finished game. Returns
- * { total, placement, breakdown } — total is 0 (with an empty breakdown)
- * when the player never actively played a card (anti-AFK) or has no stats.
+ * Compute one player's XP for the finished game using the tier-keyed
+ * XP_TABLE. `tier` selects the rate column (defaults to 'streets' for old
+ * rooms without `room.tier`). Returns { total, placement, breakdown } —
+ * total is 0 (null breakdown) when the player never actively played a card
+ * (anti-AFK) or has no stats. `placement` is the standings index (1-based),
+ * kept for display only — it is no longer an XP component.
  */
-function computeXpAward(room, player, standings = computeStandings(room)) {
+function computeXpAward(room, player, tier = 'streets', standings = computeStandings(room)) {
   const stats = player?.gameStats;
   const placement = standings.indexOf(player?.id) + 1 || standings.length;
   if (!stats || stats.cardsPlayed < 1) {
     return { total: 0, placement, breakdown: null };
   }
 
-  const playerCount = standings.length;
-  const spinXp = Math.min(
-    stats.spinsSurvived * XP_RULES.perSpinSurvived,
-    XP_RULES.spinsSurvivedCap,
-  );
-  const bluffXp = Math.min(
-    stats.correctBluffCalls * XP_RULES.perCorrectBluffCall,
-    XP_RULES.correctBluffCallsCap,
-  );
-  // Winner gets the full pool, last place 0, linear in between. A 2-player
-  // game is all-or-nothing.
-  const placementXp = playerCount > 1
-    ? Math.round(XP_RULES.placementPool * (playerCount - placement) / (playerCount - 1))
-    : 0;
-  const isWinner = placement === 1 && player.status === 'alive';
-  const winXp = isWinner ? XP_RULES.win : 0;
+  const rates = XP_TABLE[tier] || XP_TABLE.streets;
+  // Covenant — a Pact dual win credits BOTH surviving partners with the win XP,
+  // even though only the placement-1 partner is the nominal "winner".
+  const dualWinnerIds = Array.isArray(room?.dualWinnerIds) ? room.dualWinnerIds : [];
+  const isWinner = player.status === 'alive'
+    && (placement === 1 || dualWinnerIds.includes(player.id));
 
   const breakdown = {
-    participation: XP_RULES.participation,
-    spinsSurvived: spinXp,
-    correctBluffCalls: bluffXp,
-    placement: placementXp,
-    win: winXp,
+    win: isWinner ? rates.win : 0,
+    spinsSurvived: (stats.spinsSurvived || 0) * rates.spinSurvived,
+    correctBluffCalls: (stats.correctBluffCalls || 0) * rates.correctBluffCall,
+    bluffDefended: (stats.bluffDefended || 0) * rates.bluffDefended,
+    playersEliminated: (stats.playersEliminated || 0) * rates.playerEliminated,
+    powerCardsResolved: (stats.powerCardsResolved || 0) * rates.powerCardResolved,
+    lastStandWin: stats.lastStandWin ? rates.lastStandWin : 0,
+    participation: rates.participation,
   };
   const total = Object.values(breakdown).reduce((a, b) => a + b, 0);
   return { total, placement, breakdown };
 }
 
 module.exports = {
-  XP_RULES,
+  LEVEL_XP_THRESHOLDS,
+  MAX_LEVEL,
+  TIER_LEVELS,
+  XP_TABLE,
   levelForXp,
   xpForLevel,
+  tierForLevel,
   COSMETIC_SLOTS,
   COSMETICS,
   DEFAULT_COSMETICS,
@@ -228,6 +280,10 @@ module.exports = {
   trackCardPlayed,
   trackSpinOutcome,
   trackBluffOutcome,
+  trackBluffDefended,
+  trackPlayerEliminated,
+  trackPowerCardResolved,
+  trackLastStandWin,
   computeStandings,
   computeXpAward,
 };

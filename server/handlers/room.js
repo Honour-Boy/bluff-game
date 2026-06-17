@@ -16,6 +16,8 @@ const {
   _clearSpinPendingTimer,
   _clearGameOverTimer,
   _clearRedemptionTimer,
+  _clearBloodDebtTimer,
+  _clearPactVolunteerTimer,
   _clearSpeedModeTimer,
   _clearIdleTurnTimer,
   _clearBotTimer,
@@ -34,6 +36,7 @@ const { resolveLeaverPendingPauses } = require('../lib/orchestration');
 const { discardLobbyIdleState } = require('../lib/idleSweep');
 const { rollBotCallRate } = require('../engine/botStrategy');
 const { seatedElsewhere } = require('../lib/sessions');
+const { tierMismatchMessage } = require('../groupsRepo');
 
 // Defense-in-depth for the single-device policy: an account already seated at
 // a table via a different live socket can never create or join a second seat.
@@ -59,15 +62,34 @@ function register(io, socket, deps) {
 
     try {
       const roomMode = mode === engine.MODES.ONLINE ? engine.MODES.ONLINE : engine.MODES.PHYSICAL;
-      const room = await buildAdHocRoom(socket, roomMode, config, groupsRepo);
+
+      // ─── Tier gate (Progression & Covenant overhaul) ─────────
+      // The host's tier (derived from their level) decides which mechanics the
+      // room may use. Room creation is the SOLE gating point: the requested
+      // config is capped here and can't be re-escalated at runtime. Guests are
+      // always level 1 → Streets, so no DB fetch is needed for them.
+      let tier = 'streets';
+      if (!socket.isGuest && typeof leaderboardRepo?.getLevel === 'function') {
+        try {
+          tier = engine.tierForLevel(await leaderboardRepo.getLevel(socket.userId));
+        } catch (err) {
+          console.error('[Room] tier lookup failed, defaulting to streets', err);
+        }
+      }
+      const requestedConfig = engine.normalizeRoomConfig(config || engine.defaultRoomConfig());
+      const cappedConfig = engine.applyTierCapsToConfig(requestedConfig, tier);
+      const capsApplied = JSON.stringify(cappedConfig) !== JSON.stringify(requestedConfig);
+
+      const room = await buildAdHocRoom(socket, roomMode, cappedConfig, groupsRepo);
       room.hostUserId = socket.userId;
+      engine.applyTierFlags(room, tier);
       room.cardPlayedThisTurn = false;
       room.bluffUsedThisTurn = false;
       room.powerActivatedThisTurn = false;
       await saveRoom(room);
 
       socket.join(room.code);
-      console.log(`[Room ${room.code}] Created by ${socket.username} (mode: ${roomMode})`);
+      console.log(`[Room ${room.code}] Created by ${socket.username} (mode: ${roomMode}, tier: ${tier})`);
 
       if (roomMode === engine.MODES.ONLINE) {
         const player = engine.createPlayer(socket.userId, socket.username, socket.id);
@@ -76,9 +98,9 @@ function register(io, socket, deps) {
         // (non-blocking; pops in on the follow-up broadcast).
         stampCosmeticsInBackground(io, leaderboardRepo, room.code, player);
         await saveRoom(room);
-        callback({ success: true, roomCode: room.code, isHost: true, mode: roomMode, playerId: socket.userId });
+        callback({ success: true, roomCode: room.code, isHost: true, mode: roomMode, playerId: socket.userId, tier, capsApplied });
       } else {
-        callback({ success: true, roomCode: room.code, isHost: true, mode: roomMode });
+        callback({ success: true, roomCode: room.code, isHost: true, mode: roomMode, tier, capsApplied });
       }
 
       await broadcastRoomState(io, room.code);
@@ -232,6 +254,26 @@ function register(io, socket, deps) {
         const allowed = await groupsRepo.isGroupMember(group.id, socket.userId);
         if (!allowed) {
           return callback({ success: false, error: 'not_a_group_member' });
+        }
+
+        // Phase 6 (G3) — tier entry gate. A group is bound to one tier; a
+        // member promoted ABOVE it (XP only rises) is blocked on entry until
+        // the owner re-tiers the group or hands over — block-on-entry avoids
+        // surprise removals. Guests never reach group rooms. Default Streets on
+        // any lookup failure so a flaky read can't silently open a higher tier.
+        const requiredTier = group.required_tier || 'streets';
+        let joinerTier = 'streets';
+        try {
+          joinerTier = engine.tierForLevel(await leaderboardRepo.getLevel(socket.userId));
+        } catch (err) {
+          console.error('[Room] join tier lookup failed, defaulting to streets', err);
+        }
+        if (joinerTier !== requiredTier) {
+          return callback({
+            success: false,
+            error: tierMismatchMessage(requiredTier, joinerTier),
+            code: 'tier_mismatch',
+          });
         }
       } else if (!room) {
         return callback({ success: false, error: 'Room not found' });
@@ -394,7 +436,9 @@ function register(io, socket, deps) {
       if (room.phase !== 'lobby') return callback?.({ success: false, error: 'Game already started' });
       if (room.mode !== engine.MODES.ONLINE) return callback?.({ success: false, error: 'Online mode only' });
 
-      room.config = engine.normalizeRoomConfig(config);
+      // Re-cap on every config change so a host can't escalate past their tier
+      // after creation (room.tier is fixed at create time).
+      room.config = engine.applyTierCapsToConfig(config, engine.getRoomTier(room));
       await saveRoom(room);
       await broadcastRoomState(io, code);
       callback?.({ success: true });
@@ -443,6 +487,8 @@ function register(io, socket, deps) {
         _clearSpinPendingTimer(code);
         _clearGameOverTimer(code);
         _clearRedemptionTimer(code);
+        _clearBloodDebtTimer(code);
+        _clearPactVolunteerTimer(code);
         _clearSpeedModeTimer(code);
         _clearIdleTurnTimer(code);
         _clearBotTimer(code);
@@ -474,7 +520,8 @@ function register(io, socket, deps) {
         const gameOverWinner = engine.checkGameOver(room);
         if (gameOverWinner) {
           room.phase = 'game_over';
-          room.lastAction = { type: 'game_over', winnerId: gameOverWinner.id, winnerName: gameOverWinner.username };
+          room.lastAction = engine.buildGameOverLastAction(gameOverWinner);
+          engine.markDualWinners(room, gameOverWinner);
           await maybeRecordGroupWinner(io, room, leaderboardRepo);
         }
       } else {
@@ -522,6 +569,8 @@ function register(io, socket, deps) {
         _clearSpinPendingTimer(code);
         _clearGameOverTimer(code);
         _clearRedemptionTimer(code);
+        _clearBloodDebtTimer(code);
+        _clearPactVolunteerTimer(code);
         _clearSpeedModeTimer(code);
         _clearIdleTurnTimer(code);
         discardLobbyIdleState(code);
@@ -617,7 +666,8 @@ function register(io, socket, deps) {
         const gameOverWinner = engine.checkGameOver(room);
         if (gameOverWinner) {
           room.phase = 'game_over';
-          room.lastAction = { type: 'game_over', winnerId: gameOverWinner.id, winnerName: gameOverWinner.username };
+          room.lastAction = engine.buildGameOverLastAction(gameOverWinner);
+          engine.markDualWinners(room, gameOverWinner);
           await maybeRecordGroupWinner(io, room, leaderboardRepo);
         }
       }
@@ -731,6 +781,8 @@ function register(io, socket, deps) {
       _clearSpinPendingTimer(code);
       _clearGameOverTimer(code);
       _clearRedemptionTimer(code);
+      _clearBloodDebtTimer(code);
+      _clearPactVolunteerTimer(code);
       _clearSpeedModeTimer(code);
       _clearIdleTurnTimer(code);
       discardLobbyIdleState(code);

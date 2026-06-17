@@ -6,6 +6,7 @@ const engine = require('../gameEngine');
 const { rooms, saveRoom } = require('../lib/state');
 const { broadcastRoomState, emitHostChanged } = require('../lib/broadcast');
 const { getGroupAuthError, maybeRecordGroupWinner } = require('../lib/roomBuilders');
+const { tierRank } = require('../groupsRepo');
 const { socketRateLimit } = require('../lib/rateLimiter');
 
 // §3.3 — live pre-room occupancy for the groups directory. Reads the in-memory
@@ -30,13 +31,27 @@ function buildLiveRoom(groupId) {
 function register(io, socket, deps) {
   const { groupsRepo, leaderboardRepo } = deps;
 
+  // Phase 6 — a user's current progression tier (from their stored XP). Defaults
+  // to Streets on any lookup failure (the safest, lowest tier).
+  async function deriveTier(userId) {
+    try {
+      return engine.tierForLevel(await leaderboardRepo.getLevel(userId));
+    } catch {
+      return 'streets';
+    }
+  }
+
   socket.on('create_group', async ({ name } = {}, callback) => {
     try {
       const authError = getGroupAuthError(socket);
       if (authError) return callback?.({ success: false, error: authError });
+      // G2 — a group is bound to the creator's current tier; the client can't
+      // pick a different one.
+      const requiredTier = await deriveTier(socket.userId);
       const group = await groupsRepo.createGroup({
         hostUserId: socket.userId,
         name,
+        requiredTier,
       });
       callback?.({ success: true, group });
     } catch (err) {
@@ -77,7 +92,32 @@ function register(io, socket, deps) {
         userId: socket.userId,
       });
       socket.join(`group:${group.id}`);
-      callback?.({ success: true, group: { ...group, liveRoom: buildLiveRoom(group.id) } });
+
+      // Phase 6 (G5) — surface owner tier-mismatch so the client can show the
+      // resolution panel and block new games. Member tiers (for the handover
+      // candidates + eviction preview) are only resolved when there IS a
+      // mismatch, to avoid an N-read fan-out on every group open.
+      const requiredTier = group.requiredTier || 'streets';
+      const ownerTier = await deriveTier(group.ownerUserId);
+      const ownerTierMismatch = ownerTier !== requiredTier;
+      let members = group.members;
+      if (ownerTierMismatch) {
+        members = await Promise.all((group.members || []).map(async (m) => {
+          const tier = await deriveTier(m.userId);
+          return { ...m, tier, tierMatches: tier === requiredTier };
+        }));
+      }
+
+      callback?.({
+        success: true,
+        group: {
+          ...group,
+          members,
+          ownerTier,
+          ownerTierMismatch,
+          liveRoom: buildLiveRoom(group.id),
+        },
+      });
     } catch (err) {
       callback?.({ success: false, error: err.message });
     }
@@ -197,7 +237,8 @@ function register(io, socket, deps) {
         const winner = engine.checkGameOver(room);
         if (winner) {
           room.phase = 'game_over';
-          room.lastAction = { type: 'game_over', winnerId: winner.id, winnerName: winner.username };
+          room.lastAction = engine.buildGameOverLastAction(winner);
+          engine.markDualWinners(room, winner);
           await maybeRecordGroupWinner(io, room, leaderboardRepo);
         }
       }
@@ -249,6 +290,83 @@ function register(io, socket, deps) {
     }
   });
 
+  // ─── Phase 6 (G5) — owner tier-mismatch resolution ──────────────────────────
+
+  // (a) Hand permanent ownership to a member who currently matches the group's
+  // tier. The handler verifies the candidate's live tier before the repo moves
+  // owner_user_id.
+  socket.on('transfer_ownership', async ({ groupId, newOwnerUserId } = {}, callback) => {
+    try {
+      const authError = getGroupAuthError(socket);
+      if (authError) return callback?.({ success: false, error: authError });
+
+      const group = await groupsRepo.getActiveGroupById(groupId);
+      if (!group) return callback?.({ success: false, error: 'Group not found' });
+      if (group.owner_user_id !== socket.userId) {
+        return callback?.({ success: false, error: 'Only the group owner can hand over ownership' });
+      }
+      const requiredTier = group.required_tier || 'streets';
+      const candidateTier = await deriveTier(newOwnerUserId);
+      if (candidateTier !== requiredTier) {
+        return callback?.({
+          success: false,
+          error: `New owner must be a ${requiredTier} player to run this crew.`,
+        });
+      }
+
+      const result = await groupsRepo.transferOwnership({
+        groupId,
+        ownerUserId: socket.userId,
+        newOwnerUserId,
+      });
+      await syncLiveRoomHosts(groupId, result.hostUserId, 'reclaimed');
+      callback?.({ success: true });
+    } catch (err) {
+      callback?.({ success: false, error: err.message });
+    }
+  });
+
+  // (b) Re-tier the group up to the owner's new tier. Evicts members below the
+  // new tier (the handler resolves each member's live tier) and boots them from
+  // any live room.
+  socket.on('regroup_retier', async ({ groupId } = {}, callback) => {
+    try {
+      const authError = getGroupAuthError(socket);
+      if (authError) return callback?.({ success: false, error: authError });
+
+      const group = await groupsRepo.getActiveGroupById(groupId);
+      if (!group) return callback?.({ success: false, error: 'Group not found' });
+      if (group.owner_user_id !== socket.userId) {
+        return callback?.({ success: false, error: 'Only the group owner can re-tier this group' });
+      }
+      const newTier = await deriveTier(socket.userId);
+
+      // Resolve which members fall below the new tier so the repo can evict them.
+      const members = await groupsRepo.getGroup({ groupId, userId: socket.userId });
+      const evictUserIds = [];
+      for (const m of members.members || []) {
+        if (m.userId === socket.userId) continue;
+        const memberTier = await deriveTier(m.userId);
+        if (tierRank(memberTier) < tierRank(newTier)) {
+          evictUserIds.push(m.userId);
+        }
+      }
+
+      const result = await groupsRepo.setGroupTier({
+        groupId,
+        ownerUserId: socket.userId,
+        newTier,
+        evictUserIds,
+      });
+      for (const userId of result.evicted) {
+        await bootRemovedMemberFromRooms(groupId, userId);
+      }
+      callback?.({ success: true, requiredTier: result.requiredTier, evicted: result.evicted });
+    } catch (err) {
+      callback?.({ success: false, error: err.message });
+    }
+  });
+
   socket.on('invite_to_group', async ({ groupId, identifier } = {}, callback) => {
     if (!socketRateLimit(socket, 'invite_to_group', 5, 60_000).allowed) {
       return callback?.({ success: false, error: 'Rate limit exceeded' });
@@ -285,10 +403,14 @@ function register(io, socket, deps) {
     try {
       const authError = getGroupAuthError(socket);
       if (authError) return callback?.({ success: false, error: authError });
+      // G3 — accepting an invite is tier-gated; the joiner must match the
+      // group's bound tier. Declining never needs the tier.
+      const joinerTier = accept ? await deriveTier(socket.userId) : null;
       const result = await groupsRepo.respondToInvite({
         inviteId,
         inviteeUserId: socket.userId,
         accept: !!accept,
+        joinerTier,
       });
       callback?.(result);
     } catch (err) {

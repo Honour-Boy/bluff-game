@@ -12,12 +12,15 @@ const {
   pregameTimers,
   _clearPreGameTimer,
   _clearGameOverTimer,
+  _clearBloodDebtTimer,
+  _clearPactVolunteerTimer,
+  _clearSpinPendingTimer,
   logTurnState,
 } = require('../lib/state');
 const { broadcastRoomState } = require('../lib/broadcast');
 const { socketRateLimit } = require('../lib/rateLimiter');
 const { maybeRecordGroupWinner } = require('../lib/roomBuilders');
-const { runMirrorMatchSpin, resolvePendingGameOver, beginRedemption } = require('../lib/orchestration');
+const { runMirrorMatchSpin, resolvePendingGameOver, beginRedemption, applySpinAndBroadcast } = require('../lib/orchestration');
 const { _beginPowerClinic, advanceClinic, _beginTour } = require('../lib/tutorialDirector');
 const { clinicEndTurnBlock, clinicActionBlock } = require('../engine/tutorialScenarios');
 
@@ -39,11 +42,28 @@ async function emitRoleReveals(io, room) {
   }
 }
 
+// Covenant — privately prompt the Pact Selector with the list of alive players
+// they may bond with (everyone but themselves). Fired alongside the role reveals.
+async function emitPactSelectorPrompt(io, room) {
+  const selector = room.players.find(p => p.id === room.pactSelectorId);
+  if (!selector?.socketId) return;
+  const choices = room.players
+    .filter(p => p.status === 'alive' && p.id !== selector.id)
+    .map(p => ({ id: p.id, username: p.username }));
+  io.to(selector.socketId).emit('pact_selector_prompt', {
+    playerNames: choices,
+    defaultTargetId: room.pactTargetId || null,
+  });
+}
+
 async function finalizePreGameAndBroadcast(io, code) {
   const room = await getRoom(code);
   if (!room || room.phase !== 'pre_game') return;
   const result = engine.finalizePreGame(room);
   if (!result.ok) return;
+  // Covenant — grant the Pact Selector their reserved power card now that every
+  // other player's pre-game pick has been applied (no-op outside Covenant rooms).
+  engine.grantPactSelectorCard(room);
   await saveRoom(room);
   io.to(code).emit('pre_game_complete');
   await broadcastRoomState(io, code);
@@ -95,7 +115,25 @@ function schedulePreGameSelectionOpen(io, code) {
 }
 
 function register(io, socket, deps) {
-  const { groupSettingsRepo, leaderboardRepo } = deps;
+  const { groupSettingsRepo, leaderboardRepo, groupsRepo } = deps;
+
+  // Phase 6 (G5) — a persistent group whose OWNER has been promoted above the
+  // group's bound tier is in a mismatch state that blocks new games until the
+  // owner re-tiers or hands over. Checked at start time (lazily) for group
+  // rooms only; ad-hoc rooms and a matching owner pass straight through.
+  async function groupOwnerTierMismatch(room) {
+    if (!room.groupId || !groupsRepo || !leaderboardRepo) return null;
+    try {
+      const group = await groupsRepo.getActiveGroupById(room.groupId);
+      if (!group) return null;
+      const requiredTier = group.required_tier || 'streets';
+      const ownerTier = engine.tierForLevel(await leaderboardRepo.getLevel(group.owner_user_id));
+      return ownerTier !== requiredTier ? { requiredTier, ownerTier } : null;
+    } catch (err) {
+      console.error('[start_game] owner tier check failed', err);
+      return null; // never block a game on a flaky read
+    }
+  }
 
   // ─── HOST: Start the game ─────────────────────────────────
   socket.on('start_game', async ({ roomCode } = {}, callback) => {
@@ -113,6 +151,16 @@ function register(io, socket, deps) {
         && room.players.some(p => p.id === socket.userId && !p.isBot);
       if (room.hostSocketId !== socket.id && !isTutorialStarter) {
         return callback({ success: false, error: 'Not the host' });
+      }
+
+      // Phase 6 (G5) — block new games while the group owner is tier-mismatched.
+      const mismatch = await groupOwnerTierMismatch(room);
+      if (mismatch) {
+        return callback({
+          success: false,
+          error: 'The group owner has outgrown this crew\'s tier. The owner must re-tier the group or hand it over before new games can start.',
+          code: 'owner_tier_mismatch',
+        });
       }
 
       // v2 Phase E2 — Mirror Match auto-disable when alive count is odd.
@@ -163,7 +211,14 @@ function register(io, socket, deps) {
       // roles and powers are off, so the role-reveal + selection window would
       // just stall the learner on a "you are Barehand" card. Deal straight in.
       const runsPreGame = room.mode === engine.MODES.ONLINE && !room.isTutorial;
+      // Covenant — The Pact. Designate the secret Selector + a default Target
+      // AFTER the deal/roles (startGame) but BEFORE beginPreGame builds the pools,
+      // so the Selector's pool can be emptied (they forgo the normal pick for a
+      // reserved power card granted at finalize).
+      const isCovenant = runsPreGame && engine.getRoomTier(room) === 'covenant';
+      if (isCovenant) engine.assignPactRoles(room);
       if (runsPreGame) engine.beginPreGame(room);
+      if (isCovenant) engine.pactSelectorAutoAssignPower(room);
 
       if (room.groupId) {
         try {
@@ -228,6 +283,11 @@ function register(io, socket, deps) {
       // open selection once the reveal display window elapses.
       if (runsPreGame) {
         await emitRoleReveals(io, room);
+        // Covenant — privately prompt the Pact Selector to choose their partner
+        // (a sensible random default is already set; this lets them override it).
+        if (isCovenant && room.pactSelectorId) {
+          await emitPactSelectorPrompt(io, room);
+        }
         // #2 — skip the "Claim your edge" picker when fewer than 2 power types
         // are enabled; otherwise open it after the role-reveal window.
         if (room.pregameSelectionSkipped) {
@@ -606,7 +666,8 @@ function register(io, socket, deps) {
       const gameOverWinner = engine.checkGameOver(room);
       if (gameOverWinner) {
         room.phase = 'game_over';
-        room.lastAction = { type: 'game_over', winnerId: gameOverWinner.id, winnerName: gameOverWinner.username };
+        room.lastAction = engine.buildGameOverLastAction(gameOverWinner);
+        engine.markDualWinners(room, gameOverWinner);
         await maybeRecordGroupWinner(io, room, leaderboardRepo);
       }
 
@@ -667,6 +728,27 @@ function register(io, socket, deps) {
       return;
     }
 
+    // Covenant — Blood Debt. The caller carried a debt, so an extra "debt spin"
+    // fires on them AFTER the primary resolution (mirrors the Mirror Match queue:
+    // resume from the ack so it never interleaves with the primary overlay).
+    // Inserted after Mirror Match but before Redemption (roadmap R3).
+    if (room?.pendingBloodDebtSpin) {
+      const { debtorId } = room.pendingBloodDebtSpin;
+      delete room.pendingBloodDebtSpin;
+      // Consumed exactly once whether or not the spin actually fires.
+      engine.consumeBloodDebt(room, debtorId);
+      const debtor = room.players.find(p => p.id === debtorId);
+      if (debtor && debtor.status === 'alive') {
+        // Clear the primary overlay first, then animate the debt spin fresh.
+        io.to(code).emit('spin_acknowledged');
+        await applySpinAndBroadcast(io, code, room, debtor, leaderboardRepo, { spinReason: 'blood_debt' });
+        return;
+      }
+      // R3 — the debtor died on the primary spin; cancel the debt spin silently
+      // and continue the normal ack flow.
+      await saveRoom(room);
+    }
+
     // Redemption Spin (Phase E1) — the eliminating spin's overlay has been
     // dismissed; now open the redemption_pending offer to the eliminated player.
     if (room?.pendingRedemption) {
@@ -685,6 +767,124 @@ function register(io, socket, deps) {
       room.tourSpinAcked = true;
       await saveRoom(room);
       await broadcastRoomState(io, code);
+    }
+  });
+
+  // ─── Covenant — Blood Debt target pick ───────────────────
+  // The just-eliminated player (from a correct-bluff spin in a Covenant room)
+  // names which alive player carries their blood debt, inside the 10s window.
+  // On expiry with no pick the server defaults to the bluff caller (see
+  // _onBloodDebtExpire in orchestration).
+  socket.on('blood_debt_target', async ({ roomCode, targetUserId } = {}, callback) => {
+    try {
+      if (!socket.userId) return callback?.({ success: false, error: 'Not authenticated' });
+      const code = roomCode?.toUpperCase();
+      const room = await getRoom(code);
+      if (!room) return callback?.({ success: false, error: 'Room not found' });
+      const pending = room.pendingBloodDebt;
+      if (!pending || pending.eliminatedId !== socket.userId) {
+        return callback?.({ success: false, error: 'No blood debt to assign' });
+      }
+      const target = room.players.find(p => p.id === targetUserId && p.status === 'alive');
+      if (!target) return callback?.({ success: false, error: 'Invalid target' });
+
+      _clearBloodDebtTimer(code);
+      engine.assignBloodDebt(room, targetUserId);
+      room.pendingBloodDebt = null;
+      await saveRoom(room);
+      await broadcastRoomState(io, code);
+      callback?.({ success: true });
+    } catch (err) {
+      callback?.({ success: false, error: err.message });
+    }
+  });
+
+  // ─── COVENANT: Pact Selector picks their partner (pre_game) ──────────────
+  // A sensible random default is already set at game start; this lets the
+  // Selector override it any time before the pact is offered.
+  socket.on('pact_choose', async ({ roomCode, targetUserId } = {}, callback) => {
+    try {
+      if (!socket.userId) return callback?.({ success: false, error: 'Not authenticated' });
+      const code = roomCode?.toUpperCase();
+      const room = await getRoom(code);
+      if (!room) return callback?.({ success: false, error: 'Room not found' });
+      if (room.pactSelectorId !== socket.userId) {
+        return callback?.({ success: false, error: 'Not the Pact selector' });
+      }
+      if (room.pact || room.pactOfferPending) {
+        return callback?.({ success: false, error: 'Pact already offered' });
+      }
+      const target = room.players.find(
+        p => p.id === targetUserId && p.status === 'alive' && p.id !== socket.userId,
+      );
+      if (!target) return callback?.({ success: false, error: 'Invalid pact target' });
+      room.pactTargetId = targetUserId;
+      await saveRoom(room);
+      return callback?.({ success: true });
+    } catch (err) {
+      return callback?.({ success: false, error: err.message });
+    }
+  });
+
+  // ─── COVENANT: Pact Target accepts or denies the bond (in-game) ──────────
+  socket.on('pact_respond', async ({ roomCode, accepted } = {}, callback) => {
+    try {
+      if (!socket.userId) return callback?.({ success: false, error: 'Not authenticated' });
+      const code = roomCode?.toUpperCase();
+      const room = await getRoom(code);
+      if (!room) return callback?.({ success: false, error: 'Room not found' });
+      if (room.phase !== 'playing') return callback?.({ success: false, error: 'Not in playing phase' });
+      if (room.pactTargetId !== socket.userId) {
+        return callback?.({ success: false, error: 'No pact offer for you' });
+      }
+      if (!room.pactOfferPending) return callback?.({ success: false, error: 'No pact offer pending' });
+
+      const selectorId = room.pactSelectorId;
+      const result = engine.applyPactResponse(room, !!accepted);
+      if (!result.ok) return callback?.({ success: false, error: 'Could not resolve pact' });
+      await saveRoom(room);
+
+      if (result.action === 'confirmed') {
+        const a = room.players.find(p => p.id === result.a);
+        const b = room.players.find(p => p.id === result.b);
+        if (a?.socketId) io.to(a.socketId).emit('pact_confirmed', { partnerId: b?.id || null, partnerName: b?.username || null });
+        if (b?.socketId) io.to(b.socketId).emit('pact_confirmed', { partnerId: a?.id || null, partnerName: a?.username || null });
+      } else {
+        const sel = room.players.find(p => p.id === selectorId);
+        if (sel?.socketId) io.to(sel.socketId).emit('pact_denied', {});
+      }
+      await broadcastRoomState(io, code);
+      return callback?.({ success: true });
+    } catch (err) {
+      return callback?.({ success: false, error: err.message });
+    }
+  });
+
+  // ─── COVENANT: Pact partner volunteers to take a spin (in-game) ──────────
+  // While the table is parked on a spin aimed at one partner, the OTHER partner
+  // can step in and take the bullet. Resolves the spin against the volunteer.
+  socket.on('pact_volunteer', async ({ roomCode } = {}, callback) => {
+    try {
+      if (!socket.userId) return callback?.({ success: false, error: 'Not authenticated' });
+      const code = roomCode?.toUpperCase();
+      const room = await getRoom(code);
+      if (!room) return callback?.({ success: false, error: 'Room not found' });
+      if (room.phase !== 'spin_pending') return callback?.({ success: false, error: 'No spin pending' });
+      const pending = room.pendingPactVolunteer;
+      if (!pending || pending.partnerId !== socket.userId) {
+        return callback?.({ success: false, error: 'Not your volunteer prompt' });
+      }
+      const volunteer = room.players.find(p => p.id === socket.userId && p.status === 'alive');
+      if (!volunteer) return callback?.({ success: false, error: 'Cannot volunteer' });
+
+      _clearPactVolunteerTimer(code);
+      room.pendingPactVolunteer = null;
+      room.spinTargetId = volunteer.id;
+      _clearSpinPendingTimer(code);
+      const spinResult = await applySpinAndBroadcast(io, code, room, volunteer, leaderboardRepo, { spinReason: 'pact_volunteer' });
+      return callback?.({ success: true, spinResult });
+    } catch (err) {
+      return callback?.({ success: false, error: err.message });
     }
   });
 }

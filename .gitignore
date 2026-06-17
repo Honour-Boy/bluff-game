@@ -23,3 +23,6 @@ docs/
 # The BUILT skins (client/public/cosmetics/*.svg) are committed; the
 # sources stay local-only.
 cosmetic-previews/
+
+# Local UI snapshot artifacts (Pact/progression review)
+client/.pact-snapshots/
