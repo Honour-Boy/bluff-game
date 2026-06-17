@@ -6,8 +6,9 @@
 // fall back to Streets.
 
 import { tierMeta } from '../../lib/tiers';
+import { TierSigil } from './TierSigil';
 
-export function TierBadge({ tier, size = 'sm', style = {} }) {
+export function TierBadge({ tier, size = 'sm', showSigil = true, style = {} }) {
   if (!tier) return null;
   const meta = tierMeta(tier);
   const small = size === 'sm';
@@ -17,8 +18,8 @@ export function TierBadge({ tier, size = 'sm', style = {} }) {
       style={{
         display: 'inline-flex',
         alignItems: 'center',
-        gap: 4,
-        padding: small ? '2px 8px' : '3px 11px',
+        gap: small ? 5 : 7,
+        padding: small ? '2px 9px 2px 5px' : '3px 13px 3px 6px',
         borderRadius: 999,
         fontFamily: "'Cinzel', serif",
         fontSize: small ? 9 : 11,
@@ -34,6 +35,7 @@ export function TierBadge({ tier, size = 'sm', style = {} }) {
         ...style,
       }}
     >
+      {showSigil && <TierSigil tier={tier} size={small ? 15 : 19} />}
       {meta.label}
     </span>
   );
