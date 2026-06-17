@@ -126,16 +126,6 @@ export function PlayerChip({
         boxShadow: '0 3px 10px rgba(0,0,0,0.5), inset 0 1px 0 rgba(255,255,255,0.04)',
       }}
     >
-      {/* Covenant — Pact partner marker (only shown to the bonded partners). */}
-      {alive && isPactPartner && (
-        <span
-          title="Your pact partner"
-          style={{ position: 'absolute', top: 3, left: 4, lineHeight: 0 }}
-        >
-          <PactSigil size={compact ? 13 : 15} withSeal={false} />
-        </span>
-      )}
-
       {/* Bounty marker - tiny crimson badge */}
       {alive && player.hasBounty && (
         <span
@@ -183,6 +173,13 @@ export function PlayerChip({
             voiceConnected={voice.isConnected}
             size={compact ? 6 : 7}
           />
+        )}
+        {/* Covenant — Pact partner marker, inline so it never overlaps the name.
+            Only the two bonded partners ever receive isPactPartner. */}
+        {alive && isPactPartner && (
+          <span title="Your pact partner" style={{ lineHeight: 0, flexShrink: 0 }}>
+            <PactSigil size={compact ? 11 : 13} withSeal={false} glow={false} />
+          </span>
         )}
         <span style={{ overflow: 'hidden', textOverflow: 'ellipsis' }}>
           {truncated}
