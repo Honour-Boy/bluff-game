@@ -965,6 +965,7 @@ export function OnlinePlayerUI({
         cylinderAnimating={ui.cylinderAnimating}
         isSpinTarget={isSpinTarget}
         acknowledgeSpinResult={ui.handleSpinContinue}
+        spinTargetGunSkin={spinTargetPlayer?.gunSkin || 'gun_default'}
         pendingCard={ui.pendingCard}
         setPendingCard={ui.setPendingCard}
         whotPickerCard={ui.whotPickerCard}

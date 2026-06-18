@@ -6,11 +6,11 @@
 const engine = require('../gameEngine');
 const { getRoom, saveRoom } = require('../lib/state');
 const { broadcastRoomState } = require('../lib/broadcast');
-const { maybeRecordGroupWinner } = require('../lib/roomBuilders');
+const { maybeRecordGroupWinner, maybeAwardGameXp } = require('../lib/roomBuilders');
 const { applyBluffOutcome, _maybeOpenBetting, _scheduleSpinPendingTimeout, applySpinAndBroadcast } = require('../lib/orchestration');
 
 function register(io, socket, deps) {
-  const { leaderboardRepo } = deps;
+  const { leaderboardRepo, xpRepo } = deps;
 
   // ─── PLAYER: Medic decision ─────────────────────────────
   // While room.phase === 'medic_pending', the Medic chooses save or
@@ -61,7 +61,8 @@ function register(io, socket, deps) {
           if (typeof pending.finaliseFn === 'function') pending.finaliseFn();
           room.pendingMedicSave = null;
           if (room.phase === 'medic_pending') room.phase = 'playing';
-          await maybeRecordGroupWinner(io, room, leaderboardRepo);
+          await maybeAwardGameXp(room, xpRepo);
+        await maybeRecordGroupWinner(io, room, leaderboardRepo);
           await saveRoom(room);
           await broadcastRoomState(io, code);
           releaseDeath();
@@ -92,6 +93,7 @@ function register(io, socket, deps) {
       if (typeof pending.finaliseFn === 'function') pending.finaliseFn();
       room.pendingMedicSave = null;
       if (room.phase === 'medic_pending') room.phase = 'playing';
+      await maybeAwardGameXp(room, xpRepo);
       await maybeRecordGroupWinner(io, room, leaderboardRepo);
       await saveRoom(room);
       await broadcastRoomState(io, code);

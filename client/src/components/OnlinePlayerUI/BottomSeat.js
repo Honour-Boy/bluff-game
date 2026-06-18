@@ -441,6 +441,7 @@ export function BottomSeat({
                   powerInteractive={isMyTurn && isPlaying}
                   justPlayedCardId={justPlayedCardId}
                   fanHeight={isMobile ? 104 : 128}
+                  cardBackId={myPlayer?.cardBack}
                 />
               </div>
             </div>
