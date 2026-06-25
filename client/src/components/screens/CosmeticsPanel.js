@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { CloseIcon } from '../shared/CloseIcon';
 import { TierBadge } from '../shared/TierBadge';
+import { CareerLedger } from '../shared/CareerLedger';
 import { tierForLevel, tierMeta } from '../../lib/tiers';
 import {
   DEFAULT_EQUIPPED,
@@ -282,6 +283,21 @@ export function CosmeticsPanel({ getProgression, setCosmetics, onClose }) {
                   ? 'Max level — The Covenant. Every cosmetic set is yours.'
                   : 'Earn XP by finishing online games — surviving spins, calling bluffs right, defending bluffs, eliminating players, resolving power cards, and winning. Reach a new tier to unlock its whole cosmetic set.'}
               </div>
+            </div>
+
+            {/* ── Career ledger — lifetime stats that feed XP ── */}
+            <div style={{ marginBottom: 18 }}>
+              <div style={{
+                fontFamily: "'Cinzel', serif",
+                fontSize: 10,
+                color: 'var(--text-dim)',
+                letterSpacing: '0.18em',
+                textTransform: 'uppercase',
+                marginBottom: 10,
+              }}>
+                Career
+              </div>
+              <CareerLedger progression={progression} />
             </div>
 
             {/* ── Slots ── */}
