@@ -8,6 +8,7 @@ const HowToPlayModal = lazy(() =>
 import { ShapeIcon } from '../shared/ShapeIcon';
 import { TierBadge } from '../shared/TierBadge';
 import { TierSigil } from '../shared/TierSigil';
+import { CareerLedger } from '../shared/CareerLedger';
 import { tierForLevel, tierMeta } from '../../lib/tiers';
 import { useIsMobile } from '../../hooks/useIsMobile';
 
@@ -190,10 +191,10 @@ function FloatingSuits() {
 // ─── Level chip + profile drawer (top-left) ───────────────────────────────────
 // Replaces the old full RankIdentity panel that lived in the button stack. A
 // compact pill anchored top-left (where the wrought-iron bracket used to sit);
-// tapping it drops a profile drawer with the rank sigil, XP-to-next bar and
-// lifetime games played. Detailed match stats (wins/losses/bluffs/spins) aren't
-// tracked server-side yet (docs/landing-redesign.md data note), so the drawer
-// surfaces only what's real and flags the rest as coming.
+// tapping it drops a profile drawer with the rank sigil, XP-to-next bar and the
+// career ledger — lifetime games, win rate and the per-event stats that feed XP
+// (wins, spins survived, bluffs called/defended, eliminations, power cards, last
+// stands), served via get_progression's `stats` block.
 const MAX_LEVEL = 20;
 
 function xpPct(p) {
@@ -312,17 +313,14 @@ function LevelChip({ progression, isGuest, username }) {
 
             <div style={{ height: 1, background: 'var(--border)', marginBottom: 12 }} />
 
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline' }}>
-              <span style={{ fontFamily: "'Space Mono', monospace", fontSize: 8, letterSpacing: '0.1em', textTransform: 'uppercase', color: 'var(--text-dim)' }}>
-                Games Played
-              </span>
-              <span style={{ fontFamily: "'Space Mono', monospace", fontSize: 16, fontWeight: 700, color: 'var(--text)' }}>
-                {isGuest ? '—' : (p.gamesPlayed ?? 0)}
-              </span>
-            </div>
-            <div style={{ fontFamily: "'Crimson Text', serif", fontStyle: 'italic', fontSize: 12, color: 'var(--text-dim)', marginTop: 10, lineHeight: 1.5 }}>
-              Wins, bluffs called &amp; trigger pulls — coming to your ledger soon.
-            </div>
+            {isGuest ? (
+              <div style={{ fontFamily: "'Crimson Text', serif", fontStyle: 'italic', fontSize: 12, color: 'var(--text-dim)', lineHeight: 1.5 }}>
+                Sign in to start your ledger — wins, bluffs and trigger pulls all
+                count toward your rank.
+              </div>
+            ) : (
+              <CareerLedger progression={p} />
+            )}
           </div>
         )}
       </div>
