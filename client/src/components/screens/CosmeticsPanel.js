@@ -2,8 +2,6 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import { CloseIcon } from '../shared/CloseIcon';
-import { TierBadge } from '../shared/TierBadge';
-import { CareerLedger } from '../shared/CareerLedger';
 import { tierForLevel, tierMeta } from '../../lib/tiers';
 import {
   DEFAULT_EQUIPPED,
@@ -12,13 +10,16 @@ import {
   tableFeltFor,
 } from '../../lib/cosmetics';
 
-const MAX_LEVEL = 20;
-
-// ─── CosmeticsPanel — XP, level, and the cosmetic locker (#205) ───────────────
+// ─── CosmeticsPanel — the cosmetic locker (#205) ──────────────────────────────
 // Opened from the global SettingsGear (signed-in, non-guest only). The server
-// is the authority on XP / unlocks / what's equipped: this panel fetches via
+// is the authority on unlocks / what's equipped: this panel fetches via
 // get_progression and equips via set_cosmetics (which re-validates ownership
 // server-side). Previews are pure CSS — same render maps the table uses.
+//
+// Rank / level / XP / career stats live in their OWN surface (the Landing rank
+// chip + profile drawer), so this panel is cosmetics-only — it uses the fetched
+// `level` purely to gate which sets are unlocked; per-item labels carry the
+// tier context, so no XP bar is shown here.
 
 const SLOT_ORDER = [
   { slot: 'tableFelt', title: 'Table Felt' },
@@ -145,16 +146,6 @@ export function CosmeticsPanel({ getProgression, setCosmetics, onClose }) {
     return map;
   }, [catalog]);
 
-  const tier = tierForLevel(level);
-  const tierStyle = tierMeta(tier);
-  const isMaxLevel = level >= MAX_LEVEL;
-  const span = (progression?.nextLevelXp ?? 0) - (progression?.levelFloorXp ?? 0);
-  const progressPct = isMaxLevel
-    ? 100
-    : progression && span > 0
-      ? Math.max(0, Math.min(100, Math.round(((progression.xp - progression.levelFloorXp) / span) * 100)))
-      : 0;
-
   const handleEquip = async (item) => {
     if (item.unlockLevel > level) return;
     const next = { ...equipped, [item.slot]: item.id };
@@ -239,65 +230,18 @@ export function CosmeticsPanel({ getProgression, setCosmetics, onClose }) {
 
         {progression && (
           <>
-            {/* ── Level + tier + XP bar ── */}
-            <div style={{ marginBottom: 18 }}>
-              <div style={{
-                display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-                fontFamily: "'Space Mono', monospace", fontSize: 10,
-                color: 'var(--text-dim)', letterSpacing: '0.12em',
-                textTransform: 'uppercase', marginBottom: 6,
-              }}>
-                <span style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                  <span style={{ color: 'var(--accent)' }}>Level {level}</span>
-                  <TierBadge tier={tier} />
-                </span>
-                <span>
-                  {isMaxLevel
-                    ? `${progression.xp} XP`
-                    : `${progression.xp} XP${span > 0 ? ` · ${progression.nextLevelXp - progression.xp} to next` : ''}`}
-                </span>
-              </div>
-              <div style={{
-                height: 7, borderRadius: 4,
-                background: 'rgba(255,255,255,0.07)',
-                border: '1px solid var(--border)',
-                overflow: 'hidden',
-              }}>
-                <div style={{
-                  height: '100%',
-                  width: `${progressPct}%`,
-                  // Bar fill is tinted by the current tier so crossing a boundary
-                  // is visible at a glance (Streets amber → Covenant gold).
-                  background: `linear-gradient(90deg, ${tierStyle.fill}, var(--accent))`,
-                  boxShadow: tierStyle.glow ? `0 0 8px ${tierStyle.glow}` : 'none',
-                }} />
-              </div>
-              <div style={{
-                fontFamily: "'Crimson Text', serif",
-                fontSize: 12,
-                fontStyle: 'italic',
-                color: 'var(--text-dim)',
-                marginTop: 6,
-              }}>
-                {isMaxLevel
-                  ? 'Max level — The Covenant. Every cosmetic set is yours.'
-                  : 'Earn XP by finishing online games — surviving spins, calling bluffs right, defending bluffs, eliminating players, resolving power cards, and winning. Reach a new tier to unlock its whole cosmetic set.'}
-              </div>
-            </div>
-
-            {/* ── Career ledger — lifetime stats that feed XP ── */}
-            <div style={{ marginBottom: 18 }}>
-              <div style={{
-                fontFamily: "'Cinzel', serif",
-                fontSize: 10,
-                color: 'var(--text-dim)',
-                letterSpacing: '0.18em',
-                textTransform: 'uppercase',
-                marginBottom: 10,
-              }}>
-                Career
-              </div>
-              <CareerLedger progression={progression} />
+            {/* Cosmetics-only: rank/level/XP/stats live in the Landing rank chip
+                + profile drawer. Here we just explain how sets unlock. */}
+            <div style={{
+              fontFamily: "'Crimson Text', serif",
+              fontSize: 13,
+              fontStyle: 'italic',
+              color: 'var(--text-dim)',
+              marginBottom: 18,
+              lineHeight: 1.5,
+            }}>
+              Reach a new tier to unlock its whole set. Locked items show the tier
+              that frees them.
             </div>
 
             {/* ── Slots ── */}
