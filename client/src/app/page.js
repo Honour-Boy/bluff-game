@@ -29,6 +29,10 @@ import { ChamberSpinner } from '../components/shared/ChamberSpinner';
 import { LoadingSplash } from '../components/shared/LoadingScreen';
 import { useIsMobile } from '../hooks/useIsMobile';
 import { shouldShowIntro, markIntroSeen, rearmIntro } from '../lib/intro';
+// UAT-only issue log (removable: delete these imports + their wiring below).
+import { ISSUE_LOG_ENABLED, buildIssueContext } from '../components/feedback/issueLog';
+import { IssueReportButton } from '../components/feedback/IssueReportButton';
+import { IssueReportModal } from '../components/feedback/IssueReportModal';
 
 // §M4 — non-blocking "reconnecting" pill shown while the socket is down but the
 // player is still in a room. Sits top-centre, above the table; the resilient
@@ -558,6 +562,9 @@ function HomeContent() {
   const [gameSettingsOpen, setGameSettingsOpen] = useState(false);
   const [leaderboardOpen, setLeaderboardOpen] = useState(false);
   const [kickOpen, setKickOpen] = useState(false); // #244 - host Kick Player modal
+  // UAT issue log — single open-state for both the menu row and the floating
+  // button. Removable with the rest of the feature.
+  const [reportOpen, setReportOpen] = useState(false);
   const inRoomOnline = !!roomCode && gameMode === 'online';
   // The practice Power-Clinic progress bar is an in-flow 22px band at the very top
   // of the online table (OnlinePlayerUI). When it's up, nudge the fixed settings
@@ -676,7 +683,29 @@ function HomeContent() {
         // Landing redesign: the gear becomes a pill name chip that pairs with
         // the top-left level chip. Everywhere else keeps the compact gear.
         triggerVariant={!roomCode && homeView === 'landing' ? 'chip' : 'gear'}
+        // UAT issue log — the in-menu "Report an issue" row (present on every
+        // screen, incl. in-game where the bottom rail is the action buttons).
+        // Gating by callback presence matches the other gear rows.
+        onReportIssue={ISSUE_LOG_ENABLED ? () => setReportOpen(true) : undefined}
       />
+      {/* UAT issue log — floating "Report" pill on non-room screens (landing /
+          groups), where there's no game UI to collide with. */}
+      {ISSUE_LOG_ENABLED && !roomCode && (
+        <IssueReportButton onClick={() => setReportOpen(true)} />
+      )}
+      {ISSUE_LOG_ENABLED && reportOpen && (
+        <IssueReportModal
+          user={user ? { id: user.id, username } : null}
+          isGuest={isGuest}
+          context={buildIssueContext({
+            screen: roomCode ? (isLobby ? 'lobby' : 'game') : homeView,
+            roomCode,
+            phase: roomState?.phase,
+            mode: gameMode,
+          })}
+          onClose={() => setReportOpen(false)}
+        />
+      )}
       {/* Game settings - host edits in the lobby, everyone else sees a summary */}
       {inRoomOnline && gameSettingsOpen && (
         <ControlsModal title="Game Settings" onClose={() => setGameSettingsOpen(false)}>

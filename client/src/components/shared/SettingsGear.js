@@ -143,6 +143,9 @@ export function SettingsGear({
   // menu item to render; guests never see it (their XP isn't persisted).
   getProgression,
   setCosmetics,
+  // UAT issue log — when provided, renders a "Report an issue" row (presence of
+  // the callback gates it, like the other rows). Removable with the feature.
+  onReportIssue,
   // ── In-room game controls (Module 2) ──────────────────────────────────────
   // Ported here from the old bottom-right FAB. Rendered ONLY when `inRoom` is
   // true (i.e. the client is in a lobby OR an active game). Outside a room every
@@ -405,6 +408,23 @@ export function SettingsGear({
                   icon={(
                     <svg width="13" height="13" viewBox="0 0 24 24" fill="none" aria-hidden="true">
                       <path d="M12 3l2.4 4.9 5.4.8-3.9 3.8.9 5.4-4.8-2.5-4.8 2.5.9-5.4-3.9-3.8 5.4-.8z" stroke="currentColor" strokeWidth="1.6" strokeLinejoin="round" />
+                    </svg>
+                  )}
+                />
+              )}
+
+              {/* UAT issue log — "Report an issue" row, on every screen. Accent
+                  so testers spot it. Removable with the feature. */}
+              {onReportIssue && (
+                <SettingItem
+                  label="Report an issue"
+                  accent
+                  onClick={() => { setOpen(false); onReportIssue(); }}
+                  icon={(
+                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                      <path d="M12 9v4" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+                      <circle cx="12" cy="16.5" r="1.1" fill="currentColor" />
+                      <path d="M10.3 3.6 2.5 18a1.8 1.8 0 0 0 1.6 2.7h15.8A1.8 1.8 0 0 0 21.5 18L13.7 3.6a1.9 1.9 0 0 0-3.4 0Z" stroke="currentColor" strokeWidth="1.7" strokeLinejoin="round" />
                     </svg>
                   )}
                 />
