@@ -5,7 +5,7 @@ import { POWER_META, POWER_ICONS } from '../shared/PowerCard';
 const CARD_W = 58;
 const CARD_H = 84;
 
-// ─── Single card — physical card in a wooden cardholder ──────────────────────
+// ─── Single card - physical card in a wooden cardholder ──────────────────────
 // `arc` (shape fan only): precomputed { angle, scale, z } placing the card on
 // the shared-pivot fan. When null (power slot) the card renders upright in flow.
 function renderOneCard({
@@ -19,7 +19,7 @@ function renderOneCard({
   const drawPowerIcon = isPower ? (POWER_ICONS[card.power] || POWER_ICONS.shield) : null;
   const isArmed = card.armed === true;
   // Tutorial pre-arm lock: a defensive clinic card that can't be armed yet. Stays
-  // tappable (the tap shows a "not yet" hint) but reads as disabled — dimmed.
+  // tappable (the tap shows a "not yet" hint) but reads as disabled - dimmed.
   const isLocked = isPower && powerLocked && !isArmed;
   const effectiveInteractive = isPower
     ? (powerInteractive === undefined ? interactive : powerInteractive)
@@ -34,7 +34,7 @@ function renderOneCard({
     else onCardClick && onCardClick(card.id);
   };
 
-  // Placement — arc (fan) vs. upright (power slot).
+  // Placement - arc (fan) vs. upright (power slot).
   let outerStyle;
   if (arc) {
     const transform = isSelected
@@ -52,7 +52,7 @@ function renderOneCard({
       cursor: cardInteractive ? 'pointer' : 'default',
       pointerEvents: isArmed ? 'none' : 'auto',
       transition: isJustPlayed ? 'none' : 'transform 0.22s cubic-bezier(0.22,1,0.36,1)',
-      // base opacity is always 1 — nothing can leave a card stranded invisible
+      // base opacity is always 1 - nothing can leave a card stranded invisible
       opacity: 1,
     };
   } else {
@@ -102,7 +102,7 @@ function renderOneCard({
       className={isJustPlayed ? 'card-play-physics' : undefined}
       style={outerStyle}
     >
-      {/* Card face — ALL faces follow the equipped deck skin (#205): a frame
+      {/* Card face - ALL faces follow the equipped deck skin (#205): a frame
           skin's art ships via --cardface-bg with the shape/number (or power
           icon/label) overlaid in its empty centre. Each fallback is the card
           type's original dedicated gradient. */}
@@ -222,8 +222,8 @@ function renderOneCard({
   );
 }
 
-// ─── CardHand — true shared-pivot fan with drag-to-rotate (#4, redone) ────────
-// Shape cards share ONE bottom-centre pivot and splay by rotation — a real
+// ─── CardHand - true shared-pivot fan with drag-to-rotate (#4, redone) ────────
+// Shape cards share ONE bottom-centre pivot and splay by rotation - a real
 // semicircle, not a sliding row. Dragging the fan left/right rotates the whole
 // arc so the side cards swing up to the readable centre. Selection is bullet-
 // proof: NO pointer capture (so a tap's click still reaches the card), cards
@@ -252,7 +252,7 @@ export function CardHand({
   const half = (step * (n - 1)) / 2;
 
   const [rotateOffset, setRotateOffset] = useState(0);
-  // {down, startX, startRot, moved} — moved starts false so the first tap works.
+  // {down, startX, startRot, moved} - moved starts false so the first tap works.
   const dragRef = useRef({ down: false, startX: 0, startRot: 0, moved: false });
 
   // Keep the offset within range as the hand grows/shrinks.
@@ -275,7 +275,7 @@ export function CardHand({
     );
   }
 
-  // #M6.4 — a 2-card hand must stay draggable/selectable. With the old `n > 2`
+  // #M6.4 - a 2-card hand must stay draggable/selectable. With the old `n > 2`
   // gate, dropping from 3→2 cards left `dragRef.moved` stuck `true` (onPointerDown
   // no longer ran to reset it), which permanently blocked the click guard and
   // froze selection on the final two cards. Allow drag for any multi-card hand,
@@ -294,7 +294,7 @@ export function CardHand({
   };
   const endPointer = () => { dragRef.current.down = false; };
 
-  // A real drag must not also select. Only suppress when dragging is enabled —
+  // A real drag must not also select. Only suppress when dragging is enabled -
   // otherwise a stale `moved` from an earlier larger hand could block the tap.
   const guardedCardClick = (id) => { if (draggable && dragRef.current.moved) return; onCardClick && onCardClick(id); };
   const guardedPowerClick = (id) => { if (draggable && dragRef.current.moved) return; onPowerCardClick && onPowerCardClick(id); };

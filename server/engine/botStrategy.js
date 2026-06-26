@@ -1,15 +1,15 @@
 // ============================================================
-// ENGINE — Bot strategy (tutorial / practice opponent)
+// ENGINE - Bot strategy (tutorial / practice opponent)
 // ============================================================
 // Pure decision helpers for a server-driven bot opponent. No I/O, no
-// socket access — these only read the room + a botId and return a
+// socket access - these only read the room + a botId and return a
 // choice (a cardId + optional nominated shape). The bot turn DRIVER
 // (lib/bots.js) owns the timing + engine mutation; this module owns the
 // "what would a simple opponent do?" question.
 //
 // Deliberately dumb. The practice bot exists to teach the core loop
 // (play → bluff → spin → win), so it plays mostly honestly with an
-// occasional bluff, so a human's bluff call against it can land — and
+// occasional bluff, so a human's bluff call against it can land - and
 // usually backfires, which teaches the risk of a reckless challenge. It
 // never INITIATES a bluff call itself in v1 (the human is the challenger).
 
@@ -27,7 +27,7 @@ const BOT_BLUFF_RATE = 0.25;
 // round, without spins dominating the game.
 const BOT_BLUFF_CALL_RATE = 0.34;
 
-// Tutorial guarantee — a practice game must SHOW the bot calling bluff at least
+// Tutorial guarantee - a practice game must SHOW the bot calling bluff at least
 // twice so the learner experiences being challenged. Until that minimum is met in
 // a tutorial game the bot challenges far more eagerly (BELOW_MIN rate), and HARD-
 // forces a call once the round is winding down (the human is at/under
@@ -38,12 +38,12 @@ const BOT_BLUFF_CALL_RATE_BELOW_MIN = 0.85;
 const BOT_BLUFF_FORCE_HAND_SIZE = 3;
 
 // Free-play (sandbox) bluff-calling. The bot must feel SPONTANEOUS and never
-// like it can see your card — so each game gets its own randomized base call
+// like it can see your card - so each game gets its own randomized base call
 // rate (rolled once at game start, stored on `room.botCallRate`), and every
 // eligible turn is an INDEPENDENT gamble at that rate (no fixed count, no
 // minimum, no card knowledge). When the bot is genuinely STUCK (it holds no card
 // that matches the required shape), it leans toward calling: a resolved bluff
-// triggers a global re-deal that refreshes every hand — a legitimate way to dig
+// triggers a global re-deal that refreshes every hand - a legitimate way to dig
 // out of a dead hand, decided WITHOUT looking at the opponent's card.
 const BOT_CALL_RATE_MIN = 0.12;
 const BOT_CALL_RATE_MAX = 0.40;
@@ -56,7 +56,7 @@ function rollBotCallRate(rng = Math.random) {
 
 // Does the bot lack any legal HONEST play for the required shape? (Whot is a
 // universal honest play, so holding one means it isn't stuck.) Reads only the
-// bot's OWN hand — never the opponent's card.
+// bot's OWN hand - never the opponent's card.
 function _botHasNoHonestPlay(room, botId) {
   const hand = room.hands?.get?.(botId) || [];
   const required = room.currentCardType;
@@ -121,7 +121,7 @@ function chooseCardPlay(room, botId, rng = Math.random) {
     return { cardId: lies[0].id, nominatedShape: null };
   }
 
-  // No plain card left — play a Whot wild, nominating the required shape
+  // No plain card left - play a Whot wild, nominating the required shape
   // (or a random one if the required type is somehow unset).
   const whot = (hand || []).find((c) => c?.type === 'shape' && c.shape === 'whot');
   if (whot) {
@@ -129,7 +129,7 @@ function chooseCardPlay(room, botId, rng = Math.random) {
     return { cardId: whot.id, nominatedShape: shape };
   }
 
-  // Only power cards / empty — nothing to play.
+  // Only power cards / empty - nothing to play.
   return null;
 }
 
@@ -153,7 +153,7 @@ function shouldCallBluff(room, botId, rng = Math.random) {
   if (!accused || accused.status !== 'alive') return false;
 
   // Free play: if the bot PEEKED the challengeable card this turn (offensive
-  // Peek activation), it knows the truth — challenge a lie, never a truth. The
+  // Peek activation), it knows the truth - challenge a lie, never a truth. The
   // driver stamps `_botPeekedChallengeable` after a Peek; the id-match guard
   // keeps a stale peek from leaking onto a later card.
   if (
@@ -175,7 +175,7 @@ function shouldCallBluff(room, botId, rng = Math.random) {
   }
 
   // Coached Basics ONLY (not sandbox): lean on the challenge until the learner
-  // has seen ≥2 calls — a deliberate teaching guarantee, not card knowledge.
+  // has seen ≥2 calls - a deliberate teaching guarantee, not card knowledge.
   if (room.isTutorial && !room.sandbox && (room.botBluffCallsThisGame || 0) < BOT_BLUFF_MIN_CALLS) {
     const oppHand = _humanOpponentHandSize(room, botId);
     // Round winding down + minimum not met → take the eligible call for certain.
@@ -232,7 +232,7 @@ function _botIsAhead(room, botId) {
 }
 
 // Did the bot's card under accusation actually mismatch the required shape (a
-// genuine lie)? The accused only gains from defending when they DID lie — an
+// genuine lie)? The accused only gains from defending when they DID lie - an
 // honest accused lets the wrong call spin the accuser for free.
 function botLiedOnChallengeable(room) {
   const c = room.challengeableCard;
@@ -244,11 +244,11 @@ function botLiedOnChallengeable(room) {
  * Should the bot proactively ACTIVATE an offensive power at the start of its own
  * turn (before playing a card)? Returns `{ cardId, power } | null`.
  *
- *   • Peek    — when there's a previous play it could challenge, peek first to
+ *   • Peek    - when there's a previous play it could challenge, peek first to
  *               sharpen that decision (the driver stamps the revealed card so
  *               `shouldCallBluff` then challenges a known lie / spares a truth).
- *   • Freeze  — when ahead, arm to skip the human's next turn. Rate-limited.
- *   • Assassin— arm rarely; the bot then plays honestly and a correct human
+ *   • Freeze  - when ahead, arm to skip the human's next turn. Rate-limited.
+ *   • Assassin- arm rarely; the bot then plays honestly and a correct human
  *               challenge is struck down. High-risk, so kept sparing.
  *
  * One activation per turn is enforced by the engine ledger
@@ -287,7 +287,7 @@ function chooseBotPowerActivation(room, botId, rng = Math.random) {
 /**
  * When the bot is the ACCUSED in a bluff-intercept window, should it arm a
  * defensive power (Shield / Mirror / Swap)? Only worth it when the bot actually
- * lied — an honest accused burns the card for nothing (the wrong call already
+ * lied - an honest accused burns the card for nothing (the wrong call already
  * spins the accuser). The driver checks it holds an interceptable card.
  */
 function shouldBotInterceptBluff(room, botId) {

@@ -1,5 +1,5 @@
 // ============================================================
-// ENGINE — Deck construction (shape + power cards)
+// ENGINE - Deck construction (shape + power cards)
 // ============================================================
 // Pure builders for the online-mode draw deck. Card *play*
 // helpers (validateAndPlayCard, drawCardForPlayer, etc.) live in

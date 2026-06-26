@@ -1,9 +1,9 @@
 // ============================================================
-// GAME ENGINE — Re-export shim (issue #105 PR A)
+// GAME ENGINE - Re-export shim (issue #105 PR A)
 // ============================================================
 // The engine has been split into focused modules under ./engine/.
 // This file exists ONLY to preserve the historical `require('./gameEngine')`
-// and `import from '../gameEngine.js'` surface — every symbol that used
+// and `import from '../gameEngine.js'` surface - every symbol that used
 // to live in this file is re-exported here, so no consumer needs to
 // change its imports.
 //
@@ -207,12 +207,12 @@ module.exports = {
   computeStandings: progression.computeStandings,
   computeXpAward: progression.computeXpAward,
 
-  // ─── Covenant — Blood Debt ───────────────────────────────
+  // ─── Covenant - Blood Debt ───────────────────────────────
   assignBloodDebt: bloodDebt.assignBloodDebt,
   checkCallerHasBloodDebt: bloodDebt.checkCallerHasBloodDebt,
   consumeBloodDebt: bloodDebt.consumeBloodDebt,
 
-  // ─── Covenant — The Pact ─────────────────────────────────
+  // ─── Covenant - The Pact ─────────────────────────────────
   assignPactRoles: pact.assignPactRoles,
   pactSelectorAutoAssignPower: pact.pactSelectorAutoAssignPower,
   grantPactSelectorCard: pact.grantPactSelectorCard,

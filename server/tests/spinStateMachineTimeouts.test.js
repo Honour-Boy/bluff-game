@@ -4,15 +4,15 @@
 // Two server-side anti-hang guards, added after a play-test report of
 // the game freezing with the server healthy and BOTH sockets alive:
 //
-//   Issue 1 — spin_pending had no timeout. If the spin target never
+//   Issue 1 - spin_pending had no timeout. If the spin target never
 //             emitted player_spin (spin UI failed to mount, or a
 //             transient network blip swallowed the emit), the room sat
 //             in spin_pending forever. The server now auto-resolves the
-//             spin itself after SPIN_PENDING_TIMEOUT_MS — engine.spinGun
+//             spin itself after SPIN_PENDING_TIMEOUT_MS - engine.spinGun
 //             is server-authoritative, so the result is identical to a
 //             manual spin.
 //
-//   Issue 2 — a game-ending spin parks in room.pendingGameOver awaiting
+//   Issue 2 - a game-ending spin parks in room.pendingGameOver awaiting
 //             the client's spin_acknowledged (to sync the game-over
 //             reveal with the spin overlay's dismissal). If that ack
 //             never arrived the match stayed in 'playing' forever. The
@@ -27,8 +27,8 @@ import { createRequire } from 'module';
 
 // These three modules hold shared MUTABLE singletons (the rooms Map and the
 // timer registries) that the production code reaches via CommonJS `require`.
-// Pulling them in the same way — instead of an ESM `import`, which vitest can
-// resolve to a *separate* module instance across the ESM/CJS boundary —
+// Pulling them in the same way - instead of an ESM `import`, which vitest can
+// resolve to a *separate* module instance across the ESM/CJS boundary -
 // guarantees the test observes the very maps the handlers/orchestration mutate.
 const require = createRequire(import.meta.url);
 const {
@@ -73,7 +73,7 @@ const leaderboardRepo = {
   getLeaderboard: vi.fn(),
 };
 
-// Deterministic chambers — no client RNG, no engine RNG ambiguity.
+// Deterministic chambers - no client RNG, no engine RNG ambiguity.
 const safeChamber = () => Array(CHAMBER_SIZE).fill(null);        // never fires → survive
 const loadedChamber = () => Array(CHAMBER_SIZE).fill('bullet');  // always fires → eliminated
 
@@ -111,9 +111,9 @@ afterEach(() => {
   vi.clearAllMocks();
 });
 
-// ─── Issue 1 — spin_pending auto-resolve ─────────────────────
+// ─── Issue 1 - spin_pending auto-resolve ─────────────────────
 
-describe('Issue 1 — spin_pending auto-resolves when the target never spins', () => {
+describe('Issue 1 - spin_pending auto-resolves when the target never spins', () => {
   it('auto-spins server-side after the timeout (survival) and leaves spin_pending', async () => {
     const io = makeFakeIo();
     const room = makeSpinRoom({ targetChamber: safeChamber() });
@@ -186,7 +186,7 @@ describe('Issue 1 — spin_pending auto-resolves when the target never spins', (
     expect(spinPendingTimers.has(room.code)).toBe(false);
 
     await vi.advanceTimersByTimeAsync(SPIN_PENDING_TIMEOUT_MS);
-    expect(room.phase).toBe('spin_pending'); // untouched — nothing fired
+    expect(room.phase).toBe('spin_pending'); // untouched - nothing fired
   });
 
   it('does not auto-spin a target who is no longer alive', async () => {
@@ -203,9 +203,9 @@ describe('Issue 1 — spin_pending auto-resolves when the target never spins', (
   });
 });
 
-// ─── Issue 2 — pendingGameOver auto-finalise ─────────────────
+// ─── Issue 2 - pendingGameOver auto-finalise ─────────────────
 
-describe('Issue 2 — pendingGameOver auto-finalises when spin_acknowledged never arrives', () => {
+describe('Issue 2 - pendingGameOver auto-finalises when spin_acknowledged never arrives', () => {
   it('finalises game_over after the grace window', async () => {
     const io = makeFakeIo();
     const room = makeSpinRoom();

@@ -1,5 +1,5 @@
 // ============================================================
-// CORS origin matching — exact allow-list + preview regex.
+// CORS origin matching - exact allow-list + preview regex.
 // ============================================================
 
 import { describe, it, expect } from 'vitest';
@@ -22,7 +22,7 @@ describe('parseExactOrigins', () => {
   });
 });
 
-describe('makeOriginAllow — exact list', () => {
+describe('makeOriginAllow - exact list', () => {
   const allow = makeOriginAllow({ clientUrl: STAGING });
 
   it('allows the exact configured origin', () => {
@@ -40,7 +40,7 @@ describe('makeOriginAllow — exact list', () => {
   });
 });
 
-describe('makeOriginAllow — exact list + preview regex', () => {
+describe('makeOriginAllow - exact list + preview regex', () => {
   const allow = makeOriginAllow({ clientUrl: STAGING, previewRegex: PREVIEW_RX });
 
   it('still allows the stable staging alias', () => {
@@ -67,7 +67,7 @@ describe('makeOriginAllow — exact list + preview regex', () => {
   });
 });
 
-describe('makeOriginAllow — wildcard (dev)', () => {
+describe('makeOriginAllow - wildcard (dev)', () => {
   const allow = makeOriginAllow({ clientUrl: '*' });
   it('allows everything', () => {
     expect(allow('https://anything.example.com')).toBe(true);

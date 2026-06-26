@@ -5,14 +5,14 @@ import { ChamberSpinner } from './ChamberSpinner';
 import { useCyclingLabel } from './LoadingScreen';
 
 // ============================================================
-// IntroLoading — branded 3s progress beat after the intro video
+// IntroLoading - branded 3s progress beat after the intro video
 // ============================================================
 //
 // Shown for a fixed 3s once the intro splash video finishes, then calls
 // `onDone`. A themed determinate progress bar sweeps 1 → 100% across the
 // 3s (driven by rAF so the bar fill and the live % readout stay in lock-
 // step), under a slowly-spinning revolver cylinder (the shared
-// ChamberSpinner) and the wordmark. Purely cosmetic — it masks the
+// ChamberSpinner) and the wordmark. Purely cosmetic - it masks the
 // auth/socket bootstrap finishing underneath while the early-return holds
 // the app.
 
@@ -85,7 +85,7 @@ export function IntroLoading({ onDone }) {
         {label}
       </div>
 
-      {/* Fancy determinate bar — gradient fill + travelling sheen, width driven
+      {/* Fancy determinate bar - gradient fill + travelling sheen, width driven
           by the live % so it sweeps 1 → 100 across the 3s. */}
       <div style={{
         width: 240,

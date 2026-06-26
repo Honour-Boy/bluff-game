@@ -26,7 +26,7 @@ function mismatchGroup() {
   };
 }
 
-describe('GroupDetailScreen — owner tier-mismatch panel (G5/G6)', () => {
+describe('GroupDetailScreen - owner tier-mismatch panel (G5/G6)', () => {
   it('shows the resolution panel with re-tier (eviction count) and handover candidates to the owner', () => {
     render(
       <GroupDetailScreen

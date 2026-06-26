@@ -1,9 +1,9 @@
 import { CardShape } from '../shared/CardShape';
 import { BluffRevealCard } from './BluffRevealCard';
 // Game settings (host config / read-only summary) and the group leaderboard now
-// live in the Controls menu, not on the felt — keeps the table clean.
+// live in the Controls menu, not on the felt - keeps the table clean.
 
-// ─── Face-down card stack — leather-back texture ──────────────────────────────
+// ─── Face-down card stack - leather-back texture ──────────────────────────────
 function FaceDownStack({ count, label, warning = false }) {
   const layers = Math.min(count, 3);
   return (
@@ -28,7 +28,7 @@ function FaceDownStack({ count, label, warning = false }) {
                 position: 'absolute',
                 width: 44,
                 height: 64,
-                /* Card back — the equipped deck skin (#205): a frame skin's
+                /* Card back - the equipped deck skin (#205): a frame skin's
                    SVG via --cardback-bg, else the gradient fallback (original
                    leather by default). */
                 background: `var(--cardback-bg,
@@ -51,7 +51,7 @@ function FaceDownStack({ count, label, warning = false }) {
                   : 'none',
               }}
             >
-              {/* Card back diamond filigree — hidden when a frame deck skin
+              {/* Card back diamond filigree - hidden when a frame deck skin
                   carries its own artwork (--cardback-filigree-opacity: 0). */}
               <svg width="44" height="64" viewBox="0 0 44 64" style={{ position: 'absolute', inset: 0, opacity: 'var(--cardback-filigree-opacity, 0.25)' }} aria-hidden>
                 <rect x="4" y="4" width="36" height="56" rx="3" fill="none" stroke="var(--cardback-accent, var(--accent))" strokeWidth="0.8"/>
@@ -83,7 +83,7 @@ function FaceDownStack({ count, label, warning = false }) {
   );
 }
 
-// ─── Lobby ambience — looping "imaginary deal" ───────────────────────────────
+// ─── Lobby ambience - looping "imaginary deal" ───────────────────────────────
 // While the table waits in the lobby, a phantom dealer flicks face-down cards
 // out to five fanned seats and back, forever. Pure CSS (see lobbyDeal in
 // helpers.js); decorative only (aria-hidden, pointer-events:none).
@@ -157,7 +157,7 @@ function LobbyDealAnimation() {
   );
 }
 
-// ─── CenterTablePanel — the felt surface at the heart of the table ────────────
+// ─── CenterTablePanel - the felt surface at the heart of the table ────────────
 export function CenterTablePanel({
   tableCenterRef,
   isPlaying,
@@ -230,7 +230,7 @@ export function CenterTablePanel({
               className="focal-breathe"
               style={{
                 padding: '12px 14px',
-                // #205 — the Required focal card follows the equipped deck
+                // #205 - the Required focal card follows the equipped deck
                 // skin's face art; fallback = the original radial face.
                 background: 'var(--cardface-bg, radial-gradient(ellipse at 50% 35%, rgba(45,34,18,0.95) 0%, rgba(18,13,8,0.95) 100%))',
                 backgroundSize: '100% 100%',
@@ -350,7 +350,7 @@ export function CenterTablePanel({
               </div>
               <div style={{
                 padding: '11px 13px',
-                // #205 — themed like the Required focal card above so the
+                // #205 - themed like the Required focal card above so the
                 // bluff-reveal pair matches the equipped deck skin.
                 background: 'var(--cardface-bg, radial-gradient(ellipse at 50% 35%, rgba(45,34,18,0.95) 0%, rgba(18,13,8,0.95) 100%))',
                 backgroundSize: '100% 100%',

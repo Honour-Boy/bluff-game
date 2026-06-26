@@ -1,5 +1,5 @@
 // ============================================================
-// TUTORIAL — Content + contextual coaching logic (pure)
+// TUTORIAL - Content + contextual coaching logic (pure)
 // ============================================================
 // No React here. INTRO_SLIDES is the stepped welcome walkthrough; coachFor()
 // maps the current game state to the single most relevant tip. Keeping this
@@ -8,7 +8,7 @@
 
 export const BOT_NAME = 'Dealer Bot';
 
-// ─── Intro walkthrough — a few slides before the first deal ──────────────────
+// ─── Intro walkthrough - a few slides before the first deal ──────────────────
 // Plain data: the modal renders title + body (+ an optional bullet list). The
 // final slide's primary action ("Begin practice") deals the cards.
 export const INTRO_SLIDES = [
@@ -70,7 +70,7 @@ export const INTRO_SLIDES = [
   {
     id: 'rank',
     title: 'Rank & XP',
-    body: 'Practice is free and nothing here counts. Real online games earn XP — which raises your Level and Tier:',
+    body: 'Practice is free and nothing here counts. Real online games earn XP - which raises your Level and Tier:',
     points: [
       'Earn XP for winning, surviving spins, calling bluffs right, defending bluffs, and eliminating players.',
       'Four tiers: Streets → Backroads → Syndicate → Covenant.',
@@ -103,10 +103,10 @@ const POWER_LABELS = {
   peek: 'Peek', freeze: 'Freeze', assassin: 'Assassin',
 };
 
-// ─── Power Clinic — scripted before/after coaching ────────────────────────────
+// ─── Power Clinic - scripted before/after coaching ────────────────────────────
 // The Powers lesson runs as a clinic: each drill stages the exact moment one
 // power is needed. `room.tutorialScenario` carries { power, actor, step, index,
-// total }; clinicCoachFor maps that to the tip — `intro` tells the learner WHY +
+// total }; clinicCoachFor maps that to the tip - `intro` tells the learner WHY +
 // HOW to use it now, `resolved` explains WHAT just happened (including when the
 // bot uses one). Pure copy, keyed by a `${power}:${actor}` slug.
 const CLINIC_COACH = {
@@ -174,7 +174,7 @@ const CLINIC_COACH = {
  * room.tutorialScenario ({ power, actor, step, index, total }); returns
  * { key, tone, title, body } or null.
  */
-// Shown when the learner taps their (dimmed) defensive power card too early — i.e.
+// Shown when the learner taps their (dimmed) defensive power card too early - i.e.
 // during the "play a bluff + end turn" step of a Shield/Mirror/Swap drill, before
 // the bot's challenge opens the defence window. Mirrors the server block in
 // `activatePowerCard` so pre-arming can never stall the clinic.
@@ -183,7 +183,7 @@ export const DEFENSE_PREARM_HINT = `Not yet - defensive powers fire when you're 
 /**
  * True while a defensive drill is waiting on the learner to play + end their turn
  * (BEFORE the bot's challenge opens the intercept window). In this window the
- * staged Shield/Mirror/Swap must not be armed yet — the client dims it and the
+ * staged Shield/Mirror/Swap must not be armed yet - the client dims it and the
  * server refuses early activation. Pure read of the serialized scenario + phase.
  */
 export function isDefensivePreArmLocked(scenario, phase) {
@@ -234,7 +234,7 @@ export function clinicEndTurnLock(scenario, flags = {}) {
     return `Use your ${power} first.`;
   }
   if (scenario.expect === 'arm_then_play' && !flags.powerActivatedThisTurn) {
-    // (Module 3.1) Freeze bonus turn — already consumed; just play + End Turn.
+    // (Module 3.1) Freeze bonus turn - already consumed; just play + End Turn.
     if (scenario.power === 'freeze' && flags.freezeConsumed) return null;
     return `Arm your ${power} first, then play a card and End Turn.`;
   }
@@ -252,13 +252,13 @@ export function clinicCoachFor(scenario, ctx = {}) {
   let stepName;
   if (scenario.step === 'resolved') stepName = 'resolved';
   // (Module 3.1) Freeze double-turn: once the freeze is consumed, play bounces
-  // back to the learner for a free second turn — show the "your free turn" beat.
+  // back to the learner for a free second turn - show the "your free turn" beat.
   else if (scenario.power === 'freeze' && ctx.freezeConsumed && entry.bonus) {
     stepName = 'bonus';
   } else if (scenario.expect === 'play_then_defend' && ctx.phase !== 'bluff_intercept_pending'
     && scenario.challengeAnnounced && entry.announce) {
     // (Module 4.1) The bot's challenge has been announced but the defend window
-    // isn't open yet — show the "bot calls bluff!" beat before the arm prompt.
+    // isn't open yet - show the "bot calls bluff!" beat before the arm prompt.
     stepName = 'announce';
   } else if (scenario.expect === 'play_then_defend' && entry.play && ctx.phase !== 'bluff_intercept_pending') {
     stepName = 'play';
@@ -337,14 +337,14 @@ export function introSlidesFor(lesson) {
 }
 
 // Tone drives the coach card's accent colour in the layer.
-//   'info'   — neutral teaching
-//   'action' — it's on you to do something now
-//   'danger' — a spin / on-the-spot moment
-//   'win'    — round over
+//   'info'   - neutral teaching
+//   'action' - it's on you to do something now
+//   'danger' - a spin / on-the-spot moment
+//   'win'    - round over
 
 /**
  * The one coaching tip to show for the current game state. Returns
- *   { key, tone, title, body }  or null (no coach — e.g. lobby / pre-deal,
+ *   { key, tone, title, body }  or null (no coach - e.g. lobby / pre-deal,
  * where the intro modal is in charge).
  *
  * ctx fields (all optional, defensively defaulted):
@@ -369,7 +369,7 @@ export function coachFor(ctx = {}) {
     amAccusedIntercept = false,
   } = ctx;
 
-  // Power Cards lesson — a defensive-power holder being bluff-called can block it.
+  // Power Cards lesson - a defensive-power holder being bluff-called can block it.
   if (phase === 'bluff_intercept_pending') {
     if (amAccusedIntercept) {
       return {
@@ -514,7 +514,7 @@ export function coachContextFromRoom(roomState, myPlayerId) {
     amWinner: winnerId === myPlayerId,
     winnerName: roomState.lastAction?.winnerName || null,
     eliminated: me?.status === 'eliminated',
-    // Power Cards lesson — what the player is holding + whether they're the one
+    // Power Cards lesson - what the player is holding + whether they're the one
     // being bluff-called (so the coach can prompt a block).
     heldPowerLabel: POWER_LABELS[roomState.myPowerCardSlot?.[0]?.power] || null,
     amAccusedIntercept: roomState.phase === 'bluff_intercept_pending'

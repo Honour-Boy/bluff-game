@@ -1,9 +1,9 @@
 // ============================================================
-// #237 — Russian Roulette: auto-pull the trigger AND auto-end the turn.
+// #237 - Russian Roulette: auto-pull the trigger AND auto-end the turn.
 //
 // Russian Roulette fires an IMMEDIATE spin on a failed bluff (no manual "Pull
 // the Trigger"), so the on-turn player's turn must ALSO end on its own once the
-// spin resolves — otherwise play hangs waiting for an End Turn the modifier
+// spin resolves - otherwise play hangs waiting for an End Turn the modifier
 // removed. applySpinAndBroadcast owns the auto-advance; these tests drive it
 // directly (same harness the spin-timeout tests use) and assert the turn moves
 // on for every outcome, without skipping when the spinner is the one eliminated.
@@ -61,7 +61,7 @@ function makeRRRoom({ players = 3, currentTurnIndex = 0, russianRoulette = true 
   room.discardPile = [];
   room.playedPile = [];
   room.currentCardType = 'circle';
-  // §1.1 — a spin only happens as the tail of a bluff the on-turn player called.
+  // §1.1 - a spin only happens as the tail of a bluff the on-turn player called.
   room.cardPlayedThisTurn = true;
   return room;
 }
@@ -76,7 +76,7 @@ afterEach(() => {
   vi.clearAllMocks();
 });
 
-describe('#237 — Russian Roulette auto-ends the turn after the immediate spin', () => {
+describe('#237 - Russian Roulette auto-ends the turn after the immediate spin', () => {
   it('survival: the on-turn spinner survives → turn advances to the next player', async () => {
     const io = makeFakeIo();
     const room = makeRRRoom({ currentTurnIndex: 0 });
@@ -104,7 +104,7 @@ describe('#237 — Russian Roulette auto-ends the turn after the immediate spin'
     expect(currentTurnId(room)).toBe('p2');         // advanced off the accuser p1
   });
 
-  it('spinner eliminated: pointer already moved — does NOT skip the next player', async () => {
+  it('spinner eliminated: pointer already moved - does NOT skip the next player', async () => {
     const io = makeFakeIo();
     // p0 on-turn (accuser on a wrong bluff) spins and dies.
     const room = makeRRRoom({ currentTurnIndex: 0 });

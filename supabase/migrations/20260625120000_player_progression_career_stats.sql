@@ -1,4 +1,4 @@
--- Career stats — surface what's carrying a player toward their XP.
+-- Career stats - surface what's carrying a player toward their XP.
 -- The XP system (#205) computed per-game stats at game_over, turned them into
 -- XP, then discarded the raw counts. This adds LIFETIME aggregates so the
 -- client can show wins, spins survived, bluffs called right, etc. on the

@@ -1,5 +1,5 @@
 // ============================================================
-// Spin overlay lifecycle — the "spin hangs on every pull" regression.
+// Spin overlay lifecycle - the "spin hangs on every pull" regression.
 //
 // The completion timer used to live in an effect keyed on roomState.lastAction,
 // so its cleanup cancelled the 8s timer whenever lastAction changed. In practice
@@ -59,7 +59,7 @@ describe('spin overlay completion', () => {
     act(() => { vi.advanceTimersByTime(1100); });
     rerender(makeProps({ type: 'card_played_online', playerId: 'bot:1' }));
 
-    // Past the 8080ms completion mark — completion must STILL fire.
+    // Past the 8080ms completion mark - completion must STILL fire.
     act(() => { vi.advanceTimersByTime(7200); });
     expect(result.current.spinComplete).toBe(true);
     expect(result.current.spinData).toBeTruthy();

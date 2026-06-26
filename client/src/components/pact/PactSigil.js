@@ -1,10 +1,10 @@
 // ============================================================
-// Covenant — shared Pact visual language (occult wax-seal luxury)
+// Covenant - shared Pact visual language (occult wax-seal luxury)
 // ============================================================
 // A real inline-SVG covenant emblem (two interlocking oath-rings inside a
 // ticked seal ring) replaces the old fallback-triangle emoji, plus the shared
 // modal shell, ornate divider rule, and corner flourishes every Pact overlay
-// uses. Pure presentational — no deps, inline styles, gold/crimson on charcoal.
+// uses. Pure presentational - no deps, inline styles, gold/crimson on charcoal.
 
 let _sigilSeq = 0;
 
@@ -17,7 +17,7 @@ export function PactSigil({ size = 60, withSeal = true, glow = true, broken = fa
   const gold = 'var(--accent, #f0b54a)';
   const goldDim = 'var(--accent-dim, #b8862f)';
   const crimson = 'var(--accent2, #a8261d)';
-  // Seal ticks — short radial marks around the outer ring (wax-stamp feel).
+  // Seal ticks - short radial marks around the outer ring (wax-stamp feel).
   const ticks = withSeal
     ? Array.from({ length: 24 }).map((_, i) => {
         const a = (i / 24) * Math.PI * 2;
@@ -76,14 +76,14 @@ export function PactSigil({ size = 60, withSeal = true, glow = true, broken = fa
         // A jagged break across the bond for the broken-pact state.
         <path d="M32 18 L29 31 L35 35 L31 47" stroke={crimson} strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" />
       ) : (
-        // A small crimson keystone where the rings meet — the sealed bond.
+        // A small crimson keystone where the rings meet - the sealed bond.
         <path d="M32 26.5 L35.4 33 L32 39.5 L28.6 33 Z" fill={crimson} stroke={`url(#${gid})`} strokeWidth="0.8" />
       )}
     </svg>
   );
 }
 
-// A thin gold divider with a centred diamond — the ornate rule between a Pact
+// A thin gold divider with a centred diamond - the ornate rule between a Pact
 // modal's crest and its body copy.
 export function OrnateRule({ maxWidth = 220 }) {
   const gold = 'var(--accent, #f0b54a)';
@@ -96,7 +96,7 @@ export function OrnateRule({ maxWidth = 220 }) {
   );
 }
 
-// Gilded corner brackets — drop one into each corner of a Pact card for the
+// Gilded corner brackets - drop one into each corner of a Pact card for the
 // "sealed document" frame.
 export function CornerFlourishes() {
   const gold = 'var(--accent, #f0b54a)';

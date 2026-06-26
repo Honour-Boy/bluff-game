@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { VoiceIndicator } from '../VoicePanel';
 import { CardHand } from './CardHand';
 
-// ─── BottomSeat — the player's first-person view at the table ─────────────────
+// ─── BottomSeat - the player's first-person view at the table ─────────────────
 // This is the cardholder trough and action controls at the bottom of the screen.
 // It is styled as a first-person perspective facing the table edge: a dark wooden
 // rail with the card fan visible just below eye level.
@@ -23,7 +23,7 @@ export function BottomSeat({
   bluffUsedThisTurn,
   cardPlayedThisTurn,
   bluffBlockedThisTurn,
-  // Tutorial clinic — own-turn drills (Peek/Freeze/Assassin) disable Call Bluff
+  // Tutorial clinic - own-turn drills (Peek/Freeze/Assassin) disable Call Bluff
   // so the learner stays on script.
   bluffLocked = false,
   actionHint,
@@ -304,7 +304,7 @@ export function BottomSeat({
       ) : isMySpinTurn && !isEliminated ? (
         // (Module 3) Pull-trigger morph. When this client is the one who must
         // spin, the entire card hand is REPLACED by a single high-contrast
-        // action panel — the cards are obscured so a stray tap can't misfire.
+        // action panel - the cards are obscured so a stray tap can't misfire.
         // The instant the spin resolves server-side, isMySpinTurn flips false
         // and the dock below restores to its exact prior layout.
         <div style={{ padding: '4px 12px 12px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8 }}>
@@ -417,7 +417,7 @@ export function BottomSeat({
                   flow now, clear of the label.
                   (Module 2.2) A shorter fan on mobile keeps the dock compact. */}
               <div
-                // Stable anchor for the tutorial idle "tap a card" nudge — it
+                // Stable anchor for the tutorial idle "tap a card" nudge - it
                 // measures this element's rect so the bubble sits centred over
                 // the real card fan on any viewport (not a fixed bottom offset).
                 data-tour-id="my-hand"

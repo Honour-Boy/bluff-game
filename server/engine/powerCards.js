@@ -1,5 +1,5 @@
 // ============================================================
-// ENGINE — Power-card lifecycle (hand mgmt + activation + freeze)
+// ENGINE - Power-card lifecycle (hand mgmt + activation + freeze)
 // ============================================================
 // Phase B (plumbing), Phase C (effects). Card *building* lives in
 // engine/deck.js; this module handles cards once they're in hands
@@ -61,7 +61,7 @@ function _normalisePowerCardHandCap(room) {
 }
 
 /**
- * Per #77 — guarantee that every player ends the initial deal with at
+ * Per #77 - guarantee that every player ends the initial deal with at
  * least one power card. Runs AFTER `_normalisePowerCardHandCap` so the
  * cap is already enforced; any player still holding zero power cards
  * gets one swapped in from the deck (or the discard pile, if the
@@ -102,7 +102,7 @@ function _guaranteeMinPowerCardPerPlayer(room) {
 /**
  * For every alive player, look at the Swap cards in their hand and
  * stamp the "alive playerIds who must take a turn before this Swap
- * is activatable" snapshot. Idempotent — won't overwrite an existing
+ * is activatable" snapshot. Idempotent - won't overwrite an existing
  * snapshot.
  */
 function _snapshotSwapHolders(room) {
@@ -119,17 +119,17 @@ function _snapshotSwapHolders(room) {
 }
 
 /**
- * #139 — restore the playable hand to a full `size` shape cards.
+ * #139 - restore the playable hand to a full `size` shape cards.
  *
  * The initial deal sizes each hand at 6 cards INCLUDING any power card,
  * and `_guaranteeMinPowerCardPerPlayer` ensures everyone holds one. Once
  * `_extractPowerCardsToSlot` pulls that power card into its own slot the
  * playable hand is left one short (5 shape cards). The power/bonus slot is
- * a SEPARATE slot — it must never decrement the 6-card shape hand — so we
+ * a SEPARATE slot - it must never decrement the 6-card shape hand - so we
  * top each hand back up to `size` shape cards from the remaining deck.
  *
  * Run AFTER extraction. Pure draw from room.deck (no played-pile reshuffle
- * needed at deal time — a fresh deck always has ample shape cards: 71 per
+ * needed at deal time - a fresh deck always has ample shape cards: 71 per
  * single deck, doubled past 10 players).
  */
 function _topUpShapeHandsTo(room, size) {
@@ -192,7 +192,7 @@ function _creditSwapTurnFor(room, playerId) {
 
 /**
  * Eliminations remove a player from every Swap snapshot WITHOUT
- * crediting (locked decision — eliminating someone shouldn't unlock
+ * crediting (locked decision - eliminating someone shouldn't unlock
  * a Swap mechanically).
  */
 function _removePlayerFromSwapSnapshots(room, playerId) {
@@ -244,19 +244,19 @@ function activatePowerCard(room, playerId, cardId = null) {
   const currentPlayerId = room.turnOrder[room.currentTurnIndex];
   if (currentPlayerId !== playerId) return { ok: false, error: 'Not your turn' };
 
-  // Turn-flow flexibility. The three turn actions — play a card, call a bluff,
-  // activate a power card — are fully order-independent and each allowed once
+  // Turn-flow flexibility. The three turn actions - play a card, call a bluff,
+  // activate a power card - are fully order-independent and each allowed once
   // per turn. A power card may be armed at ANY point during the holder's own
   // active turn window: before or after a normal card is played, AND before or
   // after a bluff is called. (Mid-resolution is already excluded by the
-  // `phase === 'playing'` check above — bluff resolution / spins move the room
+  // `phase === 'playing'` check above - bluff resolution / spins move the room
   // out of `playing` until they settle back on the same turn.) The only block
   // is being already armed: one activation per turn.
   const player = room.players.find(p => p.id === playerId);
   if (!player) return { ok: false, error: 'Player not found' };
   if (player.status !== 'alive') return { ok: false, error: 'Player not alive' };
   if (player.armedPowerCard)    return { ok: false, error: 'Already armed' };
-  // §1.1 — single power activation per turn. `armedPowerCard` only catches
+  // §1.1 - single power activation per turn. `armedPowerCard` only catches
   // arm-style powers; Peek is consumed-on-use and leaves no armed marker, so a
   // Collector could Peek then arm a second power without this ledger guard.
   if (room.powerActivatedThisTurn) return { ok: false, error: 'Already used a power card this turn' };
@@ -269,33 +269,33 @@ function activatePowerCard(room, playerId, cardId = null) {
   if (!powerCard) return { ok: false, error: 'No power card in hand' };
 
   // Tutorial defensive drill (Shield/Mirror/Swap clinic): the staged defensive
-  // card must be armed REACTIVELY in the bot's challenge window — never pre-armed
+  // card must be armed REACTIVELY in the bot's challenge window - never pre-armed
   // on the learner's own turn. Pre-arming sets `armedPowerCard`, which makes
   // `canInterceptBluff` false, so the director can never open that window: the
   // bot sits idle and the clinic hangs ("bot deciding forever"). Refuse it here
-  // (authoritative — the client lock can't be bypassed); the coach explains that
+  // (authoritative - the client lock can't be bypassed); the coach explains that
   // you defend only once the challenge lands. Own-turn powers (Peek/Freeze/
   // Assassin drills) aren't `play_then_defend`, so they're untouched.
   if (room.tutorialScenario
       && room.tutorialScenario.expect === 'play_then_defend'
       && room.tutorialScenario.step !== 'resolved'
       && INTERCEPTABLE_POWERS.includes(powerCard.power)) {
-    return { ok: false, error: 'Wait for the challenge — you defend after the bot calls your bluff', tutorialLocked: true };
+    return { ok: false, error: 'Wait for the challenge - you defend after the bot calls your bluff', tutorialLocked: true };
   }
 
   if (powerCard.power === 'swap' && !isSwapActivatable(powerCard)) {
-    return { ok: false, error: 'Swap not yet activatable — every alive player must take a turn first' };
+    return { ok: false, error: 'Swap not yet activatable - every alive player must take a turn first' };
   }
 
   if (!room.discardPile) room.discardPile = [];
 
-  // Peek: consumed-on-use — remove from slot immediately.
+  // Peek: consumed-on-use - remove from slot immediately.
   if (powerCard.power === 'peek') {
     room.powerCardSlot[playerId] = slot.filter(c => c.id !== powerCard.id);
     room.discardPile.push(powerCard);
-    room.powerActivatedThisTurn = true; // §1.1 — counts as this turn's one power use
-    // Peek reveals the previous player's play — the same snapshotted card a
-    // bluff targets — NOT the live lastPlayedCard, which would be this player's
+    room.powerActivatedThisTurn = true; // §1.1 - counts as this turn's one power use
+    // Peek reveals the previous player's play - the same snapshotted card a
+    // bluff targets - NOT the live lastPlayedCard, which would be this player's
     // own card if they already played this turn (order-free actions).
     const peekedCard = room.challengeableCard || null;
     return {
@@ -309,7 +309,7 @@ function activatePowerCard(room, playerId, cardId = null) {
 
   // All other powers: arm the player and mark the card armed.
   powerCard.armed = true;
-  room.powerActivatedThisTurn = true; // §1.1 — counts as this turn's one power use
+  room.powerActivatedThisTurn = true; // §1.1 - counts as this turn's one power use
   player.armedPowerCard = {
     power: powerCard.power,
     cardId: powerCard.id,
@@ -326,11 +326,11 @@ function activatePowerCard(room, playerId, cardId = null) {
 }
 
 // ─── Bluff interception (§1.1) ─────────────────────────────────
-// When a bluff is called, the accused (the previous player — NOT on turn)
+// When a bluff is called, the accused (the previous player - NOT on turn)
 // gets a window to arm a DEFENSIVE power card in response, before the bluff
 // resolves. The resolution pipeline already reads `accused.armedPowerCard` at
 // every tier (Shield→Tier1, Swap→Tier2, Mirror→Tier4), so arming here is all
-// that's needed — the existing queue does the rest.
+// that's needed - the existing queue does the rest.
 
 /**
  * The defensive power cards `playerId` could arm right now in response to a
@@ -349,7 +349,7 @@ function listInterceptCards(room, playerId) {
 /**
  * Can `playerId` open an interception window at all? True only if they hold an
  * interceptable card AND aren't already armed (an already-armed card is handled
- * by the pipeline directly — no window needed).
+ * by the pipeline directly - no window needed).
  */
 function canInterceptBluff(room, playerId) {
   const player = room.players.find(p => p.id === playerId);
@@ -378,7 +378,7 @@ function armInterceptCard(room, playerId, cardId = null) {
     return { ok: false, error: 'Not a defensive card' };
   }
   if (card.power === 'swap' && !isSwapActivatable(card)) {
-    return { ok: false, error: 'Swap not yet activatable — every alive player must take a turn first' };
+    return { ok: false, error: 'Swap not yet activatable - every alive player must take a turn first' };
   }
 
   card.armed = true;

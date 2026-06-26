@@ -26,7 +26,7 @@ function makeIo() {
 }
 
 // Build a live online room where p2 has just been eliminated by a spin, with
-// the modifier on — i.e. exactly the post-elimination state where a redemption
+// the modifier on - i.e. exactly the post-elimination state where a redemption
 // offer should be queued.
 function makeRoomWithEliminated({ redemptionSpin = true } = {}) {
   const cfg = engine.defaultRoomConfig();
@@ -79,7 +79,7 @@ describe('Redemption Spin (Phase E1)', () => {
 
     it('is false when the elimination ended the match (only one left alive)', () => {
       const room = makeRoomWithEliminated();
-      // Knock p1 out too — only p0 remains alive.
+      // Knock p1 out too - only p0 remains alive.
       const p1 = room.players.find((p) => p.id === 'p1');
       p1.status = 'eliminated';
       engine.eliminateFromTurnOrder(room, 'p1');
@@ -171,7 +171,7 @@ describe('Redemption Spin (Phase E1)', () => {
       expect(room.lastAction.eliminated).toBe(true);
     });
 
-    it('is one-shot — the player is no longer eligible after resolving', async () => {
+    it('is one-shot - the player is no longer eligible after resolving', async () => {
       const room = makeRoomWithEliminated();
       await open(room);
       room.players.find((p) => p.id === 'p2').chamber = [...LOADED_CHAMBER];

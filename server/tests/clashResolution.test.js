@@ -1,5 +1,5 @@
 // ============================================================
-// Tests for v2 Phase H — Clash Resolution Sweep
+// Tests for v2 Phase H - Clash Resolution Sweep
 //
 // The spec defines 9 clash priorities. Phases A-G implement each
 // individually; this file is the integration sweep that asserts
@@ -66,7 +66,7 @@ function configWith({ powers = {}, risk = {}, room = {}, systems = {}, copiesPer
  * accused (just played a card), p1 is accuser.
  *
  * `lastPlayedShape` defaults to 'square' and `currentCardType` to
- * 'circle', so the bluff is CORRECT by default — accused would
+ * 'circle', so the bluff is CORRECT by default - accused would
  * normally spin.
  */
 function buildRoom({
@@ -139,10 +139,10 @@ function buildRoom({
 
 // ─── Priority 1: Assassin > Mirror ───────────────────────────
 
-describe('clash 1 — Assassin > Mirror', () => {
+describe('clash 1 - Assassin > Mirror', () => {
   it('Mirror cannot deflect an Assassin elimination', () => {
     // Accused has Assassin armed. Accuser has Mirror armed. Per spec,
-    // Assassin fires before Mirror gets a chance — accuser dies.
+    // Assassin fires before Mirror gets a chance - accuser dies.
     const { room, p0, p1 } = buildRoom({
       accusedArmed: { power: 'assassin', cardId: 'kill-A' },
       accuserArmed: { power: 'mirror',   cardId: 'mir-A' },
@@ -182,10 +182,10 @@ describe('clash 1 — Assassin > Mirror', () => {
 
 // ─── Priority 2: Shield > Assassin ───────────────────────────
 
-describe('clash 2 — Shield > Assassin', () => {
+describe('clash 2 - Shield > Assassin', () => {
   it('Shield blocks the bluff, no consequence registers', () => {
     // Spec: "Bluff never officially registers" when Shield blocks.
-    // We test by holding only Shield armed — outcome must be 'blocked'.
+    // We test by holding only Shield armed - outcome must be 'blocked'.
     const { room, p0 } = buildRoom({
       accusedArmed: { power: 'shield', cardId: 'shi-A' },
     });
@@ -195,7 +195,7 @@ describe('clash 2 — Shield > Assassin', () => {
     expect(p0.armedPowerCard).toBeNull();
   });
 
-  it('the Shield short-circuits — Assassin stage never runs', () => {
+  it('the Shield short-circuits - Assassin stage never runs', () => {
     // Force an inconsistent armed state with both Shield AND Assassin
     // (the only-one-armed rule is enforced upstream; here we are
     // testing that Shield's stage runs first regardless). Stamp armed
@@ -208,8 +208,8 @@ describe('clash 2 — Shield > Assassin', () => {
       currentCardType: 'circle',
     });
     // Manually stamp a stale Assassin-armed alongside (for the test).
-    // We don't add it to the hand — _consumeArmedCard handles missing
-    // cards gracefully — so this just probes stage ordering.
+    // We don't add it to the hand - _consumeArmedCard handles missing
+    // cards gracefully - so this just probes stage ordering.
     const outcome1 = resolveBluff(room, 'p1');
     expect(outcome1.outcome.kind).toBe('blocked');
     // After short-circuit, no second stage fired.
@@ -218,7 +218,7 @@ describe('clash 2 — Shield > Assassin', () => {
     expect(p0.armedPowerCard).toBeNull();
   });
 
-  // Playtest §1.3 — the bug case: the ACCUSER (not the accused) holds the
+  // Playtest §1.3 - the bug case: the ACCUSER (not the accused) holds the
   // Shield, and a wrong call backfires the Assassin onto them. Tier 1 only
   // sees the accused's Shield, so this exercises the Tier-5 universal block.
   it('Shield on the ACCUSER blocks an Assassin strike that backfires onto them', () => {
@@ -230,7 +230,7 @@ describe('clash 2 — Shield > Assassin', () => {
     });
     const { outcome, events } = resolveBluff(room, 'p1');
 
-    // Nobody is eliminated — the bluff resolves as a clean block.
+    // Nobody is eliminated - the bluff resolves as a clean block.
     expect(outcome.kind).toBe('blocked');
     expect(outcome.shieldHolderId).toBe('p1');
     // Both cards are consumed.
@@ -247,7 +247,7 @@ describe('clash 2 — Shield > Assassin', () => {
 
 // ─── Priority 3: Mirror > Sniper Role ────────────────────────
 
-describe('clash 3 — Mirror > Sniper Role', () => {
+describe('clash 3 - Mirror > Sniper Role', () => {
   it('Sniper cannot redirect a spin to a Mirror holder', () => {
     const { room } = buildRoom({
       accusedRole: ROLES.SNIPER,
@@ -293,7 +293,7 @@ describe('clash 3 — Mirror > Sniper Role', () => {
 
 // ─── Priority 4: Medic > Assassin ────────────────────────────
 
-describe('clash 4 — Medic > Assassin', () => {
+describe('clash 4 - Medic > Assassin', () => {
   it('Medic save reverts an Assassin elimination', () => {
     // Build a bluff scenario where Assassin will fire on the accuser.
     // Per #63 the Assassin strike requires a WRONG bluff, so we
@@ -336,7 +336,7 @@ describe('clash 4 — Medic > Assassin', () => {
       currentCardType: 'circle',
       extraPlayers: [{ id: 'medic', name: 'Doc', role: ROLES.MEDIC }],
     });
-    // Medic at the save-hand cap (#142) — too full to take the +2 save cost.
+    // Medic at the save-hand cap (#142) - too full to take the +2 save cost.
     room.hands.set('medic', Array.from({ length: MEDIC_SAVE_HAND_CAP }).map((_, i) => ({
       id: `mh-${i}`, type: 'shape', shape: 'circle', number: (i % 14) + 1,
     })));
@@ -350,7 +350,7 @@ describe('clash 4 — Medic > Assassin', () => {
 
 // ─── Priority 5: Swap > Mirror ───────────────────────────────
 
-describe('clash 5 — Swap > Mirror', () => {
+describe('clash 5 - Swap > Mirror', () => {
   it('Swap pauses pipeline; on resume, Mirror still gets a chance', () => {
     const { room } = buildRoom({
       accusedArmed: { power: 'swap',   cardId: 'sw-A' },
@@ -375,7 +375,7 @@ describe('clash 5 — Swap > Mirror', () => {
     expect(events.find(e => e.kind === 'swap_resolved')).toBeTruthy();
   });
 
-  it('Swap > Mirror — events fire in order: swap_resolved THEN mirror_reflected', () => {
+  it('Swap > Mirror - events fire in order: swap_resolved THEN mirror_reflected', () => {
     const { room } = buildRoom({
       accusedArmed: { power: 'swap',   cardId: 'sw-A' },
       accuserArmed: { power: 'mirror', cardId: 'mir-out' },
@@ -397,7 +397,7 @@ describe('clash 5 — Swap > Mirror', () => {
 
 // ─── Priority 6: Sudden Death vs Gambler ─────────────────────
 
-describe('clash 6 — Sudden Death affects Gambler', () => {
+describe('clash 6 - Sudden Death affects Gambler', () => {
   it('Sudden Death threshold bumps every alive chamber, including Gambler', () => {
     // Locked decision: external modifiers still affect Gambler.
     // Gambler's freeze only applies to spin-survival (not Sudden Death).
@@ -424,7 +424,7 @@ describe('clash 6 — Sudden Death affects Gambler', () => {
   it("Gambler's role-driven chamber still works in parallel with Sudden Death", () => {
     // Sudden Death bumps Gambler chamber to 2; correct bluff against
     // Gambler in the bluff pipeline jumps it to 4 (Phase D rule).
-    // We're not running both here — we just confirm Sudden Death's
+    // We're not running both here - we just confirm Sudden Death's
     // effect is independent of role.
     const cfg = configWith({ room: { suddenDeath: true } });
     const room = createRoom('host', MODES.ONLINE, cfg);
@@ -442,7 +442,7 @@ describe('clash 6 — Sudden Death affects Gambler', () => {
 
 // ─── Priority 7: Redemption Spin vs Last Stand ───────────────
 
-describe('clash 7 — Redemption Spin disabled once Last Stand begins', () => {
+describe('clash 7 - Redemption Spin disabled once Last Stand begins', () => {
   function setupRedemptionRoom() {
     const cfg = configWith({
       risk: { redemptionSpin: true },
@@ -506,7 +506,7 @@ describe('clash 7 — Redemption Spin disabled once Last Stand begins', () => {
 
 // ─── Priority 8: Mirror Match vs eliminated opposite ─────────
 
-describe('clash 8 — Mirror Match skips eliminated opposite', () => {
+describe('clash 8 - Mirror Match skips eliminated opposite', () => {
   it('falls back to next alive in opposite direction', () => {
     const cfg = configWith({ room: { mirrorMatch: true } });
     const room = createRoom('host', MODES.ONLINE, cfg);
@@ -548,7 +548,7 @@ describe('clash 8 — Mirror Match skips eliminated opposite', () => {
 
 // ─── Priority 9: Sheriff > Assassin ──────────────────────────
 
-describe('clash 9 — Sheriff > Assassin', () => {
+describe('clash 9 - Sheriff > Assassin', () => {
   it('Sheriff is not eliminated by Assassin and a banner fires', () => {
     const { room, p0, p1 } = buildRoom({
       accusedArmed: { power: 'assassin', cardId: 'k-A' },
@@ -611,7 +611,7 @@ describe('clash 9 — Sheriff > Assassin', () => {
 
 // ─── Announcement queue: ordering of multiple events ─────────
 
-describe('announcement queue — multi-event ordering', () => {
+describe('announcement queue - multi-event ordering', () => {
   it('Swap → re-judged correct → Bounty Collected → Sheriff relief produces 4 ordered events', () => {
     // Bounty + Sheriff + Swap. Accused has Swap; bounty is on the
     // accused; accuser is Sheriff. Holder picks a card that makes the
@@ -682,7 +682,7 @@ describe('announcement queue — multi-event ordering', () => {
     // We're really just asserting the events list is stable.
     expect(outcome.kind).toBe('spin');
     expect(events.length).toBeGreaterThanOrEqual(1);
-    // Mirror first — it's the only redirector.
+    // Mirror first - it's the only redirector.
     expect(events[0].kind).toBe('mirror_reflected');
   });
 
@@ -725,7 +725,7 @@ describe('announcement queue — multi-event ordering', () => {
 
 // ─── Misc clash-adjacent regressions ─────────────────────────
 
-describe('regression — pipeline never drops events on short-circuit', () => {
+describe('regression - pipeline never drops events on short-circuit', () => {
   it('Shield blocks → only shield_blocked event, no orphan stages', () => {
     const { room } = buildRoom({
       accusedArmed: { power: 'shield', cardId: 'shi-A' },
@@ -751,9 +751,9 @@ describe('regression — pipeline never drops events on short-circuit', () => {
 
 // ─── serializeRoom-side: lastStandActive flag exposure ───────
 
-describe('serializeRoom — lastStandActive surfaced', () => {
+describe('serializeRoom - lastStandActive surfaced', () => {
   it('lastStandActive flag is set on the room object after enterLastStand', () => {
-    // We don't necessarily need to expose the flag publicly — the
+    // We don't necessarily need to expose the flag publicly - the
     // server-side check is what matters. This test pins the
     // server-side invariant so future changes don't break it silently.
     const cfg = configWith({ systems: { lastStand: true } });

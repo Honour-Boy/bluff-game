@@ -1,5 +1,5 @@
 // ============================================================
-// HANDLERS — Room lifecycle (create/join/reconnect/leave/restart)
+// HANDLERS - Room lifecycle (create/join/reconnect/leave/restart)
 // ============================================================
 
 const engine = require('../gameEngine');
@@ -94,7 +94,7 @@ function register(io, socket, deps) {
       if (roomMode === engine.MODES.ONLINE) {
         const player = engine.createPlayer(socket.userId, socket.username, socket.id);
         room.players.push(player);
-        // #205 — dress the seat with the player's equipped cosmetics
+        // #205 - dress the seat with the player's equipped cosmetics
         // (non-blocking; pops in on the follow-up broadcast).
         stampCosmeticsInBackground(io, leaderboardRepo, room.code, player);
         await saveRoom(room);
@@ -111,7 +111,7 @@ function register(io, socket, deps) {
 
   // ─── Tutorial / Practice: solo room vs. a bot ────────────
   // A frictionless single-human online room seeded with a practice bot. No code
-  // to share, no second player to wait for — the human lands in the lobby as host
+  // to share, no second player to wait for - the human lands in the lobby as host
   // with the bot already seated, presses Start, and the bot autoplays via the
   // server-side bot driver (lib/bots.js). Powers / modifiers / systems are all
   // OFF (the all-false defaultRoomConfig), and at 2 players no secret roles are
@@ -125,10 +125,10 @@ function register(io, socket, deps) {
     try {
       // Lesson → house rules. 'basics' is the all-off core loop (null config →
       // normalizeRoomConfig fills the all-off defaults). 'powers' seeds two
-      // beginner-friendly power cards — Peek (see the last card) and Shield (block
-      // a bluff) — so the player learns to hold, activate, and defend with one.
+      // beginner-friendly power cards - Peek (see the last card) and Shield (block
+      // a bluff) - so the player learns to hold, activate, and defend with one.
       // startGame guarantees each seat at least one power card. Roles/modifiers
-      // stay off (secret roles need 3+ seats AND bot prompt-handling — deferred).
+      // stay off (secret roles need 3+ seats AND bot prompt-handling - deferred).
       const isSandbox = sandbox === true;
       const chosenLesson = lesson === 'powers' ? 'powers' : 'basics';
       let config = null;
@@ -152,7 +152,7 @@ function register(io, socket, deps) {
       const room = await buildAdHocRoom(socket, engine.MODES.ONLINE, config, groupsRepo);
       room.isTutorial = true;
       room.tutorialLesson = chosenLesson;
-      // (Module 5) Sandbox is uncoached — the client suppresses every guide overlay
+      // (Module 5) Sandbox is uncoached - the client suppresses every guide overlay
       // (the existing `coachingOff` path in TutorialLayer).
       if (isSandbox) { room.tutorialCoaching = false; room.sandbox = true; }
       room.cardPlayedThisTurn = false;
@@ -161,11 +161,11 @@ function register(io, socket, deps) {
       // Tutorial "≥2 bluff calls per game" guarantee counter (botStrategy).
       room.botBluffCallsThisGame = 0;
 
-      // Seat the human as a normal player — NOT the host. A newbie shouldn't hold
+      // Seat the human as a normal player - NOT the host. A newbie shouldn't hold
       // the room controls; the bot "hosts" the table and the server drives it.
       const human = engine.createPlayer(socket.userId, socket.username, socket.id);
       room.players.push(human);
-      // #205 — even a practice table shows your own felt/card back.
+      // #205 - even a practice table shows your own felt/card back.
       stampCosmeticsInBackground(io, leaderboardRepo, room.code, human);
 
       // Seat the practice bot. The id is namespaced so it can never collide with
@@ -174,7 +174,7 @@ function register(io, socket, deps) {
       bot.isBot = true;
       room.players.push(bot);
 
-      // Bot is host-of-record. It has no socket, so hostSocketId is null — which
+      // Bot is host-of-record. It has no socket, so hostSocketId is null - which
       // makes the human's `amHost` false in serializeRoom (host controls hidden)
       // and routes every host-gated event away from the human. The learner can
       // still start the game via the tutorial bypass in `start_game`, and the
@@ -247,7 +247,7 @@ function register(io, socket, deps) {
         // hostSocketId is reconciled from hostUserId AFTER the join below, so it
         // can never diverge from the host-of-record. (Setting it only for the
         // joining host left it pointing at the OLD stand-in's socket whenever a
-        // non-host member refreshed after a reclaim/hand-back — server-side host
+        // non-host member refreshed after a reclaim/hand-back - server-side host
         // gates use hostSocketId while the client's amHost uses hostUserId, so a
         // split between them broke host controls for both players.)
 
@@ -256,9 +256,9 @@ function register(io, socket, deps) {
           return callback({ success: false, error: 'not_a_group_member' });
         }
 
-        // Phase 6 (G3) — tier entry gate. A group is bound to one tier; a
+        // Phase 6 (G3) - tier entry gate. A group is bound to one tier; a
         // member promoted ABOVE it (XP only rises) is blocked on entry until
-        // the owner re-tiers the group or hands over — block-on-entry avoids
+        // the owner re-tiers the group or hands over - block-on-entry avoids
         // surprise removals. Guests never reach group rooms. Default Streets on
         // any lookup failure so a flaky read can't silently open a higher tier.
         const requiredTier = group.required_tier || 'streets';
@@ -297,7 +297,7 @@ function register(io, socket, deps) {
         }
         player = engine.createPlayer(socket.userId, socket.username, socket.id);
         room.players.push(player);
-        // #205 — dress the seat with the player's equipped cosmetics
+        // #205 - dress the seat with the player's equipped cosmetics
         // (non-blocking; pops in on the follow-up broadcast).
         stampCosmeticsInBackground(io, leaderboardRepo, code, player);
         console.log(`[Room ${code}] Joined: ${player.username}`);
@@ -342,13 +342,13 @@ function register(io, socket, deps) {
 
       // Was a teardown actually pending? Only then did the room see the host
       // drop (and get the `host_disconnecting` countdown), so only then should
-      // the return be announced — this also avoids a duplicate toast if
+      // the return be announced - this also avoids a duplicate toast if
       // host_reconnect fires twice for one reconnect.
       const wasDisconnected = hostDisconnectTimers.has(code);
       if (wasDisconnected) {
         clearTimeout(hostDisconnectTimers.get(code));
         hostDisconnectTimers.delete(code);
-        console.log(`[Socket] host of ${code} reconnected within grace — teardown cancelled`);
+        console.log(`[Socket] host of ${code} reconnected within grace - teardown cancelled`);
       }
 
       room.hostSocketId = socket.id;
@@ -357,7 +357,7 @@ function register(io, socket, deps) {
       callback({ success: true, isHost: true, mode: room.mode });
       await broadcastRoomState(io, code);
 
-      // #183 — pair the `host_disconnecting` countdown with a "host is back"
+      // #183 - pair the `host_disconnecting` countdown with a "host is back"
       // toast so the table learns the original host reclaimed controls. The
       // host may not be seated as a player (physical mode), so fall back to the
       // authenticated socket username.
@@ -390,7 +390,7 @@ function register(io, socket, deps) {
       if (playerDisconnectTimers.has(key)) {
         clearTimeout(playerDisconnectTimers.get(key));
         playerDisconnectTimers.delete(key);
-        console.log(`[Socket] player ${socket.userId} reconnected to ${code} within grace — elimination cancelled`);
+        console.log(`[Socket] player ${socket.userId} reconnected to ${code} within grace - elimination cancelled`);
       }
 
       engine.reconnectPlayer(room, socket.userId, socket.id);
@@ -406,7 +406,7 @@ function register(io, socket, deps) {
   // ─── Re-pull authoritative state (#empty-hand recovery, §3.4) ──────────
   // A client whose deal/state packet was dropped (initial setup race or a
   // reconnect that landed before the broadcast) can ask for a fresh push. We
-  // re-serialise for THIS socket only — so `myHand` is included — without
+  // re-serialise for THIS socket only - so `myHand` is included - without
   // disturbing anyone else. Safe to call any time; it never mutates state.
   socket.on('request_room_state', async ({ roomCode } = {}, callback) => {
     try {
@@ -449,11 +449,11 @@ function register(io, socket, deps) {
   });
 
   // ─── Intentional leave ───────────────────────────────────
-  // §2.2 — accepts an optional ack callback so the SAME centralized cleanup is
+  // §2.2 - accepts an optional ack callback so the SAME centralized cleanup is
   // used by every leave entry point (the in-game "Leave Room" buttons and the
   // lobby "Leave Game" button) and the client can confirm teardown finished.
-  // The client never blocks on this ack (§2.3 fail-safe) — it's purely
-  // confirmatory — but it lets a present client know the server cleaned up.
+  // The client never blocks on this ack (§2.3 fail-safe) - it's purely
+  // confirmatory - but it lets a present client know the server cleaned up.
   socket.on('leave_room', async ({ roomCode, playerId } = {}, callback) => {
     try {
       const code = roomCode?.toUpperCase();
@@ -497,7 +497,7 @@ function register(io, socket, deps) {
         socket.leave(code);
         logRoomDeletion(code, 'tutorial_left', { phase: room.phase });
         rooms.delete(code);
-        console.log(`[Room ${code}] tutorial — ${player.username} left the table, room destroyed.`);
+        console.log(`[Room ${code}] tutorial - ${player.username} left the table, room destroyed.`);
         return callback?.({ success: true, roomClosed: true });
       }
 
@@ -515,7 +515,7 @@ function register(io, socket, deps) {
         };
         console.log(`[Room ${code}] ${player.username} forfeited mid-game`);
 
-        // §2.2 — in a 2-player game this leaves a single survivor, who wins by
+        // §2.2 - in a 2-player game this leaves a single survivor, who wins by
         // default (checkGameOver) AND inherits the host seat below.
         const gameOverWinner = engine.checkGameOver(room);
         if (gameOverWinner) {
@@ -558,7 +558,7 @@ function register(io, socket, deps) {
       // been eliminated), tear the in-memory room down so it can't hang in a
       // "game started" state that blocks rejoin. Ad-hoc rooms are destroyed
       // outright; persistent group rooms are dropped from memory so the next
-      // join rebuilds a clean lobby from the DB-backed group — preserving the
+      // join rebuilds a clean lobby from the DB-backed group - preserving the
       // group's settings and leaderboard, which live in the database, not here.
       const noOneLeft = room.players.length === 0
         || !room.players.some(p => p.status === 'alive');
@@ -579,7 +579,7 @@ function register(io, socket, deps) {
           groupId: room.groupId || undefined,
           rebuildable: !!room.groupId,
         });
-        // §3.3 — the live room is gone; clear the directory's occupancy badge.
+        // §3.3 - the live room is gone; clear the directory's occupancy badge.
         if (room.groupId) {
           io.to(`group:${room.groupId}`).emit('group_room_status', {
             groupId: room.groupId,
@@ -591,7 +591,7 @@ function register(io, socket, deps) {
           });
         }
         rooms.delete(code);
-        console.log(`[Room ${code}] last participant left — room torn down (${room.groupId ? 'group: rebuildable' : 'ad-hoc: destroyed'})`);
+        console.log(`[Room ${code}] last participant left - room torn down (${room.groupId ? 'group: rebuildable' : 'ad-hoc: destroyed'})`);
         return callback?.({ success: true, roomClosed: true });
       }
 
@@ -688,7 +688,7 @@ function register(io, socket, deps) {
       const code = roomCode?.toUpperCase();
       const room = await getRoom(code);
       if (!room) return callback?.({ success: false, error: 'Room not found' });
-      // Tutorial bypass — the bot "hosts" a practice room, so let the seated human
+      // Tutorial bypass - the bot "hosts" a practice room, so let the seated human
       // replay it. Otherwise only the real host can restart.
       const isTutorialRestarter = room.isTutorial
         && room.players.some(p => p.id === socket.userId && !p.isBot);
@@ -704,7 +704,7 @@ function register(io, socket, deps) {
         // Sandbox replay = a plain online replay in the SAME room: keep the
         // learner's chosen config (incl. powers) AND local-host privileges, then
         // drop back to the LOBBY (NO startGame) so they can tweak settings before
-        // dealing again — mirroring the first sandbox game's lobby → "Open the
+        // dealing again - mirroring the first sandbox game's lobby → "Open the
         // Game" flow. Reseed the bot's per-game bluff personality; no coaching.
         room.hostSocketId = socket.id;
         room.botBluffCallsThisGame = 0;
@@ -754,7 +754,7 @@ function register(io, socket, deps) {
   // ─── GROUP HOST: Reset the room (boot everyone, fresh table, same cipher) ──
   // Triggered from the group's detail screen. Tears the live in-memory room
   // down and boots every connected participant back to the landing screen. The
-  // group's permanent cipher (code) is untouched — the next join rebuilds a
+  // group's permanent cipher (code) is untouched - the next join rebuilds a
   // clean lobby from the DB-backed group (settings + leaderboard live in the
   // DB, so they survive). Only the group host-of-record may do this.
   socket.on('reset_room', async ({ roomCode } = {}, callback) => {
@@ -771,7 +771,7 @@ function register(io, socket, deps) {
 
       const room = await getRoom(code);
       if (!room) {
-        // Nothing live to reset — the next join already builds a fresh lobby.
+        // Nothing live to reset - the next join already builds a fresh lobby.
         return callback?.({ success: true, roomClosed: true });
       }
 
@@ -791,7 +791,7 @@ function register(io, socket, deps) {
       io.to(code).emit('game_ended', { reason: 'The host reset the room.' });
       io.in(code).socketsLeave(code);
 
-      // §3.3 — clear the directory's occupancy badge for this group.
+      // §3.3 - clear the directory's occupancy badge for this group.
       if (room.groupId) {
         io.to(`group:${room.groupId}`).emit('group_room_status', {
           groupId: room.groupId,
@@ -809,7 +809,7 @@ function register(io, socket, deps) {
         rebuildable: true,
       });
       rooms.delete(code);
-      console.log(`[Room ${code}] Reset by group host (${socket.username}) — all booted, room torn down (rebuildable).`);
+      console.log(`[Room ${code}] Reset by group host (${socket.username}) - all booted, room torn down (rebuildable).`);
       callback?.({ success: true, roomClosed: true });
     } catch (err) {
       console.error('[reset_room]', err.message);

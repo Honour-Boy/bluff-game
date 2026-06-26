@@ -1,4 +1,4 @@
-# BuildKit per-file dockerignore — applied when building client.Dockerfile.
+# BuildKit per-file dockerignore - applied when building client.Dockerfile.
 # The default .dockerignore at the root excludes client/ (so the server
 # build stays small); for the client build we need the opposite.
 server/

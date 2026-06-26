@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import { ChipPopup } from '../ChipPopup';
 
-describe('ChipPopup — contextual avatar bubble (Module 2)', () => {
+describe('ChipPopup - contextual avatar bubble (Module 2)', () => {
   it('renders its label', () => {
     render(<ChipPopup>Their turn</ChipPopup>);
     expect(screen.getByText('Their turn')).toBeInTheDocument();

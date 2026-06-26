@@ -1,5 +1,5 @@
 -- ============================================================
--- Initial schema — baseline for the Bluff Game Supabase project.
+-- Initial schema - baseline for the Bluff Game Supabase project.
 --
 -- Reconstructed from the live database state on 2026-05-01.
 -- Mirrors the migration originally tracked as 20260430133248.

@@ -1,5 +1,5 @@
 // ============================================================
-// HANDLERS — authenticate + update_username
+// HANDLERS - authenticate + update_username
 // ============================================================
 
 const crypto = require('node:crypto');
@@ -30,7 +30,7 @@ function register(io, socket) {
     if (!socketRateLimit(socket, 'authenticate', 5, 10_000).allowed) {
       return callback?.({ success: false, error: 'Rate limit exceeded' });
     }
-    // Guest path — typed username, no Supabase verification.
+    // Guest path - typed username, no Supabase verification.
     if (!token && guest && typeof guest === 'object') {
       const cleanUsername = sanitizeGuestUsername(guest.username);
       if (!cleanUsername) {
@@ -116,10 +116,10 @@ function register(io, socket) {
     }
   });
 
-  // ─── Sign out — release the single-active-session entry ──────────
+  // ─── Sign out - release the single-active-session entry ──────────
   // A sign-out doesn't drop the socket (it stays connected on the landing /
   // auth screen), so without this the registry would keep showing the account
-  // as signed-in on this device — making the NEXT login (even on the same or a
+  // as signed-in on this device - making the NEXT login (even on the same or a
   // fresh device) see a phantom active session. clearSession is socketId-
   // matched, so it only releases THIS device's own entry.
   socket.on('sign_out', (_payload, callback) => {

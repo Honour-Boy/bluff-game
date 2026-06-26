@@ -1,5 +1,5 @@
 // ============================================================
-// ENGINE — Shared constants + room-config normalisation
+// ENGINE - Shared constants + room-config normalisation
 // ============================================================
 // Pure data. Importable from anywhere in the engine without
 // risking a cycle. Anything that's purely a value (number, string,
@@ -10,7 +10,7 @@ const SHAPES = ['circle', 'triangle', 'cross', 'square', 'star'];
 const MAX_PLAYERS = 15;
 const CHAMBER_SIZE = 6;
 
-// ─── v2 Phase D — Secret roles ───────────────────────────────
+// ─── v2 Phase D - Secret roles ───────────────────────────────
 const ROLES = {
   BAREHAND: 'barehand',
   GAMBLER: 'gambler',
@@ -27,26 +27,26 @@ const ROLE_TYPES = Object.values(ROLES);
 // Barehand fillers until 7+), and a full cohort + Barehands appears at 9+.
 const ROLES_AT_MIN_ALIVE = 3;
 const COLLECTOR_POWER_CARD_CAP = 3;
-// v2 #120 — Medic may revive at most this many eliminations per game
+// v2 #120 - Medic may revive at most this many eliminations per game
 // (tracked per-player as `medicSavesUsed`, enforced in roles.js +
 // handlers/roles.js). A 4th attempt is rejected server-side.
 const MEDIC_MAX_SAVES = 3;
-// #142 — a Medic save costs +2 cards, so it is refused once the Medic's hand
+// #142 - a Medic save costs +2 cards, so it is refused once the Medic's hand
 // is already this large. Sized to the 6-shape-card starting hand (#139) plus
 // the 2-card save cost: a Medic CAN save from a fresh starting hand, but must
 // play cards down before stacking another save. (Previously hard-coded to 6,
 // which silently blocked every Medic the moment the deal grew to 6 shapes.)
 const MEDIC_SAVE_HAND_CAP = 8;
 
-// ─── v2 Phase G — Pre-game selection & role reveal (#116) ────
+// ─── v2 Phase G - Pre-game selection & role reveal (#116) ────
 // How long the private role-reveal card lingers before the server
 // opens the selection window. Selection then auto-resolves after
 // PRE_GAME_SELECTION_TIMEOUT_MS for any player who hasn't picked.
 // 10s so players can actually read their role + its description (2s was
-// too quick to read — playtest feedback).
+// too quick to read - playtest feedback).
 const ROLE_REVEAL_DISPLAY_MS = 10000;
 const PRE_GAME_SELECTION_TIMEOUT_MS = 15000;
-// Playtest §2.1 — the 15s window always runs to completion (no quick-skip when
+// Playtest §2.1 - the 15s window always runs to completion (no quick-skip when
 // the last player confirms). A pick made at/after the 12s mark is "late": the
 // picker earns a private 5s review buffer to look at what they drew, and is
 // deprioritised off the very first active turn so they aren't on the clock
@@ -60,7 +60,7 @@ const CARD_TYPES_DISCRIMINATOR = {
 };
 const POWER_TYPES = ['shield', 'mirror', 'swap', 'peek', 'freeze', 'assassin'];
 
-// §1.1 — Bluff interception window. When a bluff is called, an accused who
+// §1.1 - Bluff interception window. When a bluff is called, an accused who
 // still holds an un-armed DEFENSIVE power card gets a short window to arm it in
 // response, BEFORE resolution runs. Only reactive/defensive powers qualify:
 // shield (blocks), mirror (reflects), swap (re-faces the played card). Assassin
@@ -68,23 +68,23 @@ const POWER_TYPES = ['shield', 'mirror', 'swap', 'peek', 'freeze', 'assassin'];
 const INTERCEPTABLE_POWERS = ['shield', 'mirror', 'swap'];
 const BLUFF_INTERCEPT_WINDOW_MS = 8000;
 
-// ─── v2 #119 — Unified Event Resolution Engine ───────────────
+// ─── v2 #119 - Unified Event Resolution Engine ───────────────
 //
 // `bluffPipeline.js` resolves every bluff by pushing a single typed
 // `GameEvent` through an ordered `ResolutionQueue`. The queue has
 // exactly six priority tiers; no tier runs until the previous one has
 // fully resolved. Priority is declarative (the tier number) rather
-// than implicit in array position — there are no pairwise card-vs-card
+// than implicit in array position - there are no pairwise card-vs-card
 // overrides. Clashes that used to be encoded by stage ordering (e.g.
 // "Assassin > Mirror") are now expressed through event flags: a
 // non-`redirectable` event is one that Tier-4 redirectors (Mirror,
 // Sniper) must leave untouched.
 const RESOLUTION_TIERS = {
-  PREVENTION: 1,      // Shield, Freeze — cancel the bluff outright
-  MODIFICATION: 2,    // Swap, Peek — mutate the played card / pause
+  PREVENTION: 1,      // Shield, Freeze - cancel the bluff outright
+  MODIFICATION: 2,    // Swap, Peek - mutate the played card / pause
   BLUFF_VALIDATION: 3,// Determine truth of the played card + type the consequence
-  REDIRECTION: 4,     // Mirror, Sniper — retarget a redirectable consequence
-  CONSEQUENCE: 5,     // Spin, Assassin (FORCED_ELIMINATION) — materialise it
+  REDIRECTION: 4,     // Mirror, Sniper - retarget a redirectable consequence
+  CONSEQUENCE: 5,     // Spin, Assassin (FORCED_ELIMINATION) - materialise it
   POST_RESOLUTION: 6, // Medic, Bounty, Role effects, Announcements
 };
 
@@ -94,10 +94,10 @@ const RESOLUTION_TIERS = {
 const GAME_EVENT_TYPES = {
   BLUFF_CALLED: 'BLUFF_CALLED',           // initial, not-yet-typed event
   SPIN_CONSEQUENCE: 'SPIN_CONSEQUENCE',   // someone spins the chamber
-  FORCED_ELIMINATION: 'FORCED_ELIMINATION', // Assassin strike — non-redirectable
+  FORCED_ELIMINATION: 'FORCED_ELIMINATION', // Assassin strike - non-redirectable
   ASSASSIN_BACKFIRE: 'ASSASSIN_BACKFIRE', // correct call vs Assassin → +N penalty
-  BLUFF_BLOCKED: 'BLUFF_BLOCKED',         // Shield — bluff never registers
-  SWAP_PENDING: 'SWAP_PENDING',           // Swap — pause for the holder's pick
+  BLUFF_BLOCKED: 'BLUFF_BLOCKED',         // Shield - bluff never registers
+  SWAP_PENDING: 'SWAP_PENDING',           // Swap - pause for the holder's pick
   BLUFF_ERROR: 'BLUFF_ERROR',             // resume-time invariant violation
 };
 
@@ -130,8 +130,8 @@ const SUDDEN_DEATH_THRESHOLD = 4;
 
 // ─── Spin state-machine safety timeouts (server-side anti-hang) ──
 // The spin is fully server-authoritative (chambers live on the server). If the
-// spin target never emits player_spin — the spin UI fails to mount, or a
-// transient network blip swallows the emit — the server auto-resolves the spin
+// spin target never emits player_spin - the spin UI fails to mount, or a
+// transient network blip swallows the emit - the server auto-resolves the spin
 // on their behalf after this window instead of parking the room forever in
 // spin_pending. Generous, because players need time to read the prompt (and a
 // 10s betting window may run first).
@@ -143,28 +143,28 @@ const SPIN_PENDING_TIMEOUT_MS = 90_000;
 // can't strand the room in 'playing' with every socket still alive.
 const PENDING_GAME_OVER_TIMEOUT_MS = 10_000;
 
-// Redemption Spin (riskModifiers.redemptionSpin) — once an eliminating spin is
+// Redemption Spin (riskModifiers.redemptionSpin) - once an eliminating spin is
 // acknowledged, the eliminated player is offered ONE redemption spin. If they
 // never take it (overlay glitch / they walked away), the server runs it on
 // their behalf after this window so the room can't park in redemption_pending.
 const REDEMPTION_PENDING_TIMEOUT_MS = 30_000;
 
-// Covenant — Blood Debt assignment window. When a correct-bluff spin kills a
+// Covenant - Blood Debt assignment window. When a correct-bluff spin kills a
 // player in a Covenant room, they get this long to name their debt target; on
 // expiry the debt defaults to the bluff caller.
 const BLOOD_DEBT_WINDOW_MS = 10_000;
 
-// Covenant — The Pact volunteer-pull window. When a spin would fall on one Pact
+// Covenant - The Pact volunteer-pull window. When a spin would fall on one Pact
 // partner, the OTHER partner gets this long to volunteer to take the bullet in
 // their place; on expiry the original target spins.
 const PACT_VOLUNTEER_WINDOW_MS = 6_000;
 
-// Speed Mode (roomModifiers.speedMode) — each player's turn is capped at this
+// Speed Mode (roomModifiers.speedMode) - each player's turn is capped at this
 // many ms. When the deadline passes the server auto-ENDS the turn (no auto-spin
-// — #79 bans auto-spin in every mode). The lobby advertises a 25s turn timer.
+// - #79 bans auto-spin in every mode). The lobby advertises a 25s turn timer.
 const SPEED_MODE_TURN_MS = 25_000;
 
-// #239 — Idle-turn safety net. OUTSIDE Speed Mode an AFK current player would
+// #239 - Idle-turn safety net. OUTSIDE Speed Mode an AFK current player would
 // otherwise block the table forever. After this long with no action the server
 // auto-resolves their turn (auto-plays a sensible legal card if they haven't,
 // then ends the turn). Speed Mode's shorter advertised cap takes precedence when
@@ -196,7 +196,7 @@ function defaultRoomConfig() {
       speedMode: false,
       suddenDeath: false,
       mirrorMatch: false,
-      // Roulette Rotation — each cycle is a fresh random turn order (online).
+      // Roulette Rotation - each cycle is a fresh random turn order (online).
       rouletteRotation: false,
     },
     systems: {
@@ -253,7 +253,7 @@ function normalizeRoomConfig(input) {
 // Room mechanics unlock with the host's tier. Room creation is the SOLE
 // gating point: a normalized config is run through applyTierCapsToConfig,
 // which forces every field a tier can't use to its off-value (and forces
-// secretRoles ON for Syndicate/Covenant — see roadmap R8). Returns a NEW
+// secretRoles ON for Syndicate/Covenant - see roadmap R8). Returns a NEW
 // config; never mutates the input.
 //
 //   Streets   → no powers, no roles, no risk/room modifiers, no systems.

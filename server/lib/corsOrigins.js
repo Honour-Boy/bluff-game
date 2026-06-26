@@ -1,5 +1,5 @@
 // ============================================================
-// CORS ORIGIN MATCHING — exact list + optional preview regex
+// CORS ORIGIN MATCHING - exact list + optional preview regex
 // ============================================================
 // Pure origin-allow logic for the game server's CORS (Express + Socket.IO).
 //
@@ -8,7 +8,7 @@
 // hostnames are dynamic (e.g. https://bluff-game-ospb35d14-honour-boys-projects
 // .vercel.app), so an exact list can never enumerate them. PREVIEW_ORIGIN_REGEX
 // lets that one box additionally allow any origin matching a project-scoped
-// pattern — so a brand-new branch preview works with NO server redeploy.
+// pattern - so a brand-new branch preview works with NO server redeploy.
 //
 // Kept pure (no env reads, no I/O) so it is fully unit-testable; index.js wires
 // the env vars in.
@@ -36,7 +36,7 @@ function makeOriginAllow({ clientUrl, previewRegex } = {}) {
 
   return function originAllowed(origin) {
     // No Origin header at all (curl, server-to-server, same-origin navigations,
-    // health checks) — always allow; CORS only guards cross-origin browsers.
+    // health checks) - always allow; CORS only guards cross-origin browsers.
     if (!origin) return true;
     if (wildcard) return true;
     if (exact && exact.includes(origin)) return true;

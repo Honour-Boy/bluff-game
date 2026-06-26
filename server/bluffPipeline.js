@@ -1,5 +1,5 @@
 // ============================================================
-// BLUFF PIPELINE — Unified Event Resolution Engine (#119)
+// BLUFF PIPELINE - Unified Event Resolution Engine (#119)
 // ============================================================
 //
 // `call_bluff` resolution used to be a procedural blob, then a fixed
@@ -16,7 +16,7 @@
 //     (pass-through), a mutated / re-typed event, or `null` (cancelled).
 //   • Clash priorities are NO LONGER encoded by ordering. They fall out
 //     of the event flags: a non-`redirectable` event is one Tier-4
-//     redirectors (Mirror / Sniper) must leave untouched — that is how
+//     redirectors (Mirror / Sniper) must leave untouched - that is how
 //     "Assassin > Mirror" is honoured without an `if assassin && mirror`
 //     pairwise override.
 //
@@ -36,11 +36,11 @@
 //
 // Side effects (announce-banner socket emits, room phase mutation,
 // chamber spinning, hand reset, Sniper/Medic pauses) are still
-// performed by the *callers* — `handlers/bluff.js` + `lib/orchestration.js`.
+// performed by the *callers* - `handlers/bluff.js` + `lib/orchestration.js`.
 // The pipeline is pure logic + a list of `events` for the caller to
 // broadcast.
 //
-// Public surface (UNCHANGED — callers + tests rely on `outcome.kind`):
+// Public surface (UNCHANGED - callers + tests rely on `outcome.kind`):
 //
 //   resolveBluff(room, accuserId)     → { events, outcome }
 //   resumeAfterSwap(room, accuserId, pickedCardId) → { events, outcome }
@@ -88,12 +88,12 @@ function _accusedPrev(room) {
   return _findPlayer(room, getPreviousTurnPlayerId(room));
 }
 
-// Thin alias kept for the `_internal` test surface — the rule itself
+// Thin alias kept for the `_internal` test surface - the rule itself
 // lives in engine/bluff.js so there is exactly one implementation.
 const _isBluffCorrect = isBluffCorrect;
 
-// Phase D hook — Sheriff role exempts the accuser from Assassin's
-// strike (also gains a passive risk-drop on correct calls — Tier 6).
+// Phase D hook - Sheriff role exempts the accuser from Assassin's
+// strike (also gains a passive risk-drop on correct calls - Tier 6).
 function _isSheriff(room, playerId) {
   return _findPlayer(room, playerId)?.role === 'sheriff';
 }
@@ -102,7 +102,7 @@ function _isGambler(room, playerId) {
   return _findPlayer(room, playerId)?.role === 'gambler';
 }
 
-// v2 Phase D — Gambler: a correctly-called bluff jumps their risk to 4
+// v2 Phase D - Gambler: a correctly-called bluff jumps their risk to 4
 // BEFORE the spin by rewriting the chamber to hold exactly 4 bullets at
 // random positions (preserving "risk level = bullet count").
 function _bumpGamblerRiskToFour(player) {
@@ -119,7 +119,7 @@ function _bumpGamblerRiskToFour(player) {
   player.riskLevel = TARGET;
 }
 
-// APNAP tie-breaker — Active Player → Non-Active Player. When two or
+// APNAP tie-breaker - Active Player → Non-Active Player. When two or
 // more handlers in the SAME tier want to fire simultaneously, resolve
 // them in clockwise turn order starting from the active player
 // (`currentTurnIndex`). Returns the candidate ids re-ordered to match.
@@ -145,9 +145,9 @@ function _event(type, { source = null, target = null, redirectable = false, prev
   return { type, source, target, redirectable, preventable, payload };
 }
 
-// ─── Tier 1 — Prevention (Shield, Freeze) ─────────────────────
+// ─── Tier 1 - Prevention (Shield, Freeze) ─────────────────────
 //
-// Shield blocks the bluff outright — per spec it "never officially
+// Shield blocks the bluff outright - per spec it "never officially
 // registers", so no later tier fires. Freeze is a turn-skip mechanic
 // with no bluff-resolution effect, so it is a no-op here.
 function _tierPrevention(room, event, ctx) {
@@ -169,7 +169,7 @@ function _tierPrevention(room, event, ctx) {
   return event;
 }
 
-// ─── Tier 2 — Modification (Swap, Peek) ───────────────────────
+// ─── Tier 2 - Modification (Swap, Peek) ───────────────────────
 //
 // An activatable armed Swap pauses the queue and asks the holder to
 // pick a card from the played pile; the caller resumes via
@@ -181,7 +181,7 @@ function _tierModification(room, event, ctx) {
 
   const slot = room.powerCardSlot?.[accused.id] || [];
   const swapCard = slot.find(c => c?.id === accused.armedPowerCard.cardId);
-  // If the activation gate is still pending we do NOT pause — fall
+  // If the activation gate is still pending we do NOT pause - fall
   // through so Tier 3+ resolve the bluff normally.
   const stillGated = swapCard
     && Array.isArray(swapCard.swapPendingPlayerIds)
@@ -200,7 +200,7 @@ function _tierModification(room, event, ctx) {
   });
 }
 
-// ─── Tier 3 — Bluff Validation (+ consequence typing) ─────────
+// ─── Tier 3 - Bluff Validation (+ consequence typing) ─────────
 //
 // Determines truth of the played card (delegated to engine/bluff.js so
 // the rule lives in one place) and types the consequence event:
@@ -216,7 +216,7 @@ function _tierBluffValidation(room, event, ctx) {
   ctx.revealedCard = revealedCard;
 
   if (accused?.armedPowerCard?.power === 'assassin') {
-    // Sheriff is immune — Assassin stays armed, bluff falls through to
+    // Sheriff is immune - Assassin stays armed, bluff falls through to
     // the normal spin consequence (a correct Sheriff call still spins
     // the accused and earns its Tier-6 risk-drop).
     if (_isSheriff(room, accuser?.id)) {
@@ -237,7 +237,7 @@ function _tierBluffValidation(room, event, ctx) {
     //   preventable: true   → Shield CAN cancel it (Shield > Assassin).
     // The `preventable` flag is declarative here: a player holds at most
     // one armed power card, and an armed Shield is already consumed at
-    // Tier 1 (Prevention) before this consequence is ever typed — so the
+    // Tier 1 (Prevention) before this consequence is ever typed - so the
     // clash is honoured by ordering. The flag keeps the GameEvent
     // self-describing for any future tier that reads it.
     if (bluffIsCorrect === false) {
@@ -280,7 +280,7 @@ function _tierBluffValidation(room, event, ctx) {
   return spinEvent;
 }
 
-// ─── Tier 4 — Redirection (Mirror, Sniper) ────────────────────
+// ─── Tier 4 - Redirection (Mirror, Sniper) ────────────────────
 //
 // Only `redirectable` events can be retargeted. Mirror has two
 // scenarios; when more than one holder could fire, candidates are
@@ -337,7 +337,7 @@ function _tierRedirection(room, event, ctx) {
   return event;
 }
 
-// ─── Tier 5 — Consequence (Spin, Assassin elimination) ────────
+// ─── Tier 5 - Consequence (Spin, Assassin elimination) ────────
 //
 // Materialises the typed consequence. A FORCED_ELIMINATION consumes the
 // Assassin, emits the strike banner, and halts the queue (no
@@ -347,7 +347,7 @@ function _tierConsequence(room, event, ctx) {
   if (event.type === GAME_EVENT_TYPES.FORCED_ELIMINATION) {
     const { accused } = ctx;
 
-    // Playtest §1.3 — Shield > Assassin, applied UNIVERSALLY to whoever the
+    // Playtest §1.3 - Shield > Assassin, applied UNIVERSALLY to whoever the
     // strike lands on. A wrong call backfires onto the ACCUSER, who may have
     // armed a Shield in their own defence. Tier 1 (Prevention) only ever sees
     // the *accused's* Shield, so it cannot catch this case; without the check
@@ -355,7 +355,7 @@ function _tierConsequence(room, event, ctx) {
     // armed-but-useless, and the death banner would clash with the expected
     // block (the reported "engine lockup"). When the elimination target holds
     // an armed Shield we consume BOTH cards, emit the block banner, and resolve
-    // the bluff cleanly as BLUFF_BLOCKED — nobody dies, no later tier runs.
+    // the bluff cleanly as BLUFF_BLOCKED - nobody dies, no later tier runs.
     const target = _findPlayer(room, event.target);
     if (event.preventable && target?.armedPowerCard?.power === 'shield') {
       _consumeArmedCard(room, target);   // the Shield (intercepts)
@@ -392,7 +392,7 @@ function _tierConsequence(room, event, ctx) {
   return event;
 }
 
-// ─── Tier 6 — Post-Resolution (Roles, Bounty) ─────────────────
+// ─── Tier 6 - Post-Resolution (Roles, Bounty) ─────────────────
 //
 // Role passives and bounty collection that fire AFTER the spin target
 // is locked. Order: Gambler → Sheriff → Bounty (announcement order is
@@ -402,7 +402,7 @@ function _tierPostResolution(room, event, ctx) {
   if (ctx.bluffIsCorrect !== true) return event;
   const { accuser, accused } = ctx;
 
-  // Gambler — accused was caught bluffing. Chamber bumped to 4 BEFORE
+  // Gambler - accused was caught bluffing. Chamber bumped to 4 BEFORE
   // the (caller-run) spin.
   if (accused && _isGambler(room, accused.id)) {
     _bumpGamblerRiskToFour(accused);
@@ -413,7 +413,7 @@ function _tierPostResolution(room, event, ctx) {
     });
   }
 
-  // Sheriff — every correct call BY the Sheriff drops their risk by 1.
+  // Sheriff - every correct call BY the Sheriff drops their risk by 1.
   if (accuser && _isSheriff(room, accuser.id)) {
     const dropped = _removeRandomBullet(accuser);
     if (dropped) {
@@ -426,7 +426,7 @@ function _tierPostResolution(room, event, ctx) {
     }
   }
 
-  // Bounty — a correct call against a bounty carrier lets the accuser
+  // Bounty - a correct call against a bounty carrier lets the accuser
   // collect: one bullet removed, bounty cleared, streak reset.
   if (accused?.hasBounty && room.config?.systems?.bounty) {
     accused.hasBounty = false;
@@ -516,7 +516,7 @@ function _toOutcome(event, ctx) {
       return {
         ...base,
         kind: 'blocked',
-        // The Shield holder is always the event target — the accused for a
+        // The Shield holder is always the event target - the accused for a
         // Tier-1 block, the strike target (accuser) for a §1.3 Assassin block.
         shieldHolderId: event.target,
         accuserId: event.payload.accuserId,
@@ -596,7 +596,7 @@ function resolveBluff(room, accuserId) {
  *      and Mirror gets a fresh chance on the post-swap world.
  *   4. Both cards are revealed (caller emits the reveal UI).
  *
- * Per #119 this re-enters the ResolutionQueue at **Tier 3** — Shield
+ * Per #119 this re-enters the ResolutionQueue at **Tier 3** - Shield
  * (Tier 1) and Swap (Tier 2) do NOT re-run; they were already evaluated
  * against the original accused state and the Swap card is consumed here.
  * Returns the same `{ events, outcome }` shape as `resolveBluff`.
@@ -612,7 +612,7 @@ function resumeAfterSwap(room, accuserId, pickedCardId) {
   }
 
   const playedPile = room.playedPile || [];
-  // The accused's just-played card is the one under accusation — i.e. the
+  // The accused's just-played card is the one under accusation - i.e. the
   // turn-boundary snapshot, NOT blindly the top of the pile. With order-free
   // actions the accuser may have played their own card after the accused, so
   // the accused's card is no longer guaranteed to be on top.
@@ -658,7 +658,7 @@ function resumeAfterSwap(room, accuserId, pickedCardId) {
     swappedCard: room.lastPlayedCard,
   });
 
-  // Re-enter at Tier 3 (Bluff Validation) — Tiers 1 + 2 are skipped.
+  // Re-enter at Tier 3 (Bluff Validation) - Tiers 1 + 2 are skipped.
   const event = _runQueue(room, ctx, RESOLUTION_TIERS.BLUFF_VALIDATION);
 
   return { events: ctx.events, outcome: _toOutcome(event, ctx) };

@@ -5,9 +5,9 @@ import { useEffect, useRef, useState } from 'react';
 const TOTAL_MS = 15000;
 
 /**
- * Speed Mode countdown — visible to EVERY player, not just the active one.
+ * Speed Mode countdown - visible to EVERY player, not just the active one.
  * Shows whose turn it is and how long they have left before the server
- * auto-ends their turn (no spin — #79). The server stamps the deadline and
+ * auto-ends their turn (no spin - #79). The server stamps the deadline and
  * sends `speedModeMsRemaining` on every room_state; between pushes we tick the
  * remaining time down locally and re-sync whenever a fresh snapshot arrives.
  */

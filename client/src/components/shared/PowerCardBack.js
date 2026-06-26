@@ -7,7 +7,7 @@
 // "?" glyph in lime over a tessellated chevron field.
 //
 // Props
-//   size  : 'sm' | 'md' | 'lg'  — same dimensions as PowerCard
+//   size  : 'sm' | 'md' | 'lg'  - same dimensions as PowerCard
 //   style : extra inline styles
 // ──────────────────────────────────────────────────────────────
 

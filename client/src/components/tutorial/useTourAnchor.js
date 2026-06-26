@@ -53,7 +53,7 @@ export function useTourAnchor(anchorId, activeBeatKey, { missingTimeoutMs = MISS
 
     let resizeObserver = null;
     let observedEl = null;
-    let scrolledIntoView = false; // once per beat — bring a low menu row into view
+    let scrolledIntoView = false; // once per beat - bring a low menu row into view
 
     const pump = () => {
       if (cancelled) return;
@@ -78,7 +78,7 @@ export function useTourAnchor(anchorId, activeBeatKey, { missingTimeoutMs = MISS
       }
 
       if (next) {
-        // Found + laid out — clear any pending missing timer.
+        // Found + laid out - clear any pending missing timer.
         if (missingTimerRef.current) { clearTimeout(missingTimerRef.current); missingTimerRef.current = null; }
         if (!rectsEqual(next, rectRef.current)) {
           rectRef.current = next;
@@ -86,7 +86,7 @@ export function useTourAnchor(anchorId, activeBeatKey, { missingTimeoutMs = MISS
         }
         if (missing) setMissing(false);
       } else if (!missingTimerRef.current && !missing) {
-        // Not found yet — arm the skip timer once.
+        // Not found yet - arm the skip timer once.
         missingTimerRef.current = setTimeout(() => {
           if (!cancelled) setMissing(true);
         }, missingTimeoutMs);
@@ -108,7 +108,7 @@ export function useTourAnchor(anchorId, activeBeatKey, { missingTimeoutMs = MISS
     const kick1 = setTimeout(schedule, 50);
     const kick2 = setTimeout(schedule, 200);
     // Low-frequency safety re-measure: a target can vanish (menu/modal unmount)
-    // with NO resize/scroll event, and a ResizeObserver doesn't fire on removal —
+    // with NO resize/scroll event, and a ResizeObserver doesn't fire on removal -
     // so poll, ensuring a silently-removed anchor still trips the missing timeout
     // (never strand the player) and a drifting target stays tracked.
     const poll = setInterval(schedule, 400);

@@ -1,5 +1,5 @@
 // ============================================================
-// ENGINE — Player lifecycle + turn rotation
+// ENGINE - Player lifecycle + turn rotation
 // ============================================================
 // createPlayer, turn-order helpers, elimination + reconnect bookkeeping.
 
@@ -10,7 +10,7 @@ const { checkDualWin } = require('./pact');
 
 /**
  * Create a new player.
- * chamber is always initialised here (backend only — never on client).
+ * chamber is always initialised here (backend only - never on client).
  */
 function createPlayer(id, username, socketId) {
   return {
@@ -23,19 +23,19 @@ function createPlayer(id, username, socketId) {
     isSpectator: false,
     connectedAt: Date.now(),
     armedPowerCard: null,
-    // v2 Phase D — Secret roles.
+    // v2 Phase D - Secret roles.
     role: ROLES.BAREHAND,
-    // v2 #120 — Medic revives are capped per game (MEDIC_MAX_SAVES).
+    // v2 #120 - Medic revives are capped per game (MEDIC_MAX_SAVES).
     // Track a running count instead of a one-shot boolean.
     medicSavesUsed: 0,
     saboteurAbilityAvailable: true,
     sniperAbilityAvailable: true,
-    // v2 Phase F — Bounty system.
+    // v2 Phase F - Bounty system.
     consecutiveSurvivedSpins: 0,
     hasBounty: false,
-    // v2 Phase F — Betting system.
+    // v2 Phase F - Betting system.
     consecutiveCorrectBets: 0,
-    // Covenant — Blood Debt. Set true on a player named as the revenge target
+    // Covenant - Blood Debt. Set true on a player named as the revenge target
     // by someone eliminated via a correct-bluff spin; consumed on their next
     // call_bluff (an extra debt spin fires). Covenant rooms only.
     hasBloodDebt: false,
@@ -50,19 +50,19 @@ function getCurrentPlayer(room) {
 
 // ─── Turn management ───────────────────────────────────────────
 //
-// v2 Phase C — Freeze. When the freeze holder ends their turn we
+// v2 Phase C - Freeze. When the freeze holder ends their turn we
 // stamp room.skipNextPlayer = true (and queue the bluff-block). On
 // the very next advanceTurn, we advance an EXTRA step so the next
 // player in turn order is fully skipped. The player AFTER the
 // skipped one inherits room.bluffBlockedThisTurn = true.
 
-// ─── Roulette Rotation — spontaneous turn order (online) ───────
+// ─── Roulette Rotation - spontaneous turn order (online) ───────
 //
 // Each "cycle" is a fresh random permutation of the alive players: everyone
 // takes exactly one turn before anyone repeats, and the first player of a new
 // cycle differs from the last player of the finished one so nobody plays twice
 // back-to-back across the boundary. With exactly two alive players this forces
-// strict alternation (the only repeat-free order possible) — intended.
+// strict alternation (the only repeat-free order possible) - intended.
 function _buildRouletteCycle(room, avoidFirstId) {
   const ids = room.players.filter(p => p.status === 'alive').map(p => p.id);
   // Fisher-Yates.
@@ -107,7 +107,7 @@ function advanceTurn(room) {
   // Snapshot the card the finishing player played as the "card under
   // accusation" for the incoming player. Frozen at this turn boundary so the
   // incoming player's OWN same-turn play (turn actions are order-free) can no
-  // longer overwrite what a call_bluff / Peek resolves against — the bug where
+  // longer overwrite what a call_bluff / Peek resolves against - the bug where
   // playing first made the bluff judge your own card instead of the previous
   // player's. `lastPlayedCard` keeps tracking the live most-recent play so the
   // next boundary captures this player's card in turn.
@@ -123,7 +123,7 @@ function advanceTurn(room) {
   _advanceTurnIndex(room);
   room.lastAction = null;
   room.phase = 'playing';
-  // §1.1 — the turn-action ledger. advanceTurn is the SINGLE authoritative
+  // §1.1 - the turn-action ledger. advanceTurn is the SINGLE authoritative
   // reset point for a genuine turn change: each of the three once-per-turn
   // actions (card play / bluff call / power activation) re-opens here and
   // nowhere else. Mid-turn resolutions (bluff/spin/assassin) must NOT clear
@@ -143,7 +143,7 @@ function advanceTurn(room) {
     _advanceTurnIndex(room);
     room.skipNextPlayer = false;
     room.bluffBlockedThisTurn = true;
-    // The skipped (frozen) player played nothing — nothing to challenge or peek.
+    // The skipped (frozen) player played nothing - nothing to challenge or peek.
     room.challengeableCard = null;
     room.challengeableCardType = null;
   }
@@ -152,7 +152,7 @@ function advanceTurn(room) {
   return room;
 }
 
-// The player who took the immediately-previous turn — i.e. the player a bluff
+// The player who took the immediately-previous turn - i.e. the player a bluff
 // call accuses / Peek reveals. Prefers the explicit `prevTurnPlayerId` stamped
 // by advanceTurn (correct across Roulette Rotation cycle boundaries) and falls
 // back to fixed turn-order arithmetic for callers/tests that build a room
@@ -164,7 +164,7 @@ function getPreviousTurnPlayerId(room) {
   return room.turnOrder[(room.currentTurnIndex - 1 + len) % len] || null;
 }
 
-// #163 + playtest §1.4 — sweep stale armed power cards on every turn advance.
+// #163 + playtest §1.4 - sweep stale armed power cards on every turn advance.
 //
 // A holder can only ever be bluffed by the player immediately AFTER them
 // (`call_bluff` always targets the previous player), so an armed Shield /
@@ -183,8 +183,8 @@ function getPreviousTurnPlayerId(room) {
 // ready to be re-armed on the holder's next turn.
 //
 // Excluded:
-//   • Freeze — consumed at end_turn via consumeFreezeOnTurnEnd, never survives.
-//   • Swap   — armed early but only becomes activatable after a full turn
+//   • Freeze - consumed at end_turn via consumeFreezeOnTurnEnd, never survives.
+//   • Swap   - armed early but only becomes activatable after a full turn
 //              cycle (swapPendingPlayerIds), so it MUST persist across turns.
 function _sweepStaleArmedPowerCards(room) {
   if (!Array.isArray(room.turnOrder) || room.turnOrder.length === 0) return;
@@ -208,7 +208,7 @@ function _sweepStaleArmedPowerCards(room) {
 }
 
 function eliminateFromTurnOrder(room, playerId) {
-  // #205 — stamp the elimination order for end-of-game placement XP. Every
+  // #205 - stamp the elimination order for end-of-game placement XP. Every
   // real elimination funnels through here (spin death, assassin strike,
   // leave/disconnect, kick), so it's the single reliable stamp point. A
   // redemption rejoin clears the stamp (engine/modifiers.js).
@@ -229,7 +229,7 @@ function eliminateFromTurnOrder(room, playerId) {
   }
   // Eliminations remove from Swap pending sets WITHOUT crediting.
   _removePlayerFromSwapSnapshots(room, playerId);
-  // v2 Phase E2 — Sudden Death: any elimination resets the streak
+  // v2 Phase E2 - Sudden Death: any elimination resets the streak
   // counter to 0. Done inline here to avoid pulling in modifiers.js
   // just for one field reset.
   if (room) room.suddenDeathCounter = 0;
@@ -254,7 +254,7 @@ function handleDisconnect(room, socketId) {
 }
 
 function checkGameOver(room) {
-  // Covenant — The Pact. If both partners of an active pact are the last two
+  // Covenant - The Pact. If both partners of an active pact are the last two
   // standing they SHARE the win, so the game is over at two alive (not one).
   // Returns a sentinel that carries `.id`/`.username` (the first partner) so the
   // ~14 existing call sites that only stamp a single winner keep working; the
@@ -315,16 +315,16 @@ function reconnectPlayer(room, playerId, newSocketId) {
   return player;
 }
 
-// Playtest §2.2 — when the acting host leaves a live game, hand the in-room
+// Playtest §2.2 - when the acting host leaves a live game, hand the in-room
 // host seat to a random still-present alive player. In a 2-player game the
 // lone survivor is BOTH the winner and the new host. Returns the chosen
 // player, or null if nobody is left to take over (the room is being torn down).
-// For persistent group rooms the ORIGINAL owner reclaims on rejoin — join_room
-// re-stamps room.hostUserId from group.host_user_id — so this only governs the
+// For persistent group rooms the ORIGINAL owner reclaims on rejoin - join_room
+// re-stamps room.hostUserId from group.host_user_id - so this only governs the
 // temporary in-room host while the owner is away.
 function pickReplacementHost(room, leavingPlayerId) {
   const candidates = room.players.filter(
-    // A bot can never hold the host seat — it has no socket to run host controls.
+    // A bot can never hold the host seat - it has no socket to run host controls.
     // (In a tutorial room the bot is the only other seat, so this returns null
     // and the caller tears the room down instead of migrating.)
     p => p.id !== leavingPlayerId && p.status === 'alive' && !p.isBot,

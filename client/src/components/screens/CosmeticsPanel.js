@@ -10,14 +10,14 @@ import {
   tableFeltFor,
 } from '../../lib/cosmetics';
 
-// ─── CosmeticsPanel — the cosmetic locker (#205) ──────────────────────────────
+// ─── CosmeticsPanel - the cosmetic locker (#205) ──────────────────────────────
 // Opened from the global SettingsGear (signed-in, non-guest only). The server
 // is the authority on unlocks / what's equipped: this panel fetches via
 // get_progression and equips via set_cosmetics (which re-validates ownership
-// server-side). Previews are pure CSS — same render maps the table uses.
+// server-side). Previews are pure CSS - same render maps the table uses.
 //
 // Rank / level / XP / career stats live in their OWN surface (the Landing rank
-// chip + profile drawer), so this panel is cosmetics-only — it uses the fetched
+// chip + profile drawer), so this panel is cosmetics-only - it uses the fetched
 // `level` purely to gate which sets are unlocked; per-item labels carry the
 // tier context, so no XP bar is shown here.
 
@@ -30,9 +30,9 @@ const SLOT_ORDER = [
 
 // Per-category confirmation so the save line names what was actually equipped.
 const SAVE_MSG = {
-  tableFelt: 'Table felt saved — your table is dressed.',
-  cardBack: 'Deck skin saved — your cards are dressed.',
-  gunSkin: 'Chamber skin saved — your iron is dressed.',
+  tableFelt: 'Table felt saved - your table is dressed.',
+  cardBack: 'Deck skin saved - your cards are dressed.',
+  gunSkin: 'Chamber skin saved - your iron is dressed.',
 };
 
 function FeltSwatch({ id }) {
@@ -149,7 +149,7 @@ export function CosmeticsPanel({ getProgression, setCosmetics, onClose }) {
   const handleEquip = async (item) => {
     if (item.unlockLevel > level) return;
     const next = { ...equipped, [item.slot]: item.id };
-    setEquipped(next); // optimistic — the server re-validates
+    setEquipped(next); // optimistic - the server re-validates
     setSaveMsg(null);
     const res = await setCosmetics(next);
     if (res?.success && res.equipped) {

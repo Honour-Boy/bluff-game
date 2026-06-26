@@ -1,8 +1,8 @@
 // ============================================================
-// HANDLERS — Disconnect (immediate removal, no reconnection grace)
+// HANDLERS - Disconnect (immediate removal, no reconnection grace)
 // ============================================================
 // Product decision: a disconnect for ANY reason (refresh, tab close, sign-out,
-// or a network drop) removes the participant from the game right away — even
+// or a network drop) removes the participant from the game right away - even
 // the host. There is no grace period and no auto-rejoin; the matching client
 // no longer emits host_reconnect / player_reconnect.
 
@@ -40,14 +40,14 @@ function register(io, socket, deps) {
     // Single-device registry: release this account's session, but ONLY if it
     // still points at this socket. A late disconnect from an already-evicted
     // socket must not wipe the new session that replaced it. (No-op for guests
-    // and unauthenticated sockets — they were never registered.)
+    // and unauthenticated sockets - they were never registered.)
     clearSession(socket.userId, socket.id);
 
     for (const [code, room] of rooms.entries()) {
       // ── Tutorial / Practice: the human is a non-host seat (the bot "hosts"),
       //    so a dropped human no longer trips the host-teardown path below.
       //    A practice room is only ever human + bot, so the human dropping ends
-      //    the session — destroy the whole room (mirrors the leave_room tutorial
+      //    the session - destroy the whole room (mirrors the leave_room tutorial
       //    teardown) instead of auto-eliminating into a bot-only zombie room. ──
       if (room.isTutorial && room.players.some(p => p.socketId === socket.id && !p.isBot)) {
         logRoomDeletion(code, 'tutorial_disconnected', { phase: room.phase });
@@ -65,7 +65,7 @@ function register(io, socket, deps) {
         _clearBotTimer(code);
         _clearTutorialTimer(code);
         rooms.delete(code);
-        console.log(`[Room ${code}] tutorial — human disconnected, practice room destroyed.`);
+        console.log(`[Room ${code}] tutorial - human disconnected, practice room destroyed.`);
         continue;
       }
 
@@ -87,7 +87,7 @@ function register(io, socket, deps) {
         _clearBotTimer(code);
         discardLobbyIdleState(code);
         rooms.delete(code);
-        console.log(`[Room ${code}] host disconnected — room ended immediately.`);
+        console.log(`[Room ${code}] host disconnected - room ended immediately.`);
         continue;
       }
 
@@ -106,7 +106,7 @@ function register(io, socket, deps) {
       // ── Mid-game: eliminate immediately, resolving any pending pause first
       //    so the table never deadlocks waiting on a player who's now gone. ──
       if (['playing', 'bluff_resolution', 'spin_pending', 'swap_pending', 'medic_pending', 'sniper_pending', 'bluff_intercept_pending', 'ghost_vote_pending', 'last_stand'].includes(room.phase)) {
-        // v2 Phase D — auto-decline gating pauses to avoid deadlock.
+        // v2 Phase D - auto-decline gating pauses to avoid deadlock.
         if (room.phase === 'medic_pending' && room.pendingMedicSave?.medicId === player.id) {
           const pending = room.pendingMedicSave;
           if (typeof pending.finaliseFn === 'function') pending.finaliseFn();
@@ -119,7 +119,7 @@ function register(io, socket, deps) {
           room.pendingSniperRedirect = null;
           applyBluffOutcome(room, outcome);
         }
-        // v2 Phase H — Swap holder disconnect: forfeit, fall through to a
+        // v2 Phase H - Swap holder disconnect: forfeit, fall through to a
         // default spin without consuming the Swap.
         if (room.phase === 'swap_pending' && room.swapHolderId === player.id) {
           const accuserId = room.lastAction?.accuserId;

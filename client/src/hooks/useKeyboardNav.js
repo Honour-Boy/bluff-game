@@ -12,14 +12,14 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 // and call `handleKeyDown` on the container's onKeyDown (or the document).
 //
 // Keyboard contract (matches the global requirement):
-//   ArrowUp / W       — previous item
-//   ArrowDown / S     — next item
-//   ArrowLeft / A     — previous item (horizontal grids)
-//   ArrowRight / D    — next item (horizontal grids)
-//   Enter / Space     — confirm/activate focused item
-//   B                 — bluff hotkey (dispatches custom event)
-//   P                 — power-card hotkey (dispatches custom event)
-//   Escape            — blur / close
+//   ArrowUp / W       - previous item
+//   ArrowDown / S     - next item
+//   ArrowLeft / A     - previous item (horizontal grids)
+//   ArrowRight / D    - next item (horizontal grids)
+//   Enter / Space     - confirm/activate focused item
+//   B                 - bluff hotkey (dispatches custom event)
+//   P                 - power-card hotkey (dispatches custom event)
+//   Escape            - blur / close
 
 export function useKeyboardNav(itemCount, { onConfirm, onEscape, loop = true } = {}) {
   const [focusedIndex, setFocusedIndex] = useState(-1);
@@ -93,7 +93,7 @@ export function useKeyboardNav(itemCount, { onConfirm, onEscape, loop = true } =
         return;
       }
 
-      // Global game hotkeys — broadcast as custom DOM events so any
+      // Global game hotkeys - broadcast as custom DOM events so any
       // listener in the tree can react (Phase 2 will consume these).
       if (key === 'b' || key === 'B') {
         document.dispatchEvent(new CustomEvent('bluff-hotkey'));

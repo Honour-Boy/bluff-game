@@ -1,7 +1,7 @@
 // ============================================================
 // Tests for the chamber / spin-trigger system.
 //
-// Backend-authoritative randomness — these lock the contract that
+// Backend-authoritative randomness - these lock the contract that
 // pullTrigger always returns a coherent spinIndex/eliminated/chamber
 // triple. Issue #67 changed the model from raw `bullets/6` to a
 // non-linear DEATH_CURVE, with the chamber slot SELECTED to agree
@@ -55,7 +55,7 @@ describe('addBulletToChamber', () => {
   });
 });
 
-describe('deathProbability — issue #67 curve table', () => {
+describe('deathProbability - issue #67 curve table', () => {
   it('matches the issue #67 table exactly', () => {
     expect(deathProbability(0)).toBe(0);
     expect(deathProbability(1)).toBeCloseTo(0.15);
@@ -74,7 +74,7 @@ describe('deathProbability — issue #67 curve table', () => {
   });
 });
 
-describe('pullTrigger — issue #67 curve, chamber-consistent', () => {
+describe('pullTrigger - issue #67 curve, chamber-consistent', () => {
   afterEach(() => vi.restoreAllMocks());
 
   it('eliminates when the outcome roll lands under the curve; spinIndex points to a bullet slot; chamber unchanged on death', () => {
@@ -118,7 +118,7 @@ describe('pullTrigger — issue #67 curve, chamber-consistent', () => {
   });
 });
 
-describe('pullTrigger — death distribution approximates the curve (issue #67)', () => {
+describe('pullTrigger - death distribution approximates the curve (issue #67)', () => {
   it('observed death rate ≈ curve for 1..5 bullets over many trials', () => {
     const TRIALS = 20000;
     for (let bullets = 1; bullets <= 5; bullets++) {

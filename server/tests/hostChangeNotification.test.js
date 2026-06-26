@@ -1,5 +1,5 @@
 // ============================================================
-// #183 — host changes are announced to the whole room
+// #183 - host changes are announced to the whole room
 //
 // When a group stand-in is appointed or the owner reclaims / is
 // handed host back, syncLiveRoomHosts already moves the host controls
@@ -24,7 +24,7 @@ function makeIo() {
   };
 }
 
-describe('#183 — host_changed notification', () => {
+describe('#183 - host_changed notification', () => {
   it('emits host_changed to the room with id, name and the standin reason', () => {
     const io = makeIo();
 

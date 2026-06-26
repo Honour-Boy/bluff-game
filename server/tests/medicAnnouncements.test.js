@@ -1,5 +1,5 @@
 // ============================================================
-// #121 — Medic pause is announced to the whole room
+// #121 - Medic pause is announced to the whole room
 //
 // Before #121 `maybeStartMedicPause` only pinged the Medic's own
 // socket, so every other player sat through an unexplained freeze
@@ -38,7 +38,7 @@ function setupMedicRoom() {
   return { room, medic, patient };
 }
 
-describe('#121 — Medic pause broadcast', () => {
+describe('#121 - Medic pause broadcast', () => {
   it('emits a public medic_deciding banner to room.code AND the private prompt to the Medic', () => {
     const { room } = setupMedicRoom();
     const io = makeIo();

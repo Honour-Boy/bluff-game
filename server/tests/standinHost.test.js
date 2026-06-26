@@ -66,7 +66,7 @@ function seedGroup() {
 const group = (data) => data.groups[0];
 const roleOf = (data, uid) => data.group_members.find((m) => m.user_id === uid)?.role;
 
-describe('issue #145 — temporary stand-in host', () => {
+describe('issue #145 - temporary stand-in host', () => {
   it('transferHost appoints a stand-in without changing the permanent owner', async () => {
     const { client, data } = makeSupabaseMock(seedGroup());
     const repo = createGroupsRepo(client);
@@ -171,9 +171,9 @@ describe('issue #145 — temporary stand-in host', () => {
 // (gates server-side host actions) could point at different people. After a
 // reclaim/hand-back changed the DB host while the new host was away, the next
 // member to refresh re-stamped hostUserId from the DB but left hostSocketId on
-// the OLD stand-in's socket — a split-brain host. reconcileHostSocket is the
+// the OLD stand-in's socket - a split-brain host. reconcileHostSocket is the
 // invariant that keeps the two in lock-step.
-describe('reconcileHostSocket — keeps hostSocketId aligned with hostUserId', () => {
+describe('reconcileHostSocket - keeps hostSocketId aligned with hostUserId', () => {
   function groupRoom() {
     const room = createRoom('host-socket', MODES.ONLINE);
     room.groupId = GROUP_ID;
@@ -196,7 +196,7 @@ describe('reconcileHostSocket — keeps hostSocketId aligned with hostUserId', (
     // re-stamped hostUserId, but hostSocketId still points at the stand-in.
     const room = groupRoom();
     room.hostUserId = OWNER;        // re-stamped from DB on a member refresh
-    room.hostSocketId = 'standin-sock'; // stale — old stand-in still holds it
+    room.hostSocketId = 'standin-sock'; // stale - old stand-in still holds it
     reconcileHostSocket(room);
     expect(room.hostSocketId).toBe('owner-sock'); // now matches the owner
   });

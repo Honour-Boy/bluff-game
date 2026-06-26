@@ -11,21 +11,21 @@ import { ShapeIcon } from "./shared/ShapeIcon";
 // ONE blind; on confirm it
 // flips to reveal what they claimed and the modal switches to a live
 // "waiting for N players" state. A countdown reflects the server's
-// 15s auto-resolve deadline — when it lapses the server assigns a
+// 15s auto-resolve deadline - when it lapses the server assigns a
 // random pick and advances to play, so no client action is required.
 //
 // Props
-//   pool        : Card[]  — this player's options (face-down until picked)
-//   deadline    : number  — ms-epoch auto-resolve time (or null)
-//   pendingCount: number  — players still choosing (incl. me until I pick)
-//   totalCount  : number  — alive players
-//   selectedId  : string  — server-confirmed pick id (null until confirmed)
-//   busy        : bool    — a pick request is in flight
-//   reviewUntil : number  — ms-epoch end of a private late-pick review buffer
+//   pool        : Card[]  - this player's options (face-down until picked)
+//   deadline    : number  - ms-epoch auto-resolve time (or null)
+//   pendingCount: number  - players still choosing (incl. me until I pick)
+//   totalCount  : number  - alive players
+//   selectedId  : string  - server-confirmed pick id (null until confirmed)
+//   busy        : bool    - a pick request is in flight
+//   reviewUntil : number  - ms-epoch end of a private late-pick review buffer
 //                           (§2.1); when set the modal stays on the reveal
 //                           with its own countdown instead of the waiting copy.
 //   onSelect    : (optionId) => Promise<{ success, late, reviewMs }>
-//   onLatePick  : (reviewMs, optionId) => void  — raised when the server flags
+//   onLatePick  : (reviewMs, optionId) => void  - raised when the server flags
 //                           the pick as late (≥12s in), so the parent can hold
 //                           this player's reveal open past the shared finalize.
 // ──────────────────────────────────────────────────────────────
@@ -113,7 +113,7 @@ export function PreGameSelectionModal({
     return () => clearInterval(id);
   }, [deadline]);
 
-  // §2.1 — private review buffer countdown for a late pick. Independent of
+  // §2.1 - private review buffer countdown for a late pick. Independent of
   // the auto-pick `deadline`; it ticks down the parent-held reviewUntil so the
   // late picker gets a guaranteed look at their card before joining the table.
   const [reviewSecondsLeft, setReviewSecondsLeft] = useState(null);
@@ -137,7 +137,7 @@ export function PreGameSelectionModal({
       setLocalPickId(null);
       return;
     }
-    // §2.1 — a late pick earns a private review buffer; hand the parent the
+    // §2.1 - a late pick earns a private review buffer; hand the parent the
     // reviewMs + chosen id so it can keep this reveal mounted past finalize.
     if (res && res.late && res.reviewMs) onLatePick?.(res.reviewMs, optionId);
   };

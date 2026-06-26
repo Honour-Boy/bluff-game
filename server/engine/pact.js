@@ -1,7 +1,7 @@
 // ============================================================
-// ENGINE — The Pact (Covenant-exclusive mechanic)
+// ENGINE - The Pact (Covenant-exclusive mechanic)
 // ============================================================
-// Pure helpers only — no I/O, no socket access. Orchestration (the pre-game
+// Pure helpers only - no I/O, no socket access. Orchestration (the pre-game
 // selector prompt, the in-game offer/confirm, the volunteer-pull pause) lives in
 // the handler/lib layer; this module owns the deterministic state transitions.
 //
@@ -17,10 +17,10 @@
 //   • share victory if they are the last two standing (checkDualWin).
 //
 // Room fields owned here:
-//   room.pactSelectorId / room.pactTargetId — unconfirmed pre-game designation.
-//   room.pactSelectorReservedCard           — power card reserved for the selector.
-//   room.pact = { a, b, active }            — the confirmed bond.
-//   room.pactOfferPending / pactOfferSent / pactOfferDeferred — offer bookkeeping.
+//   room.pactSelectorId / room.pactTargetId - unconfirmed pre-game designation.
+//   room.pactSelectorReservedCard           - power card reserved for the selector.
+//   room.pact = { a, b, active }            - the confirmed bond.
+//   room.pactOfferPending / pactOfferSent / pactOfferDeferred - offer bookkeeping.
 
 const { POWER_TYPES } = require('./constants');
 
@@ -67,7 +67,7 @@ function assignPactRoles(room) {
  * The Pact Selector forgoes the normal pre-game pick: their selection pool is
  * emptied (no picker UI) and a random power card is RESERVED for them, granted
  * at finalize time via grantPactSelectorCard. Robust whether or not a pool was
- * built (the ≤1-power skip path leaves pools empty) — falls back to synthesising
+ * built (the ≤1-power skip path leaves pools empty) - falls back to synthesising
  * a power from the host-enabled set. No-op when no powers are enabled at all.
  */
 function pactSelectorAutoAssignPower(room) {
@@ -137,7 +137,7 @@ function applyPactResponse(room, accepted) {
     return { ok: true, action: 'confirmed', a, b };
   }
 
-  // Denied — the selector's reserved bet is forfeit.
+  // Denied - the selector's reserved bet is forfeit.
   if (room.powerCardSlot?.[a]) room.powerCardSlot[a] = [];
   room.pact = null;
   room.pactSelectorId = null;

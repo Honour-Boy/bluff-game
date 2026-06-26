@@ -1,8 +1,8 @@
 // ============================================================
-// HANDLERS — Meta-progression: XP + cosmetics (#205)
+// HANDLERS - Meta-progression: XP + cosmetics (#205)
 // ============================================================
-// get_progression — the caller's XP / level / unlock catalog / equipped set.
-// set_cosmetics   — equip cosmetics; the server validates ownership against
+// get_progression - the caller's XP / level / unlock catalog / equipped set.
+// set_cosmetics   - equip cosmetics; the server validates ownership against
 //                   the unlock catalog before persisting, so the client can
 //                   only ever render what it actually owns.
 
@@ -53,7 +53,7 @@ function register(io, socket, deps = {}) {
         return callback?.({ success: false, error: 'Rate limit exceeded' });
       }
 
-      // Guests have no persistent row — everything reads as level 1 defaults.
+      // Guests have no persistent row - everything reads as level 1 defaults.
       if (socket.isGuest || !isPersistentUserId(socket.userId)) {
         return callback?.({
           success: true,
@@ -86,7 +86,7 @@ function register(io, socket, deps = {}) {
         return callback?.({ success: false, error: 'Sign in to unlock and keep cosmetics' });
       }
 
-      // Validate against the caller's REAL xp — a locked or unknown id
+      // Validate against the caller's REAL xp - a locked or unknown id
       // silently falls back to the slot default, so nothing unowned can
       // ever be equipped no matter what the client sends.
       const row = await leaderboardRepo.getProgression(socket.userId);

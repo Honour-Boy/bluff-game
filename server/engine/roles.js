@@ -1,5 +1,5 @@
 // ============================================================
-// ENGINE — Secret roles + role-specific abilities (v2 Phase D)
+// ENGINE - Secret roles + role-specific abilities (v2 Phase D)
 // ============================================================
 // Roles activate ONLY when alive count >= ROLES_AT_MIN_ALIVE (3). Each
 // "unique" special role appears at most once per game; Gambler may appear
@@ -21,7 +21,7 @@ function _shuffle(arr) {
   return a;
 }
 
-// #235 — Collector's only purpose is holding/activating power cards (up to
+// #235 - Collector's only purpose is holding/activating power cards (up to
 // COLLECTOR_POWER_CARD_CAP). With every power card disabled the role is dead
 // weight, so it's dropped from the eligible pool unless ≥1 power card is on.
 function _anyPowerCardEnabled(room) {
@@ -50,7 +50,7 @@ function _roleAssignmentFor(aliveCount, { collectorEligible = true } = {}) {
 
 function assignRoles(room) {
   // Secret roles are off unless the room config opts in (Syndicate+ tiers).
-  // Below that every player is Barehand — no specials in play.
+  // Below that every player is Barehand - no specials in play.
   if (!room.config?.secretRoles) {
     for (const p of room.players) p.role = ROLES.BAREHAND;
     return room;
@@ -78,7 +78,7 @@ function getRole(room, playerId) {
  * Pre-game role reveal visibility (#116). Special roles are only
  * assigned when alive count >= ROLES_AT_MIN_ALIVE, but the reveal
  * overlay must additionally hide the *Barehand* label below the
- * threshold — small tables show a neutral "Standard" indicator
+ * threshold - small tables show a neutral "Standard" indicator
  * instead so the reveal doesn't telegraph that no roles are in play.
  * Assignment vs. visibility are deliberately decoupled.
  */
@@ -95,9 +95,9 @@ function isBarehandVisible(playerCount) {
  * sized so a Medic can always save from a fresh 6-shape starting hand (#142).
  */
 // `includeEliminatedId` lets a Medic who was JUST eliminated by the spin now
-// being resolved still count as available — so the Medic can save THEMSELVES.
+// being resolved still count as available - so the Medic can save THEMSELVES.
 // (spinGun flips status to 'eliminated' before the save prompt opens, so a
-// plain alive-only check would silently deny every self-save — issue: "couldn't
+// plain alive-only check would silently deny every self-save - issue: "couldn't
 // save myself".)
 function findAvailableMedic(room, includeEliminatedId = null) {
   const medic = room.players.find(p =>
@@ -138,7 +138,7 @@ function applyMedicSave(room, eliminatedPlayerId, source = 'spin') {
   const medic = findAvailableMedic(room, eliminatedPlayerId);
   if (!medic) {
     // findAvailableMedic also rejects a Medic who has spent all their
-    // saves — surface that as a distinct error so the caller (and the
+    // saves - surface that as a distinct error so the caller (and the
     // 4th-attempt acceptance test) can tell it apart from "no Medic".
     const capped = room.players.find(p =>
       p.role === ROLES.MEDIC
@@ -221,7 +221,7 @@ function applySaboteurTransfer(room, holderId, targetPlayerId) {
       pickIdx = shapeIdx;
       pickedCard = holderHand[shapeIdx];
     } else {
-      return { ok: false, error: 'Cannot transfer — recipient power-card cap reached' };
+      return { ok: false, error: 'Cannot transfer - recipient power-card cap reached' };
     }
   }
 

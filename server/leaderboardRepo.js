@@ -105,12 +105,12 @@ function createLeaderboardRepo(supabase) {
     })));
   }
 
-  // ─── #205 — player meta-progression (XP + cosmetics) ─────────
+  // ─── #205 - player meta-progression (XP + cosmetics) ─────────
   // Not group-scoped: one row per signed-in player. Lives on this repo
-  // (rather than a new one) so the game-over flow — which already threads
-  // leaderboardRepo everywhere — can award XP without new dependencies.
+  // (rather than a new one) so the game-over flow - which already threads
+  // leaderboardRepo everywhere - can award XP without new dependencies.
 
-  // Career stats — lifetime aggregates surfaced on the profile ledger.
+  // Career stats - lifetime aggregates surfaced on the profile ledger.
   // Columns added by 20260625120000_player_progression_career_stats; older
   // rows / test stubs without them read as 0.
   function _statsFromRow(row) {

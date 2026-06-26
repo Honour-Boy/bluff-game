@@ -1,10 +1,10 @@
 // ============================================================
-// SOCKET LIB — Speed Mode turn timer (roomModifiers.speedMode)
+// SOCKET LIB - Speed Mode turn timer (roomModifiers.speedMode)
 // ============================================================
 // When Speed Mode is on, every player's turn is capped at
 // SPEED_MODE_TURN_MS. The server stamps `room.speedModeDeadline` when a new
 // turn opens (serialize.js exposes `speedModeMsRemaining` to drive the
-// client-side countdown for ALL players) and, on expiry, auto-ENDS the turn —
+// client-side countdown for ALL players) and, on expiry, auto-ENDS the turn -
 // the same advanceTurn + freeze-consume path a normal `end_turn` runs. There is
 // NO auto-spin: #79 bans auto-spin in every mode; running out of time simply
 // forfeits the rest of your turn.
@@ -51,7 +51,7 @@ function armSpeedModeTimer(io, room) {
   }
 
   const key = _turnKey(room);
-  // Already counting down for this exact turn — let it keep running.
+  // Already counting down for this exact turn - let it keep running.
   if (room._speedModeTurnKey === key && speedModeTimers.has(code)) return;
 
   _clearSpeedModeTimer(code);

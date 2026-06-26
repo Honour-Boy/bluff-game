@@ -1,16 +1,16 @@
 'use client';
 
 // ============================================================
-// TUTORIAL — Guided layer over the real practice table
+// TUTORIAL - Guided layer over the real practice table
 // ============================================================
 // Two pieces, both gated to tutorial rooms (roomState.isTutorial):
-//   • Intro modal — a short stepped walkthrough shown in the lobby; its final
+//   • Intro modal - a short stepped walkthrough shown in the lobby; its final
 //     "Begin practice" button deals the cards (startGame).
-//   • Coach bar — a compact, state-driven tip docked at the top of the table
+//   • Coach bar - a compact, state-driven tip docked at the top of the table
 //     that updates every turn (coachFor()). Dismissable + reopenable.
 //
 // Deliberately NO DOM spotlight cut-outs (the roadmap flags those as the
-// highest-risk surface across the responsive/pannable table) — the coach teaches
+// highest-risk surface across the responsive/pannable table) - the coach teaches
 // with clear, live copy that references the on-screen controls by name.
 
 import { useEffect, useRef, useState } from 'react';
@@ -28,7 +28,7 @@ const TONE_COLORS = {
   win: 'var(--accent)',
 };
 
-// ─── Controls tour (intro slide) — small icon cards for chat/settings/board ───
+// ─── Controls tour (intro slide) - small icon cards for chat/settings/board ───
 const CONTROL_ICONS = {
   gear: <><circle cx="12" cy="12" r="3" /><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z" /></>,
   chat: <path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z" />,
@@ -282,7 +282,7 @@ function useDockBottom() {
   return dockBottom;
 }
 
-// ─── Coach focus-gate — a dimmed backdrop that blocks play until acknowledged ──
+// ─── Coach focus-gate - a dimmed backdrop that blocks play until acknowledged ──
 // For an action-required beat the table is dimmed and non-interactive so the
 // learner can't misclick while reading; an OK button reveals the table to perform
 // the step. The card itself docks just above the bottom seat (expanding in place
@@ -337,9 +337,9 @@ function CoachGate({ coach, isMobile, dockBottom, onOk }) {
   );
 }
 
-// ─── Collapsed coach bar — a slim reminder docked above the bottom seat ────────
+// ─── Collapsed coach bar - a slim reminder docked above the bottom seat ────────
 // After the gate is acknowledged (or for a non-actionable info beat) the coach
-// collapses to a slim bar sitting directly above the hand dock — within the
+// collapses to a slim bar sitting directly above the hand dock - within the
 // player's natural line of sight, clear of the dealer bot up top. Tapping it
 // re-expands to the full backdrop-gated card (blocking other inputs).
 function CoachPill({ coach, isMobile, dockBottom, onExpand }) {
@@ -383,7 +383,7 @@ function CoachPill({ coach, isMobile, dockBottom, onExpand }) {
   );
 }
 
-// ─── Idle "tap a card" nudge — a small caret at the very bottom of the seat ────
+// ─── Idle "tap a card" nudge - a small caret at the very bottom of the seat ────
 // Pinned to the very bottom of the bottom seat and pointing UP (▲) at the hand,
 // so it never overlaps the table / play area ("event place"). It stays
 // horizontally aligned to the actual card fan (measures the rendered cards' centre
@@ -396,7 +396,7 @@ function CardNudge() {
     const measure = () => {
       // (Module 1.3) Anchor to the fan CONTAINER centre, NOT the individual card
       // bounds. The cards splay by rotating around a shared bottom-centre pivot, so
-      // their left/right bounds shift while the fan is dragged — measuring them made
+      // their left/right bounds shift while the fan is dragged - measuring them made
       // the nudge drift sideways mid-drag. The container's centre is fixed on the
       // layout axis, so the nudge now stays completely stationary during a drag.
       const fan = document.querySelector('[data-tour-id="my-hand-fan"]')
@@ -452,7 +452,7 @@ function CardNudge() {
 
 // (The clinic progress bar now lives IN-FLOW at the top of OnlinePlayerUI.)
 
-// ─── Clinic-complete end card — celebrate + replay / leave ───────────────────
+// ─── Clinic-complete end card - celebrate + replay / leave ───────────────────
 function ClinicCompleteCard({ coach, onReplay, onLeave }) {
   return (
     <div
@@ -619,7 +619,7 @@ function ReplayChoiceModal({ onCoached, onUncoached, onBack }) {
   );
 }
 
-// ─── Free-play (uncoached) end card — minimal "play again / leave" at game over ─
+// ─── Free-play (uncoached) end card - minimal "play again / leave" at game over ─
 function FreePlayEndCard({ onPlayAgain, onLeave }) {
   return (
     <div style={{
@@ -652,7 +652,7 @@ function FreePlayEndCard({ onPlayAgain, onLeave }) {
 
 // ─── Generic guided modal (briefing pop-up + resolved explanation) ────────────
 // `gateMs` holds the CTA disabled for that long (a countdown) so the info has
-// time to settle — Module 4 mandates a 5s pause before the "I understand now"
+// time to settle - Module 4 mandates a 5s pause before the "I understand now"
 // button becomes active on each power's explanation.
 function GuidedModal({ kicker, title, body, cta, onCta, tone = 'info', gateMs = 0 }) {
   const color = TONE_COLORS[tone] || 'var(--accent)';
@@ -767,7 +767,7 @@ export function TutorialLayer({
 
   // Corrective flash when the learner attempts an off-script card play in a clinic
   // drill (e.g. plays a card when they should Call Bluff). Shown as a transient
-  // coach bar — NOT a focus-gate — so it reads as an in-the-moment "hold on".
+  // coach bar - NOT a focus-gate - so it reads as an in-the-moment "hold on".
   const [actionHintText, setActionHintText] = useState(null);
   useEffect(() => {
     if (!clinicActionHint?.n) return undefined;
@@ -785,14 +785,14 @@ export function TutorialLayer({
   const [forcedGateKey, setForcedGateKey] = useState(null);
   const ackCoach = (key) => { if (key) ackKeysRef.current.add(key); setForcedGateKey(null); bumpAck((v) => v + 1); };
 
-  // Where the coach docks — just above the bottom seat (measured).
+  // Where the coach docks - just above the bottom seat (measured).
   const dockBottom = useDockBottom();
 
   // Auto-expand policy: on the learner's FIRST practice run the coach pops open
-  // (the focus-gate) at each new instruction so they learn the rhythm — they OK it
+  // (the focus-gate) at each new instruction so they learn the rhythm - they OK it
   // back to the collapsed bar, the next beat re-opens, and so on. Once they've
   // completed practice once (`bluff_tutorial_completed`), repeated runs stay
-  // collapsed by default — the bar still updates, but only expands when tapped.
+  // collapsed by default - the bar still updates, but only expands when tapped.
   // Re-read on each new game (lobby) so a replay after completing reflects it.
   const readAutoExpand = () => {
     try { return typeof window !== 'undefined' ? !window.localStorage.getItem('bluff_tutorial_completed') : true; }
@@ -835,8 +835,8 @@ export function TutorialLayer({
     }
   }, [clinicComplete]);
 
-  // The basics game starts the FIRST time the intro is dismissed — whether via
-  // "Begin practice" OR by closing the pop-up — and never again.
+  // The basics game starts the FIRST time the intro is dismissed - whether via
+  // "Begin practice" OR by closing the pop-up - and never again.
   const spawnBasics = () => {
     if (isLobby && !spawnedRef.current && typeof startGame === 'function') {
       spawnedRef.current = true;
@@ -865,7 +865,7 @@ export function TutorialLayer({
   const replayIntro = () => { setIntroStep(0); setIntroReopened(true); setCoachHidden(false); };
 
   // Spotlight tour CTAs on the final Basics slide. "Show me around" hands off to
-  // the server tour (deal-if-needed + stage step 0) — we latch spawnedRef so the
+  // the server tour (deal-if-needed + stage step 0) - we latch spawnedRef so the
   // Basics deal effect doesn't ALSO fire. "Skip tour" is just the ordinary Basics
   // begin (deal + coach), so a skipper never even enters the tour lesson.
   const tourDoneBefore = (() => {
@@ -885,7 +885,7 @@ export function TutorialLayer({
 
   // Clinic briefing pop-up (before each staged instance) + resolved explanation.
   // Held back while a cylinder is still spinning OR the practice loss hand-off is
-  // pending (the player must clear their "Eliminated" card first) — otherwise the
+  // pending (the player must clear their "Eliminated" card first) - otherwise the
   // briefing races over the spin / elimination card during the Basics→Powers move.
   const briefing = scenario && scenario.step === 'intro' && briefedIndex !== scenario.index
     && !spinActive && !holdClinic
@@ -899,7 +899,7 @@ export function TutorialLayer({
   // intro) owns the screen, and during clinic-complete (its own card shows).
   let coach = null;
   // A "correction" coach is a transient in-the-moment flash (a wrong tap), shown
-  // as a plain bar — never as a focus-gate (it would be jarring to backdrop every
+  // as a plain bar - never as a focus-gate (it would be jarring to backdrop every
   // mis-tap, and these auto-dismiss).
   let coachIsCorrection = false;
   const modalUp = showIntro || showChoice || briefing || showExplanation;
@@ -932,8 +932,8 @@ export function TutorialLayer({
   // Focus-gate decision: an actionable instruction dims the table until OK'd; once
   // acknowledged (or for an info/win beat) it collapses to the slim pill. Never
   // gate a correction flash. Also never gate while a dedicated overlay or dock
-  // control owns the screen — a spin (cylinder/Pull-Trigger), the bluff-intercept
-  // arm UI, or a redemption — so the gate backdrop can't bury the very control the
+  // control owns the screen - a spin (cylinder/Pull-Trigger), the bluff-intercept
+  // arm UI, or a redemption - so the gate backdrop can't bury the very control the
   // player needs (it would dead-end the lesson). The pill still carries the tip.
   const overlayOwnsScreen = spinActive
     || phase === 'spin_pending'
@@ -942,7 +942,7 @@ export function TutorialLayer({
   const coachActionable = !!coach && (coach.tone === 'action' || coach.tone === 'danger');
   const coachAcked = !!coach && ackKeysRef.current.has(coach.key);
   // Auto-gate the coach only in BASICS (no scenario): the clinic already gates
-  // each drill with its briefing pop-up ("Got it — show me"), so a second backdrop
+  // each drill with its briefing pop-up ("Got it - show me"), so a second backdrop
   // on the live coach would be redundant and re-hide the bot the briefing just
   // revealed. The auto-open only fires on the FIRST practice run (`autoExpand`);
   // after that the bar stays collapsed and only opens when the learner taps it
@@ -1075,7 +1075,7 @@ export function TutorialLayer({
 
       {coach && !clinicComplete && !coachHidden && (
         coachIsCorrection ? (
-          // Transient "hold on / not yet" flash — plain bar, no backdrop.
+          // Transient "hold on / not yet" flash - plain bar, no backdrop.
           <CoachBar
             coach={coach}
             isMobile={isMobile}
@@ -1083,7 +1083,7 @@ export function TutorialLayer({
             onReplayIntro={replayIntro}
           />
         ) : showCoachGate ? (
-          // Action-required beat — dim the table until the learner taps OK, so
+          // Action-required beat - dim the table until the learner taps OK, so
           // they can't misclick and the coach never hides the dealer bot mid-read.
           <CoachGate
             coach={coach}
@@ -1092,7 +1092,7 @@ export function TutorialLayer({
             onOk={() => ackCoach(coach.key)}
           />
         ) : (
-          // Acknowledged action beat, or a passive info/win beat — slim top-left
+          // Acknowledged action beat, or a passive info/win beat - slim top-left
           // pill, clear of the centred bot. Tap to re-open the full instruction.
           <CoachPill
             coach={coach}

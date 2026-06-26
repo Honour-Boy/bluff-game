@@ -5,11 +5,11 @@ import { TourLayer, isSettingsMenuOpen } from './TourLayer';
 import { tourBeatsFor } from './tourContent';
 import { TOUR_IDS } from './tourIds';
 
-// ─── OnlineTourLayer — host that drives the tour over the live table ──────────
+// ─── OnlineTourLayer - host that drives the tour over the live table ──────────
 // The spotlight engine (TourLayer) is dumb; this wires it to the REAL app:
 //   - builds the beat list for the current player (guest filtering),
 //   - derives the `menu-open` signal by watching the global SettingsGear (which
-//     is mounted at the app root, not here — so we read its DOM, no prop
+//     is mounted at the app root, not here - so we read its DOM, no prop
 //     drilling), and merges in the Part-B signals the host supplies,
 //   - closes the settings menu programmatically when the walk crosses from the
 //     Part-A controls into the Part-B in-game beats (beat A9 in the spec),

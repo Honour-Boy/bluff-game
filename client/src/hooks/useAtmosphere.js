@@ -5,15 +5,15 @@ import { useCallback, useEffect, useRef, useSyncExternalStore } from 'react';
 // ─── useAtmosphere ────────────────────────────────────────────────────────────
 // Phase 3: atmospheric effects hook.
 // Exposes:
-//   triggerShake()                      — screen-shake the wrapper
-//   triggerAudio(kind)                  — one-shot cue: 'bluff'|'spin'|'card'|'win'|'eliminate'
-//   startSpinAudio(finalAngle, durMs)   — schedules mechanical cylinder clicks
+//   triggerShake()                      - screen-shake the wrapper
+//   triggerAudio(kind)                  - one-shot cue: 'bluff'|'spin'|'card'|'win'|'eliminate'
+//   startSpinAudio(finalAngle, durMs)   - schedules mechanical cylinder clicks
 //                                         that decelerate in lockstep with the 8 s
 //                                         CSS transition cubic-bezier(0.1,0,0.15,1).
 //                                         Call when the animation begins (after the
 //                                         80 ms start delay). Fires a final heavy
 //                                         clunk at the last click position.
-//   stopSpinAudio()                     — cancels all pending click timeouts (early
+//   stopSpinAudio()                     - cancels all pending click timeouts (early
 //                                         dismiss / unmount cleanup).
 //
 // Audio is synthesised via Web Audio API, except the lethal-hit gunshot which
@@ -104,7 +104,7 @@ function installAudioUnlock() {
 
 // ─── One-shot sound primitives ────────────────────────────────────────────────
 
-// Wood knock — card play
+// Wood knock - card play
 function playCardSound(ctx) {
   resume(ctx);
   const now = ctx.currentTime;
@@ -121,7 +121,7 @@ function playCardSound(ctx) {
   osc.stop(now + 0.14);
 }
 
-// Heavy bell toll — bluff called
+// Heavy bell toll - bluff called
 function playBluffSound(ctx) {
   resume(ctx);
   const now = ctx.currentTime;
@@ -141,7 +141,7 @@ function playBluffSound(ctx) {
   });
 }
 
-// Survived — a warm celebratory relief chime (the cylinder came up empty).
+// Survived - a warm celebratory relief chime (the cylinder came up empty).
 // A quick exhale "phew" of filtered noise, then a bright rising major arpeggio
 // (G–B–D–G) on soft triangles: tavern-warm, uplifting, but lighter than the
 // full game-win fanfare.
@@ -149,7 +149,7 @@ function playSpinSound(ctx) {
   resume(ctx);
   const now = ctx.currentTime;
 
-  // Relief exhale — short noise swell through a sweeping low-pass.
+  // Relief exhale - short noise swell through a sweeping low-pass.
   const bufLen = Math.ceil(ctx.sampleRate * 0.35);
   const buf = ctx.createBuffer(1, bufLen, ctx.sampleRate);
   const data = buf.getChannelData(0);
@@ -167,7 +167,7 @@ function playSpinSound(ctx) {
   noise.connect(lp); lp.connect(nGain); nGain.connect(masterOut(ctx));
   noise.start(now);
 
-  // Rising major arpeggio — warm bells of relief.
+  // Rising major arpeggio - warm bells of relief.
   const notes = [392.0, 493.88, 587.33, 783.99]; // G4 B4 D5 G5
   notes.forEach((freq, i) => {
     const t = now + 0.16 + i * 0.1;
@@ -188,7 +188,7 @@ function playSpinSound(ctx) {
   });
 }
 
-// Victory fanfare — three ascending chords
+// Victory fanfare - three ascending chords
 function playWinSound(ctx) {
   resume(ctx);
   const now = ctx.currentTime;
@@ -212,14 +212,14 @@ function playWinSound(ctx) {
   );
 }
 
-// Elimination — a sombre, mournful end: a deep gut-punch boom layered under a
+// Elimination - a sombre, mournful end: a deep gut-punch boom layered under a
 // hollow funeral-bell toll and a sighing minor-third fall (a "down" two-note
 // motif). Tavern-dark and sad rather than just a thud.
 function playEliminateSound(ctx) {
   resume(ctx);
   const now = ctx.currentTime;
 
-  // Deep descending boom — the body of the hit.
+  // Deep descending boom - the body of the hit.
   const boom = ctx.createOscillator();
   const boomGain = ctx.createGain();
   boom.type = 'sine';
@@ -230,7 +230,7 @@ function playEliminateSound(ctx) {
   boom.connect(boomGain); boomGain.connect(masterOut(ctx));
   boom.start(now); boom.stop(now + 0.65);
 
-  // Hollow funeral-bell toll — dull, slightly detuned partials.
+  // Hollow funeral-bell toll - dull, slightly detuned partials.
   [146.83, 220.0, 311.13].forEach((freq, i) => {
     const osc = ctx.createOscillator();
     const gain = ctx.createGain();
@@ -244,7 +244,7 @@ function playEliminateSound(ctx) {
     osc.start(now + 0.04); osc.stop(now + 1.45);
   });
 
-  // Sighing minor-third fall (E4 → C4) — the "sad" gesture.
+  // Sighing minor-third fall (E4 → C4) - the "sad" gesture.
   const fall = ctx.createOscillator();
   const fallGain = ctx.createGain();
   fall.type = 'triangle';
@@ -259,7 +259,7 @@ function playEliminateSound(ctx) {
 
 // ─── Recorded gunshot sample ─────────────────────────────────────────────────
 // The lethal-hit cue plays the real recording (public/audio/gunshot.mp3)
-// through the master bus. Fetched + decoded once, lazily — kicked off by the
+// through the master bus. Fetched + decoded once, lazily - kicked off by the
 // first triggerAudio call of the session so it's ready long before any spin
 // can land on a live round. The synth below stays as the fallback so the cue
 // can never be silent (decode still in flight, fetch failed, offline…).
@@ -281,7 +281,7 @@ function playGunshot(ctx) {
     const src = ctx.createBufferSource();
     src.buffer = _gunshotBuf;
     const g = ctx.createGain();
-    g.gain.value = 0.9; // recorded shot is hot — sit it just under the synth peaks
+    g.gain.value = 0.9; // recorded shot is hot - sit it just under the synth peaks
     src.connect(g); g.connect(masterOut(ctx));
     src.start(ctx.currentTime);
     return;
@@ -290,7 +290,7 @@ function playGunshot(ctx) {
   playGunshotSynth(ctx);
 }
 
-// Synth gunshot (fallback) — a high-impact crack + low boom, fired when a spin
+// Synth gunshot (fallback) - a high-impact crack + low boom, fired when a spin
 // lands on a live round (lethal bullet hit) and the recorded sample isn't
 // decoded yet. Sharp filtered-noise crack over a fast descending boom body,
 // then a short tail.
@@ -299,7 +299,7 @@ function playGunshotSynth(ctx) {
   const now = ctx.currentTime;
   const out = masterOut(ctx);
 
-  // tanh saturator — the nonlinear grit that makes this read as a real shot
+  // tanh saturator - the nonlinear grit that makes this read as a real shot
   // rather than the soft "blank" a clean sine gives. One per noise layer.
   const mkShaper = () => {
     const sh = ctx.createWaveShaper();
@@ -309,7 +309,7 @@ function playGunshotSynth(ctx) {
     return sh;
   };
 
-  // 1) CRACK — the muzzle snap. Full-spectrum white noise, instant attack, very
+  // 1) CRACK - the muzzle snap. Full-spectrum white noise, instant attack, very
   //    fast decay, through a wide bandpass + saturation. This sharp transient is
   //    what the ear actually hears as "gunshot".
   const crackLen = Math.ceil(ctx.sampleRate * 0.05);
@@ -325,7 +325,7 @@ function playGunshotSynth(ctx) {
   crack.connect(cbp); cbp.connect(csh); csh.connect(cg); cg.connect(out);
   crack.start(now);
 
-  // 2) BODY — the explosive punch. A burst of low-passed noise (an explosion is
+  // 2) BODY - the explosive punch. A burst of low-passed noise (an explosion is
   //    noise, not a tone) sweeping down, saturated, decaying fast.
   const bodyLen = Math.ceil(ctx.sampleRate * 0.24);
   const bbuf = ctx.createBuffer(1, bodyLen, ctx.sampleRate);
@@ -342,7 +342,7 @@ function playGunshotSynth(ctx) {
   body.connect(blp); blp.connect(bsh); bsh.connect(bg); bg.connect(out);
   body.start(now);
 
-  // 3) SUB — the chest-thump low end under the body.
+  // 3) SUB - the chest-thump low end under the body.
   const sub = ctx.createOscillator();
   const sg = ctx.createGain();
   sub.type = 'sine';
@@ -353,7 +353,7 @@ function playGunshotSynth(ctx) {
   sub.connect(sg); sg.connect(out);
   sub.start(now); sub.stop(now + 0.34);
 
-  // 4) TAIL — a short low-passed noise decay so the shot rings out into the room
+  // 4) TAIL - a short low-passed noise decay so the shot rings out into the room
   //    instead of cutting off abruptly.
   const tailLen = Math.ceil(ctx.sampleRate * 0.4);
   const tbuf = ctx.createBuffer(1, tailLen, ctx.sampleRate);
@@ -381,11 +381,11 @@ const AUDIO_MAP = {
 // The cylinder CSS transition is: transform 8s cubic-bezier(0.1, 0, 0.15, 1)
 // P0=(0,0) P1=(0.1,0) P2=(0.15,1) P3=(1,1)
 //
-// Strategy (Option A — Angular Tick Model):
+// Strategy (Option A - Angular Tick Model):
 //   Evaluate the inverse of the easing curve to find the exact wall-clock
 //   instant when the cylinder crosses each 60° segment boundary. Schedule a
 //   crisp noise-burst click at each crossing. As the CSS easing decelerates,
-//   the inter-click interval naturally widens — creating a physically correct
+//   the inter-click interval naturally widens - creating a physically correct
 //   slow-down without any DOM polling.
 //   The very last click fires a heavier "clunk" sound to mark the lock.
 
@@ -418,7 +418,7 @@ function progressToTimeFraction(progress) {
   return easeX((lo + hi) / 2);
 }
 
-// Crisp metallic detent click — noise burst through a bandpass filter (15 ms)
+// Crisp metallic detent click - noise burst through a bandpass filter (15 ms)
 function playSpinClick(ctx) {
   resume(ctx);
   const now = ctx.currentTime;
@@ -441,7 +441,7 @@ function playSpinClick(ctx) {
   src.start(now);
 }
 
-// Heavy hammer clunk — cylinder locks into the final chamber (250 ms)
+// Heavy hammer clunk - cylinder locks into the final chamber (250 ms)
 function playSpinClunk(ctx) {
   resume(ctx);
   const now = ctx.currentTime;
@@ -458,20 +458,20 @@ function playSpinClunk(ctx) {
   osc.stop(now + 0.28);
 }
 
-// ─── Background music — multi-track playlists w/ crossfade (per view context) ───
+// ─── Background music - multi-track playlists w/ crossfade (per view context) ───
 // Each app SECTION owns a PLAYLIST and a playback MODE. Two HTMLAudio "decks"
 // let us crossfade between tracks (a single element can't overlap itself). The
 // one-shot cues stay on the Web Audio path above; this only governs the bed.
 //
-//   lobby      SHUFFLE     — start on a RANDOM track, loop; when a track ends,
+//   lobby      SHUFFLE     - start on a RANDOM track, loop; when a track ends,
 //                            crossfade to the alternative in the pool.
-//   game       PROGRESSIVE — stage 0 = Nordic Hums (quiet tension); as stakes
+//   game       PROGRESSIVE - stage 0 = Nordic Hums (quiet tension); as stakes
 //                            rise, 3 s crossfade up to the Bluff Anthem
 //                            (instrumental), then Call It Bluff, to drive
 //                            momentum. Stage is fed from live game state
 //                            (player attrition) by page.js via setGameStage().
-//   groups     LOOP        — the vocal Bluff Anthem on a clean continuous loop.
-//   gameover   ONCE        — Gutter-Candle Dread, gently faded in over 2 s.
+//   groups     LOOP        - the vocal Bluff Anthem on a clean continuous loop.
+//   gameover   ONCE        - Gutter-Candle Dread, gently faded in over 2 s.
 //
 // Volume (per the brief): songs play at 8% of max, instrumentals at 12% (the
 // instrumentals sit a touch louder so the ambience still reads under the cues).
@@ -512,7 +512,7 @@ function _getVolSnapshot() { return _musicVolume; }
 
 function _trackVol(src) {
   // The volume slider maps DIRECTLY to the track's own playback volume, so 100%
-  // means full song volume (1.0) — not 100% of the old ~8% ambient cap. `src` is
+  // means full song volume (1.0) - not 100% of the old ~8% ambient cap. `src` is
   // kept for call-site compatibility.
   void src;
   return Math.max(0, Math.min(1, _musicVolume));
@@ -533,7 +533,7 @@ function _setMusicVolume(v) {
 const MUSIC_SECTIONS = {
   // Lobby shuffles all three (the new instrumental v2 included).
   lobby:    ['/audio/BLUFF Tavern.mp3', '/audio/Click_Clack_Spin.mp3', '/audio/Bluff Anthem (instrumental)-v2.mp3'],
-  // ACTIVE GAME holds the largest pool — every track that isn't a lobby / groups
+  // ACTIVE GAME holds the largest pool - every track that isn't a lobby / groups
   // / gameover cue lives here, so nothing is left unassigned. The progression now
   // SCALES to this list's length (gameMusicStage), stepping up one track per
   // elimination so each is reached as the field thins: stage 0 at the full table
@@ -567,7 +567,7 @@ const MUSIC_DUCK_VOL = 0.04;      // ducked level while a one-shot cue plays
 // ── One continuous, app-wide playlist ────────────────────────────────────────
 // The music is now a SINGLE uninterrupted stream: moving between sections never
 // stops or restarts it. We derive the order from the section pools (deduped) so
-// every assigned track still plays and nothing is orphaned — the section grouping
+// every assigned track still plays and nothing is orphaned - the section grouping
 // just defines the running order. Tracks advance automatically when one ends, and
 // the player can step through them with the prev/next controls in settings.
 const PLAYLIST = Array.from(new Set([
@@ -583,7 +583,7 @@ function _musicMutedFromStorage() {
 }
 
 // Shared mute store so every consumer (the landing settings gear AND the
-// in-game menu) reflects the same on/off state via useSyncExternalStore —
+// in-game menu) reflects the same on/off state via useSyncExternalStore -
 // toggling in one place updates everywhere, no per-instance desync.
 const _mutedListeners = new Set();
 function _subscribeMuted(cb) { _mutedListeners.add(cb); return () => _mutedListeners.delete(cb); }
@@ -711,7 +711,7 @@ function _onDeckEnded(eng, deckIdx) {
 }
 
 // Section switch. Playback is ONE continuous playlist, so this never changes the
-// track or restarts the music when navigating — it only kicks the stream off the
+// track or restarts the music when navigating - it only kicks the stream off the
 // first time (and nudges a paused deck back to life, e.g. after a tab return).
 function _setSection(name) {
   installAudioUnlock();
@@ -719,7 +719,7 @@ function _setSection(name) {
   if (!eng) return;
   eng.section = name;            // retained for reference only
   eng.queue = PLAYLIST;
-  // Already playing or queued (while muted)? Leave it running — continuity.
+  // Already playing or queued (while muted)? Leave it running - continuity.
   if (eng.currentSrc || eng.pendingSrc) {
     if (!eng.muted) {
       const d = eng.decks[eng.active];
@@ -730,7 +730,7 @@ function _setSection(name) {
     }
     return;
   }
-  // First start — open the playlist on a random track for session variety.
+  // First start - open the playlist on a random track for session variety.
   eng.idx = Math.floor(Math.random() * eng.queue.length);
   const src = eng.queue[eng.idx];
   if (eng.muted) { eng.currentSrc = src; eng.pendingSrc = src; return; }
@@ -855,13 +855,13 @@ export function gameMusicStage(roomState, stageCount = (MUSIC_SECTIONS.game ? MU
 // per-screen atmosphere hook. Used at the app root (start on first gesture) and
 // by any settings UI (mute toggle). Mute state is shared via the module store
 // so the landing gear and the in-game menu never drift apart.
-//   setSection(name)   — note the active view context; the music is ONE
+//   setSection(name)   - note the active view context; the music is ONE
 //                        continuous playlist, so this never restarts it.
-//   setGameStage(n)    — retained no-op (continuous playlist mode).
-//   nextTrack()/prevTrack() — step through the playlist (settings skip buttons).
-//   startMusic()       — arm the mobile unlock + start/resume the playlist.
-//   toggleMusic()      — flip mute (persisted); unmuting resumes playback.
-//   musicEnabled       — boolean, reactive.
+//   setGameStage(n)    - retained no-op (continuous playlist mode).
+//   nextTrack()/prevTrack() - step through the playlist (settings skip buttons).
+//   startMusic()       - arm the mobile unlock + start/resume the playlist.
+//   toggleMusic()      - flip mute (persisted); unmuting resumes playback.
+//   musicEnabled       - boolean, reactive.
 export function useMusic() {
   const muted = useSyncExternalStore(_subscribeMuted, _getMutedSnapshot, () => false);
   // (Module 5.3) reactive master music volume (0..1), shared across consumers.

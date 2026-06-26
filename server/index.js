@@ -1,5 +1,5 @@
 // ============================================================
-// SERVER ENTRY — Express + Socket.IO
+// SERVER ENTRY - Express + Socket.IO
 // ============================================================
 
 const express = require('express');
@@ -15,7 +15,7 @@ const PORT = process.env.PORT || 3001;
 // ─── CORS origin resolution ──────────────────────────────────
 // Hard-fail at boot if running in production without an explicit
 // CLIENT_URL. Falling back to '*' on a deployed server is a real
-// footgun — every origin gets to talk to the game and Socket.IO.
+// footgun - every origin gets to talk to the game and Socket.IO.
 //
 // Dev convenience: defaults to '*' only when NODE_ENV !== 'production'.
 const isProd = process.env.NODE_ENV === 'production';
@@ -26,12 +26,12 @@ if (!corsOrigin) {
     process.exit(1);
   }
   corsOrigin = '*';
-  console.warn('[cors] CLIENT_URL not set — falling back to "*" (development only).');
+  console.warn('[cors] CLIENT_URL not set - falling back to "*" (development only).');
 }
 // CLIENT_URL is a comma-separated EXACT allow-list, e.g.
 //   "https://app.com,https://staging.app.com".
 // PREVIEW_ORIGIN_REGEX (optional) additionally allows any origin matching a
-// pattern — used on the staging box (Railway) so dynamic Vercel preview URLs
+// pattern - used on the staging box (Railway) so dynamic Vercel preview URLs
 // (https://bluff-game-<hash>-<scope>.vercel.app) pass without a redeploy. Anchor
 // it to your project+scope, e.g.
 //   ^https://bluff-game-[a-z0-9-]+-honour-boys-projects\.vercel\.app$
@@ -47,7 +47,7 @@ app.use(express.json());
 // ─── Health check / room info endpoints ─────────────────────
 app.get('/health', (_, res) => res.json({ status: 'ok', rooms: rooms.size }));
 
-// §2.1 — lightweight keepalive endpoint for an EXTERNAL uptime pinger (e.g. a
+// §2.1 - lightweight keepalive endpoint for an EXTERNAL uptime pinger (e.g. a
 // cron-job.org / UptimeRobot hit every few minutes). Cheap and side-effect free;
 // complements the in-process WebSocket heartbeat below.
 app.get('/keepalive', (_, res) => {
@@ -74,7 +74,7 @@ app.get('/room/:code',
 const server = http.createServer(app);
 const io = new Server(server, {
   cors: { origin: corsOriginFn, methods: ['GET', 'POST'] },
-  // §2.1 — aggressive heartbeat. A shorter ping interval keeps a steady stream
+  // §2.1 - aggressive heartbeat. A shorter ping interval keeps a steady stream
   // of WebSocket ping/pong frames flowing so idle-detection on free-tier hosts
   // (Render et al.) is far less likely to flag the container as inactive and
   // spin it down mid-session. pingTimeout stays comfortably above the interval
@@ -86,7 +86,7 @@ const io = new Server(server, {
 // ─── Per-IP connection rate limiting ────────────────────────
 // Tracks new connections per IP over a 60-second rolling window.
 // IPs that exceed 10 new connections are refused immediately and
-// the socket is disconnected with an error event — the socket
+// the socket is disconnected with an error event - the socket
 // object already exists at this point so we use socket.disconnect
 // rather than preventing the TCP handshake.
 const ipConnectTimestamps = new Map();
@@ -118,16 +118,16 @@ io.on('connection', (socket) => {
   }
   console.log(`[Socket] Connected: ${socket.id}`);
 
-  // §2.1 — per-socket error boundary. A throw inside one socket's handler
+  // §2.1 - per-socket error boundary. A throw inside one socket's handler
   // registration (or a later listener) must never take the whole process down
   // and strand every other room. Log it verbosely with context and move on.
   socket.on('error', (err) => {
     console.error(`[Socket ${socket.id}] socket error:`, err?.message || err);
   });
 
-  // §2.1 — application-level keepalive ack. The client echoes our heartbeat,
+  // §2.1 - application-level keepalive ack. The client echoes our heartbeat,
   // producing a steady trickle of INBOUND traffic on top of the engine-level
-  // pong — extra insurance that the host sees the container as active.
+  // pong - extra insurance that the host sees the container as active.
   socket.on('client_keepalive', () => {
     socket.emit('server_keepalive_ack', { t: Date.now() });
   });
@@ -140,7 +140,7 @@ io.on('connection', (socket) => {
   }
 });
 
-// §2.1 — in-process WebSocket keepalive. Emits a tiny heartbeat to every
+// §2.1 - in-process WebSocket keepalive. Emits a tiny heartbeat to every
 // connected client on a short interval. Combined with the shortened
 // pingInterval above, this keeps both directions of the socket busy so the
 // platform's idle watchdog doesn't spin the instance down during a live game.
@@ -151,7 +151,7 @@ const keepaliveHandle = setInterval(() => {
 }, KEEPALIVE_INTERVAL_MS);
 if (typeof keepaliveHandle.unref === 'function') keepaliveHandle.unref();
 
-// §2.1 — verbose runtime diagnostics. Periodically snapshot memory + room/socket
+// §2.1 - verbose runtime diagnostics. Periodically snapshot memory + room/socket
 // counts so a stall has a breadcrumb trail right up to the moment it happens,
 // and shout loudly on a sudden RSS spike (a common precursor to an OOM stall).
 const DIAGNOSTICS_INTERVAL_MS = 30_000;
@@ -170,7 +170,7 @@ const diagnosticsHandle = setInterval(() => {
 }, DIAGNOSTICS_INTERVAL_MS);
 if (typeof diagnosticsHandle.unref === 'function') diagnosticsHandle.unref();
 
-// §2.1 — process-level error boundaries. We log with full context (and memory)
+// §2.1 - process-level error boundaries. We log with full context (and memory)
 // rather than exiting: the goal is to capture exactly what the runtime looked
 // like just before a stall, and to keep serving the other live rooms. An
 // unhandled rejection or stray throw in one async path should not silently kill

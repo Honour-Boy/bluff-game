@@ -1,11 +1,11 @@
 // ============================================================
-// Tutorial idle "tap a card" nudge — anchoring.
+// Tutorial idle "tap a card" nudge - anchoring.
 //
 // The nudge used to sit at a FIXED bottom offset, which drifted off the hand on
 // wide screens. It now measures the real hand element ([data-tour-id="my-hand"])
 // and centres over it. These tests lock that anchoring (and the fixed fallback
 // when the hand isn't mounted yet) deterministically, without needing the live
-// app — a Playwright pass against the running app still needs Supabase env.
+// app - a Playwright pass against the running app still needs Supabase env.
 // ============================================================
 
 import { describe, it, expect, vi, afterEach } from 'vitest';

@@ -2,7 +2,7 @@
 // Mirror of the server's tier model (`server/engine/progression.js`):
 // levels 1–20 group into four tiers, each gating which room mechanics a host
 // may enable. Tier is purely derived from level, so the client never needs a
-// dedicated wire field — `roomState.tier` (in-room) and `levelForXp` (lobby)
+// dedicated wire field - `roomState.tier` (in-room) and `levelForXp` (lobby)
 // are enough. Keep the boundaries in lockstep with the server's `tierForLevel`.
 
 export const TIER_ORDER = ['streets', 'backroads', 'syndicate', 'covenant'];

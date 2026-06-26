@@ -1,12 +1,12 @@
 // ============================================================
-// Regression — a bluff (and Peek) always resolves against the PREVIOUS
+// Regression - a bluff (and Peek) always resolves against the PREVIOUS
 // player's card, even when the accuser has already played their own card
 // this turn.
 //
 // Turn actions are order-free (play / call bluff / activate power, any
 // order, once each). Before the fix, playing first overwrote the live
 // `lastPlayedCard` with the accuser's own card, so the bluff judged the
-// accuser's play instead of the accused's — letting a guilty previous
+// accuser's play instead of the accused's - letting a guilty previous
 // player escape and an innocent accuser take the spin. The card under
 // accusation is now snapshotted at the turn boundary (advanceTurn) into
 // `challengeableCard`, so the accuser's own same-turn play can't move it.

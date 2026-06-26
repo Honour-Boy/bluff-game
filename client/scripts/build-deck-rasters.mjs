@@ -1,5 +1,5 @@
 // ============================================================
-// #205 — Rasterize the deck-skin SVGs to PNGs (paint performance)
+// #205 - Rasterize the deck-skin SVGs to PNGs (paint performance)
 // ============================================================
 // The frame deck skins are committed as self-contained SVGs (built by
 // build-cosmetic-decks.mjs from the owner traces). Painting those SVGs as
@@ -8,13 +8,13 @@
 // element size, and deck_kente.svg alone carries ~0.5 MB of trace paths.
 //
 // This script renders each deck SVG ONCE to a 480×720 PNG (the largest
-// in-game card is 220×320 CSS px, so 480 wide stays sharp past 2× DPR) —
+// in-game card is 220×320 CSS px, so 480 wide stays sharp past 2× DPR) -
 // the client then paints a cached bitmap instead of vector art. The SVGs
 // stay in the repo as this script's input; only the PNGs ship to players
 // (lib/cosmetics.js points at deck_*.png).
 //
 // Rasterization uses headless Edge via the client's playwright-core (same
-// run-on-demand pattern as build-chamber-skins.mjs — not part of any build).
+// run-on-demand pattern as build-chamber-skins.mjs - not part of any build).
 // Re-run after any build-cosmetic-decks.mjs change.
 //
 // Usage: node scripts/build-deck-rasters.mjs
@@ -40,7 +40,7 @@ const page = await browser.newPage({ viewport: { width: W + 40, height: H + 40 }
 
 for (const f of decks) {
   // Force the render size onto the SVG (the sources carry
-  // preserveAspectRatio="none", so any aspect drift is intentional —
+  // preserveAspectRatio="none", so any aspect drift is intentional -
   // in-game the art is stretched 100% 100% over the card too).
   const svg = readFileSync(join(dir, f), 'utf8')
     .replace('<svg ', `<svg width="${W}" height="${H}" `);

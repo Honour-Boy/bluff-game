@@ -1,21 +1,21 @@
 "use client";
 
 /**
- * TurnStartNotice — a simple "it's your turn" acknowledgement shown once at the
+ * TurnStartNotice - a simple "it's your turn" acknowledgement shown once at the
  * start of the active player's turn (online mode).
  *
  * There is intentionally NO action choice here. The player dismisses this with
- * OK and then performs any of the three turn actions — play a card, call bluff,
- * activate a power card — in ANY order (and up to all three), straight from the
+ * OK and then performs any of the three turn actions - play a card, call bluff,
+ * activate a power card - in ANY order (and up to all three), straight from the
  * inline controls / hand. Each action locks its own control once spent; this
  * modal never gates them.
  *
  * Props:
- *   visible        — whether to render the notice
- *   isFirstTurn    — note that Call Bluff is unavailable on the very first turn
- *   bluffBlocked   — note that the previous turn was a frozen skip (§1.2), so
+ *   visible        - whether to render the notice
+ *   isFirstTurn    - note that Call Bluff is unavailable on the very first turn
+ *   bluffBlocked   - note that the previous turn was a frozen skip (§1.2), so
  *                    there is nothing to challenge this turn
- *   onAcknowledge  — called when the player taps OK (dismisses the notice)
+ *   onAcknowledge  - called when the player taps OK (dismisses the notice)
  */
 export function TurnStartNotice({
   visible,

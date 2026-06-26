@@ -1,5 +1,5 @@
 // ============================================================
-// #141 — Assassin backfire turn-order
+// #141 - Assassin backfire turn-order
 //
 // Play-test regression: when an Assassin backfires (the accuser
 // called the holder's bluff CORRECTLY), the engine was advancing
@@ -14,7 +14,7 @@
 // These compose the same pieces the call_bluff handler uses:
 //   resolveBluff (pipeline) → applyAssassinBackfirePenalty →
 //   applyBluffOutcome (orchestration). The handler no longer calls
-//   advanceTurn on a backfire — this pins that behaviour.
+//   advanceTurn on a backfire - this pins that behaviour.
 // ============================================================
 
 import { describe, it, expect } from 'vitest';
@@ -69,7 +69,7 @@ function buildRoom({ lastPlayedShape }) {
   return { room, p0, p1, p2 };
 }
 
-describe('#141 — Assassin backfire keeps the turn on the correct caller', () => {
+describe('#141 - Assassin backfire keeps the turn on the correct caller', () => {
   it('CORRECT call: holder draws 3, card consumed, and turn STAYS on the caller', () => {
     // lastPlayedShape 'square' vs currentCardType 'circle' → bluff is correct.
     const { room, p0 } = buildRoom({ lastPlayedShape: 'square' });
@@ -87,7 +87,7 @@ describe('#141 — Assassin backfire keeps the turn on the correct caller', () =
     expect(room.hands.get('p0').length).toBe(handBefore + 3);
     expect(p0.armedPowerCard).toBeNull();
 
-    // Turn priority stays with the caller — NOT advanced.
+    // Turn priority stays with the caller - NOT advanced.
     expect(room.currentTurnIndex).toBe(1);
     expect(room.turnOrder[room.currentTurnIndex]).toBe('p1');
     // Caller can still act: phase playing, no card played yet this turn.

@@ -2,7 +2,7 @@
 -- applied directly to production but its file was never committed; recovered
 -- 2026-06-11 while reconciling history for #205).
 
--- handle_new_user is a trigger function — it is invoked by the auth.users
+-- handle_new_user is a trigger function - it is invoked by the auth.users
 -- INSERT trigger, not via REST RPC. Revoking PUBLIC execute closes the
 -- /rest/v1/rpc/handle_new_user endpoint for all unauthenticated and
 -- authenticated callers without affecting the trigger itself.

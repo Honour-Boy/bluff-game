@@ -216,7 +216,7 @@ describe('useAuth', () => {
     expect(token).toBeNull();
   });
 
-  // ─── Issue #106 — profile cache ─────────────────────────────
+  // ─── Issue #106 - profile cache ─────────────────────────────
   it('does not re-fetch the profile when TOKEN_REFRESHED fires for the same user', async () => {
     supabaseMock.auth.getSession.mockResolvedValueOnce({
       data: { session: { user: { id: 'u1', email: 'x@y.com' } } },
@@ -232,7 +232,7 @@ describe('useAuth', () => {
     const callsAfterBootstrap = supabaseMock.from.mock.calls.length;
     expect(callsAfterBootstrap).toBeGreaterThanOrEqual(1);
 
-    // Fire TOKEN_REFRESHED for the same user — should be a no-op.
+    // Fire TOKEN_REFRESHED for the same user - should be a no-op.
     const stateChangeListener = supabaseMock.auth.onAuthStateChange.mock.calls[0][0];
     await act(async () => {
       stateChangeListener('TOKEN_REFRESHED', { user: { id: 'u1', email: 'x@y.com' } });
@@ -279,9 +279,9 @@ describe('useAuth', () => {
 });
 
 // ─── Guest sign-in flow ─────────────────────────────────────────
-describe('useAuth — guest sign-in', () => {
+describe('useAuth - guest sign-in', () => {
   // sessionStorage is a global in jsdom but tests pollute each other
-  // if we don't reset between cases. clear() only — keep the mocked
+  // if we don't reset between cases. clear() only - keep the mocked
   // supabase setup that beforeEach above provides.
   beforeEach(() => {
     if (typeof sessionStorage !== 'undefined') sessionStorage.clear();
@@ -324,7 +324,7 @@ describe('useAuth — guest sign-in', () => {
     expect(result.current.user?.id).toMatch(/^guest:/);
     expect(result.current.user?.isGuest).toBe(true);
     expect(result.current.username).toBe('Joker');
-    // Persistence — the UUID part is whatever the hook minted.
+    // Persistence - the UUID part is whatever the hook minted.
     expect(sessionStorage.getItem('bluff_guest_username')).toBe('Joker');
     expect(sessionStorage.getItem('bluff_guest_id')).toBeTruthy();
     expect(result.current.user.id).toBe(`guest:${sessionStorage.getItem('bluff_guest_id')}`);
@@ -380,7 +380,7 @@ describe('useAuth — guest sign-in', () => {
 
   it('a real Supabase session shadows a stored guest entry', async () => {
     // Pretend a guest was signed in previously and an authenticated
-    // session now exists for the same tab — the real user should win.
+    // session now exists for the same tab - the real user should win.
     sessionStorage.setItem('bluff_guest_id', '550e8400-e29b-41d4-a716-446655440000');
     sessionStorage.setItem('bluff_guest_username', 'OldGuest');
 

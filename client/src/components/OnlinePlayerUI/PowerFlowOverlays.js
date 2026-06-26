@@ -29,7 +29,7 @@ export function PowerFlowOverlays({
   const bannerModel = buildAnnouncementBannerProps(event);
 
   // #121: an event at the head that maps to no banner (unknown kind)
-  // renders nothing by design — but it must still be consumed or it
+  // renders nothing by design - but it must still be consumed or it
   // would stall every banner queued behind it. Drop it so the queue
   // keeps moving. `consumePowerEvent` is a stable useCallback.
   // While a spin is animating we hold the WHOLE queue (don't even drop
@@ -146,7 +146,7 @@ export function PowerFlowOverlays({
                   style={{
                     width: 80,
                     height: 112,
-                    // #205 — the peeked card wears the viewer's deck skin.
+                    // #205 - the peeked card wears the viewer's deck skin.
                     background: 'var(--cardface-bg, var(--surface2))',
                     backgroundSize: '100% 100%',
                     border: '2px solid var(--accent)',
@@ -242,7 +242,7 @@ export function PowerFlowOverlays({
                   style={{
                     width: 56,
                     height: 80,
-                    // #205 — face-down pile picks wear the deck skin's back.
+                    // #205 - face-down pile picks wear the deck skin's back.
                     background: 'var(--cardback-bg, linear-gradient(160deg, #14141a 0%, #08080a 100%))',
                     backgroundSize: '100% 100%',
                     border: `1.5px solid ${POWER_META.swap.color}66`,

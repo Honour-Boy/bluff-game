@@ -1,19 +1,19 @@
 'use client';
 
 // ============================================================
-// ChamberSpinner — the spinning revolver-cylinder loading motif
+// ChamberSpinner - the spinning revolver-cylinder loading motif
 // ============================================================
 //
 // Single source of truth for the on-theme loading spinner used across every
 // loading state (auth bootstrap, Suspense fallbacks, in-app spinners) and the
 // post-intro IntroLoading beat. A metallic cylinder: six chambers around a hub
 // (alternating loaded brass rounds / empty holes so the rotation reads), a
-// bright rim light-catch and a motion trail that — because the whole SVG spins
-// via the global `spin` keyframe — make it look like real spinning metal.
+// bright rim light-catch and a motion trail that - because the whole SVG spins
+// via the global `spin` keyframe - make it look like real spinning metal.
 // Size-configurable so a small inline spinner and a big splash spinner share
 // one definition. CSS-var themed (`--accent`); no new styling system.
 //
-// SVG gradient ids are constant (SSR-stable — no hydration mismatch). If two
+// SVG gradient ids are constant (SSR-stable - no hydration mismatch). If two
 // spinners ever mount at once the duplicate defs are identical, so shared
 // resolution is harmless; in practice only one loading surface shows at a time.
 
@@ -60,12 +60,12 @@ export function ChamberSpinner({ size = 80, spinMs = 2000, style }) {
 
       {/* Cylinder body + gilt rim */}
       <circle cx="40" cy="40" r="37" fill="url(#cs-body)" stroke="url(#cs-ring)" strokeWidth="3" />
-      {/* Bright light-catch arc on the rim — rotates with the svg → spinning metal */}
+      {/* Bright light-catch arc on the rim - rotates with the svg → spinning metal */}
       <path d="M40 3 A37 37 0 0 1 77 40" fill="none" stroke="rgba(255,240,205,0.85)" strokeWidth="2.4" strokeLinecap="round" opacity="0.7" />
       {/* Faint motion-trail arc opposite the highlight */}
       <path d="M11 62 A37 37 0 0 1 6 34" fill="none" stroke="rgba(240,181,74,0.22)" strokeWidth="5" strokeLinecap="round" />
 
-      {/* Chambers — loaded ones carry a brass round */}
+      {/* Chambers - loaded ones carry a brass round */}
       {holes.map((h, i) => (
         <g key={i}>
           <circle cx={h.cx} cy={h.cy} r="7.5" fill="url(#cs-hole)" stroke="rgba(240,181,74,0.45)" strokeWidth="1.4" />

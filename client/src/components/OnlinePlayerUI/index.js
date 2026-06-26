@@ -89,7 +89,7 @@ export function OnlinePlayerUI({
   voice,
   openChat,
   chatUnread = 0,
-  // #205 — this client's private end-of-game XP payload (useGame), if any.
+  // #205 - this client's private end-of-game XP payload (useGame), if any.
   xpAward = null,
   // Spotlight tour: whether THIS client is a guest (drops the profile / cosmetics
   // beats, which guests don't have in the settings menu).
@@ -117,12 +117,12 @@ export function OnlinePlayerUI({
   const panControls = useAnimationControls();
   const [panConstraints, setPanConstraints] = useState({ left: 0, right: 0, top: 0, bottom: 0 });
   const [pannable, setPannable] = useState(false);
-  // Tutorial — bumped by the header "Guide" button to reopen the guided walkthrough.
+  // Tutorial - bumped by the header "Guide" button to reopen the guided walkthrough.
   const [guideSignal, setGuideSignal] = useState(0);
-  // Covenant — the Pact selector can dismiss their partner-picker (keeps the
+  // Covenant - the Pact selector can dismiss their partner-picker (keeps the
   // server-set default). Sticky so it doesn't re-pop on every room_state push.
   const [pactSelectorDismissed, setPactSelectorDismissed] = useState(false);
-  // Spotlight tour — flips true when the walk's last beat is finished, so the
+  // Spotlight tour - flips true when the walk's last beat is finished, so the
   // congrats card replaces the spotlight. Reset whenever we leave the tour.
   const [tourDone, setTourDone] = useState(false);
   const ready = !!(roomState && myPlayer);
@@ -173,8 +173,8 @@ export function OnlinePlayerUI({
   const spinAudioDelayRef = useRef(null);
   // (Module 2.3) Dedup the spin-audio START by the server's monotonic spinSeq, the
   // same way the cylinder animation dedups (useOnlinePlayerUiController). Without
-  // this, a re-stamped / re-broadcast spin_result — seen during Mirror/Swap clinic
-  // resolution — restarts the cylinder/click SFX a second time in rapid succession.
+  // this, a re-stamped / re-broadcast spin_result - seen during Mirror/Swap clinic
+  // resolution - restarts the cylinder/click SFX a second time in rapid succession.
   const seenSpinAudioKeysRef = useRef(new Set());
   // Set when the server flips to game_over WHILE a terminal spin is still
   // animating: the victory fanfare is deferred and fired at spinComplete (below)
@@ -188,13 +188,13 @@ export function OnlinePlayerUI({
     const prevPhase = prevPhaseRef.current;
     const prevLa = prevLastActionRef.current;
 
-    // Bluff resolution — shake + bell when spin_pending starts
+    // Bluff resolution - shake + bell when spin_pending starts
     if (phase === 'spin_pending' && prevPhase !== 'spin_pending') {
       triggerShake();
       triggerAudio('bluff');
     }
 
-    // Spin result — shake immediately, then start the click engine at the
+    // Spin result - shake immediately, then start the click engine at the
     // same moment the CSS transition begins (+80 ms, matching useOnlinePlayerUiController).
     // The old flat spin-whir (`triggerAudio('spin'/'eliminate')`) is intentionally
     // removed here; it now plays only after spinComplete (see effect below).
@@ -215,17 +215,17 @@ export function OnlinePlayerUI({
       }
     }
 
-    // Card played — soft knock
+    // Card played - soft knock
     if (la && la !== prevLa && la.type === 'card_played') {
       triggerAudio('card');
     }
-    // Game over — victory fanfare for the LOCAL winner only, and held until the
+    // Game over - victory fanfare for the LOCAL winner only, and held until the
     // terminal spin finishes. Two old bugs are fixed here: playing 'win' the
     // instant the server flipped to game_over fired it OVER the still-spinning
     // cylinder, and it sounded a "win" even when the local player had just lost.
     // The loser's defeat sting now rides the "Eliminated" card instead (below).
     if (phase === 'game_over' && prevPhase !== 'game_over') {
-      // Covenant — a Pact dual win credits both partners (winnerIds).
+      // Covenant - a Pact dual win credits both partners (winnerIds).
       const iWon = la?.dualWin
         ? (la.winnerIds || []).includes(myPlayer?.id)
         : la?.winnerId === myPlayer?.id;
@@ -244,7 +244,7 @@ export function OnlinePlayerUI({
   }, [roomState?.phase, roomState?.lastAction, myPlayer?.id, triggerShake, triggerAudio, startSpinAudio]); // eslint-disable-line
 
   // Fire the result-reveal sound (survive/eliminate) once the cylinder animation
-  // completes — not when the server event first arrives. Also stop any remaining
+  // completes - not when the server event first arrives. Also stop any remaining
   // click timeouts (defensive; the last click already fired the clunk by this point).
   const prevSpinCompleteRef = useRef(false);
   useEffect(() => {
@@ -253,20 +253,20 @@ export function OnlinePlayerUI({
       // lethal chamber, fire the high-impact gunshot cue right as the result
       // lands. Read the spin SNAPSHOT (ui.spinData) rather than roomState.lastAction:
       // in practice mode the tutorial director restages the room ~2.6s after the
-      // game ends, swapping lastAction out before the 8s cylinder finishes — so by
+      // game ends, swapping lastAction out before the 8s cylinder finishes - so by
       // spinComplete `lastAction` is no longer the spin and the cue would be lost.
       stopSpinAudio();
       if (ui.spinData?.eliminated) {
         triggerAudio('gunshot');
       }
-      // Deferred victory fanfare — held since the server flipped to game_over so it
+      // Deferred victory fanfare - held since the server flipped to game_over so it
       // lands once the cylinder stops, just after the gunshot/clunk.
       if (pendingWinRef.current) {
         pendingWinRef.current = false;
         setTimeout(() => triggerAudio('win'), 400);
       }
       // (Global redeal) a resolved bluff that triggered a reshuffle rides the
-      // SAME spin_result lastAction. Don't play the card flight now — the spin
+      // SAME spin_result lastAction. Don't play the card flight now - the spin
       // overlay is still up. Stash it and let the overlay-close effect play it
       // once the cylinder has been dismissed.
       const la = roomState?.lastAction;
@@ -277,7 +277,7 @@ export function OnlinePlayerUI({
     prevSpinCompleteRef.current = ui.spinComplete;
   }, [ui.spinComplete, stopSpinAudio, triggerAudio, roomState?.lastAction, ui.spinData]);
 
-  // Defeat sting — the mournful cue rides the "Eliminated" card surfacing (after
+  // Defeat sting - the mournful cue rides the "Eliminated" card surfacing (after
   // the cylinder has locked AND been dismissed), never over the live spin. Covers
   // both an ordinary elimination and the practice loss that hands into the clinic.
   const prevJustElimRef = useRef(false);
@@ -298,7 +298,7 @@ export function OnlinePlayerUI({
   // On a resolved bluff the server silently re-deals every alive player's shape
   // hand (powers kept, same count) and flags it on lastAction as
   // `globalReshuffle: true`. To make the swap legible, this client's shape cards
-  // visibly fly OUT to the draw pile, then fresh backs deal back IN — played
+  // visibly fly OUT to the draw pile, then fresh backs deal back IN - played
   // only AFTER the trigger/spin animation has finished so the two don't overlap.
   const [reshuffling, setReshuffling] = useState(false);
   // Spin path: the reshuffle rides the spin_result lastAction, so we stash it at
@@ -329,14 +329,14 @@ export function OnlinePlayerUI({
     if (rects.length === 0) return;
     const n = rects.length;
     setReshuffling(true);
-    // Phase 1 — cards fly OUT to the draw pile, staggered.
+    // Phase 1 - cards fly OUT to the draw pile, staggered.
     rects.forEach((rect, i) => {
       setTimeout(
         () => launchCardFlight({ back: true }, rect, deckRect, { mode: 'out', back: true }),
         i * 55,
       );
     });
-    // Phase 2 — fresh backs deal back IN from the draw pile to each spot.
+    // Phase 2 - fresh backs deal back IN from the draw pile to each spot.
     const phase2 = n * 55 + 240;
     rects.forEach((rect, i) => {
       setTimeout(
@@ -349,7 +349,7 @@ export function OnlinePlayerUI({
   }, [launchCardFlight, roomState?.myHand]);
 
   // Gate keeper for both reshuffle paths: the flight animation plays ONLY for
-  // the player whose turn it now is, and never under the "YOUR TURN" notice —
+  // the player whose turn it now is, and never under the "YOUR TURN" notice -
   // if the notice is still up (it always is right after the turn flips), hold
   // the animation until the player taps OK, then play. Coached tutorial rooms
   // suppress the notice entirely, so they play immediately.
@@ -401,13 +401,13 @@ export function OnlinePlayerUI({
   // Clear the pending-reshuffle delay timer on unmount.
   useEffect(() => () => clearTimeout(reshuffleDelayRef.current), []);
 
-  // §2.1 — private late-pick review buffer. When the server flags a pick as
+  // §2.1 - private late-pick review buffer. When the server flags a pick as
   // late (≥12s into the 15s window) it returns a reviewMs grace period. We
   // snapshot this player's pool + chosen id so their reveal can stay mounted
   // past the shared finalize, giving them a guaranteed private look before the
   // table appears. (They're already deprioritised off the opening turn server-
   // side.) Only the late picker ever sees this hold.
-  // Redemption Spin (Phase E1) — guard against a double-tap on the offer.
+  // Redemption Spin (Phase E1) - guard against a double-tap on the offer.
   const [redemptionBusy, setRedemptionBusy] = useState(false);
   const handleRedemptionSpin = useCallback(() => {
     if (!redemptionSpin || redemptionBusy) return;
@@ -467,7 +467,7 @@ export function OnlinePlayerUI({
   const isEliminated = myPlayer.status === 'eliminated';
   const isSpectator = myPlayer.isSpectator;
   const showSpectatorView = isEliminated || isSpectator;
-  // #197 — when the player taps a specific held card (a Collector holds up to
+  // #197 - when the player taps a specific held card (a Collector holds up to
   // 3), the activation modal targets that card; otherwise default to slot[0].
   const heldPowerCard =
     (ui.pendingPowerCardId
@@ -555,9 +555,9 @@ export function OnlinePlayerUI({
     : '';
   const bluffOutcomeColor = lastAction?.bluffCorrect ? 'var(--accent2)' : 'var(--alive)';
 
-  // #139 — eligibility to show the activation modal at all (turn/state gating).
+  // #139 - eligibility to show the activation modal at all (turn/state gating).
   // The three turn actions are order-independent: neither `cardPlayedThisTurn`
-  // nor `bluffUsedThisTurn` gates power activation — it's allowed before or
+  // nor `bluffUsedThisTurn` gates power activation - it's allowed before or
   // after a card is played and before or after a bluff is called. The only
   // block is already being armed (one activation per turn).
   const powerModalEligible = (
@@ -570,14 +570,14 @@ export function OnlinePlayerUI({
     && !ui.spinData
     && !ui.justEliminated
   );
-  // #139 — NO turn-start auto-prompt. The Activate/Skip modal opens ONLY
+  // #139 - NO turn-start auto-prompt. The Activate/Skip modal opens ONLY
   // when the player explicitly taps their power-card slot (which flips
   // ui.powerConfirmOpen). Eligibility still gates whether that tap is honoured.
   const showPowerModal = powerModalEligible && ui.powerConfirmOpen;
 
   // Tutorial defensive drill: dim the held Shield/Mirror/Swap during the "play a
   // bluff + end turn" step so the learner doesn't pre-arm it (which would stall
-  // the clinic — the server refuses it too). It becomes armable only once the
+  // the clinic - the server refuses it too). It becomes armable only once the
   // bot's challenge opens the intercept window.
   const powerPreArmLocked = (
     isTutorial
@@ -595,7 +595,7 @@ export function OnlinePlayerUI({
         cardPlayedThisTurn,
         bluffUsedThisTurn,
         powerActivatedThisTurn: roomState?.powerActivatedThisTurn,
-        // (Module 3.1) Freeze bonus turn — don't block End Turn once it's spent.
+        // (Module 3.1) Freeze bonus turn - don't block End Turn once it's spent.
         freezeConsumed: !(roomState?.myPowerCardSlot || []).some((c) => c?.power === 'freeze'),
       })
     : null;
@@ -604,12 +604,12 @@ export function OnlinePlayerUI({
   const amSwapHolder = isSwapPending && roomState?.swapHolderId === myPlayer?.id;
   const swapPickOptions = roomState?.swapPickOptions || [];
   const myRole = myPlayer?.role || 'barehand';
-  // #116 — role reveal is now server-sequenced during the pre_game
+  // #116 - role reveal is now server-sequenced during the pre_game
   // phase, BEFORE the selection popup. Once the server opens selection
   // (pregame.selectionOpen) the reveal gives way to the picker.
   const inPreGame = phase === 'pre_game';
   const showRoleReveal = inPreGame && !pregame?.selectionOpen && !!myPlayer?.role;
-  // §2.1 — keep the modal alive through the private review buffer even after
+  // §2.1 - keep the modal alive through the private review buffer even after
   // pre_game has finalised for the table at large.
   const reviewActive = !!reviewSnapshot && reviewSnapshot.until > Date.now();
   const showPreGameSelection = (inPreGame && !!pregame?.selectionOpen) || reviewActive;
@@ -668,11 +668,11 @@ export function OnlinePlayerUI({
 
   // (Role timing) While the spin cylinder is still turning, hold BOTH the
   // event/achievement announcements AND any role decision prompt (Medic save,
-  // Sniper redirect) until the animation resolves — so nothing pops over a
+  // Sniper redirect) until the animation resolves - so nothing pops over a
   // live spin. They surface the instant the cylinder locks (spinComplete).
   const holdForSpin = !!ui.spinData && !ui.spinComplete;
 
-  // Global pacing — only one overlay at a time. While ANY focus-stealing overlay
+  // Global pacing - only one overlay at a time. While ANY focus-stealing overlay
   // is up (a spin, a phase prompt, a power/peek/swap modal, the eliminated card),
   // suppress the lower-priority "your turn" notice and HOLD the announcement queue
   // so banners surface one after another instead of stacking over each other.
@@ -699,7 +699,7 @@ export function OnlinePlayerUI({
 
   // Clinic progress for the in-flow top band (reserves its own height; the rest
   // of the HUD sits below it, so nothing is obstructed). The spotlight tour uses
-  // a different scenario shape (no index/total) — exclude it so the bar never
+  // a different scenario shape (no index/total) - exclude it so the bar never
   // renders a NaN width during the tour.
   const scenarioForBar = (roomState?.tutorialScenario && !roomState.tutorialScenario.tour)
     ? roomState.tutorialScenario
@@ -714,7 +714,7 @@ export function OnlinePlayerUI({
 
   const isSpinPendingPhase = roomState?.phase === 'spin_pending';
 
-  // #205 — cosmetics. The viewer's OWN felt + card back theme the table via CSS
+  // #205 - cosmetics. The viewer's OWN felt + card back theme the table via CSS
   // custom properties on this root (defaults in the CSS keep the original look);
   // the spin overlay paints the SPINNER's gun skin so everyone sees their iron.
   // Memoized: this component re-renders constantly (timers, spin frames) and a
@@ -727,7 +727,7 @@ export function OnlinePlayerUI({
     ? (players?.find((p) => p.id === ui.spinData.spinTargetId)?.cosmetics?.gunSkin || null)
     : null;
 
-  // Spotlight tour — Part-B signals. Each `do-action` beat advances when the
+  // Spotlight tour - Part-B signals. Each `do-action` beat advances when the
   // SERVER-confirmed effect (or a client overlay) reflects the action, NOT on the
   // raw click. Keyed to the tourContent `waitFor` strings. The step transitions
   // (turn-ended / spin-acknowledged) are driven by the director restaging.
@@ -845,11 +845,11 @@ export function OnlinePlayerUI({
           }}>
             {lastAction?.dualWin
               ? ((lastAction.winnerIds || []).includes(myPlayer.id)
-                  ? 'Shared Victory — The Pact Holds'
+                  ? 'Shared Victory - The Pact Holds'
                   : `${(lastAction.winnerNames || []).join(' & ')} Prevail`)
               : (lastAction?.winnerId === myPlayer.id ? 'Victory' : `${lastAction?.winnerName ?? '?'} Prevails`)}
           </div>
-          {/* #205 — this player's private XP gain for the finished game. */}
+          {/* #205 - this player's private XP gain for the finished game. */}
           <XpSummary xpAward={xpAward} isMobile={ui.isMobile} />
         </div>
       )}
@@ -1019,7 +1019,7 @@ export function OnlinePlayerUI({
         />
       )}
 
-      {/* Covenant — Blood Debt target picker (private to the just-eliminated
+      {/* Covenant - Blood Debt target picker (private to the just-eliminated
           player). Gated to Covenant rooms; no Blood Debt UI elsewhere. */}
       {roomState?.tier === 'covenant' && bloodDebtPrompt && (
         <BloodDebtOverlay
@@ -1029,7 +1029,7 @@ export function OnlinePlayerUI({
         />
       )}
 
-      {/* Covenant — The Pact (all gated to Covenant rooms). Selector picks a
+      {/* Covenant - The Pact (all gated to Covenant rooms). Selector picks a
           partner during pre_game; the target accepts/denies once play begins;
           a partner can volunteer to take a spin. */}
       {roomState?.tier === 'covenant'
@@ -1156,11 +1156,11 @@ export function OnlinePlayerUI({
         />
       )}
 
-      {/* Spotlight "Show me around" tour — runs over the live table during the
+      {/* Spotlight "Show me around" tour - runs over the live table during the
           'tour' practice lesson. The congrats card is gated on the CLIENT
           finishing the final beat (tourDone), NOT on the server's tourComplete:
           the server flags complete the instant the last power is used, but the
-          learner still has the result beat to read — showing congrats then would
+          learner still has the result beat to read - showing congrats then would
           cut it off. */}
       {tourActive && !tourDone && (
         <OnlineTourLayer

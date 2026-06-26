@@ -1,5 +1,5 @@
 // ============================================================
-// §1.1 — Granular single-action turn ledger.
+// §1.1 - Granular single-action turn ledger.
 //
 // The three turn actions (play a card, call a bluff, activate a power
 // card) are order-free but each capped at once per turn. advanceTurn is
@@ -41,7 +41,7 @@ function onlineRoom(playerIds) {
   return room;
 }
 
-describe('§1.1 turn-action ledger — reset boundaries', () => {
+describe('§1.1 turn-action ledger - reset boundaries', () => {
   it('advanceTurn clears all three action flags', () => {
     const room = onlineRoom(['p0', 'p1']);
     room.cardPlayedThisTurn = true;
@@ -58,7 +58,7 @@ describe('§1.1 turn-action ledger — reset boundaries', () => {
   it('finaliseAssassinElimination preserves the ledger (no mid-turn reset)', () => {
     // The accuser (p1) played a card AND called a bluff this turn; the bluff
     // resolves into an Assassin strike. The turn has NOT advanced, so the
-    // ledger must stay set — p1 cannot play a second card.
+    // ledger must stay set - p1 cannot play a second card.
     const room = onlineRoom(['p0', 'p1', 'p2']);
     room.currentTurnIndex = 1; // p1 is on turn
     room.cardPlayedThisTurn = true;
@@ -88,7 +88,7 @@ describe('§1.1 turn-action ledger — reset boundaries', () => {
   });
 });
 
-describe('§1.1 turn-action ledger — single power activation per turn', () => {
+describe('§1.1 turn-action ledger - single power activation per turn', () => {
   it('rejects a second power activation after Peek is consumed', () => {
     const room = onlineRoom(['p0']);
     room.challengeableCard = { id: 'x', type: 'shape', shape: 'circle', number: 4 };

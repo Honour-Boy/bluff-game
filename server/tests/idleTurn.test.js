@@ -1,9 +1,9 @@
 // ============================================================
-// #239 — Idle-turn safety net.
+// #239 - Idle-turn safety net.
 //
 // OUTSIDE Speed Mode, a current player who never acts must not stall the table.
 // After IDLE_TURN_TIMEOUT_MS the server auto-resolves their turn (auto-plays a
-// sensible legal card when safe, then ends the turn — no spin, #79) and play
+// sensible legal card when safe, then ends the turn - no spin, #79) and play
 // continues. Speed Mode's shorter advertised cap takes precedence, so the idle
 // timer never arms while Speed Mode is on (the two can't double-fire).
 // ============================================================
@@ -47,7 +47,7 @@ function makeRoom({ speedMode = false } = {}) {
 
 const handLen = (room, id) => (room.hands.get(id) || []).length;
 
-describe('#239 — idle-turn safety net', () => {
+describe('#239 - idle-turn safety net', () => {
   beforeEach(() => {
     vi.useFakeTimers();
   });
@@ -67,7 +67,7 @@ describe('#239 — idle-turn safety net', () => {
 
     expect(_idleTurnActive(room)).toBe(true);
     expect(idleTurnTimers.has(room.code)).toBe(true);
-    // The idle net is silent — it must NOT surface a Speed Mode countdown.
+    // The idle net is silent - it must NOT surface a Speed Mode countdown.
     expect(engine.serializeRoom(room, 'p1').speedModeMsRemaining).toBeUndefined();
   });
 
@@ -81,7 +81,7 @@ describe('#239 — idle-turn safety net', () => {
     expect(idleTurnTimers.has(room.code)).toBe(false);
   });
 
-  it('auto-plays a card and advances the turn on expiry — no spin, nobody eliminated', async () => {
+  it('auto-plays a card and advances the turn on expiry - no spin, nobody eliminated', async () => {
     const room = makeRoom();
     await saveRoom(room);
     const io = makeIo();
@@ -104,7 +104,7 @@ describe('#239 — idle-turn safety net', () => {
 
   it('forfeits without auto-playing when it would empty the hand (no handing a win)', async () => {
     const room = makeRoom();
-    // p0 down to a single card — auto-play would empty their hand and "win".
+    // p0 down to a single card - auto-play would empty their hand and "win".
     room.hands.set('p0', [{ id: 'last', type: 'shape', shape: 'circle', number: 5 }]);
     await saveRoom(room);
     const io = makeIo();

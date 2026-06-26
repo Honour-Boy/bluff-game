@@ -1,10 +1,10 @@
 // ============================================================
-// SOCKET LIB — Tutorial progression director (Basics → Power Clinic)
+// SOCKET LIB - Tutorial progression director (Basics → Power Clinic)
 // ============================================================
 // The bot "hosts" a practice room and the SERVER drives the lesson flow:
 //   • when a Basics game ends, hand the learner off to the Power Clinic;
 //   • inside the clinic, step through the scripted drills (engine/
-//     tutorialScenarios.js) — stage a drill, wait for the learner to use the
+//     tutorialScenarios.js) - stage a drill, wait for the learner to use the
 //     power, hold a beat on the "what happened" explanation, then advance.
 //
 // Modelled on lib/bots.js: armTutorialDirector is idempotent and called at the
@@ -14,7 +14,7 @@
 // rooms are untouched.
 //
 // Cycle note: this module is required at the top of lib/broadcast.js, so it must
-// NOT require ./broadcast at top level — that is pulled in via a DEFERRED require
+// NOT require ./broadcast at top level - that is pulled in via a DEFERRED require
 // inside the expiry handler (same trick lib/bots.js / lib/idleTurn.js use).
 
 const engine = require('../gameEngine');
@@ -29,17 +29,17 @@ const {
 } = require('./state');
 
 // Beat timing (ms). Module 4 slows the clinic down deliberately so each beat is
-// legible — the player should never feel rushed through a power.
+// legible - the player should never feel rushed through a power.
 const DELAYS = {
   start_clinic: 2600,   // "you finished the basics round" → deal the clinic
   announce_challenge: 1600, // (Module 4.1) "Dealer Bot calls bluff!" beat BEFORE the defend window
   open_intercept: 1400, // beat before the arm/defend window actually opens
   resolve: 1800,        // hold on the live consequence before the explanation
-  // (Module 2.2) The clinic's final beat — the Assassin strike that eliminates the
-  // bot (= you win) — holds longer so the victory coach + Eliminated card are fully
+  // (Module 2.2) The clinic's final beat - the Assassin strike that eliminates the
+  // bot (= you win) - holds longer so the victory coach + Eliminated card are fully
   // readable before the clinic-complete card / cleanup transitions.
   resolve_victory: 4200,
-  // Spotlight tour — short beats between staged Part-B instances (the tour is
+  // Spotlight tour - short beats between staged Part-B instances (the tour is
   // player-paced; the director only restages between steps).
   tour_next: 700,
   tour_finish: 700,
@@ -51,10 +51,10 @@ const ALL_POWERS_ON = {
 
 /**
  * The one staged step the room owes right now, or null. Pure read.
- *   start_clinic — a Basics tutorial reached game over; move to the clinic.
- *   resolve      — the current drill's power was used; show the explanation.
+ *   start_clinic - a Basics tutorial reached game over; move to the clinic.
+ *   resolve      - the current drill's power was used; show the explanation.
  *
- * Advancing PAST a resolved drill is NOT timed — it waits for the learner to tap
+ * Advancing PAST a resolved drill is NOT timed - it waits for the learner to tap
  * "I Understand" (the `tutorial_advance` socket event → advanceClinic below), so
  * each power's explanation stays up until the player is ready.
  */
@@ -62,7 +62,7 @@ function _pendingDirectorAction(room) {
   if (!room || !room.isTutorial) return null;
   const lesson = room.tutorialLesson || 'basics';
 
-  // Spotlight tour — advance between the staged Part-B instances. Step 0 is
+  // Spotlight tour - advance between the staged Part-B instances. Step 0 is
   // staged by the tutorial_start_tour handler; here we only restage the next
   // step once the current one is complete, and flag tourComplete after the last.
   if (lesson === 'tour') {
@@ -95,7 +95,7 @@ function _pendingDirectorAction(room) {
       && engine.getPreviousTurnPlayerId(room) === humanId
       && engine.canInterceptBluff(room, humanId)) {
       // (Module 4.1) Two beats: first announce the bot's challenge, THEN open the
-      // defend window — so "the bot called your bluff" reads before the arm panel.
+      // defend window - so "the bot called your bluff" reads before the arm panel.
       if (!sc.challengeAnnounced) return { kind: 'announce_challenge', index: sc.index };
       return { kind: 'open_intercept', index: sc.index };
     }
@@ -129,7 +129,7 @@ function _directorKey(action, room) {
 function armTutorialDirector(io, room) {
   if (!room || !room.code) return;
   // Inert for non-tutorial rooms AND for an uncoached practice replay (a plain
-  // game vs the bot, opted out of the guided progression — no clinic hand-off).
+  // game vs the bot, opted out of the guided progression - no clinic hand-off).
   if (!room.isTutorial || room.tutorialCoaching === false) { _clearTutorialTimer(room.code); return; }
 
   const action = _pendingDirectorAction(room);
@@ -175,7 +175,7 @@ function _beginTour(room) {
   stageTourStep(room, 0);
 }
 
-// Tour done — flag it (the client shows the congrats card) and clear the staged
+// Tour done - flag it (the client shows the congrats card) and clear the staged
 // scenario so no spotlight lingers. The phase stays 'playing'; the learner
 // proceeds via the congrats screen's "Begin Practice" (tutorial_finish_tour).
 function _finishTour(room) {
@@ -197,7 +197,7 @@ function _beginPowerClinic(room) {
 
 // The "bot challenges you" beat of a defensive drill: open the bluff-intercept
 // window against the human's just-played (mismatched) card so they can arm their
-// defence. No server safety timeout — the clinic is guided and the BluffIntercept
+// defence. No server safety timeout - the clinic is guided and the BluffIntercept
 // overlay hides its countdown in tutorial mode.
 function _openInterceptForDefence(room) {
   const human = room.players.find(p => p && !p.isBot) || null;
@@ -272,7 +272,7 @@ async function _onDirectorExpire(io, code, key) {
       if (room.tutorialScenario) room.tutorialScenario.step = 'resolved';
       break;
     case 'tour_next': {
-      // Current tour instance is complete — stage the next one.
+      // Current tour instance is complete - stage the next one.
       const next = (room.tutorialScenario?.stepIndex ?? -1) + 1;
       stageTourStep(room, next);
       break;

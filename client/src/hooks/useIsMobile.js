@@ -1,6 +1,6 @@
 'use client';
 
-// useIsMobile — SSR-safe matchMedia hook. Defaults to false during
+// useIsMobile - SSR-safe matchMedia hook. Defaults to false during
 // SSR / first client render and flips to the live value on mount.
 // Default query matches the existing 640px breakpoint used in
 // OnlinePlayerUI's CSS for the same purpose (chip sizing / etc).

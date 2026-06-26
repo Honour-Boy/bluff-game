@@ -5,7 +5,7 @@ import { CardHand } from '../CardHand';
 const shapeCard = { id: 's1', shape: 'circle', number: 3 };
 const powerCard = { id: 'p1', type: 'power', power: 'shield' };
 
-describe('CardHand — power-card / shape-card click decoupling (#139)', () => {
+describe('CardHand - power-card / shape-card click decoupling (#139)', () => {
   it('routes a power-card click to onPowerCardClick, never onCardClick', () => {
     const onCardClick = vi.fn();
     const onPowerCardClick = vi.fn();

@@ -1,5 +1,5 @@
 // ============================================================
-// #244 — Host "Kick Player" control.
+// #244 - Host "Kick Player" control.
 //
 // The host can remove a disruptive player mid-session. The kick is host-only,
 // boots the target's socket back to landing with a `kicked` event, removes them
@@ -76,7 +76,7 @@ function makeRoom({ phase = 'lobby' } = {}) {
 beforeEach(() => { rooms.clear(); });
 afterEach(() => { vi.clearAllMocks(); });
 
-describe('#244 — kick_player', () => {
+describe('#244 - kick_player', () => {
   it('host removes a lobby player and boots their socket to landing', async () => {
     const io = makeIo(['sock-host', 'sock-a', 'sock-b']);
     const room = makeRoom({ phase: 'lobby' });

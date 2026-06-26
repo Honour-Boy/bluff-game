@@ -1,5 +1,5 @@
 // ============================================================
-// Tests — single-device session registry (lib/sessions.js)
+// Tests - single-device session registry (lib/sessions.js)
 //
 // Pure logic, no socket transport: a fake `io` exposes
 // `sockets.sockets` (a Map of live socketId → socket) and a fake
@@ -60,7 +60,7 @@ describe('deviceId helpers', () => {
   });
 });
 
-describe('resolveLogin — verdict matrix', () => {
+describe('resolveLogin - verdict matrix', () => {
   it('no prior session → clean proceed', () => {
     const io = makeIo(['new']);
     const v = resolveLogin(io, new Map(), { userId: 'u1', deviceId: DEV_A, socketId: 'new' });
@@ -121,7 +121,7 @@ describe('resolveLogin — verdict matrix', () => {
   });
 });
 
-describe('clearSession — socketId-matched (eviction-safe)', () => {
+describe('clearSession - socketId-matched (eviction-safe)', () => {
   it('clears when the socket matches', () => {
     registerSession('u1', { socketId: 'sock', deviceId: DEV_A, username: 'U' });
     clearSession('u1', 'sock');

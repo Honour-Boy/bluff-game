@@ -1,5 +1,5 @@
 // ============================================================
-// HANDLERS — Bluff resolution + spin pipeline
+// HANDLERS - Bluff resolution + spin pipeline
 // ============================================================
 // Covers: resolve_bluff (physical host), player_spin, call_bluff,
 // swap_pick. These share the orchestration pipeline
@@ -66,14 +66,14 @@ function register(io, socket, deps) {
         bluffCorrect: bluffIsCorrect,
       };
 
-      // Russian Roulette — failed bluff fires an immediate spin (no host/player
+      // Russian Roulette - failed bluff fires an immediate spin (no host/player
       // "pull the trigger" step).
       if (engine.shouldImmediateSpin(room)) {
         await applySpinAndBroadcast(io, room.code, room, spinTarget, leaderboardRepo);
         return callback({ success: true });
       }
 
-      // Issue 1 — guard against a spin that never gets performed.
+      // Issue 1 - guard against a spin that never gets performed.
       _scheduleSpinPendingTimeout(io, room.code, leaderboardRepo);
 
       await saveRoom(room);
@@ -93,7 +93,7 @@ function register(io, socket, deps) {
       if (room.phase !== 'spin_pending') return callback({ success: false, error: 'No spin pending' });
       if (room.spinTargetId !== playerId) return callback({ success: false, error: 'Not your spin' });
 
-      // v2 Phase F — Betting window: spin target must wait until close.
+      // v2 Phase F - Betting window: spin target must wait until close.
       if (room.betting && !room.betting.closed) {
         const everyoneBet = room.betting.eligibleIds.every(
           id => room.betting.bets[id]
@@ -108,7 +108,7 @@ function register(io, socket, deps) {
       const player = room.players.find(p => p.id === playerId);
       if (!player) return callback({ success: false, error: 'Player not found' });
 
-      // A real spin arrived — cancel the spin_pending auto-resolve safety timer
+      // A real spin arrived - cancel the spin_pending auto-resolve safety timer
       // (Issue 1) before running the shared spin pipeline.
       _clearSpinPendingTimer(room.code);
       const spinResult = await applySpinAndBroadcast(io, code, room, player, leaderboardRepo);
@@ -149,15 +149,15 @@ function register(io, socket, deps) {
       if (room.bluffUsedThisTurn) return callback({ success: false, error: 'Bluff already called this turn' });
       if (room.isFirstTurn) return callback({ success: false, error: 'Cannot call bluff on the first turn' });
       if (room.bluffBlockedThisTurn) {
-        return callback({ success: false, error: 'No card to challenge — last turn was frozen' });
+        return callback({ success: false, error: 'No card to challenge - last turn was frozen' });
       }
-      // Tutorial clinic — own-turn drills (Peek/Freeze/Assassin) disable Call Bluff
+      // Tutorial clinic - own-turn drills (Peek/Freeze/Assassin) disable Call Bluff
       // so the learner stays on script. (The client also hides the button.)
       if (room.tutorialScenario?.lockBluff) {
         return callback({ success: false, error: 'Not part of this lesson step' });
       }
 
-      // Covenant — The Pact. Partners can NEVER call each other's bluffs. Reject
+      // Covenant - The Pact. Partners can NEVER call each other's bluffs. Reject
       // privately (no table-visible event) WITHOUT consuming the caller's bluff
       // for this turn (return before bluffUsedThisTurn is set).
       if (room.mode === engine.MODES.ONLINE) {
@@ -168,9 +168,9 @@ function register(io, socket, deps) {
         }
       }
 
-      // Covenant — Blood Debt. A caller carrying a debt fires an EXTRA "debt
+      // Covenant - Blood Debt. A caller carrying a debt fires an EXTRA "debt
       // spin" on themselves after the primary resolution. Queue it now (don't
-      // consume the flag yet — that happens when the debt spin actually fires,
+      // consume the flag yet - that happens when the debt spin actually fires,
       // from spin_acknowledged). Online only; the flag is Covenant-exclusive.
       if (room.mode === engine.MODES.ONLINE && engine.checkCallerHasBloodDebt(room, playerId)) {
         room.pendingBloodDebtSpin = { debtorId: playerId };
@@ -181,10 +181,10 @@ function register(io, socket, deps) {
       logTurnState(code, playerId, 'call_bluff', room, { accusedId: engine.getPreviousTurnPlayerId(room) });
 
       if (room.mode === engine.MODES.ONLINE) {
-        // §1.1 — interception window. If the accused (the previous player, who
+        // §1.1 - interception window. If the accused (the previous player, who
         // is OFF-turn) still holds an un-armed defensive power card, pause and
         // let them arm it in response BEFORE the bluff resolves. The resolution
-        // queue reads the freshly-armed card when we resume — no pipeline
+        // queue reads the freshly-armed card when we resume - no pipeline
         // change is needed. On arm/pass/timeout we run `_resolveOnlineBluff`.
         if (await maybeOpenBluffIntercept(io, code, room, playerId, leaderboardRepo)) {
           return callback({ success: true, intercept: true });
@@ -213,7 +213,7 @@ function register(io, socket, deps) {
   // ─── ACCUSED: Respond to a bluff during the interception window (§1.1) ──
   // The bluffed player either arms a defensive card (`cardId` present) or
   // passes (`cardId` omitted). Either way the window closes and the bluff
-  // resolves immediately via the shared resolver — which now sees any card
+  // resolves immediately via the shared resolver - which now sees any card
   // they just armed.
   socket.on('bluff_intercept', async ({ roomCode, cardId } = {}, callback) => {
     try {
@@ -235,7 +235,7 @@ function register(io, socket, deps) {
       if (cardId) {
         const res = engine.armInterceptCard(room, socket.userId, cardId);
         if (!res.ok) {
-          // Malformed pick — keep the window open for whatever time is left.
+          // Malformed pick - keep the window open for whatever time is left.
           const remaining = Math.max(0, (pending.deadline || 0) - Date.now());
           _scheduleBluffInterceptTimeout(io, code, leaderboardRepo, remaining);
           return callback?.({ success: false, error: res.error });
@@ -244,7 +244,7 @@ function register(io, socket, deps) {
       }
 
       const accuserId = pending.accuserId;
-      // §1.2 — close the window WITHOUT ending any turn. Whether the accused
+      // §1.2 - close the window WITHOUT ending any turn. Whether the accused
       // armed a defence or passed, the on-turn accuser keeps priority; we only
       // restore `playing` + clear the pending state and let the bluff resolve.
       // Passing here never routes into an implicit turn-end.
@@ -261,7 +261,7 @@ function register(io, socket, deps) {
         });
         console.log(`[Room ${code}] ${pending.accusedName || socket.userId} intercepted with ${armedPower}`);
       } else {
-        console.log(`[Room ${code}] ${pending.accusedName || socket.userId} PASSED the bluff-intercept — on-turn player ${onTurnBefore} retains the turn; resolving bluff.`);
+        console.log(`[Room ${code}] ${pending.accusedName || socket.userId} PASSED the bluff-intercept - on-turn player ${onTurnBefore} retains the turn; resolving bluff.`);
       }
 
       await _resolveOnlineBluff(io, code, room, accuserId, leaderboardRepo);
@@ -307,7 +307,7 @@ function register(io, socket, deps) {
           applyPostElimSystemHooks(io, room);
         });
         if (medicStarted) {
-          // #121 — hold the death announcement until the Medic resolves
+          // #121 - hold the death announcement until the Medic resolves
           // (released on decline / dropped on save by medic_decide).
           const deferred = events.filter(e => e?.kind === 'assassin_strike');
           const immediate = events.filter(e => e?.kind !== 'assassin_strike');
@@ -331,7 +331,7 @@ function register(io, socket, deps) {
 
       if (room.phase === 'spin_pending') {
         _maybeOpenBetting(io, room);
-        // Issue 1 — guard against a spin that never gets performed.
+        // Issue 1 - guard against a spin that never gets performed.
         _scheduleSpinPendingTimeout(io, room.code, leaderboardRepo);
       }
 

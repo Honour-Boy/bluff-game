@@ -2,13 +2,13 @@ import { defineConfig } from 'vitest/config';
 import react from '@vitejs/plugin-react';
 import path from 'node:path';
 
-// ─── Vitest config — JSDOM env, RTL setup ───────────────────────────
+// ─── Vitest config - JSDOM env, RTL setup ───────────────────────────
 // Mirrors the server's vitest setup but adds the React / DOM bits the
 // client needs.
 //
 // JSX in .js files: Next.js compiles JSX in plain .js files, and the
 // existing client codebase relies on that. Vitest 4 uses Rolldown/oxc
-// by default, which doesn't parse JSX from .js files — so we wire up
+// by default, which doesn't parse JSX from .js files - so we wire up
 // the official @vitejs/plugin-react and tell its Babel layer to treat
 // every .js / .jsx file in src/ as JSX. This matches how Next.js
 // compiles the same files at runtime.
@@ -26,7 +26,7 @@ export default defineConfig({
   },
   plugins: [
     react({
-      // Babel parses JSX from .js too — Vite's default would skip them.
+      // Babel parses JSX from .js too - Vite's default would skip them.
       include: /\.(js|jsx)$/,
     }),
   ],

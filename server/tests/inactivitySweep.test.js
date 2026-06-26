@@ -61,7 +61,7 @@ describe('inactivity sweep', () => {
     rooms.set(room.code, room);
 
     startInactivitySweep(io);
-    // First tick fires after 60s — advance to it.
+    // First tick fires after 60s - advance to it.
     await vi.advanceTimersByTimeAsync(60_000 + 100);
 
     expect(rooms.has(room.code)).toBe(false);
@@ -92,7 +92,7 @@ describe('inactivity sweep', () => {
 
   it('startInactivitySweep is idempotent', () => {
     // We can't directly assert "only one interval scheduled" without
-    // peeking at the module — but we CAN assert subsequent calls
+    // peeking at the module - but we CAN assert subsequent calls
     // don't throw and the predicate still passes the smoke test
     // above. The internal short-circuit (`if (handle) return`) is
     // exercised here.

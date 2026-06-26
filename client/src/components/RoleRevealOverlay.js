@@ -29,7 +29,7 @@ export const ROLE_META = {
     color: "#8a8f99", // neutral steel grey
     flavor: "No special abilities. Read the room and trust your instincts - the basics are all you need to win.",
   },
-  // Shown to Barehand players on small tables (#116) — the literal
+  // Shown to Barehand players on small tables (#116) - the literal
   // "Barehand" label is hidden below the role threshold so the reveal
   // doesn't telegraph that no special roles are in play this game.
   standard: {
@@ -146,7 +146,7 @@ export function RoleRevealOverlay({ role, onComplete, durationMs = 9000, barehan
 
   // Issue #61: previously this effect listed `onComplete` in its deps.
   // Callers (OnlinePlayerUI.js:2085) pass it as an inline arrow, which
-  // re-creates on every parent render — and the parent re-renders on
+  // re-creates on every parent render - and the parent re-renders on
   // every `room_state` socket tick during the game. That cleared and
   // restarted t1/t2/t3 each tick, so the overlay's exit timer never
   // fired (the user saw the card stuck on screen indefinitely, which

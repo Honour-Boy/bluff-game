@@ -1,14 +1,14 @@
 // ============================================================
-// ROOM SESSION PERSISTENCE — primary + short-TTL recovery
+// ROOM SESSION PERSISTENCE - primary + short-TTL recovery
 // ============================================================
 //
 // Two stores, deliberately layered (issue #M4 reconnection hardening):
 //
-//  • PRIMARY  — sessionStorage['bluff_session']. Tab-local, matching the
+//  • PRIMARY  - sessionStorage['bluff_session']. Tab-local, matching the
 //    rest of the app's "close the tab = signed out" contract (see useAuth).
 //    Survives a same-tab refresh; gone when the tab closes.
 //
-//  • RECOVERY — localStorage['bluff_session_recovery'], stamped with `ts`
+//  • RECOVERY - localStorage['bluff_session_recovery'], stamped with `ts`
 //    and honoured ONLY within RECOVERY_TTL_MS. Used purely as a fallback
 //    when the primary entry is unexpectedly missing during a transient
 //    drop / refresh, so a brief network blip never strands the player or
@@ -16,7 +16,7 @@
 //    purged, so it can't silently re-drop someone into a long-dead room.
 //
 // Always read/write/clear through these helpers so both stores stay in
-// sync — never poke sessionStorage['bluff_session'] directly.
+// sync - never poke sessionStorage['bluff_session'] directly.
 
 const SESSION_KEY  = 'bluff_session';
 const RECOVERY_KEY = 'bluff_session_recovery';
@@ -35,7 +35,7 @@ export function saveRoomSession(session) {
 
 export function readRoomSession() {
   if (typeof window === 'undefined') return null;
-  // Primary first — authoritative within the tab.
+  // Primary first - authoritative within the tab.
   try {
     const saved = sessionStorage.getItem(SESSION_KEY);
     if (saved) {
@@ -43,7 +43,7 @@ export function readRoomSession() {
       if (parsed?.roomCode) return parsed;
     }
   } catch (_) { /* fall through to recovery */ }
-  // Recovery fallback — only if fresh.
+  // Recovery fallback - only if fresh.
   try {
     const raw = localStorage.getItem(RECOVERY_KEY);
     if (raw) {

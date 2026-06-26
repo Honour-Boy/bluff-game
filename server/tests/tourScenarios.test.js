@@ -1,5 +1,5 @@
 // ============================================================
-// Spotlight tour — staged instances, completion predicates, director + bot.
+// Spotlight tour - staged instances, completion predicates, director + bot.
 //
 // Locks the PURE logic (no io / timers):
 //   • stageTourStep writes a deterministic, on-script room per step,
@@ -44,7 +44,7 @@ describe('TOUR_STEPS', () => {
   });
 });
 
-describe('stageTourStep — play_card (B1–B4)', () => {
+describe('stageTourStep - play_card (B1–B4)', () => {
   it('puts the human on turn with an all-legal hand and no Call Bluff', () => {
     const room = tourRoom();
     const sc = stageTourStep(room, 0);
@@ -68,7 +68,7 @@ describe('stageTourStep — play_card (B1–B4)', () => {
   });
 });
 
-describe('stageTourStep — call_bluff_chain (B5–B7)', () => {
+describe('stageTourStep - call_bluff_chain (B5–B7)', () => {
   it('stages an HONEST bot play (matching) so the call is wrong, and empties the human chamber', () => {
     const room = tourRoom();
     const sc = stageTourStep(room, 1);
@@ -93,7 +93,7 @@ describe('stageTourStep — call_bluff_chain (B5–B7)', () => {
   });
 });
 
-describe('stageTourStep — activate_power (B8–B10)', () => {
+describe('stageTourStep - activate_power (B8–B10)', () => {
   it('seeds a Peek in the human slot and locks Call Bluff', () => {
     const room = tourRoom();
     const sc = stageTourStep(room, 2);
@@ -111,7 +111,7 @@ describe('stageTourStep — activate_power (B8–B10)', () => {
   });
 });
 
-describe('director — tour step advancement', () => {
+describe('director - tour step advancement', () => {
   it('owes nothing while the current step is incomplete', () => {
     const room = tourRoom();
     stageTourStep(room, 0);

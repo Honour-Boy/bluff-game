@@ -2,13 +2,13 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { renderHook, act } from '@testing-library/react';
 import { useOnlinePlayerUiController } from '../useOnlinePlayerUiController';
 
-// ─── #185 — Last Event must not reveal a spin outcome mid-animation ──────
+// ─── #185 - Last Event must not reveal a spin outcome mid-animation ──────
 // The controller exposes `displayedLastAction`: it mirrors roomState.lastAction
 // for every action type EXCEPT a spin_result, which is withheld until the
 // cylinder animation completes (spinComplete flips at 8080ms). These tests
 // drive that timer with fake timers and assert the gate.
 
-// Minimal prop bag — the controller destructures many props but only a few
+// Minimal prop bag - the controller destructures many props but only a few
 // matter for the Last Event gate. Everything else is a noop / inert value.
 function makeProps(lastAction) {
   return {
@@ -48,7 +48,7 @@ afterEach(() => {
   vi.useRealTimers();
 });
 
-describe('useOnlinePlayerUiController — Last Event spin gating (#185)', () => {
+describe('useOnlinePlayerUiController - Last Event spin gating (#185)', () => {
   it('withholds a spin_result until the cylinder animation completes (8080ms)', () => {
     const preSpin = { type: 'bluff_called', callerName: 'Ann' };
     const { result, rerender } = renderHook(
@@ -59,7 +59,7 @@ describe('useOnlinePlayerUiController — Last Event spin gating (#185)', () => 
     // The pre-spin event shows immediately.
     expect(result.current.displayedLastAction).toEqual(preSpin);
 
-    // A spin_result arrives — the panel must NOT flip to the outcome yet.
+    // A spin_result arrives - the panel must NOT flip to the outcome yet.
     act(() => rerender(makeProps(SPIN_RESULT)));
     expect(result.current.spinComplete).toBe(false);
     expect(result.current.displayedLastAction).toEqual(preSpin);
@@ -68,7 +68,7 @@ describe('useOnlinePlayerUiController — Last Event spin gating (#185)', () => 
     act(() => vi.advanceTimersByTime(4000));
     expect(result.current.displayedLastAction).toEqual(preSpin);
 
-    // Cylinder stops at 8080ms — outcome is revealed immediately.
+    // Cylinder stops at 8080ms - outcome is revealed immediately.
     act(() => vi.advanceTimersByTime(4080));
     expect(result.current.spinComplete).toBe(true);
     expect(result.current.displayedLastAction).toEqual(SPIN_RESULT);
@@ -77,7 +77,7 @@ describe('useOnlinePlayerUiController — Last Event spin gating (#185)', () => 
   it('does not blank the panel: holds the last renderable event through the spin_pending "must spin" marker', () => {
     // Real online sequence is card_played_online -> spin_pending -> spin_result.
     // ActionLog renders nothing for spin_pending, so it must NOT replace the
-    // displayed event — otherwise the panel goes blank during the wait + spin.
+    // displayed event - otherwise the panel goes blank during the wait + spin.
     const cardPlayed = {
       type: 'card_played_online',
       playerName: 'Alice',
@@ -95,16 +95,16 @@ describe('useOnlinePlayerUiController — Last Event spin gating (#185)', () => 
     );
     expect(result.current.displayedLastAction).toEqual(cardPlayed);
 
-    // "Must spin" marker arrives — panel keeps the card, does not go blank.
+    // "Must spin" marker arrives - panel keeps the card, does not go blank.
     act(() => rerender(makeProps(spinPending)));
     expect(result.current.displayedLastAction).toEqual(cardPlayed);
 
-    // The spin animates — still the card, never blank, never the outcome yet.
+    // The spin animates - still the card, never blank, never the outcome yet.
     act(() => rerender(makeProps(SPIN_RESULT)));
     act(() => vi.advanceTimersByTime(4000));
     expect(result.current.displayedLastAction).toEqual(cardPlayed);
 
-    // Cylinder stops — outcome revealed.
+    // Cylinder stops - outcome revealed.
     act(() => vi.advanceTimersByTime(4080));
     expect(result.current.displayedLastAction).toEqual(SPIN_RESULT);
   });
@@ -127,7 +127,7 @@ describe('useOnlinePlayerUiController — Last Event spin gating (#185)', () => 
       spinTargetName: 'Bob',
     };
     act(() => rerender(makeProps(bluffResolved)));
-    // No timer advance — it should already be visible.
+    // No timer advance - it should already be visible.
     expect(result.current.displayedLastAction).toEqual(bluffResolved);
   });
 
@@ -151,8 +151,8 @@ describe('useOnlinePlayerUiController — Last Event spin gating (#185)', () => 
   });
 });
 
-// ─── #197 — Collector can activate any held power card, not just slot[0] ──
-describe('useOnlinePlayerUiController — power card selection (#197)', () => {
+// ─── #197 - Collector can activate any held power card, not just slot[0] ──
+describe('useOnlinePlayerUiController - power card selection (#197)', () => {
   function makeActiveProps(activatePowerCard) {
     return {
       roomState: { lastAction: null, phase: 'playing', powerActivatedThisTurn: false },

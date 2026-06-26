@@ -1,10 +1,10 @@
 // ============================================================
-// ENGINE — Tutorial Power Clinic (scripted drill staging, pure)
+// ENGINE - Tutorial Power Clinic (scripted drill staging, pure)
 // ============================================================
 // The Powers lesson is a CLINIC: a fixed sequence of staged mid-game
 // "instances", each engineering the exact moment one power card is needed
 // so the learner activates it and sees the effect (and, for one drill,
-// watches the bot use a power). No free-play RNG — `stageScenario` writes a
+// watches the bot use a power). No free-play RNG - `stageScenario` writes a
 // deterministic snapshot onto the room and `scenarioComplete` is the pure
 // predicate the director (lib/tutorialDirector.js) polls to advance.
 //
@@ -13,13 +13,13 @@
 // (`forceBotBluff`, `botArmsIntercept`) to play its scripted part.
 //
 // Each drill stages one of two shapes:
-//   • own-turn drills (peek / freeze / assassin) — the human acts on their
+//   • own-turn drills (peek / freeze / assassin) - the human acts on their
 //     own turn; `lockBluff` disables the Call-Bluff button so they stay on
 //     script.
-//   • intercept drills (shield / mirror / swap) — staged DIRECTLY into the
+//   • intercept drills (shield / mirror / swap) - staged DIRECTLY into the
 //     `bluff_intercept_pending` window with the human as the accused holding
 //     the defensive card, so the only move is to arm it (or pick, for Swap).
-//   • the bot-Shield demo — staged in `playing` with the bot holding a Shield
+//   • the bot-Shield demo - staged in `playing` with the bot holding a Shield
 //     and the human prompted to Call Bluff; the bot arms it (botArmsIntercept)
 //     so the learner sees a power used against them.
 
@@ -67,7 +67,7 @@ function _resetForDrill(room) {
     // real drama (a live round in the cylinder, not an empty barrel). The bot can
     // still never DIE here: the spin pipeline force-survives the clinic bot and
     // lands the chamber on an empty slot (see applySpinAndBroadcast), so a stray
-    // ~15% death can't end the round (and the clinic) before the Assassin drill —
+    // ~15% death can't end the round (and the clinic) before the Assassin drill -
     // the one place the bot is meant to be eliminated. The human keeps a normal
     // 1-bullet chamber (they're saved by the power in every drill anyway).
     p.chamber = initChamber(1);
@@ -111,7 +111,7 @@ function _holds(room, holderId, power) {
 
 // ─── Drill defs (keyed by id; run order set by _CLINIC_ORDER below) ────────────
 const _DRILL_DEFS = [
-  // 0 — PEEK: own-turn, reveals the previous play.
+  // 0 - PEEK: own-turn, reveals the previous play.
   {
     id: 'peek', power: 'peek', actor: 'player', lockBluff: true, expect: 'use_power',
     stage(room) {
@@ -120,7 +120,7 @@ const _DRILL_DEFS = [
       room.turnOrder = [hid, BOT_ID];
       room.currentTurnIndex = 0;            // human on turn
       room.prevTurnPlayerId = BOT_ID;       // bot "just played"
-      // The bot's last play was a mismatch — Peek will expose the lie.
+      // The bot's last play was a mismatch - Peek will expose the lie.
       const botPlay = _mismatch(0);
       room.challengeableCard = botPlay;
       room.challengeableCardType = REQUIRED_SHAPE;
@@ -135,7 +135,7 @@ const _DRILL_DEFS = [
     },
   },
 
-  // 1 — FREEZE: own-turn, arm + play + end → skip the bot's next turn.
+  // 1 - FREEZE: own-turn, arm + play + end → skip the bot's next turn.
   {
     id: 'freeze', power: 'freeze', actor: 'player', lockBluff: true, expect: 'arm_then_play',
     stage(room) {
@@ -143,7 +143,7 @@ const _DRILL_DEFS = [
       _resetForDrill(room);
       room.turnOrder = [hid, BOT_ID];
       room.currentTurnIndex = 0;
-      room.isFirstTurn = true;              // human leads — nothing to challenge
+      room.isFirstTurn = true;              // human leads - nothing to challenge
       room.prevTurnPlayerId = null;
       room.hands.set(hid, [_shape(REQUIRED_SHAPE, 6), _shape('square', 4), _shape('cross', 2)]);
       room.hands.set(BOT_ID, [_shape('triangle', 5), _shape('star', 7)]);
@@ -152,7 +152,7 @@ const _DRILL_DEFS = [
     // (Module 3.1) Double-turn drill. The freeze leaves the slot when the holder
     // ends their turn with it armed (consumeFreezeOnTurnEnd queues the skip), and
     // the skip bounces play straight back to the human for a free SECOND turn.
-    // So the drill is NOT done the moment the freeze is consumed — it completes
+    // So the drill is NOT done the moment the freeze is consumed - it completes
     // only after the learner has taken that bonus turn and ended it, which
     // advances the turn onto the (previously skipped) bot.
     complete(room) {
@@ -161,7 +161,7 @@ const _DRILL_DEFS = [
     },
   },
 
-  // 2 — SHIELD: full loop — deal mismatches, the player plays + ends turn, the bot
+  // 2 - SHIELD: full loop - deal mismatches, the player plays + ends turn, the bot
   //     challenges (director opens the window), the player arms Shield to block.
   {
     id: 'shield', power: 'shield', actor: 'player', expect: 'play_then_defend',
@@ -171,7 +171,7 @@ const _DRILL_DEFS = [
     },
   },
 
-  // 3 — BOT SHIELD DEMO: the human calls bluff, the bot blocks with a Shield so
+  // 3 - BOT SHIELD DEMO: the human calls bluff, the bot blocks with a Shield so
   //     the learner sees a power used against them.
   {
     id: 'bot-shield', power: 'shield', actor: 'bot', lockBluff: false,
@@ -197,7 +197,7 @@ const _DRILL_DEFS = [
     },
   },
 
-  // 4 — MIRROR: full loop; arm it to bounce the spin onto the bot.
+  // 4 - MIRROR: full loop; arm it to bounce the spin onto the bot.
   {
     id: 'mirror', power: 'mirror', actor: 'player', expect: 'play_then_defend',
     stage(room) { _stageDefensiveDrill(room, 'mirror'); },
@@ -206,7 +206,7 @@ const _DRILL_DEFS = [
     },
   },
 
-  // 5 — SWAP: full loop; arm it, then pick the matching card from the played pile
+  // 5 - SWAP: full loop; arm it, then pick the matching card from the played pile
   //     so the bluff fails and the bot spins instead.
   {
     id: 'swap', power: 'swap', actor: 'player', expect: 'play_then_defend',
@@ -218,7 +218,7 @@ const _DRILL_DEFS = [
     },
   },
 
-  // 6 — ASSASSIN (LAST): own-turn, arm + honest play + end → a reckless bot
+  // 6 - ASSASSIN (LAST): own-turn, arm + honest play + end → a reckless bot
   //     challenge eliminates it, ending the clinic on a win.
   {
     id: 'assassin', power: 'assassin', actor: 'player', lockBluff: true,
@@ -228,9 +228,9 @@ const _DRILL_DEFS = [
       _resetForDrill(room);
       room.turnOrder = [hid, BOT_ID];
       room.currentTurnIndex = 0;
-      room.isFirstTurn = true;              // human leads — they play honestly
+      room.isFirstTurn = true;              // human leads - they play honestly
       room.prevTurnPlayerId = null;
-      // All matching cards, so whatever the human plays is HONEST — the bot's
+      // All matching cards, so whatever the human plays is HONEST - the bot's
       // forced challenge is therefore wrong, and the Assassin strikes it.
       room.hands.set(hid, [_shape(REQUIRED_SHAPE, 8), _shape(REQUIRED_SHAPE, 3), _shape(REQUIRED_SHAPE, 11)]);
       room.hands.set(BOT_ID, [_shape('triangle', 4), _shape('square', 6)]);
@@ -260,10 +260,10 @@ function _stageDefensiveDrill(room, power) {
   const hid = _humanId(room);
   _resetForDrill(room);
   room.turnOrder = [hid, BOT_ID];
-  room.currentTurnIndex = 0;               // human on turn — they lead with a bluff
+  room.currentTurnIndex = 0;               // human on turn - they lead with a bluff
   room.isFirstTurn = true;
   room.prevTurnPlayerId = null;
-  // Step A — a hand guaranteed to never match the required shape.
+  // Step A - a hand guaranteed to never match the required shape.
   room.hands.set(hid, [_mismatch(0), _mismatch(1), _mismatch(2)]);
   room.hands.set(BOT_ID, [_shape('triangle', 7), _shape('cross', 5)]);
 
@@ -287,7 +287,7 @@ function stageScenario(room, index) {
   spec.stage(room);
   // Intercept drills set their own phase; everything else is normal play.
   if (room.phase !== 'bluff_intercept_pending') room.phase = 'playing';
-  // "Power Card N of M" numbering counts only the player-facing drills — the bot
+  // "Power Card N of M" numbering counts only the player-facing drills - the bot
   // demo is an un-numbered aside (playerStep = null).
   const playerTotal = POWER_CLINIC.filter(d => (d.actor || 'player') === 'player').length;
   const playerStep = (spec.actor === 'bot')
@@ -327,7 +327,7 @@ function scenarioComplete(room, index) {
  *   arm_then_play    (Freeze, Assassin)  → must arm the power first
  *   use_power        (Peek)              → must use the power first
  *   play_then_defend (Shield/Mirror/Swap)→ only needs a card play, which the
- *                    end_turn handler already requires — no extra gate here.
+ *                    end_turn handler already requires - no extra gate here.
  */
 function clinicEndTurnBlock(room) {
   if (!room || !room.isTutorial || (room.tutorialLesson || 'basics') !== 'powers') return null;
@@ -335,14 +335,14 @@ function clinicEndTurnBlock(room) {
   if (!sc || sc.step === 'resolved') return null;
   switch (sc.expect) {
     case 'call_bluff':
-      if (!room.bluffUsedThisTurn) return { reason: "Call the bot's bluff first — that's this drill." };
+      if (!room.bluffUsedThisTurn) return { reason: "Call the bot's bluff first - that's this drill." };
       break;
     case 'arm_then_play':
     case 'use_power':
       // (Module 3.1) Freeze double-turn: once the freeze is consumed the learner
-      // takes a free second turn with no power to arm — don't gate End Turn on it.
+      // takes a free second turn with no power to arm - don't gate End Turn on it.
       if (sc.power === 'freeze' && !_holds(room, _humanId(room), 'freeze')) break;
-      if (!room.powerActivatedThisTurn) return { reason: 'Use your power card first — follow the coach before ending your turn.' };
+      if (!room.powerActivatedThisTurn) return { reason: 'Use your power card first - follow the coach before ending your turn.' };
       break;
     default:
       break;
@@ -353,7 +353,7 @@ function clinicEndTurnBlock(room) {
 /**
  * Power-Clinic *action* gate: refuses an action that isn't the drill's scripted
  * one, so a stray tap can't break the lesson. The reported failure was the
- * bot-Shield demo (expect 'call_bluff') — the coach says "Call Bluff", but if the
+ * bot-Shield demo (expect 'call_bluff') - the coach says "Call Bluff", but if the
  * learner instead plays a card it overwrites the bot's challengeable card, the
  * call-bluff target is gone, and the drill can never complete (End Turn is also
  * blocked) → the clinic hangs. We block the off-script `play_card` up front and
@@ -362,7 +362,7 @@ function clinicEndTurnBlock(room) {
  *   use_power / arm_then_play    → must use/arm the power BEFORE playing a card
  *                                  (peeking after a card play reveals the wrong
  *                                  card; arming is meant to precede the play).
- *   play_then_defend             → playing a card IS the step — never blocked.
+ *   play_then_defend             → playing a card IS the step - never blocked.
  */
 function clinicActionBlock(room, action) {
   if (!room || !room.isTutorial || (room.tutorialLesson || 'basics') !== 'powers') return null;
@@ -370,13 +370,13 @@ function clinicActionBlock(room, action) {
   if (!sc || sc.step === 'resolved') return null;
   if (action === 'play_card') {
     if (sc.expect === 'call_bluff') {
-      return { reason: "Call the bot's bluff first — that's this drill. Don't play a card yet." };
+      return { reason: "Call the bot's bluff first - that's this drill. Don't play a card yet." };
     }
     if ((sc.expect === 'use_power' || sc.expect === 'arm_then_play') && !room.powerActivatedThisTurn) {
       // (Module 3.1) Freeze bonus turn: freeze already spent, so the second card
-      // play is free — don't block it.
+      // play is free - don't block it.
       if (sc.power === 'freeze' && !_holds(room, _humanId(room), 'freeze')) return null;
-      return { reason: 'Use your power card first — follow the coach before playing a card.' };
+      return { reason: 'Use your power card first - follow the coach before playing a card.' };
     }
   }
   return null;

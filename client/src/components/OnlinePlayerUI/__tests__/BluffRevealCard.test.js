@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest';
 import { render, screen, waitFor } from '@testing-library/react';
 import { BluffRevealCard } from '../BluffRevealCard';
 
-describe('BluffRevealCard — 3D flip (Module 3)', () => {
+describe('BluffRevealCard - 3D flip (Module 3)', () => {
   it('renders the played card face (number + shape label)', () => {
     render(<BluffRevealCard card={{ shape: 'circle', number: 7 }} revealed />);
     expect(screen.getByText('7')).toBeInTheDocument();

@@ -1,10 +1,10 @@
 'use client';
 
-// ─── TourSpotlight — the dumb spotlight renderer ──────────────────────────────
+// ─── TourSpotlight - the dumb spotlight renderer ──────────────────────────────
 // Given a measured target `rect` it darkens the whole screen EXCEPT a cutout
 // over the rect, and renders an explanation popup beside the hole. The darkening
 // is FOUR absolutely-positioned blocking strips (top/bottom/left/right of the
-// hole) so the hole itself is genuinely empty DOM — the live element underneath
+// hole) so the hole itself is genuinely empty DOM - the live element underneath
 // receives real clicks. For read-only ('next') beats a transparent hole-blocker
 // pane is added over the hole so the target is visible-but-inert.
 //

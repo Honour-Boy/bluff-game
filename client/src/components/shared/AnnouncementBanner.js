@@ -5,7 +5,7 @@ import { useEffect, useState } from "react";
 // ─── AnnouncementBanner ───────────────────────────────────────
 // A full-width dramatic sweep used by power-card triggers, bounty
 // placements, sudden death, last stand entry, etc. Pure presentation
-// — Phase B will plumb the trigger events.
+// - Phase B will plumb the trigger events.
 //
 // Lifecycle: mount → sweep in (350ms) → linger 3.5s → sweep out
 // (300ms) → call onComplete (if provided). Nothing else: the parent
@@ -19,7 +19,7 @@ import { useEffect, useState } from "react";
 //   title        : main headline (overrides preset title)
 //   subtitle     : smaller text below title
 //   accentColor  : override the preset accent
-//   playerName   : optional — appended after the kind glyph
+//   playerName   : optional - appended after the kind glyph
 //   onComplete   : called once the sweep-out finishes
 //   durationMs   : linger duration (default 3500)
 // ──────────────────────────────────────────────────────────────
@@ -191,7 +191,7 @@ const PRESETS = {
   },
 };
 
-// Inline glyph SVGs — same approach as ShapeIcon / PowerCard
+// Inline glyph SVGs - same approach as ShapeIcon / PowerCard
 const GLYPHS = {
   shield: (c) => (
     <path

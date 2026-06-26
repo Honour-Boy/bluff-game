@@ -1,4 +1,4 @@
--- Phase 6 (Progression & Covenant) — Group Room Tier Gating, G1.
+-- Phase 6 (Progression & Covenant) - Group Room Tier Gating, G1.
 --
 -- A group is bound to exactly one progression tier (the creator's tier at
 -- creation). Every member must match that tier; the persistent group room is
@@ -7,14 +7,14 @@
 --
 -- The tier is derived at runtime from XP everywhere else in the app; this
 -- column persists the group's *binding* so it survives owner promotion (XP
--- only rises, so an owner can outgrow the group — handled by the owner
+-- only rises, so an owner can outgrow the group - handled by the owner
 -- mismatch resolution in G5, not by mutating this column automatically).
 
 alter table public.groups
   add column if not exists required_tier text not null default 'streets'
   check (required_tier in ('streets', 'backroads', 'syndicate', 'covenant'));
 
--- R-G1 — backfill from the *owner's* current tier rather than a flat
+-- R-G1 - backfill from the *owner's* current tier rather than a flat
 -- 'streets', so existing higher-tier crews aren't locked out of their own
 -- group on the next entry. Tier thresholds mirror engine/progression.js
 -- LEVEL_XP_THRESHOLDS: level 3 (Backroads) = 350 XP, level 9 (Syndicate) =

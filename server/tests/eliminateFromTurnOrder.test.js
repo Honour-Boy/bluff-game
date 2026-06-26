@@ -13,30 +13,30 @@ import { eliminateFromTurnOrder } from '../gameEngine.js';
 const room = (turnOrder, currentTurnIndex) => ({ turnOrder: [...turnOrder], currentTurnIndex });
 
 describe('eliminateFromTurnOrder', () => {
-  it('removes a player who is BEFORE the current turn — currentTurnIndex shifts down by 1', () => {
+  it('removes a player who is BEFORE the current turn - currentTurnIndex shifts down by 1', () => {
     const r = room(['a', 'b', 'c', 'd', 'e'], 3); // 'd' is current
     eliminateFromTurnOrder(r, 'a');
     expect(r.turnOrder).toEqual(['b', 'c', 'd', 'e']);
     expect(r.currentTurnIndex).toBe(2); // 'd' is still at index 2
   });
 
-  it('removes the current player — index stays so the next player slides in', () => {
+  it('removes the current player - index stays so the next player slides in', () => {
     const r = room(['a', 'b', 'c', 'd', 'e'], 2); // 'c' is current
     eliminateFromTurnOrder(r, 'c');
     // Splice removes 'c'; 'd' is now at index 2. Without the fix this
-    // decremented to 1 and 'b' acted again — a skipped turn.
+    // decremented to 1 and 'b' acted again - a skipped turn.
     expect(r.turnOrder).toEqual(['a', 'b', 'd', 'e']);
     expect(r.currentTurnIndex).toBe(2);
   });
 
-  it('removes a player AFTER the current turn — index unchanged', () => {
+  it('removes a player AFTER the current turn - index unchanged', () => {
     const r = room(['a', 'b', 'c', 'd', 'e'], 1); // 'b' is current
     eliminateFromTurnOrder(r, 'd');
     expect(r.turnOrder).toEqual(['a', 'b', 'c', 'e']);
     expect(r.currentTurnIndex).toBe(1);
   });
 
-  it('removes the last player when current is the last — wraps to 0', () => {
+  it('removes the last player when current is the last - wraps to 0', () => {
     const r = room(['a', 'b', 'c'], 2); // 'c' is current
     eliminateFromTurnOrder(r, 'c');
     expect(r.turnOrder).toEqual(['a', 'b']);

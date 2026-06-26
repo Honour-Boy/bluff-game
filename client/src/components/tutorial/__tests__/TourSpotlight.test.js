@@ -43,7 +43,7 @@ describe('computeStrips', () => {
   });
 });
 
-describe('computePopupPosition — quadrant flip', () => {
+describe('computePopupPosition - quadrant flip', () => {
   it('places the popup to the LEFT when the hole is in the right half', () => {
     const hole = computeHole({ top: 40, left: 850, width: 120, height: 40 }, 'square', VW, VH);
     const p = computePopupPosition(hole, VW, VH);
@@ -80,7 +80,7 @@ describe('computePopupPosition — quadrant flip', () => {
   });
 });
 
-describe('TourSpotlight — rendering', () => {
+describe('TourSpotlight - rendering', () => {
   const rect = { top: 100, left: 100, width: 120, height: 40 };
 
   it('renders the hole-blocker only for read-only (non-interactive) beats', () => {

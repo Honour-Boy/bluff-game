@@ -2,7 +2,7 @@
 
 import { useEffect } from 'react';
 
-// ─── TourCongrats — the spotlight tour's celebration card ─────────────────────
+// ─── TourCongrats - the spotlight tour's celebration card ─────────────────────
 // Shown when the "Show me around" walk finishes. Reuses the clinic-complete card
 // styling (gold), with a lightweight CSS shimmer + falling-spark confetti (no new
 // deps). Persists `bluff_tour_done` so a returning player isn't forced through the
@@ -78,7 +78,7 @@ export function TourCongrats({ onBeginPractice }) {
           fontFamily: "'Crimson Text', serif", fontSize: 15, lineHeight: 1.7,
           color: 'var(--text)', marginBottom: 24,
         }}>
-          That’s every control and every move — settings, your hand, calling a
+          That’s every control and every move - settings, your hand, calling a
           bluff, the chamber, and power cards. Time to put it into practice against
           the bot.
         </div>

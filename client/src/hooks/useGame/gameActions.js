@@ -38,7 +38,7 @@ export function useGameActions({
     });
   }, [setError, setIsHost, setPlayerId, setRoomCode, socket]);
 
-  // Tutorial / Practice — spin up a solo online room seeded with a bot. Mirrors
+  // Tutorial / Practice - spin up a solo online room seeded with a bot. Mirrors
   // createRoom's local state plumbing (the server seats the human host + bot and
   // returns the same { roomCode, isHost, playerId } shape); gameMode then derives
   // from the room_state broadcast like any online room, so the player lands in
@@ -63,28 +63,28 @@ export function useGameActions({
   // (Module 5) Convenience wrapper for the landing "Just Practice with Bot" entry.
   const startSandbox = useCallback(() => startTutorial('basics', { sandbox: true }), [startTutorial]);
 
-  // Tutorial — in-room "Skip to Power Cards": server jumps straight to the clinic.
+  // Tutorial - in-room "Skip to Power Cards": server jumps straight to the clinic.
   const skipToPowers = useCallback(() => {
     socket.emit('tutorial_skip_to_powers', { roomCode }, (res) => {
       if (!res?.success) failError(res);
     });
   }, [failError, roomCode, socket]);
 
-  // Tutorial — clinic "I Understand": advance past the resolved drill.
+  // Tutorial - clinic "I Understand": advance past the resolved drill.
   const advanceTutorial = useCallback(() => {
     socket.emit('tutorial_advance', { roomCode }, (res) => {
       if (!res?.success) failError(res);
     });
   }, [failError, roomCode, socket]);
 
-  // Tutorial — intro "Show me around": deal (if needed) + enter the spotlight tour.
+  // Tutorial - intro "Show me around": deal (if needed) + enter the spotlight tour.
   const startTour = useCallback(() => {
     socket.emit('tutorial_start_tour', { roomCode }, (res) => {
       if (!res?.success) failError(res);
     });
   }, [failError, roomCode, socket]);
 
-  // Tutorial — congrats "Begin Practice" / Skip tour: reset to a fresh Basics game.
+  // Tutorial - congrats "Begin Practice" / Skip tour: reset to a fresh Basics game.
   const finishTour = useCallback(() => {
     socket.emit('tutorial_finish_tour', { roomCode }, (res) => {
       if (!res?.success) failError(res);
@@ -146,7 +146,7 @@ export function useGameActions({
     setSpinDismissed(true);
   }, [roomCode, setSpinDismissed, socket]);
 
-  // Redemption Spin (Phase E1) — the eliminated player takes their one offered
+  // Redemption Spin (Phase E1) - the eliminated player takes their one offered
   // spin. The result comes back as a normal spin_result, so reset the dismiss
   // flag the same way playerSpin does so its overlay shows.
   const redemptionSpin = useCallback(() => {
@@ -209,27 +209,27 @@ export function useGameActions({
     return emitPromiseAction(socket, 'sniper_redirect', { roomCode, newTargetId: newTargetId || null }, failError);
   }, [failError, roomCode, socket]);
 
-  // Covenant — the just-eliminated player names who carries their blood debt.
+  // Covenant - the just-eliminated player names who carries their blood debt.
   const bloodDebtTarget = useCallback((targetUserId) => {
     return emitPromiseAction(socket, 'blood_debt_target', { roomCode, targetUserId }, failError);
   }, [failError, roomCode, socket]);
 
-  // Covenant — The Pact. Selector picks their secret partner during pre_game.
+  // Covenant - The Pact. Selector picks their secret partner during pre_game.
   const pactChoose = useCallback((targetUserId) => {
     return emitPromiseAction(socket, 'pact_choose', { roomCode, targetUserId }, failError);
   }, [failError, roomCode, socket]);
 
-  // Covenant — The Pact. Target accepts or denies the offered bond.
+  // Covenant - The Pact. Target accepts or denies the offered bond.
   const pactRespond = useCallback((accepted) => {
     return emitPromiseAction(socket, 'pact_respond', { roomCode, accepted: !!accepted }, failError);
   }, [failError, roomCode, socket]);
 
-  // Covenant — The Pact. A partner volunteers to take the other's spin.
+  // Covenant - The Pact. A partner volunteers to take the other's spin.
   const volunteerForPact = useCallback(() => {
     return emitPromiseAction(socket, 'pact_volunteer', { roomCode }, failError);
   }, [failError, roomCode, socket]);
 
-  // §1.1 — accused responds to a bluff during the interception window: arm a
+  // §1.1 - accused responds to a bluff during the interception window: arm a
   // defensive card (cardId set) or pass (cardId null). Either closes the window.
   const bluffIntercept = useCallback((cardId = null) => {
     return emitPromiseAction(socket, 'bluff_intercept', { roomCode, cardId: cardId || null }, failError);
@@ -251,7 +251,7 @@ export function useGameActions({
     return emitPromiseAction(socket, 'last_stand_end_turn', { roomCode }, failError);
   }, [failError, roomCode, socket]);
 
-  // #205 — meta-progression. Both resolve with the raw ack ({ success,
+  // #205 - meta-progression. Both resolve with the raw ack ({ success,
   // progression } / { success, equipped }) so the cosmetics panel can render
   // errors inline; neither needs a room.
   const getProgression = useCallback(() => {
@@ -280,10 +280,10 @@ export function useGameActions({
 
   const closeChat = useCallback(() => setChatOpen(false), [setChatOpen]);
 
-  // §2.2 / §2.3 — single fail-safe leave path shared by every "Leave Room" /
+  // §2.2 / §2.3 - single fail-safe leave path shared by every "Leave Room" /
   // "Leave Game" button. Local cleanup + redirect (clearSession) ALWAYS run,
   // even if the socket is disconnected, the room is already gone, or the server
-  // never answers — so a broken socket / "Room not found" can never trap the
+  // never answers - so a broken socket / "Room not found" can never trap the
   // player in a dead view. The server notify is best-effort (try/catch) and the
   // client never blocks on its ack.
   const leaveGame = useCallback(() => {
@@ -306,7 +306,7 @@ export function useGameActions({
   // `coached` only matters for practice (tutorial) rooms: false replays as a
   // plain game vs the bot with no guide. Defaults true; note existing callers
   // wire this straight to onClick, so a MouseEvent arg (truthy, !== false) is
-  // correctly treated as a coached replay — only an explicit `false` opts out.
+  // correctly treated as a coached replay - only an explicit `false` opts out.
   const restartRoom = useCallback((coached = true) => {
     if (!roomCode) return;
     socket.emit('restart_room', { roomCode, coached: coached !== false }, (res) => {
@@ -314,14 +314,14 @@ export function useGameActions({
     });
   }, [failError, roomCode, socket]);
 
-  // #244 — host kicks a player. Resolves with the ack so the caller can surface
+  // #244 - host kicks a player. Resolves with the ack so the caller can surface
   // success/failure inline in the settings roster.
   const kickPlayer = useCallback((targetPlayerId) => {
     if (!roomCode || !targetPlayerId) return Promise.resolve({ success: false, error: 'No player' });
     return emitPromiseAction(socket, 'kick_player', { roomCode, playerId: targetPlayerId }, failError);
   }, [failError, roomCode, socket]);
 
-  // Group host: reset a (possibly remote) room by its cipher — boots everyone
+  // Group host: reset a (possibly remote) room by its cipher - boots everyone
   // and tears the live room down so the next join rebuilds a fresh lobby with
   // the same code. Called from the group detail screen, so it takes an explicit
   // code rather than relying on the active roomCode. Resolves with the ack.
@@ -331,7 +331,7 @@ export function useGameActions({
     return emitPromiseAction(socket, 'reset_room', { roomCode: target }, failError);
   }, [failError, roomCode, socket]);
 
-  // §3.4 — empty-hand recovery. Re-pull authoritative state (with myHand) when a
+  // §3.4 - empty-hand recovery. Re-pull authoritative state (with myHand) when a
   // deal/state packet was dropped. Fire-and-forget and idempotent: the server
   // just re-emits room_state to this socket; never blocks or mutates anything.
   const refreshRoomState = useCallback(() => {
@@ -339,7 +339,7 @@ export function useGameActions({
     try {
       socket.emit('request_room_state', { roomCode }, () => {});
     } catch (_) {
-      // Transport hiccup — the next room_state push will recover us anyway.
+      // Transport hiccup - the next room_state push will recover us anyway.
     }
   }, [roomCode, socket]);
 

@@ -1,7 +1,7 @@
--- #205 — XP + cosmetic unlocks (meta-progression).
+-- #205 - XP + cosmetic unlocks (meta-progression).
 -- One row per signed-in player: lifetime XP, games credited, and the
 -- equipped cosmetics (validated server-side against the unlock catalog
--- before being written — the jsonb here is already sanitised).
+-- before being written - the jsonb here is already sanitised).
 
 create table if not exists public.player_progression (
   user_id uuid primary key references auth.users(id) on delete cascade,
@@ -51,5 +51,5 @@ $$;
 -- Server-only (called via the service-role key). Like the group-leaderboard
 -- functions (see 20260519203950_security_rls_and_function_hardening), anon +
 -- authenticated must also be revoked explicitly or Supabase's default grants
--- leave the /rest/v1/rpc/ endpoint open — letting any client mint its own XP.
+-- leave the /rest/v1/rpc/ endpoint open - letting any client mint its own XP.
 revoke execute on function public.player_progression_add_xp(uuid, int, timestamptz) from public, anon, authenticated;

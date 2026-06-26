@@ -1,5 +1,5 @@
 // ============================================================
-// Spotlight tour — socket handler flow (start / finish / spin-ack).
+// Spotlight tour - socket handler flow (start / finish / spin-ack).
 //
 // Drives the real game handlers against an in-memory room:
 //   • tutorial_start_tour deals (if needed), flips the lesson to 'tour', and
@@ -150,7 +150,7 @@ describe('tutorial_finish_tour', () => {
   });
 });
 
-describe('spin_acknowledged — tour hook', () => {
+describe('spin_acknowledged - tour hook', () => {
   it('stamps tourSpinAcked during the call_bluff_chain step', async () => {
     const io = makeIo();
     const handlers = captureHandlers(io);

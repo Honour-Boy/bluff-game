@@ -1,11 +1,11 @@
 // ============================================================
-// #121 — Announcement accuracy
+// #121 - Announcement accuracy
 //
 // Covers the kind→banner mapping (buildAnnouncementBannerProps) and
 // the AnnouncementBanner preset guard. The pre-#121 bug: any kind not
 // in the switch fell through to "BLUFF BLOCKED", so swaps, freezes,
 // medic saves, sudden death, betting, ghost votes, etc. all rendered
-// the WRONG banner — actively contradicting the real game state.
+// the WRONG banner - actively contradicting the real game state.
 // ============================================================
 
 import { describe, it, expect, vi } from 'vitest';
@@ -13,7 +13,7 @@ import { render, screen } from '@testing-library/react';
 import { buildAnnouncementBannerProps } from '../helpers';
 import { AnnouncementBanner } from '../../shared/AnnouncementBanner';
 
-describe('buildAnnouncementBannerProps — #121 mapping accuracy', () => {
+describe('buildAnnouncementBannerProps - #121 mapping accuracy', () => {
   // Each distinct server kind must map to its OWN preset, never be
   // squashed onto an unrelated one. (kind, expected preset, expected title)
   const cases = [
@@ -79,7 +79,7 @@ describe('buildAnnouncementBannerProps — #121 mapping accuracy', () => {
   });
 });
 
-describe('AnnouncementBanner — #121 preset guard', () => {
+describe('AnnouncementBanner - #121 preset guard', () => {
   it('renders the headline for a known kind', () => {
     render(<AnnouncementBanner kind="swap_resolved" />);
     expect(screen.getByText('SWAP RESOLVED')).toBeInTheDocument();

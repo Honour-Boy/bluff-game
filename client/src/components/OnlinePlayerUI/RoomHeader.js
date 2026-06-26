@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { TierBadge } from '../shared/TierBadge';
 
-// ─── Share dropdown — tavern-styled ──────────────────────────────────────────
+// ─── Share dropdown - tavern-styled ──────────────────────────────────────────
 function ShareButton({ roomCode, senderName }) {
   const [showFallback, setShowFallback] = useState(false);
 
@@ -100,7 +100,7 @@ function ShareButton({ roomCode, senderName }) {
   );
 }
 
-// ─── RoomHeader — the tavern table's nameplate ────────────────────────────────
+// ─── RoomHeader - the tavern table's nameplate ────────────────────────────────
 export function RoomHeader({
   roomCode,
   roundNumber,

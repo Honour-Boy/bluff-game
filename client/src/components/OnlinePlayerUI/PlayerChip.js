@@ -2,7 +2,7 @@ import { VoiceIndicator } from '../VoicePanel';
 import { cardBackFor } from '../../lib/cosmetics';
 import { PactSigil } from '../pact/PactSigil';
 
-// ─── Mini deck-skin card — the player's OWN equipped card back (#205) ─────────
+// ─── Mini deck-skin card - the player's OWN equipped card back (#205) ─────────
 // Deliberately resolved from player.cosmetics (broadcast to everyone), NOT the
 // --cardback-bg CSS vars: those carry the VIEWER's skin, and the seat chip
 // must show what its OWNER has equipped.
@@ -27,7 +27,7 @@ function MiniCardBack({ cardBackId, height = 17 }) {
   );
 }
 
-// ─── Mini chamber dots — shown as risk bullets inside the chip ────────────────
+// ─── Mini chamber dots - shown as risk bullets inside the chip ────────────────
 function MiniRiskDots({ riskLevel = 1 }) {
   return (
     <div style={{ display: 'flex', alignItems: 'center', gap: 2 }}>
@@ -56,7 +56,7 @@ function MiniRiskDots({ riskLevel = 1 }) {
   );
 }
 
-// ─── PlayerChip — carved wooden seat around the table ─────────────────────────
+// ─── PlayerChip - carved wooden seat around the table ─────────────────────────
 export function PlayerChip({
   player,
   isCurrentTurn,
@@ -174,7 +174,7 @@ export function PlayerChip({
             size={compact ? 6 : 7}
           />
         )}
-        {/* Covenant — Pact partner marker, inline so it never overlaps the name.
+        {/* Covenant - Pact partner marker, inline so it never overlaps the name.
             Only the two bonded partners ever receive isPactPartner. */}
         {alive && isPactPartner && (
           <span title="Your pact partner" style={{ lineHeight: 0, flexShrink: 0 }}>
@@ -206,7 +206,7 @@ export function PlayerChip({
         )}
       </div>
 
-      {/* Hand size — fronted by this player's own equipped deck skin */}
+      {/* Hand size - fronted by this player's own equipped deck skin */}
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 4 }}>
         <MiniCardBack cardBackId={player.cosmetics?.cardBack} height={compact ? 14 : 17} />
         <span style={{

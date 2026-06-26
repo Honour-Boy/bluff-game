@@ -1,11 +1,11 @@
 // ============================================================
-// Tutorial v2 — Power Clinic (scripted drills) + progression director.
+// Tutorial v2 - Power Clinic (scripted drills) + progression director.
 //
 // Locks:
 //   • the Basics "bot calls bluff ≥2 per game" guarantee (botStrategy),
 //   • stageScenario producing the intended staged state for each drill,
 //   • scenarioComplete flipping once the power is actually used (driven through
-//     the REAL resolution pipeline — shield blocks, mirror reflects, swap
+//     the REAL resolution pipeline - shield blocks, mirror reflects, swap
 //     re-faces, assassin eliminates),
 //   • the director's Basics→clinic hand-off and drill-stepping transitions,
 //   • the start_game tutorial bypass (a non-host human starts their own game).
@@ -115,7 +115,7 @@ describe('bot bluff minimum (tutorial Basics)', () => {
 
   it('FORCES the call when below the minimum and the round is winding down', () => {
     const room = eligibleRoom({ calls: 0, oppHand: 2 });
-    // rng that would normally never call — the force ignores it.
+    // rng that would normally never call - the force ignores it.
     expect(shouldCallBluff(room, 'bot:1', () => 0.999)).toBe(true);
   });
 
@@ -140,7 +140,7 @@ describe('bot bluff minimum (tutorial Basics)', () => {
 // ─── stageScenario ────────────────────────────────────────────────────────────
 describe('stageScenario', () => {
   it('stages all six powers + the bot demo, each with the right holder + phase', () => {
-    // Every drill now stages in `playing` — defensive drills are full loops
+    // Every drill now stages in `playing` - defensive drills are full loops
     // (play → end turn → bot challenge) rather than staged into the window.
     const expected = [
       ['shield', 'player', 'playing'],
@@ -355,7 +355,7 @@ describe('tutorialDirector', () => {
     completeShieldDrill(room);
     expect(_pendingDirectorAction(room)).toEqual({ kind: 'resolve', index: 0 });
     room.tutorialScenario.step = 'resolved';
-    // Advancing past a resolved drill is NO LONGER timed — the director waits.
+    // Advancing past a resolved drill is NO LONGER timed - the director waits.
     expect(_pendingDirectorAction(room)).toBeNull();
     expect(advanceClinic(room)).toBe(true);
     expect(room.tutorialScenario.index).toBe(1);
@@ -425,7 +425,7 @@ describe('tutorialDirector', () => {
 });
 
 // ─── Director async loop (real beats through broadcastRoomState) ──────────────
-describe('tutorialDirector — live beats', () => {
+describe('tutorialDirector - live beats', () => {
   function makeIo() {
     return { to: () => ({ emit: () => {} }), in: () => ({ fetchSockets: async () => [] }) };
   }
@@ -591,7 +591,7 @@ describe('start_game tutorial bypass', () => {
   });
 });
 
-describe('restart_room — sandbox replay returns to the lobby', () => {
+describe('restart_room - sandbox replay returns to the lobby', () => {
   const deps = {
     groupsRepo: { getActiveGroupByCode: async () => null },
     groupSettingsRepo: { upsertGroupSettings: vi.fn() },
@@ -630,12 +630,12 @@ describe('restart_room — sandbox replay returns to the lobby', () => {
     await roomHandlers['restart_room']({ roomCode: code }, cb);
     expect(cb).toHaveBeenCalledWith(expect.objectContaining({ success: true }));
 
-    // Same room object, back in the LOBBY — NOT dealt (player can tweak settings).
+    // Same room object, back in the LOBBY - NOT dealt (player can tweak settings).
     expect(rooms.get(code)).toBe(room);
     expect(room.phase).toBe('lobby');
     expect(room.hands).toBeNull();
 
-    // Sandbox identity survived — NOT degraded to a coached all-off Basics reset.
+    // Sandbox identity survived - NOT degraded to a coached all-off Basics reset.
     expect(room.sandbox).toBe(true);
     expect(room.tutorialCoaching).toBe(false);
     for (const p of ALL_POWERS) expect(room.config.powerCards.enabled[p]).toBe(true);

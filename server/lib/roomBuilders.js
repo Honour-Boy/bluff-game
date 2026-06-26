@@ -1,5 +1,5 @@
 // ============================================================
-// SOCKET LIB — Room builders, group-auth gate, winner recording
+// SOCKET LIB - Room builders, group-auth gate, winner recording
 // ============================================================
 
 const engine = require('../gameEngine');
@@ -28,7 +28,7 @@ function buildPersistentGroupRoom(group, opts = {}) {
     settingsRecord = null,
     defaultSettings,
   } = opts;
-  // Phase 6 (G4) — the group is bound to ONE tier (groups.required_tier), NOT
+  // Phase 6 (G4) - the group is bound to ONE tier (groups.required_tier), NOT
   // the live host's tier. Cap the stored/default settings to that tier so a
   // persistent group room can never bypass the gate Phase 2 added for ad-hoc
   // rooms. (Secret roles are forced ON for Syndicate+ by applyTierCapsToConfig.)
@@ -71,7 +71,7 @@ function getWinnerFromRoom(room) {
   };
 }
 
-// #205 — award end-of-game XP to every human player and emit a private
+// #205 - award end-of-game XP to every human player and emit a private
 // `xp_awarded` summary to each. Online, non-tutorial games only (bot/practice
 // rooms and host-judged physical games are excluded as anti-farming), and only
 // once per game (`room.xpAwarded`, reset by startGame). Guests get the summary
@@ -152,7 +152,7 @@ async function maybeAwardGameXp(io, room, leaderboardRepo) {
   return awards;
 }
 
-// #205 — look up a (signed-in) player's validated equipped cosmetics + level
+// #205 - look up a (signed-in) player's validated equipped cosmetics + level
 // so the join/create handlers can stamp them onto the seated player object.
 // The level doubles as the VIEWER gate in serializeRoom: a player only sees
 // other players' cosmetics they have reached themselves.
@@ -173,11 +173,11 @@ async function fetchEquippedCosmetics(leaderboardRepo, userId) {
 }
 
 // Fire-and-forget cosmetics stamp for a freshly-seated player. A join/create
-// must never block on (or fail because of) the progression lookup — the look
+// must never block on (or fail because of) the progression lookup - the look
 // simply "pops in" on the broadcast that follows the fetch. Re-resolves the
 // room before saving so a room torn down mid-fetch is never resurrected.
 // Deferred requires: roomBuilders is loaded by orchestration, which broadcast
-// also feeds — same cycle-avoidance trick as lib/bots.js.
+// also feeds - same cycle-avoidance trick as lib/bots.js.
 function stampCosmeticsInBackground(io, leaderboardRepo, roomCode, player) {
   fetchEquippedCosmetics(leaderboardRepo, player.id)
     .then(async (result) => {
@@ -192,12 +192,12 @@ function stampCosmeticsInBackground(io, leaderboardRepo, roomCode, player) {
       await saveRoom(room);
       await broadcastRoomState(io, roomCode);
     })
-    .catch(() => { /* cosmetic only — defaults render fine */ });
+    .catch(() => { /* cosmetic only - defaults render fine */ });
 }
 
 // The shared game-outcome funnel. Every game_over path already calls this to
 // record a group win (it no-ops for ad-hoc rooms), so the #205 XP award rides
-// the same call — any future game-over site gets both for free.
+// the same call - any future game-over site gets both for free.
 async function maybeRecordGroupWinner(io, room, leaderboardRepo) {
   await maybeAwardGameXp(io, room, leaderboardRepo);
 

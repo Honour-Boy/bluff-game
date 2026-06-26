@@ -30,7 +30,7 @@ function makeRoom({ speedMode = true } = {}) {
     room.players.push(engine.createPlayer(`p${i}`, `P${i}`, `s${i}`));
   }
   engine.startGame(room); // leaves phase 'playing'
-  // Pin a deterministic turn order — startGame may shuffle the starting seat.
+  // Pin a deterministic turn order - startGame may shuffle the starting seat.
   room.turnOrder = ['p0', 'p1', 'p2'];
   room.currentTurnIndex = 0;
   room.skipNextPlayer = false;
@@ -63,7 +63,7 @@ describe('Speed Mode turn timer', () => {
     expect(view.currentPlayerId).toBe('p0');
   });
 
-  it('auto-ENDS the current turn on expiry — advances the turn, no spin', async () => {
+  it('auto-ENDS the current turn on expiry - advances the turn, no spin', async () => {
     const room = makeRoom();
     await saveRoom(room);
     const io = makeIo();
@@ -117,7 +117,7 @@ describe('Speed Mode turn timer', () => {
     armSpeedModeTimer(io, room);
     expect(speedModeTimers.has(room.code)).toBe(true);
 
-    // A bluff call moves the room into spin_pending — the countdown must pause.
+    // A bluff call moves the room into spin_pending - the countdown must pause.
     room.phase = 'spin_pending';
     armSpeedModeTimer(io, room);
 

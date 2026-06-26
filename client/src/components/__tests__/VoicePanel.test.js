@@ -84,7 +84,7 @@ describe('VoicePanel', () => {
   });
 });
 
-describe('VoicePanel — layout invariant (issue #102)', () => {
+describe('VoicePanel - layout invariant (issue #102)', () => {
   // Voice toggling between idle/connecting/connected MUST NOT change
   // the wrapper slot's footprint. Anything that changes the slot's
   // width or display reflows the parent flex header and pushes the

@@ -1,5 +1,5 @@
 // ============================================================
-// Tests for v2 Phase D — Secret roles
+// Tests for v2 Phase D - Secret roles
 //
 // Covers:
 //   - assignRoles distribution (>=3 alive → specials; <3 → all barehand)
@@ -216,12 +216,12 @@ describe('assignRoles', () => {
   });
 });
 
-// ─── #235 — Collector gated on power cards being enabled ─────
+// ─── #235 - Collector gated on power cards being enabled ─────
 
-describe('assignRoles — Collector requires power cards', () => {
+describe('assignRoles - Collector requires power cards', () => {
   it('never assigns Collector when ALL power cards are disabled', () => {
     // Default config has every power card off. Across many assignments the
-    // Collector must never appear — the role is dead weight without power cards.
+    // Collector must never appear - the role is dead weight without power cards.
     for (let run = 0; run < 200; run++) {
       const room = makeOnlineRoom(9); // default config → no power cards
       assignRoles(room);
@@ -274,9 +274,9 @@ describe('getRole', () => {
   });
 });
 
-// ─── Gambler — frozen risk on survival ────────────────────────
+// ─── Gambler - frozen risk on survival ────────────────────────
 
-describe('Gambler — risk frozen on survival', () => {
+describe('Gambler - risk frozen on survival', () => {
   it('chamber stays at 1 bullet across many surviving spins', () => {
     const player = createPlayer('p0', 'G', 'sock');
     player.role = ROLES.GAMBLER;
@@ -289,7 +289,7 @@ describe('Gambler — risk frozen on survival', () => {
     for (let i = 0; i < 50; i++) {
       const result = spinGun(player);
       if (result.eliminated) {
-        // Stop on elimination — verify chamber didn't accumulate.
+        // Stop on elimination - verify chamber didn't accumulate.
         expect(player.chamber.filter(s => s === 'bullet').length).toBe(1);
         return;
       }
@@ -316,9 +316,9 @@ describe('Gambler — risk frozen on survival', () => {
   });
 });
 
-// ─── Gambler — chamber bumped to 4 on correct bluff ──────────
+// ─── Gambler - chamber bumped to 4 on correct bluff ──────────
 
-describe('Gambler — caught bluffing', () => {
+describe('Gambler - caught bluffing', () => {
   it('chamber jumps to 4 bullets on a correct bluff against them', () => {
     const { room } = buildBluffScenario({
       accusedRole: ROLES.GAMBLER,
@@ -349,9 +349,9 @@ describe('Gambler — caught bluffing', () => {
   });
 });
 
-// ─── Sheriff — risk drop on correct bluff ────────────────────
+// ─── Sheriff - risk drop on correct bluff ────────────────────
 
-describe('Sheriff — correct bluff drops their risk', () => {
+describe('Sheriff - correct bluff drops their risk', () => {
   it('removes one bullet from Sheriff chamber on correct call', () => {
     const { room } = buildBluffScenario({
       accuserRole: ROLES.SHERIFF,
@@ -398,9 +398,9 @@ describe('Sheriff — correct bluff drops their risk', () => {
   });
 });
 
-// ─── Sheriff — Assassin immunity ─────────────────────────────
+// ─── Sheriff - Assassin immunity ─────────────────────────────
 
-describe('Sheriff — Assassin immunity', () => {
+describe('Sheriff - Assassin immunity', () => {
   it('Assassin does NOT fire when accuser is Sheriff', () => {
     const { room, p0, p1 } = buildBluffScenario({
       accusedArmed: { power: 'assassin', cardId: 'k-A' },
@@ -412,7 +412,7 @@ describe('Sheriff — Assassin immunity', () => {
     // Outcome falls through to spin (correct bluff → accused spins).
     expect(outcome.kind).toBe('spin');
     expect(outcome.spinTargetId).toBe('p0');
-    // Assassin was NOT consumed — Sheriff exempted the call.
+    // Assassin was NOT consumed - Sheriff exempted the call.
     expect(p0.armedPowerCard).not.toBeNull();
     expect(events.find(e => e.kind === 'assassin_strike')).toBeFalsy();
   });
@@ -432,9 +432,9 @@ describe('Sheriff — Assassin immunity', () => {
   });
 });
 
-// ─── Medic — save reverts elimination ────────────────────────
+// ─── Medic - save reverts elimination ────────────────────────
 
-describe('Medic — save flow', () => {
+describe('Medic - save flow', () => {
   function setupMedicRoom() {
     const cfg = configWith({ assassin: true });
     const room = createRoom('host', MODES.ONLINE, cfg);
@@ -466,7 +466,7 @@ describe('Medic — save flow', () => {
   it('save adds 2 shape cards, consumes ability, revives player', () => {
     const { room, p0, p1 } = setupMedicRoom();
     // Eliminate p1 (set status, leave in turnOrder for the engine
-    // to handle — applyMedicSave is documented as "after elimination
+    // to handle - applyMedicSave is documented as "after elimination
     // is applied" but turnOrder integrity).
     p1.status = 'eliminated';
     p1.isSpectator = true;
@@ -479,7 +479,7 @@ describe('Medic — save flow', () => {
     expect(p1.status).toBe('alive');
     expect(p1.isSpectator).toBe(false);
     expect(room.hands.get('p0').length).toBe(handBefore + 2);
-    // #120 — one save spent (counter, not a one-shot boolean).
+    // #120 - one save spent (counter, not a one-shot boolean).
     expect(p0.medicSavesUsed).toBe(1);
   });
 
@@ -527,7 +527,7 @@ describe('Medic — save flow', () => {
     expect(p1.chamber.filter(s => s === 'bullet').length).toBe(before);
   });
 
-  it('blocked at the save-hand cap — findAvailableMedic returns null', () => {
+  it('blocked at the save-hand cap - findAvailableMedic returns null', () => {
     const { room } = setupMedicRoom();
     // Pad Medic up to the cap.
     const hand = room.hands.get('p0');
@@ -537,7 +537,7 @@ describe('Medic — save flow', () => {
     expect(findAvailableMedic(room)).toBeNull();
   });
 
-  // #142 — regression guard: post-#139 every starting hand is 6 shape cards.
+  // #142 - regression guard: post-#139 every starting hand is 6 shape cards.
   // The save-hand cap must leave room for a save from that fresh hand, or the
   // Medic could never trigger a save at game start.
   it('can save from a fresh 6-card starting hand (#142 / #139 interaction)', () => {
@@ -564,7 +564,7 @@ describe('Medic — save flow', () => {
     }
     expect(p0.medicSavesUsed).toBe(MEDIC_MAX_SAVES);
 
-    // Budget spent — no longer available, and a further attempt is
+    // Budget spent - no longer available, and a further attempt is
     // rejected with the specific error.
     room.hands.set('p0', []);
     p1.status = 'eliminated';
@@ -597,7 +597,7 @@ describe('Medic — save flow', () => {
   });
 });
 
-// ─── Saboteur — silent transfer ──────────────────────────────
+// ─── Saboteur - silent transfer ──────────────────────────────
 
 describe('Saboteur', () => {
   function setupSaboteurRoom(holderHandSize = 5) {
@@ -661,9 +661,9 @@ describe('Saboteur', () => {
   });
 });
 
-// ─── Sniper — redirect validation ────────────────────────────
+// ─── Sniper - redirect validation ────────────────────────────
 
-describe('Sniper — applySniperRedirect', () => {
+describe('Sniper - applySniperRedirect', () => {
   function setupSniperRoom() {
     const cfg = defaultRoomConfig();
     const room = createRoom('host', MODES.ONLINE, cfg);
@@ -721,12 +721,12 @@ describe('Sniper — applySniperRedirect', () => {
   });
 });
 
-// ─── Collector — power-card hand cap = 3 ─────────────────────
+// ─── Collector - power-card hand cap = 3 ─────────────────────
 
-describe('Collector — relaxed power-card cap', () => {
+describe('Collector - relaxed power-card cap', () => {
   it('keeps up to 3 power cards in hand on the initial deal', () => {
     // Build a 9-player room with all 6 power types enabled, double-deck
-    // (>10 not needed — but enable copies=2 to flood power cards).
+    // (>10 not needed - but enable copies=2 to flood power cards).
     const cfg = configWith({
       shield: true, mirror: true, swap: true,
       peek: true, freeze: true, assassin: true,
@@ -773,7 +773,7 @@ describe('Collector — relaxed power-card cap', () => {
 
 // ─── Roles privacy ───────────────────────────────────────────
 
-describe('serializeRoom — role privacy', () => {
+describe('serializeRoom - role privacy', () => {
   it('exposes only the requesting player\'s own role', () => {
     const room = makeOnlineRoom(9);
     startGame(room);

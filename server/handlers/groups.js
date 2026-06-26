@@ -1,5 +1,5 @@
 // ============================================================
-// HANDLERS — Persistent groups (FR1-P1)
+// HANDLERS - Persistent groups (FR1-P1)
 // ============================================================
 
 const engine = require('../gameEngine');
@@ -9,7 +9,7 @@ const { getGroupAuthError, maybeRecordGroupWinner } = require('../lib/roomBuilde
 const { tierRank } = require('../groupsRepo');
 const { socketRateLimit } = require('../lib/rateLimiter');
 
-// §3.3 — live pre-room occupancy for the groups directory. Reads the in-memory
+// §3.3 - live pre-room occupancy for the groups directory. Reads the in-memory
 // room (if any) backing a group so the directory can show who is already
 // waiting BEFORE an outside member commits to entering. Returns null when no
 // live room exists yet for the group.
@@ -31,7 +31,7 @@ function buildLiveRoom(groupId) {
 function register(io, socket, deps) {
   const { groupsRepo, leaderboardRepo } = deps;
 
-  // Phase 6 — a user's current progression tier (from their stored XP). Defaults
+  // Phase 6 - a user's current progression tier (from their stored XP). Defaults
   // to Streets on any lookup failure (the safest, lowest tier).
   async function deriveTier(userId) {
     try {
@@ -45,7 +45,7 @@ function register(io, socket, deps) {
     try {
       const authError = getGroupAuthError(socket);
       if (authError) return callback?.({ success: false, error: authError });
-      // G2 — a group is bound to the creator's current tier; the client can't
+      // G2 - a group is bound to the creator's current tier; the client can't
       // pick a different one.
       const requiredTier = await deriveTier(socket.userId);
       const group = await groupsRepo.createGroup({
@@ -67,7 +67,7 @@ function register(io, socket, deps) {
       const authError = getGroupAuthError(socket);
       if (authError) return callback?.({ success: false, error: authError });
       const groups = await groupsRepo.listMyGroups({ userId: socket.userId });
-      // §3.3 — attach live pre-room occupancy + subscribe this socket to each
+      // §3.3 - attach live pre-room occupancy + subscribe this socket to each
       // group channel so the directory receives push `group_room_status` updates
       // while it's open (no need to re-poll to see players gathering).
       const withLive = (groups || []).map((g) => {
@@ -93,7 +93,7 @@ function register(io, socket, deps) {
       });
       socket.join(`group:${group.id}`);
 
-      // Phase 6 (G5) — surface owner tier-mismatch so the client can show the
+      // Phase 6 (G5) - surface owner tier-mismatch so the client can show the
       // resolution panel and block new games. Member tiers (for the handover
       // candidates + eviction preview) are only resolved when there IS a
       // mismatch, to avoid an N-read fan-out on every group open.
@@ -166,13 +166,13 @@ function register(io, socket, deps) {
     for (const room of rooms.values()) {
       if (room.groupId !== groupId) continue;
       const nextHostPlayer = room.players.find((player) => player.id === newHostUserId);
-      // #159 — appointing a stand-in ('standin') who is NOT seated in this room
+      // #159 - appointing a stand-in ('standin') who is NOT seated in this room
       // must not force them in as its host: that would null hostSocketId and
       // leave a hostless room nobody present can run. Leave it on its existing
       // host until the stand-in actually joins (join_room then reconciles).
       //
       // A reclaim / hand-back ('reclaimed'), by contrast, returns the seat to
-      // the PERMANENT owner, who is authoritative even while away — apply it
+      // the PERMANENT owner, who is authoritative even while away - apply it
       // immediately so the old stand-in stops holding controls the instant the
       // owner takes them back. hostSocketId drops to null until the owner
       // (re)joins; join_room / host_reconnect reattaches their socket then.
@@ -181,7 +181,7 @@ function register(io, socket, deps) {
       engine.reconcileHostSocket(room); // hostSocketId follows hostUserId (null if away)
       await saveRoom(room);
       await broadcastRoomState(io, room.code);
-      // #183 — room_state already moves the host controls; this dedicated event
+      // #183 - room_state already moves the host controls; this dedicated event
       // is what every client toasts so the table knows who now holds them.
       // emitHostChanged no-ops without a hostName, so an absent reclaiming owner
       // simply doesn't toast (the room_state push already moved amHost).
@@ -193,7 +193,7 @@ function register(io, socket, deps) {
     }
   }
 
-  // #156 — When a member is removed from a group, evict them from any live
+  // #156 - When a member is removed from a group, evict them from any live
   // room for that group immediately rather than leaving them seated until a
   // manual refresh. Mirrors syncLiveRoomHosts (iterate rooms by groupId,
   // mutate, saveRoom + broadcastRoomState) and the 30s disconnect
@@ -217,7 +217,7 @@ function register(io, socket, deps) {
 
       // Defensive: removeMember already blocks evicting the acting host, but
       // if the removed player is somehow this room's host there's no valid
-      // host left to run it — end the room for everyone.
+      // host left to run it - end the room for everyone.
       if (room.hostUserId === userId) {
         io.to(room.code).emit('game_ended', { reason: 'The host left the game.' });
         rooms.delete(room.code);
@@ -264,7 +264,7 @@ function register(io, socket, deps) {
     }
   });
 
-  // #145 — original owner reclaims acting host from a stand-in.
+  // #145 - original owner reclaims acting host from a stand-in.
   socket.on('reclaim_host', async ({ groupId } = {}, callback) => {
     try {
       const authError = getGroupAuthError(socket);
@@ -277,7 +277,7 @@ function register(io, socket, deps) {
     }
   });
 
-  // #145 — acting stand-in hands host back to the owner.
+  // #145 - acting stand-in hands host back to the owner.
   socket.on('hand_back_host', async ({ groupId } = {}, callback) => {
     try {
       const authError = getGroupAuthError(socket);
@@ -290,7 +290,7 @@ function register(io, socket, deps) {
     }
   });
 
-  // ─── Phase 6 (G5) — owner tier-mismatch resolution ──────────────────────────
+  // ─── Phase 6 (G5) - owner tier-mismatch resolution ──────────────────────────
 
   // (a) Hand permanent ownership to a member who currently matches the group's
   // tier. The handler verifies the candidate's live tier before the repo moves
@@ -403,7 +403,7 @@ function register(io, socket, deps) {
     try {
       const authError = getGroupAuthError(socket);
       if (authError) return callback?.({ success: false, error: authError });
-      // G3 — accepting an invite is tier-gated; the joiner must match the
+      // G3 - accepting an invite is tier-gated; the joiner must match the
       // group's bound tier. Declining never needs the tier.
       const joinerTier = accept ? await deriveTier(socket.userId) : null;
       const result = await groupsRepo.respondToInvite({

@@ -1,5 +1,5 @@
 // ============================================================
-// HANDLERS — v2 Phase F systems (betting, ghost vote, Last Stand)
+// HANDLERS - v2 Phase F systems (betting, ghost vote, Last Stand)
 // ============================================================
 
 const engine = require('../gameEngine');

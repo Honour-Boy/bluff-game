@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 
-// ─── KickPlayerPanel (#244) — host-only roster with per-player Kick buttons.
+// ─── KickPlayerPanel (#244) - host-only roster with per-player Kick buttons.
 // Rendered inside the global ControlsModal from the settings gear. Lists every
 // current player EXCEPT the host; kicking removes that player (the server boots
 // their socket to landing and re-broadcasts the roster, which re-renders this

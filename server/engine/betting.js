@@ -1,5 +1,5 @@
 // ============================================================
-// ENGINE — v2 Phase F — Betting (per-spin window + streak reward)
+// ENGINE - v2 Phase F - Betting (per-spin window + streak reward)
 // ============================================================
 // When a spin enters spin_pending, a 10s betting window opens for
 // every alive player except the spin target. Correct guesses bump

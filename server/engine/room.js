@@ -1,5 +1,5 @@
 // ============================================================
-// ENGINE — Room creation, lobby → game lifecycle, chat, replay reset
+// ENGINE - Room creation, lobby → game lifecycle, chat, replay reset
 // ============================================================
 // Deals with the room object as a whole: factory, chat log, startGame
 // (initial deal + role assignment), and the replay reset that the host
@@ -58,7 +58,7 @@ function createRoom(hostSocketId, mode = MODES.PHYSICAL, config = null) {
     currentCard: null,
     lastPlayedCard: null,
     // Snapshot of the previous player's play (taken at each turn boundary in
-    // advanceTurn) — the card a bluff / Peek resolves against. See engine/bluff.js.
+    // advanceTurn) - the card a bluff / Peek resolves against. See engine/bluff.js.
     challengeableCard: null,
     challengeableCardType: null,
     // Id of the player who took the immediately-previous turn (the bluff target).
@@ -68,7 +68,7 @@ function createRoom(hostSocketId, mode = MODES.PHYSICAL, config = null) {
     chatLog: [],
     config: normalizeRoomConfig(config),
     discardPile: [],
-    // Phase C — Freeze. One-shot skip queue.
+    // Phase C - Freeze. One-shot skip queue.
     skipNextPlayer: false,
     bluffBlockedThisTurn: false,
   };
@@ -78,7 +78,7 @@ function createRoom(hostSocketId, mode = MODES.PHYSICAL, config = null) {
 //
 // The host's tier is fixed at room creation. Covenant rooms additionally
 // carry two structural flags that drive the in-game Covenant mechanics
-// (these are NOT config toggles — they ride the tier). Idempotent.
+// (these are NOT config toggles - they ride the tier). Idempotent.
 function applyTierFlags(room, tier) {
   room.tier = tier;
   room.pactActive = false;
@@ -117,7 +117,7 @@ function startGame(room) {
   const alivePlayers = room.players.filter(p => p.status === 'alive');
   if (alivePlayers.length < 2) throw new Error('Need at least 2 players');
 
-  // #243 — remember how many players the game STARTED with. Last Stand only
+  // #243 - remember how many players the game STARTED with. Last Stand only
   // triggers for a game that began with more than 3 players (a >3-player table
   // narrowing to the final two), so this count gates the duel later.
   room.startingAliveCount = alivePlayers.length;
@@ -135,10 +135,10 @@ function startGame(room) {
   room.prevTurnPlayerId = null;
   room.discardPile = room.discardPile || [];
 
-  // v2 Phase E1 — Double Barrel: load 2 bullets into every chamber at start
+  // v2 Phase E1 - Double Barrel: load 2 bullets into every chamber at start
   // (≈24% first-spin death on the issue #67 curve). Russian Roulette is a
   // separate modifier (failed bluff = immediate spin) and does NOT touch the
-  // chamber load — see shouldImmediateSpin / the bluff handlers.
+  // chamber load - see shouldImmediateSpin / the bluff handlers.
   if (room.config?.riskModifiers?.doubleBarrel) {
     for (const p of alivePlayers) {
       p.chamber = initChamber(2);
@@ -147,16 +147,16 @@ function startGame(room) {
   }
   room.suddenDeathCounter = 0;
   room.mirrorMatchActive = !!room.config?.roomModifiers?.mirrorMatch;
-  // #6 — highlight callouts: one "First Blood" per game; per-player survival
+  // #6 - highlight callouts: one "First Blood" per game; per-player survival
   // streaks reset at the start of a fresh game.
   room.firstBloodAwarded = false;
   for (const p of alivePlayers) p.survivalStreak = 0;
 
-  // #205 — fresh per-game progression stats (cards played / spins survived /
+  // #205 - fresh per-game progression stats (cards played / spins survived /
   // bluff verdicts / elimination order). XP is computed from these at game_over.
   initGameStats(room);
 
-  // v2 Phase D — assign roles BEFORE the deal so the per-player
+  // v2 Phase D - assign roles BEFORE the deal so the per-player
   // power-card hand cap is honoured by `_normalisePowerCardHandCap`.
   assignRoles(room);
 
@@ -172,7 +172,7 @@ function startGame(room) {
     _guaranteeMinPowerCardPerPlayer(room);
     _snapshotSwapHolders(room);
     _extractPowerCardsToSlot(room);
-    // #139 — the power card lives in its own slot and must NOT eat into the
+    // #139 - the power card lives in its own slot and must NOT eat into the
     // playable hand. Refill each hand to a full 6 shape cards after the
     // power card has been pulled out.
     _topUpShapeHandsTo(room, 6);
@@ -218,7 +218,7 @@ function resetRoomForReplay(room) {
   // The spin sequence counter must keep climbing ACROSS replays. The client
   // dedups spin animations by `seq:<spinSeq>` in a Set that lives for the whole
   // (un-remounted) room session, so if the counter reset to 0 here the replay's
-  // spins would reuse `seq:1`, `seq:2`… — keys already in that Set — and every
+  // spins would reuse `seq:1`, `seq:2`… - keys already in that Set - and every
   // spin would be silently deduped (no cylinder animation on "Play Again").
   const spinSeq      = room.spinSeq || 0;
   // Tutorial flag + lesson + bot seats must survive a replay reset, or "play
@@ -227,12 +227,12 @@ function resetRoomForReplay(room) {
   const tutorialLesson = room.tutorialLesson || null;
   // Sandbox flags must also survive: without them the `restart_room` sandbox
   // branch can't fire (room.sandbox gone) and the room degrades to a coached
-  // Basics reset — wiping the powers config + breaking spins. Preserve both the
+  // Basics reset - wiping the powers config + breaking spins. Preserve both the
   // sandbox marker and the coaching-off flag so replay stays a plain online game.
   const sandbox      = !!room.sandbox;
   const tutorialCoaching = room.tutorialCoaching;
   // The host's tier (and the Covenant structural flags it implies) is fixed at
-  // room creation from the host's level — it must survive a replay reset, or
+  // room creation from the host's level - it must survive a replay reset, or
   // "play again" in a Covenant room would silently drop to Streets.
   const tier         = room.tier || null;
 
@@ -241,7 +241,7 @@ function resetRoomForReplay(room) {
     username: p.username,
     socketId: p.socketId,
     isBot: !!p.isBot,
-    // #205 — equipped cosmetics are part of a player's identity, stamped at
+    // #205 - equipped cosmetics are part of a player's identity, stamped at
     // join from the progression store; they must survive a replay reset.
     cosmetics: p.cosmetics || null,
   }));

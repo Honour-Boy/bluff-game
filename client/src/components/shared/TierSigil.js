@@ -1,13 +1,13 @@
 // ============================================================
-// TierSigil — escalating rank emblems (Streets → Covenant)
+// TierSigil - escalating rank emblems (Streets → Covenant)
 // ============================================================
 // One construction language across all four tiers: a revolver-cylinder
-// medallion (6 chambers around a hub) — the game's core motif. Rank escalates
+// medallion (6 chambers around a hub) - the game's core motif. Rank escalates
 // by FORM, not colour alone, so it reads even at 14px:
-//   • Streets   — bare ring, 1 loaded chamber (pewter)
-//   • Backroads — + laurel wreath flanks, 2 loaded (aged brass)
-//   • Syndicate — + a crown of points, 3 loaded (verdigris)
-//   • Covenant  — double seal ring + radiant ticks + apex star, all 6 loaded,
+//   • Streets   - bare ring, 1 loaded chamber (pewter)
+//   • Backroads - + laurel wreath flanks, 2 loaded (aged brass)
+//   • Syndicate - + a crown of points, 3 loaded (verdigris)
+//   • Covenant  - double seal ring + radiant ticks + apex star, all 6 loaded,
 //                 gold with a glow (gold)
 // Pure inline SVG, no deps. Sizes cleanly from a 14px chip badge to a 44px crest.
 
@@ -25,7 +25,7 @@ let _seq = 0;
 // Six cylinder chambers around the hub (top, then clockwise).
 function chambers(grad, base, loadedCount) {
   const angles = [-90, -30, 30, 90, 150, 210];
-  // Load from the top, clockwise — gives each rank a recognisable filled pattern.
+  // Load from the top, clockwise - gives each rank a recognisable filled pattern.
   const loadOrder = [0, 3, 1, 4, 2, 5].slice(0, loadedCount);
   const loadedSet = new Set(loadOrder);
   return angles.map((deg, i) => {
@@ -141,7 +141,7 @@ export function TierSigil({ tier = 'streets', size = 40, glow }) {
       {chambers(gid, pal.base, loaded)}
       <circle cx="22" cy="22" r="2.4" fill={`url(#${gid})`} />
 
-      {/* Covenant apex star — the sealed crown jewel. */}
+      {/* Covenant apex star - the sealed crown jewel. */}
       {tier === 'covenant' && (
         <path d="M22 1.5 L23.4 5 L27 5.2 L24.2 7.6 L25.2 11 L22 9 L18.8 11 L19.8 7.6 L17 5.2 L20.6 5 Z" fill={`url(#${gid})`} stroke={pal.base} strokeWidth="0.5" strokeLinejoin="round" />
       )}

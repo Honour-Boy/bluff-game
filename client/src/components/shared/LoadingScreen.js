@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react';
 import { ChamberSpinner } from './ChamberSpinner';
 
 // ============================================================
-// LoadingScreen — branded full-screen loading splash
+// LoadingScreen - branded full-screen loading splash
 // ============================================================
 //
 // The on-theme loading surface: the spinning revolver cylinder (ChamberSpinner)

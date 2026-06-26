@@ -1,5 +1,5 @@
 // ============================================================
-// Tests for v2 Phase F — Systems
+// Tests for v2 Phase F - Systems
 //
 // Covers:
 //   - Bounty: counter increments on survival, resets on placement,
@@ -84,7 +84,7 @@ function makeRoom(playerCount, configOverrides = null) {
 
 // ─── Bounty ──────────────────────────────────────────────────
 
-describe('Bounty — counter increments on survival', () => {
+describe('Bounty - counter increments on survival', () => {
   it('counter starts at 0, increments to 1 on first survival', () => {
     const room = makeRoom(3);
     const player = room.players[0];
@@ -139,7 +139,7 @@ describe('Bounty — counter increments on survival', () => {
   });
 });
 
-describe('Bounty — collection drops accuser risk by 1', () => {
+describe('Bounty - collection drops accuser risk by 1', () => {
   it('collectBounty mutates accuser chamber + clears bounty', () => {
     const room = makeRoom(3);
     const accused = room.players[0];
@@ -156,7 +156,7 @@ describe('Bounty — collection drops accuser risk by 1', () => {
     expect(accuser.riskLevel).toBe(2);
   });
 
-  it('pipeline integration — correct bluff against bounty holder fires bounty_collected', () => {
+  it('pipeline integration - correct bluff against bounty holder fires bounty_collected', () => {
     const cfg = configWith({ bounty: true });
     const room = createRoom('host', MODES.ONLINE, cfg);
     const accused = createPlayer('p0', 'Marked', 'sock-0');
@@ -211,7 +211,7 @@ describe('Bounty — collection drops accuser risk by 1', () => {
 
 // ─── Betting ─────────────────────────────────────────────────
 
-describe('Betting — window opens for non-target players', () => {
+describe('Betting - window opens for non-target players', () => {
   it('eligibleIds excludes the spin target', () => {
     const room = makeRoom(4);
     room.spinTargetId = 'p0';
@@ -263,7 +263,7 @@ describe('Betting — window opens for non-target players', () => {
   });
 });
 
-describe('Betting — streak reward', () => {
+describe('Betting - streak reward', () => {
   it('correct prediction increments counter; reset to 0 at 3 with risk drop', () => {
     const room = makeRoom(3);
     const better = room.players[1];
@@ -314,7 +314,7 @@ describe('Betting — streak reward', () => {
 
 // ─── Dead Man's Hand ─────────────────────────────────────────
 
-describe('Dead Man\'s Hand — vote threshold', () => {
+describe('Dead Man\'s Hand - vote threshold', () => {
   it('threshold check: alive count must drop more than 2', () => {
     const room = makeRoom(6);
     expect(shouldOpenGhostVote(room)).toBe(false);
@@ -332,7 +332,7 @@ describe('Dead Man\'s Hand — vote threshold', () => {
   });
 });
 
-describe('Dead Man\'s Hand — vote options', () => {
+describe('Dead Man\'s Hand - vote options', () => {
   it('option 3 hidden when no risk modifier enabled', () => {
     const room = makeRoom(6);
     for (let i = 0; i < 4; i++) room.players[i].status = 'eliminated';
@@ -366,7 +366,7 @@ describe('Dead Man\'s Hand — vote options', () => {
   });
 });
 
-describe('Dead Man\'s Hand — tally + effects', () => {
+describe('Dead Man\'s Hand - tally + effects', () => {
   it('tie produces no-op banner', () => {
     const room = makeRoom(6);
     for (let i = 0; i < 4; i++) room.players[i].status = 'eliminated';
@@ -445,7 +445,7 @@ describe('Dead Man\'s Hand — tally + effects', () => {
 
 // ─── Last Stand ──────────────────────────────────────────────
 
-describe('Last Stand — entry conditions', () => {
+describe('Last Stand - entry conditions', () => {
   it('triggers exactly when alive count = 2 and no pending phases', () => {
     const room = makeRoom(4);
     expect(shouldEnterLastStand(room)).toBe(false);
@@ -479,7 +479,7 @@ describe('Last Stand — entry conditions', () => {
   });
 });
 
-describe('Last Stand — entry consumes armed cards + clears hands', () => {
+describe('Last Stand - entry consumes armed cards + clears hands', () => {
   function setupFinalists() {
     const room = makeRoom(4);
     // Eliminate p2, p3 to leave p0, p1 alive.
@@ -535,7 +535,7 @@ describe('Last Stand — entry consumes armed cards + clears hands', () => {
   });
 });
 
-describe('Last Stand — spin + winner declaration', () => {
+describe('Last Stand - spin + winner declaration', () => {
   function setupLastStand() {
     const room = makeRoom(4);
     room.players[2].status = 'eliminated';
@@ -597,9 +597,9 @@ describe('Last Stand — spin + winner declaration', () => {
   });
 });
 
-// ─── #243 — shared-gun alternating duel ──────────────────────
+// ─── #243 - shared-gun alternating duel ──────────────────────
 
-describe('Last Stand — #243 shared-gun alternating duel', () => {
+describe('Last Stand - #243 shared-gun alternating duel', () => {
   function setup4PlayerFinalists() {
     const room = makeRoom(4);
     room.players[2].status = 'eliminated';
@@ -666,7 +666,7 @@ describe('Last Stand — #243 shared-gun alternating duel', () => {
     }
   });
 
-  it('alternates strictly — a survivor never spins twice in a row', () => {
+  it('alternates strictly - a survivor never spins twice in a row', () => {
     const room = setup4PlayerFinalists();
     const order = [];
     for (let i = 0; i < 6; i++) {
@@ -682,7 +682,7 @@ describe('Last Stand — #243 shared-gun alternating duel', () => {
     }
   });
 
-  it('terminates when a spin kills the active finalist — the other wins', () => {
+  it('terminates when a spin kills the active finalist - the other wins', () => {
     const room = setup4PlayerFinalists();
     const active = room.lastStand.activeFinalistId;
     const other = room.lastStand.finalistIds.find(id => id !== active);
@@ -701,7 +701,7 @@ describe('Last Stand — #243 shared-gun alternating duel', () => {
 
 // ─── Serialization ───────────────────────────────────────────
 
-describe('serializeRoom — Phase F fields', () => {
+describe('serializeRoom - Phase F fields', () => {
   it('exposes hasBounty + counters publicly', () => {
     const room = makeRoom(3);
     room.players[0].hasBounty = true;

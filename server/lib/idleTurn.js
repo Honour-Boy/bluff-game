@@ -1,10 +1,10 @@
 // ============================================================
-// SOCKET LIB — Idle-turn safety net (#239)
+// SOCKET LIB - Idle-turn safety net (#239)
 // ============================================================
 // OUTSIDE Speed Mode an AFK current player would block the table forever. This
 // mirrors the Speed Mode timer exactly (arm on a fresh turn, re-arm on turn
 // change, pause off the `playing` phase, clear on teardown) but at a longer
-// IDLE_TURN_TIMEOUT_MS and ONLY when Speed Mode is OFF — Speed Mode's shorter,
+// IDLE_TURN_TIMEOUT_MS and ONLY when Speed Mode is OFF - Speed Mode's shorter,
 // advertised cap takes precedence, so the two never both fire on one turn.
 //
 // On expiry the server AUTO-RESOLVES the turn: it auto-plays a sensible legal
@@ -18,10 +18,10 @@ const { getRoom, saveRoom, idleTurnTimers, _clearIdleTurnTimer } = require('./st
 const { IDLE_TURN_TIMEOUT_MS } = engine;
 
 // Active only in an online room mid-`playing` with a live turn order AND Speed
-// Mode OFF — when Speed Mode is on, armSpeedModeTimer owns the per-turn timeout.
+// Mode OFF - when Speed Mode is on, armSpeedModeTimer owns the per-turn timeout.
 // Tutorial / Practice rooms opt OUT: a learner reading the on-screen guide must
 // never be rushed off their turn, and the only other seat is a bot (which drives
-// its OWN turns via lib/bots.js), so an idle human only ever blocks themselves —
+// its OWN turns via lib/bots.js), so an idle human only ever blocks themselves -
 // the inactivity sweep GCs an abandoned practice room anyway.
 function _idleTurnActive(room) {
   return !!room
@@ -85,7 +85,7 @@ async function _onIdleTurnExpire(io, code) {
   const endingPlayerId = room.turnOrder[room.currentTurnIndex];
   const endingPlayer = room.players.find(p => p.id === endingPlayerId);
 
-  // Auto-play a sensible legal card if they never acted — but never play their
+  // Auto-play a sensible legal card if they never acted - but never play their
   // LAST card, which would hand an absent player the win; just forfeit then.
   let autoPlayed = false;
   if (!room.cardPlayedThisTurn) {

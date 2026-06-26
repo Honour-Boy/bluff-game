@@ -45,11 +45,11 @@ export function useGame(getAccessToken, getGuestAuth, authIdentityKey = null, on
   const [medicPrompt, setMedicPrompt] = useState(null);
   const [sniperPrompt, setSniperPrompt] = useState(null);
   const [bloodDebtPrompt, setBloodDebtPrompt] = useState(null);
-  // Covenant — The Pact. Only the timed volunteer-pull prompt needs transient
+  // Covenant - The Pact. Only the timed volunteer-pull prompt needs transient
   // state; the offer + partner badge ride the serialized room_state.pact block.
   const [pactVolunteer, setPactVolunteer] = useState(null);
   const [pregame, setPregame] = useState(null);
-  // #205 — this client's private end-of-game XP payload. Set by `xp_awarded`,
+  // #205 - this client's private end-of-game XP payload. Set by `xp_awarded`,
   // cleared whenever the room moves off game_over (next deal / reset).
   const [xpAward, setXpAward] = useState(null);
 
@@ -132,11 +132,11 @@ export function useGame(getAccessToken, getGuestAuth, authIdentityKey = null, on
     const msg = res?.error || 'Action failed';
     setError(msg);
     notify(msg, 'error');
-    // §2.3 — if the server says the room is gone, never leave the player stuck
+    // §2.3 - if the server says the room is gone, never leave the player stuck
     // in a frozen in-room view. Force the same local teardown + redirect to the
-    // dashboard that an explicit leave does (the room vanished — e.g. host left,
+    // dashboard that an explicit leave does (the room vanished - e.g. host left,
     // inactivity sweep, server restart).
-    // §M4 — but ONLY while the socket is actually connected. During a transient
+    // §M4 - but ONLY while the socket is actually connected. During a transient
     // network drop a stale/queued ack can arrive as "room not found" before the
     // reconnect flow finishes rejoining; tearing down then would wrongly bounce
     // the player to the landing screen. While disconnected we keep the session
@@ -161,7 +161,7 @@ export function useGame(getAccessToken, getGuestAuth, authIdentityKey = null, on
           return;
         }
         // Single-active-session: another live device holds the account. Surface
-        // it so the UI can show a takeover screen naming that device — DON'T
+        // it so the UI can show a takeover screen naming that device - DON'T
         // sign out or loop-retry; the user decides.
         if (res?.code === 'session_active_elsewhere') {
           setSessionConflict(res.activeDevice || { name: 'Another device' });
@@ -200,7 +200,7 @@ export function useGame(getAccessToken, getGuestAuth, authIdentityKey = null, on
   const signOutSocket = useCallback(() => {
     try {
       if (socket?.connected) socket.emit('sign_out', {}, () => {});
-    } catch (_) { /* transport hiccup — disconnect will clear it anyway */ }
+    } catch (_) { /* transport hiccup - disconnect will clear it anyway */ }
     setSessionConflict(null);
     setAuthenticated(false);
   }, [socket]);
@@ -283,7 +283,7 @@ export function useGame(getAccessToken, getGuestAuth, authIdentityKey = null, on
     clearSession,
   });
 
-  // §3.4 — empty-hand recovery. If we're alive and playing in an online room but
+  // §3.4 - empty-hand recovery. If we're alive and playing in an online room but
   // our hand arrived empty (a dropped initial deal / state packet), re-pull our
   // authoritative state once. Guarded by a ref keyed on the room so it fires at
   // most once per empty episode and never loops. A successful re-pull lands a

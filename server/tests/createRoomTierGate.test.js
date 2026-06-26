@@ -1,5 +1,5 @@
 // ============================================================
-// Phase 2 (#292) — create_room gates the config on the host's tier.
+// Phase 2 (#292) - create_room gates the config on the host's tier.
 //
 // The host's level (from leaderboardRepo) maps to a tier; the requested
 // config is run through applyTierCapsToConfig before the room is built, and
@@ -34,7 +34,7 @@ function makeRepo(level) {
 }
 
 // groupsRepo.getActiveGroupByCode is consulted by buildAdHocRoom for code
-// collisions — always "no collision".
+// collisions - always "no collision".
 const groupsRepo = { getActiveGroupByCode: vi.fn().mockResolvedValue(null) };
 
 function captureHandlers(io, { userId = 'host-uuid', username = 'Host', isGuest = false } = {}, repo) {

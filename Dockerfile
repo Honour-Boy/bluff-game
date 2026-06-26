@@ -11,7 +11,7 @@ RUN npm ci --omit=dev
 
 COPY server/ ./
 
-# Document the default port — actual binding comes from process.env.PORT.
+# Document the default port - actual binding comes from process.env.PORT.
 EXPOSE 3001
 
 HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \

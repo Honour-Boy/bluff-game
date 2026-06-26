@@ -1,5 +1,5 @@
 // ============================================================
-// SOCKET LIB — Guest-auth helpers + username sync
+// SOCKET LIB - Guest-auth helpers + username sync
 // ============================================================
 // Anonymous players join with a typed display name. Their
 // `socket.userId` is `guest:<uuid>` so the prefix lets server logic
@@ -26,7 +26,7 @@ function sanitizeGuestUsername(raw) {
 }
 
 /**
- * Validate a client-supplied guestId. We don't trust raw input — a
+ * Validate a client-supplied guestId. We don't trust raw input - a
  * malicious client could send a UUID that collides with a real
  * Supabase user id (or an existing guest's id). The check below
  * accepts only RFC-4122 hex UUIDs.
