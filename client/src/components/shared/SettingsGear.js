@@ -12,10 +12,10 @@ const IconChat = () => (<svg {..._ic}><path d="M4 5h16v11H8l-4 4z" stroke="curre
 const IconRules = () => (<svg {..._ic}><path d="M5 7h14M5 12h14M5 17h14" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" /></svg>);
 const IconBoard = () => (<svg {..._ic}><path d="M5 20V11M12 20V5M19 20v-6M3 20h18" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" /></svg>);
 const IconLeaveTable = () => (<svg {..._ic}><path d="M14 8V6a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h6a2 2 0 0 0 2-2v-2" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" /><path d="M10 12h10m0 0-3-3m3 3-3 3" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" /></svg>);
-// #244 — host "Kick player": a person with a cross.
+// #244 - host "Kick player": a person with a cross.
 const IconKick = () => (<svg {..._ic}><circle cx="9" cy="8" r="3.2" stroke="currentColor" strokeWidth="1.8" /><path d="M3.5 20c0-3.3 2.7-6 6-6 1.2 0 2.3.35 3.2.95" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" /><path d="M16 9l5 5m0-5-5 5" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" /></svg>);
 
-// ─── SettingsGear — the global identity / settings menu ───────────────────────
+// ─── SettingsGear - the global identity / settings menu ───────────────────────
 // A small fixed gear button (top-right) available on EVERY screen once signed
 // in: landing, groups, and in-game. Folds the player's identity, the music
 // toggle, profile editing, and sign-out into one menu so the "main settings"
@@ -44,7 +44,7 @@ function Caret({ open }) {
   );
 }
 
-// Prev / next track skip button — sits under the volume slider for the
+// Prev / next track skip button - sits under the volume slider for the
 // continuous playlist. Icon-only (matches the rest of the gear's SVG controls).
 function TrackSkipButton({ dir, onClick }) {
   const isPrev = dir === 'prev';
@@ -139,7 +139,7 @@ export function SettingsGear({
   onSignOut,
   onSignOutGuest,
   onUpdateUsername,
-  // #205 — cosmetics locker (signed-in only). Both must be present for the
+  // #205 - cosmetics locker (signed-in only). Both must be present for the
   // menu item to render; guests never see it (their XP isn't persisted).
   getProgression,
   setCosmetics,
@@ -152,18 +152,18 @@ export function SettingsGear({
   onOpenChat,
   onOpenGameSettings,
   onOpenLeaderboard,
-  // #244 — host-only Kick Player. Set only for the host, so its presence gates
+  // #244 - host-only Kick Player. Set only for the host, so its presence gates
   // the menu item (non-hosts never see it).
   onOpenKickPlayer,
   onLeaveTable,
   leaveDisabled = false,
   voice,
   // Extra top inset (px) pushed under any full-width band that occupies the very
-  // top of the screen — currently the practice Power-Clinic progress bar, whose
+  // top of the screen - currently the practice Power-Clinic progress bar, whose
   // right edge the gear button would otherwise overlap.
   topOffset = 0,
   // Trigger look. 'gear' (default) is the compact icon+name button used in-game
-  // and on Groups. 'chip' is the landing redesign's pill — a borderless-feeling
+  // and on Groups. 'chip' is the landing redesign's pill - a borderless-feeling
   // name chip (no gear icon, name + caret) that pairs symmetrically with the
   // top-left level chip. The dropdown internals are identical in both modes.
   triggerVariant = 'gear',
@@ -180,7 +180,7 @@ export function SettingsGear({
     <>
       {/* Hide the inline name on small screens so it never crowds the centred
           header status; the name still shows inside the opened menu. The chip
-          trigger (landing) keeps its name at all widths — it's the identity
+          trigger (landing) keeps its name at all widths - it's the identity
           anchor there, not a utility button. */}
       <style>{`@media (max-width: 520px){.settings-gear-name{display:none !important;}}`}</style>
       <div style={{
@@ -395,7 +395,7 @@ export function SettingsGear({
                 />
               )}
 
-              {/* #205 — cosmetic locker (gun skins / card backs / felts). Rank/XP
+              {/* #205 - cosmetic locker (gun skins / card backs / felts). Rank/XP
                   lives in its own surface (Landing rank chip + profile drawer). */}
               {!isGuest && getProgression && setCosmetics && (
                 <SettingItem

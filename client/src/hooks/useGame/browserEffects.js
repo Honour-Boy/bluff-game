@@ -11,7 +11,7 @@ export function useGameBrowserEffects({ roomCode, isHost, playerId }) {
     }
   }, [roomCode, isHost, playerId]);
 
-  // §M4 — client-initiated keepalive while in a room. A steady trickle of
+  // §M4 - client-initiated keepalive while in a room. A steady trickle of
   // INBOUND traffic (on top of the server-driven server_keepalive→client_keepalive
   // loop) helps free-tier hosts keep the instance awake during a live game, so
   // the socket doesn't silently die between turns. Pure liveness; no state.
@@ -76,8 +76,8 @@ export function useSocketAuthenticationEffect({
   // authenticated and we have credentials. Covers the first connect, identity
   // changes, AND returning to the game after navigating away to another route
   // (e.g. the /feedback dashboard): the singleton socket can come back
-  // connected-but-unauthenticated — its `onConnect` re-auth never fires because
-  // it never re-`connect`ed — and a game action would then fail "Not
+  // connected-but-unauthenticated - its `onConnect` re-auth never fires because
+  // it never re-`connect`ed - and a game action would then fail "Not
   // authenticated" while Supabase still shows us signed in. A short bounded
   // retry rides out a transient failure without tripping the server's
   // authenticate rate limit (5 / 10s).

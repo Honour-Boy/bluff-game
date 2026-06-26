@@ -1,5 +1,5 @@
 // ============================================================
-// Tests for #119 — Unified Event Resolution Engine
+// Tests for #119 - Unified Event Resolution Engine
 //
 // These pin the NEW guarantees of the typed, tiered ResolutionQueue
 // that replaced the implicit-ordering stage array:
@@ -176,7 +176,7 @@ describe('#119 / APNAP tie-breaker', () => {
   });
 
   it('same-tier Mirror conflict resolves to the active player first', () => {
-    // Pathological state (both players hold Mirror) — only reachable in
+    // Pathological state (both players hold Mirror) - only reachable in
     // tests, but it exercises the tie-breaker. Wrong bluff makes BOTH
     // the accused (incoming) and accuser (outgoing) eligible to redirect.
     // APNAP from currentTurnIndex (the accuser) fires the accuser first.
@@ -199,13 +199,13 @@ describe('#119 / APNAP tie-breaker', () => {
 // ─── 4. resumeAfterSwap re-enters at Tier 3 ──────────────────
 
 describe('#119 / resumeAfterSwap re-enters at Tier 3', () => {
-  it('Tiers 1-2 are skipped on resume — an armed Shield no longer blocks', () => {
+  it('Tiers 1-2 are skipped on resume - an armed Shield no longer blocks', () => {
     // resolveBluff with a Shield blocks at Tier 1 (Prevention).
     const blocked = buildScenario({ accusedArmed: { power: 'shield', cardId: 'sh' } });
     expect(resolveBluff(blocked.room, 'p1').outcome.kind).toBe('blocked');
 
     // resumeAfterSwap re-enters at Tier 3, so the same armed Shield is
-    // never consulted — resolution proceeds to a spin instead.
+    // never consulted - resolution proceeds to a spin instead.
     const { room } = buildScenario({
       accusedArmed: { power: 'shield', cardId: 'sh' },
       lastPlayedShape: 'square',

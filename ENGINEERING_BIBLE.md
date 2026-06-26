@@ -50,8 +50,8 @@
 3. For local development: `doppler run -- <command>`. No .env files.
 4. To list variables: `doppler secrets --only-names`.
 5. Each directory that needs env vars has its own `.env.example`:
-   - `frontend/.env.example` — frontend variables (Clerk publishable key, Supabase URL, API URL, etc.)
-   - `backend/.env.example` — backend variables (Supabase service key, JWT secret, OpenRouter key, etc.)
+   - `frontend/.env.example` - frontend variables (Clerk publishable key, Supabase URL, API URL, etc.)
+   - `backend/.env.example` - backend variables (Supabase service key, JWT secret, OpenRouter key, etc.)
 6. Never commit secrets. Never hardcode secrets. Never access production secrets locally.
 
 ## Git Workflow
@@ -107,7 +107,7 @@ project/
 
 1. **Sentry owns errors. PostHog owns behaviour.** Don't cross the streams. If a thing has a stack trace, it's Sentry. If it's a user event, flag, replay, or LLM call, it's PostHog.
 2. **One SDK per concern on the frontend.** `@sentry/nextjs` for errors. `posthog-js` (via `instrumentation-client.ts`) for everything else. Don't import PostHog's error tracker if Sentry is in the project.
-3. **Feature flags live in PostHog.** Use them for production gradual rollout, kill switches, and experiments — not for "is this safe to ship," which is what the staging branch is for. Doppler stays for secrets and config, not flagging.
+3. **Feature flags live in PostHog.** Use them for production gradual rollout, kill switches, and experiments - not for "is this safe to ship," which is what the staging branch is for. Doppler stays for secrets and config, not flagging.
 4. **LLM calls through OpenRouter are captured in PostHog LLM analytics.** Cost, latency, and prompt drift are visible per user, per feature. Wire on the OpenRouter-calling layer, not at the route handler.
 5. **Provision via Vercel Marketplace where possible.** PostHog and Sentry both have Marketplace integrations that auto-write env vars. Don't hand-roll.
 6. **Alerts route through n8n.** Sentry → `#tasks` (auto-Issue, follows existing pipeline). PostHog insight/error alerts → `#product` (no auto-Issue unless tagged `regression`). The "one place to look" principle still holds.
@@ -128,7 +128,7 @@ FORGE scans code for security, quality, and architecture issues. **Run it locall
 
 ```bash
 pip install vibe2prod
-vibe2prod setup          # Interactive TUI — configures CLI + registers MCP server in Claude Code
+vibe2prod setup          # Interactive TUI - configures CLI + registers MCP server in Claude Code
 ```
 
 ### CLI
@@ -147,8 +147,8 @@ After scanning, use `/forge` in Claude Code to **autonomously fix findings**. It
 ### MCP Tools
 
 When registered via `vibe2prod setup`, FORGE exposes to Claude Code:
-- `forge_scan` — run a scan
-- `forge_status` — check progress
+- `forge_scan` - run a scan
+- `forge_status` - check progress
 
 ### Quality Gates
 
@@ -167,7 +167,7 @@ Use `.forgeignore` (YAML v2) for false positives with pattern matching, expiry d
 
 ## Architecture Coaching: /architect Skill
 
-Before building substantial features, use the `/architect` skill. It walks through 7 questions to define what needs to be built before code is written: new data, backend endpoints, frontend pages, auth, real-time needs, background work, and external services. It never answers for you — it coaches your thinking.
+Before building substantial features, use the `/architect` skill. It walks through 7 questions to define what needs to be built before code is written: new data, backend endpoints, frontend pages, auth, real-time needs, background work, and external services. It never answers for you - it coaches your thinking.
 
 **When to suggest /architect (smart intercept):**
 - The user describes a NEW feature involving schema changes, new endpoints, or external services
@@ -181,11 +181,11 @@ Before building substantial features, use the `/architect` skill. It walks throu
 - Simple additions to existing patterns (another CRUD endpoint matching existing ones)
 - The user has already defined the architecture in a GitHub Issue
 
-When suggesting, say something like: "This looks like a substantial feature. Want to run /architect to think through what's needed before we build?" — not a blocker, just a suggestion.
+When suggesting, say something like: "This looks like a substantial feature. Want to run /architect to think through what's needed before we build?" - not a blocker, just a suggestion.
 
 ## Development Lifecycle
 
-1. **Define** (15-30 min): GitHub Issue — problem, solution, definition of done.
+1. **Define** (15-30 min): GitHub Issue - problem, solution, definition of done.
 2. **Architect** (scale to complexity): Skip for small. `/architect` for medium/large. Outputs directly into the Issue.
 3. **Build**: Read Issue → read CLAUDE.md → `doppler run` → feature branch → implement → tests → FORGE scan → `/forge` fixes → PR with `Closes #N`.
 4. **Review**: GitHub Actions runs tests. Agent reviews post comments. Summary in Slack #dev-feed.
@@ -246,7 +246,7 @@ The default stack profile in this bible assumes "frontend talks to backend." Mar
 | CSS tokens | Locked tokens file with pre-commit validator | See "Design System Locking" |
 | Secrets | Doppler only if env vars are needed | Most marketing sites don't need any |
 
-**Removed from default profile:** FastAPI, Supabase, Coolify, Redis, Nango, Clerk, n8n, Sentry. None of these belong in a static marketing site. PostHog is optional — add only if the site needs web analytics or session replay; most portfolios don't.
+**Removed from default profile:** FastAPI, Supabase, Coolify, Redis, Nango, Clerk, n8n, Sentry. None of these belong in a static marketing site. PostHog is optional - add only if the site needs web analytics or session replay; most portfolios don't.
 
 ### When to use
 
@@ -258,7 +258,7 @@ The default stack profile in this bible assumes "frontend talks to backend." Mar
 
 ### Asset patterns
 
-- Fonts: self-hosted via `next/font/local`. Never CDN-loaded fonts on marketing sites — they break on slow networks and add render-blocking.
+- Fonts: self-hosted via `next/font/local`. Never CDN-loaded fonts on marketing sites - they break on slow networks and add render-blocking.
 - Images: optimized via `next/image` where dynamic, raw `<img>` for static brand assets where the optimizer adds no value.
 - Design tokens: single locked file (e.g. `lib/design-tokens.ts` or `tokens.css`), enforced by pre-commit validator. See "Design System Locking" section below.
 - OG cards and favicons: live in `public/`, referenced from `app/layout.tsx` metadata.
@@ -289,11 +289,11 @@ The default bible has no SEO discipline. Every content site needs this. These ru
 
 Every page must define, at minimum:
 
-- `title` — page-specific, not site-default
-- `description` — page-specific, 150-160 characters
-- `canonical` — pointing to the production URL for this page
-- `og:image`, `og:title`, `og:description` — for link previews
-- `twitter:card`, `twitter:image` — same content, Twitter format
+- `title` - page-specific, not site-default
+- `description` - page-specific, 150-160 characters
+- `canonical` - pointing to the production URL for this page
+- `og:image`, `og:title`, `og:description` - for link previews
+- `twitter:card`, `twitter:image` - same content, Twitter format
 
 In Next.js App Router, this lives in `app/<route>/page.tsx` via the `metadata` export, or dynamically via `generateMetadata` for content pages.
 
@@ -335,14 +335,14 @@ Every blog post, writeup, or long-form content page gets `Article` schema with `
 
 ### /llms.txt
 
-Add `/llms.txt` to the public root. It's an emerging convention for LLM crawler discovery. Auto-generate it from your content data structure rather than hardcoding — when content changes, the file updates automatically.
+Add `/llms.txt` to the public root. It's an emerging convention for LLM crawler discovery. Auto-generate it from your content data structure rather than hardcoding - when content changes, the file updates automatically.
 
 Reference: https://llmstxt.org
 
 ### Dynamic sitemap and robots
 
-- `app/sitemap.ts` — generates `/sitemap.xml` dynamically from your routes and content data. Static `sitemap.xml` files are an anti-pattern because they go stale.
-- `app/robots.ts` — environment-aware. Production allows all, staging and preview environments disallow all (see staging isolation pattern).
+- `app/sitemap.ts` - generates `/sitemap.xml` dynamically from your routes and content data. Static `sitemap.xml` files are an anti-pattern because they go stale.
+- `app/robots.ts` - environment-aware. Production allows all, staging and preview environments disallow all (see staging isolation pattern).
 
 Keying off `process.env.VERCEL_ENV`:
 
@@ -364,7 +364,7 @@ export default function robots(): MetadataRoute.Robots {
 
 - Static `sitemap.xml` or `robots.txt` files in `public/`
 - Per-page metadata stuffed into a single shared component (lazy and produces duplicates)
-- OG images that are screenshots or generic stock — design them properly
+- OG images that are screenshots or generic stock - design them properly
 - Schema with claimed credentials, awards, or facts that aren't real
 - `noindex` on production by accident (always check after deploy)
 
@@ -435,11 +435,11 @@ These break first when desktop-first sites ship to mobile. Watch for them:
 
 ### Reference UI kit
 
-For the portfolio and personal site profile specifically, the mobile implementation reference lives at `design-system/ui_kits/mobile/` — covers Config 01 mobile rules, breakpoint behavior for each section type (hero, work list, writing, about), and the navigation pattern (mobile menu, not hamburger by default).
+For the portfolio and personal site profile specifically, the mobile implementation reference lives at `design-system/ui_kits/mobile/` - covers Config 01 mobile rules, breakpoint behavior for each section type (hero, work list, writing, about), and the navigation pattern (mobile menu, not hamburger by default).
 
 When in doubt about how a Config 01 surface should adapt to mobile, look there first. If a pattern doesn't exist, add it before shipping the implementation.
 
-For Config 02 (carousels) and Config 03 (products), mobile rules are embedded in their respective kits — not a separate mobile kit, because those configs have different responsive considerations than the portfolio.
+For Config 02 (carousels) and Config 03 (products), mobile rules are embedded in their respective kits - not a separate mobile kit, because those configs have different responsive considerations than the portfolio.
 
 ---
 
@@ -494,7 +494,7 @@ Header comment, non-negotiable:
 
 ```css
 /* ============================================================
-   DESIGN SYSTEM — LOCKED
+   DESIGN SYSTEM - LOCKED
 
    This file defines the visual system. Do not modify color
    values, typography, spacing tokens, or radii without explicit
@@ -523,7 +523,7 @@ Optional but recommended:
 
 ### Implementation: stack-agnostic
 
-The validator runs as a Node script (`.mjs` works across stacks) or a Python script — pick whichever fits the project's existing tooling. Install via `git config core.hooksPath hooks` so the hook is tracked in the repo, not buried in `.git/hooks/`.
+The validator runs as a Node script (`.mjs` works across stacks) or a Python script - pick whichever fits the project's existing tooling. Install via `git config core.hooksPath hooks` so the hook is tracked in the repo, not buried in `.git/hooks/`.
 
 ### Setup instructions for new contributors
 

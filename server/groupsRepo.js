@@ -32,7 +32,7 @@ function tierLabel(tier) {
 // The user-facing message when a player's tier doesn't match a group's. Pure
 // so it can be unit-tested and reused on both the join and entry gates.
 function tierMismatchMessage(requiredTier, joinerTier) {
-  return `This crew runs ${tierLabel(requiredTier)} stakes — you're ${tierLabel(joinerTier)}.`;
+  return `This crew runs ${tierLabel(requiredTier)} stakes - you're ${tierLabel(joinerTier)}.`;
 }
 
 function normalizeGroupName(raw) {
@@ -88,7 +88,7 @@ function evaluateLeaveGroup({ isHost, otherMemberCount }) {
   return { ok: true, action: 'delete_group' };
 }
 
-// #159 — only the PERMANENT owner (owner_user_id) may delete a group. A
+// #159 - only the PERMANENT owner (owner_user_id) may delete a group. A
 // temporary stand-in host (the current acting host_user_id, appointed via
 // "Make Host" in #145) must be refused, otherwise a stand-in could destroy a
 // group they do not own. Acting-host status is deliberately NOT sufficient.
@@ -281,7 +281,7 @@ function createGroupsRepo(supabase) {
     return findUserByUsername(identifier);
   }
 
-  // §3.3 — active group names must be unique. Case-insensitive exact match
+  // §3.3 - active group names must be unique. Case-insensitive exact match
   // against non-deleted groups (ilike with no wildcards = whole-string compare).
   async function getActiveGroupByName(name) {
     const result = await supabase
@@ -293,7 +293,7 @@ function createGroupsRepo(supabase) {
     return maybeSingle(requireData(result));
   }
 
-  // Phase 6 (G2) — a group is bound to the creator's current tier. The handler
+  // Phase 6 (G2) - a group is bound to the creator's current tier. The handler
   // derives `requiredTier` from the creator's level (XP) and passes it in; the
   // client cannot pick a tier it isn't in (the value is overwritten here).
   async function createGroup({ hostUserId, name, requiredTier = 'streets' }) {
@@ -302,7 +302,7 @@ function createGroupsRepo(supabase) {
     if (!normalizedName) throw new Error('Group name must be between 1 and 64 characters');
     const tier = normalizeTier(requiredTier);
 
-    // §3.3 — block duplicate active group names before allocating a code.
+    // §3.3 - block duplicate active group names before allocating a code.
     const nameClash = await getActiveGroupByName(normalizedName);
     if (nameClash) throw new Error('A group with that name already exists');
 
@@ -404,7 +404,7 @@ function createGroupsRepo(supabase) {
   }
 
   async function deleteGroup({ groupId, hostUserId }) {
-    // #159 — gate on ownership, not acting-host. A stand-in host passes
+    // #159 - gate on ownership, not acting-host. A stand-in host passes
     // assertActiveHost (host_user_id) but must NOT be able to delete the group.
     const group = await getActiveGroupById(groupId);
     if (!group) throw new Error('Group not found');
@@ -452,7 +452,7 @@ function createGroupsRepo(supabase) {
     }
   }
 
-  // "Make Host" — appoint a TEMPORARY stand-in. The permanent owner
+  // "Make Host" - appoint a TEMPORARY stand-in. The permanent owner
   // (owner_user_id) is unchanged, so host can later revert to them. #145
   async function transferHost({ groupId, hostUserId, newHostUserId }) {
     if (hostUserId === newHostUserId) return { success: true, hostUserId };
@@ -562,7 +562,7 @@ function createGroupsRepo(supabase) {
       .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
   }
 
-  // Phase 6 (G3) — `joinerTier` is the invitee's current tier (derived from
+  // Phase 6 (G3) - `joinerTier` is the invitee's current tier (derived from
   // their XP by the handler). Accepting an invite to a group whose
   // required_tier doesn't match is rejected; declining is always allowed.
   async function respondToInvite({ inviteId, inviteeUserId, accept, joinerTier = null }) {
@@ -592,7 +592,7 @@ function createGroupsRepo(supabase) {
     const group = await getActiveGroupById(invite.group_id);
     if (!group) throw new Error('Group not found');
 
-    // G3 — tier gate. A new member must match the group's bound tier.
+    // G3 - tier gate. A new member must match the group's bound tier.
     const requiredTier = group.required_tier || 'streets';
     if (joinerTier && normalizeTier(joinerTier) !== requiredTier) {
       throw new Error(tierMismatchMessage(requiredTier, normalizeTier(joinerTier)));
@@ -741,10 +741,10 @@ function createGroupsRepo(supabase) {
     return !!membership;
   }
 
-  // ─── Phase 6 (G5) — owner tier-mismatch resolution ──────────────────────────
+  // ─── Phase 6 (G5) - owner tier-mismatch resolution ──────────────────────────
   // XP only ever rises, so an owner can be promoted ABOVE the group's bound
   // tier. The group then blocks new games until the owner resolves it: either
-  // re-tier the group up (setGroupTier — upward only, evicts sub-tier members)
+  // re-tier the group up (setGroupTier - upward only, evicts sub-tier members)
   // or hand ownership to a member who still matches the tier (transferOwnership).
 
   // Re-tier the group up to `newTier` (owner-only, upward-only) and evict the

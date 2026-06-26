@@ -12,7 +12,7 @@ import { CareerLedger } from '../shared/CareerLedger';
 import { tierForLevel, tierMeta } from '../../lib/tiers';
 import { useIsMobile } from '../../hooks/useIsMobile';
 
-// ─── Tavern sign icon — carved suit marks ────────────────────────────────────
+// ─── Tavern sign icon - carved suit marks ────────────────────────────────────
 function SuitMark({ shape, delay = 0 }) {
   return (
     <div
@@ -52,7 +52,7 @@ function PlaqueButton({ children, onClick, primary, ember, bronze, disabled, sty
   );
 }
 
-// Ghost (secondary) button — borderless-feeling, half-width in the ghost row.
+// Ghost (secondary) button - borderless-feeling, half-width in the ghost row.
 // Relies on the global `button` CSS for the border/radius/hover; overrides only
 // the fill (transparent) and weight so it reads quieter than the focal CTAs.
 const GHOST_BTN_STYLE = {
@@ -80,7 +80,7 @@ function EmberCanvas() {
     if (!ctx) return undefined;
     const reduced = typeof window !== 'undefined'
       && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-    if (reduced) return undefined; // leave the canvas blank — no motion
+    if (reduced) return undefined; // leave the canvas blank - no motion
 
     let W = 0, H = 0, raf = 0, mx = 0, my = 0;
     const resize = () => { W = canvas.width = window.innerWidth; H = canvas.height = window.innerHeight; };
@@ -147,9 +147,9 @@ function EmberCanvas() {
   );
 }
 
-// ─── Ambient looping backdrop — drifting Whot suits ──────────────────────────
+// ─── Ambient looping backdrop - drifting Whot suits ──────────────────────────
 // Large, faint card suits that drift up and slowly rotate on a perpetual loop
-// behind the content — the landing's always-on background motion. Pure CSS
+// behind the content - the landing's always-on background motion. Pure CSS
 // (the `bg-suit-drift` keyframe in globals.css); each glyph gets its own
 // duration/delay/position so they never sync up. Reduced motion freezes them.
 const BG_SUITS = [
@@ -192,7 +192,7 @@ function FloatingSuits() {
 // Replaces the old full RankIdentity panel that lived in the button stack. A
 // compact pill anchored top-left (where the wrought-iron bracket used to sit);
 // tapping it drops a profile drawer with the rank sigil, XP-to-next bar and the
-// career ledger — lifetime games, win rate and the per-event stats that feed XP
+// career ledger - lifetime games, win rate and the per-event stats that feed XP
 // (wins, spins survived, bluffs called/defended, eliminations, power cards, last
 // stands), served via get_progression's `stats` block.
 const MAX_LEVEL = 20;
@@ -305,7 +305,7 @@ function LevelChip({ progression, isGuest, username }) {
             </div>
             <div style={{ fontFamily: "'Space Mono', monospace", fontSize: 9, letterSpacing: '0.06em', color: 'var(--text-dim)', marginBottom: 12 }}>
               {isGuest
-                ? 'Guest — sign in to keep your XP & rank'
+                ? 'Guest - sign in to keep your XP & rank'
                 : isMax
                   ? `${p.xp} XP · the top of the ladder`
                   : `${p.xp} / ${p.nextLevelXp} XP · ${p.nextLevelXp - p.xp} to next level`}
@@ -315,7 +315,7 @@ function LevelChip({ progression, isGuest, username }) {
 
             {isGuest ? (
               <div style={{ fontFamily: "'Crimson Text', serif", fontStyle: 'italic', fontSize: 12, color: 'var(--text-dim)', lineHeight: 1.5 }}>
-                Sign in to start your ledger — wins, bluffs and trigger pulls all
+                Sign in to start your ledger - wins, bluffs and trigger pulls all
                 count toward your rank.
               </div>
             ) : (
@@ -328,7 +328,7 @@ function LevelChip({ progression, isGuest, username }) {
   );
 }
 
-// ─── LandingScreen — the tavern common room ──────────────────────────────────
+// ─── LandingScreen - the tavern common room ──────────────────────────────────
 export function LandingScreen({
   username,
   isGuest = false,
@@ -350,7 +350,7 @@ export function LandingScreen({
 }) {
   const [mode, setMode] = useState(null);              // null | 'play' | 'host' | 'join' | 'practice'
   // The player's full progression (rank/level/XP), surfaced on the landing as a
-  // prominent identity panel — fetched for everyone (guests read as Streets/Lv1,
+  // prominent identity panel - fetched for everyone (guests read as Streets/Lv1,
   // shown with a sign-in nudge). `tier` is derived for the inline seat badges.
   const [progression, setProgression] = useState(null);
   useEffect(() => {
@@ -385,7 +385,7 @@ export function LandingScreen({
   // Once the player has FINISHED the clinic, the button becomes a "replay" entry
   // with a ✓ chip instead of the NEW badge.
   const [tutorialDone, setTutorialDone] = useState(false);
-  // Lightweight rollout flag — default ON; build with NEXT_PUBLIC_TUTORIAL_ENABLED=false to hide.
+  // Lightweight rollout flag - default ON; build with NEXT_PUBLIC_TUTORIAL_ENABLED=false to hide.
   const tutorialEnabled = process.env.NEXT_PUBLIC_TUTORIAL_ENABLED !== 'false';
 
   useEffect(() => {
@@ -405,7 +405,7 @@ export function LandingScreen({
     } catch (_) { /* localStorage blocked - just skip the nudge */ }
   }, []);
 
-  // Enter the practice room directly — the "Go through Basics / Skip to Power
+  // Enter the practice room directly - the "Go through Basics / Skip to Power
   // Cards" choice now lives IN the room (TutorialLayer), not on the landing.
   const handleStartTutorial = () => {
     setError(null);
@@ -451,13 +451,13 @@ export function LandingScreen({
       position: 'relative',
       overflow: 'hidden',
     }}>
-      {/* Ambient looping backdrop — drifting Whot suits behind everything. */}
+      {/* Ambient looping backdrop - drifting Whot suits behind everything. */}
       <FloatingSuits />
 
-      {/* Rising ember sparks — behind the ambient haze (see EmberCanvas). */}
+      {/* Rising ember sparks - behind the ambient haze (see EmberCanvas). */}
       <EmberCanvas />
 
-      {/* Top-left rank chip + profile drawer — fixed, frames the board with the
+      {/* Top-left rank chip + profile drawer - fixed, frames the board with the
           name chip in the opposite corner. Only once progression resolves. */}
       {progression && (
         <LevelChip progression={progression} isGuest={isGuest} username={username} />
@@ -491,7 +491,7 @@ export function LandingScreen({
         background: 'radial-gradient(ellipse 80% 100% at 50% -10%, rgba(200,146,46,0.11) 0%, transparent 70%)',
       }} />
 
-      {/* Wrought-iron corner brackets — only the two BOTTOM corners. Both top
+      {/* Wrought-iron corner brackets - only the two BOTTOM corners. Both top
           corners are intentionally omitted: the level chip (top-left) and the
           name chip (top-right) now live there, and the old brackets read as a
           stray white ruler poking out from under the chips. */}
@@ -554,7 +554,7 @@ export function LandingScreen({
               >
                 BLUFF
               </h1>
-              {/* Crimson Text italic tagline — the hook, right under the title. */}
+              {/* Crimson Text italic tagline - the hook, right under the title. */}
               <div style={{
                 fontFamily: "'Crimson Text', serif",
                 fontStyle: 'italic',
@@ -636,8 +636,8 @@ export function LandingScreen({
         {!mode && (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
             {/* Rank/level/XP now lives in the top-left level chip, not in this
-                stack — keeps the menu short and the Play CTA dominant. */}
-            {/* ONE "Play" entry — like Practice, it opens a choice (Open Game /
+                stack - keeps the menu short and the Play CTA dominant. */}
+            {/* ONE "Play" entry - like Practice, it opens a choice (Open Game /
                 Join Game) instead of two separate landing buttons, so the
                 landing stays short enough to fit a phone screen unscrolled.
                 The dominant focal CTA: aged bronze (pairs with gold Practice),
@@ -691,7 +691,7 @@ export function LandingScreen({
                 ) : tutorialHint ? (
                   <span
                     style={{
-                      // Dark bronze chip with cream text — reads as engraved
+                      // Dark bronze chip with cream text - reads as engraved
                       // metal on the gold Practice button, same warm family.
                       flexShrink: 0, padding: '2px 7px', borderRadius: 999,
                       background: '#3f3016', color: '#f5dca6',
@@ -713,7 +713,7 @@ export function LandingScreen({
               <span style={{ flex: 1, height: 1, background: 'var(--border-lit)' }} />
             </div>
 
-            {/* Ghost row — quieter secondary entries, equal width side by side. */}
+            {/* Ghost row - quieter secondary entries, equal width side by side. */}
             <div style={{ display: 'flex', gap: 10 }}>
               {!isGuest && (
                 <button
@@ -795,7 +795,7 @@ export function LandingScreen({
                     </svg>
                   ),
                   title: 'Open Game',
-                  desc: 'Host a new table — physical or online — and invite the others with its room cipher.',
+                  desc: 'Host a new table - physical or online - and invite the others with its room cipher.',
                   onPick: () => { setError(null); setMode('host'); },
                 },
                 {
@@ -887,7 +887,7 @@ export function LandingScreen({
                     </svg>
                   ),
                   title: 'Coaching',
-                  desc: 'Guided lessons — learn the core loop, then a power-card clinic. Best for a first-timer.',
+                  desc: 'Guided lessons - learn the core loop, then a power-card clinic. Best for a first-timer.',
                   onPick: handleStartTutorial,
                 },
                 {
@@ -899,7 +899,7 @@ export function LandingScreen({
                     </svg>
                   ),
                   title: 'Sandbox',
-                  desc: 'A free, unguided game vs the bot — your rules. Toggle power cards and just play.',
+                  desc: 'A free, unguided game vs the bot - your rules. Toggle power cards and just play.',
                   onPick: () => { setError(null); onStartSandbox?.(); },
                 },
               ]

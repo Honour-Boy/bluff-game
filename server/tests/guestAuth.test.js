@@ -1,7 +1,7 @@
 // ============================================================
 // Tests for the guest-auth branch of the authenticate handler.
 //
-// We don't spin up a real socket.io server — that's overkill for a
+// We don't spin up a real socket.io server - that's overkill for a
 // pure auth-handler test and would pull in Supabase. Instead we:
 //   1. Mock @supabase/supabase-js so requiring socketHandlers.js
 //      doesn't try to talk to a real backend.
@@ -22,7 +22,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 // at module load. We replace the SDK entirely via vi.mock below, but the
 // real module is also reachable via require() inside socketHandlers (CJS).
 // To stop that path from blowing up before the mock is applied we need
-// non-empty env values BEFORE any import runs — vi.hoisted gives us that
+// non-empty env values BEFORE any import runs - vi.hoisted gives us that
 // guaranteed-pre-import slot.
 vi.hoisted(() => {
   process.env.SUPABASE_URL = process.env.SUPABASE_URL || 'http://localhost.test';
@@ -31,7 +31,7 @@ vi.hoisted(() => {
 
 // ─── Stub Supabase BEFORE requiring socketHandlers ───────────
 // `createClient` is called at module load time. The stub returns an
-// object with the surface socketHandlers actually touches — auth.getUser,
+// object with the surface socketHandlers actually touches - auth.getUser,
 // the chained .from().select().eq().single() builder, etc. Tests that
 // need to drive a token-path response can override these via
 // `supabaseStub.auth.getUser.mockResolvedValueOnce(...)`.
@@ -63,7 +63,7 @@ vi.mock('livekit-server-sdk', () => ({
   AccessToken: class { addGrant() {} async toJwt() { return 'fake-jwt'; } },
 }));
 
-// Now import — the mocks above apply.
+// Now import - the mocks above apply.
 import {
   registerSocketHandlers,
   sanitizeGuestUsername,
@@ -75,7 +75,7 @@ import {
 
 // ─── Fake socket harness ──────────────────────────────────────
 // Captures handler registrations so the test can drive `authenticate`
-// directly (which is what we care about — we don't want to involve
+// directly (which is what we care about - we don't want to involve
 // real socket.io transport).
 function makeFakeSocket() {
   const handlers = new Map();
@@ -168,9 +168,9 @@ describe('isValidGuestId', () => {
   });
 });
 
-// ─── authenticate handler — guest branch ──────────────────────
+// ─── authenticate handler - guest branch ──────────────────────
 
-describe('authenticate handler — guest branch', () => {
+describe('authenticate handler - guest branch', () => {
   it('rejects when no token AND no guest payload', async () => {
     const { authenticate } = setup();
     const cb = vi.fn();
@@ -254,7 +254,7 @@ describe('authenticate handler — guest branch', () => {
   });
 
   it('falls through to the token branch when no guest payload is given', async () => {
-    // We don't fully exercise Supabase here — that path is intercepted
+    // We don't fully exercise Supabase here - that path is intercepted
     // by the live createClient at module-load time and is harder to
     // mock cleanly across CJS/ESM boundaries. What we DO need to lock
     // in is that an empty payload still errors with the historical

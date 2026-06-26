@@ -1,7 +1,7 @@
 // ============================================================
 // Tests for Phase B power-card foundation.
 //
-// Pure plumbing — card data model, deck distribution, hand cap,
+// Pure plumbing - card data model, deck distribution, hand cap,
 // activation event, survive-and-reset. NO triggered EFFECTS yet
 // (Shield blocking, Mirror reflecting, etc. live in Phase C).
 //
@@ -177,7 +177,7 @@ describe('drawCardForPlayer power-card hand cap', () => {
     room.hands.set('p0', []);
     room.hands.set('p1', []);
     room.powerCardSlot = { p0: [], p1: [] };
-    // Trailing shape pool — large enough to feed any test.
+    // Trailing shape pool - large enough to feed any test.
     const filler = generateDeck().slice(0, 30);
     room.deck = [...headCards, ...filler];
     room.playedPile = [];
@@ -269,7 +269,7 @@ describe('startGame initial-deal hand cap', () => {
     }
   });
 
-  // #139 — the power card lives in its own slot and must not decrement the
+  // #139 - the power card lives in its own slot and must not decrement the
   // playable hand. After the deal every player holds a full 6 shape cards
   // PLUS their separate power slot (7 cards at round start), not 5 + 1.
   it('deals 6 shape cards plus a separate power slot (#139)', () => {
@@ -278,11 +278,11 @@ describe('startGame initial-deal hand cap', () => {
     startGame(room);
 
     for (const [pid, hand] of room.hands.entries()) {
-      // The playable hand is always 6 shape cards — power cards never count.
+      // The playable hand is always 6 shape cards - power cards never count.
       expect(hand.filter(c => c.type === 'shape')).toHaveLength(6);
       expect(hand).toHaveLength(6);
       // Power card is held separately: at least the guaranteed one (#77), up to
-      // the player's cap — a Collector (assigned at 3+ alive since #198) may hold
+      // the player's cap - a Collector (assigned at 3+ alive since #198) may hold
       // more than one.
       const player = room.players.find(p => p.id === pid);
       const slot = room.powerCardSlot?.[pid] || [];
@@ -309,7 +309,7 @@ describe('startGame initial-deal hand cap', () => {
   it('configures swapPendingPlayerIds for any Swap card that lands in a slot', () => {
     // Across many shuffled startGames with swap enabled, every Swap
     // card that ends up in a slot should have a snapshot stamped on
-    // it. Probabilistic but stable — 30 trials, 3 players each.
+    // it. Probabilistic but stable - 30 trials, 3 players each.
     let trialsWithSwapInSlot = 0;
     let trialsTotal = 0;
     for (let trial = 0; trial < 30; trial++) {
@@ -329,7 +329,7 @@ describe('startGame initial-deal hand cap', () => {
       }
     }
     expect(trialsTotal).toBeGreaterThan(0);
-    // We don't assert a minimum hit count — it's probabilistic. We
+    // We don't assert a minimum hit count - it's probabilistic. We
     // just verify that whenever a Swap landed in a slot, the snapshot
     // existed. Hits across 30 trials are virtually guaranteed but we
     // don't gate on count to keep the test robust.
@@ -339,7 +339,7 @@ describe('startGame initial-deal hand cap', () => {
 // ─── Initial-deal guaranteed minimum (#77) ───────────────────
 
 describe('startGame guarantees ≥1 power card per player (#77)', () => {
-  // Silence the engine's "deck out of power cards" warn — some tests
+  // Silence the engine's "deck out of power cards" warn - some tests
   // intentionally starve the deck to exercise the best-effort branch.
   const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
   afterAll(() => warnSpy.mockRestore());
@@ -366,7 +366,7 @@ describe('startGame guarantees ≥1 power card per player (#77)', () => {
           barehandTotal++;
           if (powerCount >= 1) barehandWithPower++;
         }
-        // #139 — the playable hand is always a full 6 shape cards; the
+        // #139 - the playable hand is always a full 6 shape cards; the
         // power card sits in its own slot and never decrements it.
         expect(hand.length).toBe(6);
         const cap = p.role === 'collector' ? 3 : 1;
@@ -384,7 +384,7 @@ describe('startGame guarantees ≥1 power card per player (#77)', () => {
 
   it('every Barehand player receives ≥1 power card across 50 trials (named bug)', () => {
     // 12 alive → 6 unique specials + 1 extra Gambler, leaving exactly 5
-    // Barehand fillers per trial — the scenario reported in #77.
+    // Barehand fillers per trial - the scenario reported in #77.
     const { barehandWithPower, barehandTotal } = runDealInitialHandsGuarantees(
       50, { players: 12, copiesPerDeck: 2 },
     );
@@ -438,7 +438,7 @@ describe('startGame guarantees ≥1 power card per player (#77)', () => {
       return slot.some(c => c?.type === 'power');
     });
     expect(covered.length).toBeGreaterThanOrEqual(1);
-    // #139 — every hand tops up to a full 6 shape cards regardless of
+    // #139 - every hand tops up to a full 6 shape cards regardless of
     // whether the power-card guarantee could reach that player.
     for (const p of room.players) {
       const hand = room.hands.get(p.id) || [];
@@ -470,7 +470,7 @@ describe('activatePowerCard', () => {
     room.playedPile = [];
     room.discardPile = [];
     room.lastPlayedCard = lastPlayedCard;
-    // Peek reveals the previous player's play — the turn-boundary snapshot.
+    // Peek reveals the previous player's play - the turn-boundary snapshot.
     room.challengeableCard = lastPlayedCard;
     return room;
   }
@@ -574,7 +574,7 @@ describe('activatePowerCard', () => {
     expect(second.error).toMatch(/already armed/i);
   });
 
-  // Playtest §1.1 — turn-flow flexibility. Arming a power card AFTER a normal
+  // Playtest §1.1 - turn-flow flexibility. Arming a power card AFTER a normal
   // card has been played in the same turn is now allowed (previously the UI
   // locked to nothing but "End Turn"). Arming a defensive Shield/Mirror after
   // your play is the intended set-up against the next player's bluff.
@@ -677,7 +677,7 @@ describe('swap pending-set credit on advanceTurn', () => {
   });
 });
 
-// ─── #163 — stale armed power card reset on turn cycle ───────
+// ─── #163 - stale armed power card reset on turn cycle ───────
 
 describe('stale armed power card resets at the holder next turn (#163)', () => {
   function armedRoom(power) {
@@ -718,7 +718,7 @@ describe('stale armed power card resets at the holder next turn (#163)', () => {
   });
 });
 
-// ─── §1.4 — armed cards cleared the moment their bluff window closes ──
+// ─── §1.4 - armed cards cleared the moment their bluff window closes ──
 // Stricter than the original full-cycle reset: a card armed by p0 is live
 // only while p0 is the immediately-previous player. Once the turn moves
 // past p0+1 the armed flag must be swept, in games of any size, so it can
@@ -757,9 +757,9 @@ describe('stale armed power cards swept once past the bluff window (§1.4)', () 
 
   it('does not strand an armed Mirror when the holder is mid-order (4-player)', () => {
     const room = armedRoomN(4, 'mirror', 1); // p1 holds, currentTurnIndex = 1
-    advanceTurn(room); // p1 → p2 (p1 is prev — kept)
+    advanceTurn(room); // p1 → p2 (p1 is prev - kept)
     expect(room.players.find(p => p.id === 'p1').armedPowerCard).not.toBeNull();
-    advanceTurn(room); // p2 → p3 (p1 no longer prev — swept)
+    advanceTurn(room); // p2 → p3 (p1 no longer prev - swept)
     expect(room.players.find(p => p.id === 'p1').armedPowerCard).toBeNull();
   });
 });
@@ -788,7 +788,7 @@ describe('resetHandOnSurvival (Section 7)', () => {
     for (const pc of retainedPowers) {
       expect(after.find(c => c.id === pc.id)).toBeTruthy();
     }
-    // #184 — the surrendered SHAPE cards go back into the DRAW PILE (not the
+    // #184 - the surrendered SHAPE cards go back into the DRAW PILE (not the
     // discard pile, which is never recycled). Retained power cards stay in hand,
     // so they're in neither pile.
     for (const card of shapesBefore) {
@@ -827,7 +827,7 @@ describe('resetHandOnSurvival (Section 7)', () => {
     expect(player.armedPowerCard).toBeNull();
   });
 
-  it('Redemption Spin path (3 cards) — deals 3 shapes and keeps held power cards (#62)', () => {
+  it('Redemption Spin path (3 cards) - deals 3 shapes and keeps held power cards (#62)', () => {
     const room = setupSurvivor();
     const retainedPowers = room.hands.get('p0').filter(c => c.type === 'power');
     const dealt = resetHandOnSurvival(room, 'p0', 3);
@@ -845,9 +845,9 @@ describe('resetHandOnSurvival (Section 7)', () => {
     expect(room.hands.get('p0')).toEqual(before);
   });
 
-  // Issue #56 — pre-fix this dealt 6 cards regardless of hand size,
+  // Issue #56 - pre-fix this dealt 6 cards regardless of hand size,
   // so hands stayed full forever and the deck never drained.
-  // After #62, "surviving hand size" applies to the SHAPE count only —
+  // After #62, "surviving hand size" applies to the SHAPE count only -
   // power cards are kept on top of the dealt shapes.
   it('omitted cardsToDeal defaults to surviving shape count + retained power cards (#56, #62)', () => {
     const room = setupSurvivor();

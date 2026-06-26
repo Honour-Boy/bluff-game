@@ -1,12 +1,12 @@
 // ============================================================
-// SOCKET HANDLERS — Orchestrator + test-surface shim (#105 PR B)
+// SOCKET HANDLERS - Orchestrator + test-surface shim (#105 PR B)
 // ============================================================
 // All socket-event logic now lives under server/handlers/*.js. The
 // helpers and orchestration moved to server/lib/*.js. This module
 // keeps its historical name and exports so every consumer (index.js
 // + 19 test files) keeps working with zero import changes.
 //
-// `registerSocketHandlers(io, socket, deps)` is the one entry point —
+// `registerSocketHandlers(io, socket, deps)` is the one entry point -
 // it wires up each topical handler module against the live `io` /
 // `socket` pair, plus an optional `deps` override for tests.
 

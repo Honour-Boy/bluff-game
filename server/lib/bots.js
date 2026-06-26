@@ -1,16 +1,16 @@
 // ============================================================
-// SOCKET LIB — Bot turn driver (tutorial / practice opponent)
+// SOCKET LIB - Bot turn driver (tutorial / practice opponent)
 // ============================================================
 // A seated bot has no socket, so it can't emit play_card_online / end_turn /
 // player_spin like a human. Instead this driver runs the bot's moves SERVER-side
-// by calling the engine + the shared spin pipeline directly, then broadcasting —
+// by calling the engine + the shared spin pipeline directly, then broadcasting -
 // exactly the pattern the idle-turn safety net (lib/idleTurn.js) uses for an AFK
 // player, just on a much shorter, human-legible beat so the player can watch.
 //
 // armBotTurn is idempotent and is called at the END of every broadcastRoomState
 // (right after armIdleTurnTimer). It figures out whether a bot owes an action
 // right now and, if so, schedules ONE beat. Performing that beat broadcasts,
-// which re-arms the next beat — so a bot's turn plays out as: play a card → end
+// which re-arms the next beat - so a bot's turn plays out as: play a card → end
 // the turn; and a bot that's bluff-called spins when it's the target.
 //
 // Cycle note: this module is required at the top of lib/broadcast.js, so it must
@@ -37,7 +37,7 @@ const {
   _clearBluffInterceptTimer,
 } = require('./state');
 
-// Beat timing — long enough to read on screen, short enough to feel responsive.
+// Beat timing - long enough to read on screen, short enough to feel responsive.
 const BOT_MOVE_DELAY_MS = 1100; // play a card / end the turn
 const BOT_SPIN_DELAY_MS = 1500; // pause on "<bot> is on the spot" before spinning
 const BOT_INTERCEPT_DELAY_MS = 700; // brief "deciding" beat before auto-passing a bluff intercept
@@ -47,7 +47,7 @@ const BOT_INTERCEPT_DELAY_MS = 700; // brief "deciding" beat before auto-passing
 const CLINIC_BOT_SPIN_DELAY_MS = 10000;
 
 // "Thinking" delay before the bot plays a card. A real opponent doesn't slam a
-// card down instantly — a randomized 4–12s pause per turn makes the bot feel
+// card down instantly - a randomized 4–12s pause per turn makes the bot feel
 // like it's actually weighing what to play (and masks the fact that its choice
 // is computed instantly). Applies to the card-play beat only; ending the turn /
 // arming / spinning keep their snappy beats. Re-rolled per distinct beat (the
@@ -62,14 +62,14 @@ function _botPlayThinkDelay() {
 }
 
 // Tutorial rooms are never group rooms (room.groupId is null), so the leaderboard
-// repo handed to the spin pipeline is never actually invoked — every call site
+// repo handed to the spin pipeline is never actually invoked - every call site
 // guards on room.groupId first. Pass an inert stub so we don't have to load the
 // Supabase client (which throws without env) into the broadcast path, and so the
 // driver works unchanged in unit tests that don't register handlers.
 const NOOP_LEADERBOARD_REPO = {
   recordWinner: async () => ({}),
   recordGameStart: async () => ({}),
-  // #205 — XP is never awarded in tutorial/practice rooms (maybeAwardGameXp
+  // #205 - XP is never awarded in tutorial/practice rooms (maybeAwardGameXp
   // gates on !room.isTutorial), but keep the surface shape complete.
   getProgression: async () => ({ xp: 0, gamesPlayed: 0, equipped: {} }),
   addXp: async () => ({}),
@@ -102,11 +102,11 @@ function _pendingBotAction(room) {
 
   // Spotlight tour: the bot is FROZEN for the whole tour. Every "bot play" the
   // Part-B beats need is written directly by the scenario stager
-  // (engine/tourScenarios.js), so the driver must never act — a stray bot move
+  // (engine/tourScenarios.js), so the driver must never act - a stray bot move
   // would derail the staged instance.
   if (room.isTutorial && room.tutorialLesson === 'tour') return null;
 
-  // A bot accused during a bluff-intercept window normally auto-passes — it has
+  // A bot accused during a bluff-intercept window normally auto-passes - it has
   // no socket to arm a defence, so without this a human bluff against a power-
   // holding bot would stall the whole window. EXCEPTION: the clinic's bot-Shield
   // demo scripts the bot to ARM its defence so the learner sees a power used
@@ -120,7 +120,7 @@ function _pendingBotAction(room) {
           ? { kind: 'intercept_arm', botId: accused.id }
           : { kind: 'intercept_pass', botId: accused.id };
       }
-      // Free play (sandbox, powers ON): defend only when it helps — the bot
+      // Free play (sandbox, powers ON): defend only when it helps - the bot
       // actually lied AND holds an interceptable card. Anywhere else the bot has
       // no socket to defend, so it passes (no 8s stall).
       if (
@@ -135,7 +135,7 @@ function _pendingBotAction(room) {
     return null;
   }
 
-  // Free play: the bot is the Swap holder resolving a swap_pending pause — it
+  // Free play: the bot is the Swap holder resolving a swap_pending pause - it
   // must pick a card from the played pile (the human picker has no analogue for
   // a bot). Clinic Swap is a learner-defence drill, never bot-held, so this is
   // free-play only.
@@ -151,7 +151,7 @@ function _pendingBotAction(room) {
   if (room.phase === 'spin_pending' && room.spinTargetId) {
     const target = room.players.find((p) => p.id === room.spinTargetId);
     if (target?.isBot && target.status === 'alive') {
-      // If a betting window is open, wait — its close re-broadcasts and re-arms us.
+      // If a betting window is open, wait - its close re-broadcasts and re-arms us.
       if (room.betting && !room.betting.closed) return null;
       return { kind: 'spin', botId: target.id };
     }
@@ -163,7 +163,7 @@ function _pendingBotAction(room) {
     const currentId = room.turnOrder[room.currentTurnIndex];
     const current = room.players.find((p) => p.id === currentId);
     if (current?.isBot && current.status === 'alive') {
-      // Inside a scripted clinic drill the bot does NOT free-play — it stays idle
+      // Inside a scripted clinic drill the bot does NOT free-play - it stays idle
       // unless the drill scripts it to CHALLENGE (the Assassin drill), so a stray
       // bot card can't derail the staged instance. The director owns the flow.
       if (room.tutorialScenario) {
@@ -269,7 +269,7 @@ function armBotTurn(io, room) {
   botTimers.set(code, handle);
 }
 
-// Play a single card for the bot via the engine (NOT the socket handler — the bot
+// Play a single card for the bot via the engine (NOT the socket handler - the bot
 // has no socket). Returns true if a card was actually played. Mirrors the
 // play_card_online handler's post-validate bookkeeping (Whot nomination +
 // lastAction) so the human's client sees an identical "card played" beat.
@@ -434,7 +434,7 @@ async function _onBotActExpire(io, code, key) {
     // Free play: the bot proactively activates an offensive power at turn start.
     // Mirrors the activate_power_card handler (engine mutation + broadcast); Peek
     // is consumed-on-use and its revealed card is stashed so the bot's challenge
-    // beat can act on a KNOWN card (a fair, in-game use of the power — not a peek
+    // beat can act on a KNOWN card (a fair, in-game use of the power - not a peek
     // at hidden state).
     const res = engine.activatePowerCard(room, action.botId, action.cardId);
     if (res?.ok) {
@@ -499,7 +499,7 @@ async function _onBotActExpire(io, code, key) {
   if (action.kind === 'spin') {
     const player = room.players.find((p) => p.id === action.botId);
     if (!player || player.status !== 'alive') return;
-    // We're taking the spin now — cancel the spin_pending auto-resolve safety net
+    // We're taking the spin now - cancel the spin_pending auto-resolve safety net
     // (mirrors the player_spin handler) and run the shared spin pipeline.
     _clearSpinPendingTimer(code);
     await applySpinAndBroadcast(io, code, room, player, NOOP_LEADERBOARD_REPO);
@@ -510,11 +510,11 @@ async function _onBotActExpire(io, code, key) {
     // Open the turn by maybe CHALLENGING the previous player (once per turn,
     // before playing a card). Mirrors the call_bluff handler EXACTLY: stamp the
     // ledger flag, give the accused their §1.1 interception window (the human
-    // gets the same "defend yourself" pop-up a human challenger would trigger —
+    // gets the same "defend yourself" pop-up a human challenger would trigger -
     // on arm/pass/timeout the shared machinery resolves and re-arms us), and
     // only resolve directly when there's nothing to intercept with. After it
     // resolves (a spin lands on the bot or the human), the bot's turn continues
-    // on the next beat — bluffUsedThisTurn is now set, so it can't bluff again
+    // on the next beat - bluffUsedThisTurn is now set, so it can't bluff again
     // and will just play a card.
     if (shouldCallBluff(room, action.botId)) {
       room.bluffUsedThisTurn = true;
@@ -522,7 +522,7 @@ async function _onBotActExpire(io, code, key) {
       room.botBluffCallsThisGame = (room.botBluffCallsThisGame || 0) + 1;
       const { maybeOpenBluffIntercept } = require('./orchestration');
       if (await maybeOpenBluffIntercept(io, code, room, action.botId, NOOP_LEADERBOARD_REPO)) {
-        return; // window open — the accused (human) decides; we wait
+        return; // window open - the accused (human) decides; we wait
       }
       await _resolveOnlineBluff(io, code, room, action.botId, NOOP_LEADERBOARD_REPO);
       return;
@@ -530,7 +530,7 @@ async function _onBotActExpire(io, code, key) {
 
     const played = _botPlayCard(room, action.botId);
     if (!played) {
-      // Nothing playable (only power cards / empty) — don't stall; end the turn.
+      // Nothing playable (only power cards / empty) - don't stall; end the turn.
       await _botEndTurn(io, code, room);
       return;
     }

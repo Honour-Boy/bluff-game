@@ -5,26 +5,26 @@
   /* ── "Smoke & Amber" tavern palette ──
      Charcoal-brown shadows lifted off near-black, a punchy amber highlight,
      and a distinct ember-red focal accent for primary actions. */
-  /* Backgrounds — smoked seasoned hardwood */
+  /* Backgrounds - smoked seasoned hardwood */
   --bg:        #100f0d;
   --surface:   #1a1714;
   --surface2:  #241f19;
   --surface3:  #2f2820;
 
-  /* Borders — wood-grain edges */
+  /* Borders - wood-grain edges */
   --border:       #463728;
   --border-lit:   #6a5232;
   --border-glow:  #8f6f3e;
 
-  /* Accent palette — amber highlight, ember CTA, blood danger, verdigris */
+  /* Accent palette - amber highlight, ember CTA, blood danger, verdigris */
   --accent:     #f0b54a;   /* amber candlelight (highlight) */
   --accent-dim: #b8862f;
   --accent2:    #a8261d;   /* deep crimson / danger */
   --accent3:    #3f8f7a;   /* aged verdigris-teal / success */
-  --ember:      #d4513a;   /* ember-red — primary focal CTA */
+  --ember:      #d4513a;   /* ember-red - primary focal CTA */
   --ember-dim:  #a83a28;
 
-  /* Text — aged parchment tones */
+  /* Text - aged parchment tones */
   --text:     #ece0c8;
   --text-dim: #998660;
   --text-mid: #c4ab82;
@@ -62,7 +62,7 @@ html, body {
   line-height: 1.65;
   min-height: 100vh;
   /* `clip` (not `hidden`) kills horizontal overflow WITHOUT turning html/body
-     into scroll containers — `hidden` on both axes' roots breaks wheel/track
+     into scroll containers - `hidden` on both axes' roots breaks wheel/track
      scrolling on tall pages (e.g. the Groups list). Vertical page scroll stays
      on the normal document scroller. */
   overflow-x: clip;
@@ -80,7 +80,7 @@ body.game-noscroll {
   height: 100dvh;
 }
 
-/* ─── Global tavern atmosphere — wood grain + vignette ─────────────────────── */
+/* ─── Global tavern atmosphere - wood grain + vignette ─────────────────────── */
 body::before {
   content: '';
   position: fixed;
@@ -124,7 +124,7 @@ h1, h2, h3, h4 {
   color: var(--text);
 }
 
-/* ─── Buttons — textured wooden plaques / metal seals ──────────────────────── */
+/* ─── Buttons - textured wooden plaques / metal seals ──────────────────────── */
 button {
   cursor: pointer;
   font-family: 'Cinzel', serif;
@@ -159,7 +159,7 @@ button:hover:not(:disabled) {
   background: linear-gradient(160deg, var(--surface3) 0%, var(--surface2) 100%);
   box-shadow: 0 0 14px var(--glow-gold), inset 0 1px 0 rgba(200,146,46,0.12);
   /* No translateY lift on hover: a 1px shift moves the button out from under
-     the cursor at its edge, dropping :hover and re-triggering it — a sustained
+     the cursor at its edge, dropping :hover and re-triggering it - a sustained
      pointer/arrow cursor flicker. The glow + colour shift carry the affordance;
      the lift stays on :focus-visible / :active, which don't flicker. */
 }
@@ -183,7 +183,7 @@ button:disabled {
   transform: none;
 }
 
-/* Primary — gilded amber seal */
+/* Primary - gilded amber seal */
 button.primary {
   background: linear-gradient(160deg, #b8862f 0%, #f0b54a 45%, #b8862f 100%);
   border-color: #9a6f24;
@@ -198,14 +198,14 @@ button.primary:hover:not(:disabled) {
   border-color: var(--accent);
   color: #120a03;
   box-shadow: 0 4px 16px var(--glow-gold), inset 0 1px 0 rgba(255,235,140,0.35);
-  /* No hover lift — see button:hover note (prevents cursor flicker). */
+  /* No hover lift - see button:hover note (prevents cursor flicker). */
 }
 
 button.primary:focus-visible {
   box-shadow: 0 0 0 2px rgba(240,181,74,0.5), 0 4px 20px var(--glow-gold), inset 0 1px 0 rgba(255,235,140,0.35);
 }
 
-/* Ember — the dominant focal CTA (Host a Table, primary actions) */
+/* Ember - the dominant focal CTA (Host a Table, primary actions) */
 button.ember {
   background: linear-gradient(160deg, #a83a28 0%, #d4513a 45%, #a83a28 100%);
   border-color: #8f2f20;
@@ -219,13 +219,13 @@ button.ember:hover:not(:disabled) {
   border-color: var(--ember);
   color: #fff4ec;
   box-shadow: 0 4px 22px var(--glow-ember), inset 0 1px 0 rgba(255,195,165,0.35);
-  /* No hover lift — see button:hover note (prevents cursor flicker). */
+  /* No hover lift - see button:hover note (prevents cursor flicker). */
 }
 button.ember:focus-visible {
   box-shadow: 0 0 0 2px rgba(212,81,58,0.55), 0 4px 22px var(--glow-ember);
 }
 
-/* Bronze — aged metal: the dominant Play CTA, paired with the gold Practice
+/* Bronze - aged metal: the dominant Play CTA, paired with the gold Practice
    button so the two read as one warm family (darker slab + amber text vs the
    brighter gold). */
 button.bronze {
@@ -241,13 +241,13 @@ button.bronze:hover:not(:disabled) {
   border-color: var(--accent-dim);
   color: #ffd877;
   box-shadow: 0 4px 20px rgba(0,0,0,0.5), 0 0 22px var(--glow-gold), inset 0 1px 0 rgba(240,181,74,0.18);
-  /* No hover lift — see button:hover note (prevents cursor flicker). */
+  /* No hover lift - see button:hover note (prevents cursor flicker). */
 }
 button.bronze:focus-visible {
   box-shadow: 0 0 0 2px rgba(240,181,74,0.4), 0 4px 20px var(--glow-gold);
 }
 
-/* Danger — crimson wax */
+/* Danger - crimson wax */
 button.danger {
   border-color: #6b1818;
   color: #c85050;
@@ -262,7 +262,7 @@ button.danger:focus-visible {
   box-shadow: 0 0 0 2px rgba(155,28,28,0.4), 0 0 18px var(--glow-crimson);
 }
 
-/* Success — verdigris copper */
+/* Success - verdigris copper */
 button.success {
   border-color: #2a5a3a;
   color: #4a9a62;
@@ -276,7 +276,7 @@ button.success:focus-visible {
   box-shadow: 0 0 0 2px rgba(58,122,82,0.4), 0 0 18px var(--glow-green);
 }
 
-/* ─── Inputs — parchment ink-wells ─────────────────────────────────────────── */
+/* ─── Inputs - parchment ink-wells ─────────────────────────────────────────── */
 input {
   font-family: 'Crimson Text', 'Georgia', serif;
   font-size: 15px;
@@ -300,7 +300,7 @@ input::placeholder {
   font-style: italic;
 }
 
-/* ─── Card / Panel — dark lacquered wood ────────────────────────────────────── */
+/* ─── Card / Panel - dark lacquered wood ────────────────────────────────────── */
 .card {
   background: linear-gradient(160deg, var(--surface2) 0%, var(--surface) 100%);
   border: 1px solid var(--border-lit);
@@ -312,7 +312,7 @@ input::placeholder {
     inset 0 -1px 0 rgba(0,0,0,0.3);
 }
 
-/* ─── Tilt panel — 3D tabletop perspective ──────────────────────────────────── */
+/* ─── Tilt panel - 3D tabletop perspective ──────────────────────────────────── */
 .tilt-panel {
   transform: perspective(var(--perspective)) rotateY(-2.5deg) rotateX(1deg);
   transform-style: preserve-3d;
@@ -326,7 +326,7 @@ input::placeholder {
   .tilt-panel:hover { transform: none; }
 }
 
-/* ─── Tags — branded wax-press labels ───────────────────────────────────────── */
+/* ─── Tags - branded wax-press labels ───────────────────────────────────────── */
 .tag {
   display: inline-block;
   font-family: 'Cinzel', serif;
@@ -344,7 +344,7 @@ input::placeholder {
 .tag.host      { color: var(--accent); border-color: var(--accent); }
 .tag.current   { color: var(--warning); border-color: var(--warning); }
 
-/* Standard browser focus ring — accessibility only, not keyboard nav */
+/* Standard browser focus ring - accessibility only, not keyboard nav */
 :focus-visible {
   outline: 2px solid rgba(200,146,46,0.4);
   outline-offset: 2px;
@@ -352,7 +352,7 @@ input::placeholder {
 
 /* ─── Animations ─────────────────────────────────────────────────────────────── */
 
-/* Candle flicker — ambient ambient atmosphere */
+/* Candle flicker - ambient ambient atmosphere */
 @keyframes candle-flicker {
   0%, 100% { opacity: 1; text-shadow: 0 0 30px rgba(200,146,46,0.6); }
   25%       { opacity: 0.96; text-shadow: 0 0 20px rgba(200,146,46,0.45); }
@@ -361,7 +361,7 @@ input::placeholder {
 }
 .candle-title { animation: candle-flicker 4s ease-in-out infinite; }
 
-/* Ember pulse — for active/current player */
+/* Ember pulse - for active/current player */
 @keyframes ember-pulse {
   0%, 100% { box-shadow: 0 0 0 0 rgba(200,146,46,0); }
   50%       { box-shadow: 0 0 14px 3px rgba(200,146,46,0.22); }
@@ -381,7 +381,7 @@ input::placeholder {
 }
 .spinning { animation: spin-roulette 1.5s cubic-bezier(0.2, 0, 0.3, 1) forwards; }
 
-/* Tavern title reveal — carved stone emerge */
+/* Tavern title reveal - carved stone emerge */
 @keyframes title-emerge {
   0%   { opacity: 0; transform: perspective(600px) translateZ(-40px) translateY(12px); filter: blur(4px); }
   100% { opacity: 1; transform: perspective(600px) translateZ(0px) translateY(0); filter: blur(0); }
@@ -395,7 +395,7 @@ input::placeholder {
 }
 .fade-in { animation: fadeIn 0.35s ease forwards; }
 
-/* Soft opacity pulse — reusable globally (e.g. the reconnecting indicator).
+/* Soft opacity pulse - reusable globally (e.g. the reconnecting indicator).
    The in-game table redefines an identical `pulse` inside GAME_UI_STYLE. */
 @keyframes pulse {
   0%, 100% { opacity: 1; }
@@ -416,7 +416,7 @@ input::placeholder {
 .stagger-child:nth-child(4) { animation-delay: 0.18s; }
 .stagger-child:nth-child(5) { animation-delay: 0.24s; }
 
-/* Continuous rotation — the ChamberSpinner loading motif (and the post-intro
+/* Continuous rotation - the ChamberSpinner loading motif (and the post-intro
    IntroLoading cylinder). Plain 360° loop; callers set the duration. */
 @keyframes spin { to { transform: rotate(360deg); } }
 
@@ -425,7 +425,7 @@ input::placeholder {
 .groups-refresh-icon { display: inline-block; font-size: 13px; line-height: 1; }
 .groups-refresh-icon--spin { animation: groups-refresh-spin 0.8s linear infinite; }
 
-/* ─── Scrollbar — aged iron track ────────────────────────────────────────────── */
+/* ─── Scrollbar - aged iron track ────────────────────────────────────────────── */
 ::-webkit-scrollbar { width: 5px; }
 ::-webkit-scrollbar-track { background: var(--surface); }
 ::-webkit-scrollbar-thumb { background: var(--border-lit); border-radius: 3px; }
@@ -471,7 +471,7 @@ input::placeholder {
   100% { opacity: 0; transform: translateY(-50px) scaleX(1.6) translateX(20px); }
 }
 
-/* ─── Phase 3: Vignette pulse — intensifies during spin_pending ─────────────── */
+/* ─── Phase 3: Vignette pulse - intensifies during spin_pending ─────────────── */
 @keyframes vignette-intensify {
   0%, 100% { opacity: 0.72; }
   50%       { opacity: 0.88; }
@@ -484,13 +484,13 @@ body.phase-spin-pending::after {
   background: radial-gradient(ellipse 100% 100% at 50% 50%, transparent 35%, rgba(60,0,0,0.85) 100%);
 }
 
-/* Screen shake class — added/removed by JS */
+/* Screen shake class - added/removed by JS */
 .screen-shake {
   animation: screen-shake 0.55s cubic-bezier(0.36, 0.07, 0.19, 0.97) both;
 }
 
 /* ─── Tavern UI refresh ───────────────────────────────────────────────────────── */
-/* Hanging tavern sign — gentle pendulum sway from its chains */
+/* Hanging tavern sign - gentle pendulum sway from its chains */
 @keyframes sign-sway {
   0%, 100% { transform: rotate(-1.1deg); }
   50%       { transform: rotate(1.1deg); }
@@ -501,7 +501,7 @@ body.phase-spin-pending::after {
   animation: sign-sway 6s ease-in-out infinite;
 }
 
-/* Ambient looping backdrop — large, faint Whot suits drift up and slowly rotate
+/* Ambient looping backdrop - large, faint Whot suits drift up and slowly rotate
    forever behind the content. The landing's always-on background motion
    (distinct from the rising ember sparks). 0% and 100% match so it loops
    seamlessly; disabled under reduced motion. */
@@ -515,7 +515,7 @@ body.phase-spin-pending::after {
   .hanging-sign { animation: none; }
 }
 
-/* Subtle wood-grain / smoke texture overlay — drop inside a position:relative
+/* Subtle wood-grain / smoke texture overlay - drop inside a position:relative
    panel as an absolutely-positioned, pointer-events:none child. */
 .wood-grain::after {
   content: '';
@@ -530,7 +530,7 @@ body.phase-spin-pending::after {
   mix-blend-mode: overlay;
 }
 
-/* Ember/candle focal glow ring — for the required-suit focal element */
+/* Ember/candle focal glow ring - for the required-suit focal element */
 @keyframes focal-breathe {
   0%, 100% { box-shadow: 0 0 18px rgba(240,181,74,0.25), inset 0 0 14px rgba(240,181,74,0.08); }
   50%       { box-shadow: 0 0 30px rgba(240,181,74,0.42), inset 0 0 18px rgba(240,181,74,0.12); }
@@ -539,7 +539,7 @@ body.phase-spin-pending::after {
 
 /* ─── Dismissal "X" (Module 6) ──────────────────────────────────────────────
    Every modal/dropdown/popup close control renders a raw literal uppercase "X"
-   (a plain Latin letter — unlike the ✕/× dingbats it always renders in the
+   (a plain Latin letter - unlike the ✕/× dingbats it always renders in the
    display fonts). Flat and on-surface: a dim glyph with NO filled background,
    brightening on hover, so it reads as a quiet dismiss control rather than a
    loud crimson chip. */

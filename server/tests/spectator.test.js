@@ -1,5 +1,5 @@
 // ============================================================
-// Tests for §3.2 — spectator anti-cheat lockout in serializeRoom
+// Tests for §3.2 - spectator anti-cheat lockout in serializeRoom
 //
 // The old #81 "spectate one chosen player's hand" feature is removed:
 // an eliminated / dead player must NEVER receive any opponent hand in a
@@ -27,7 +27,7 @@ function makeOnlineRoom(playerCount, configOverrides = null) {
   }
   // serializeRoom expects room.hands to exist for online mode; some
   // helpers rely on startGame to populate it, but for spectator tests
-  // we don't need a full deal — a Map of arbitrary card stand-ins is
+  // we don't need a full deal - a Map of arbitrary card stand-ins is
   // enough to exercise the gating.
   if (!room.hands) room.hands = new Map();
   for (const p of room.players) {
@@ -40,7 +40,7 @@ function setHand(room, playerId, cards) {
   room.hands.set(playerId, cards);
 }
 
-describe('serializeRoom — spectator hand lockout (§3.2)', () => {
+describe('serializeRoom - spectator hand lockout (§3.2)', () => {
   it('NEVER exposes spectatedHand to an eliminated caller, even with a target', () => {
     const room = makeOnlineRoom(3);
     const [eliminated, alive1] = room.players;
@@ -64,7 +64,7 @@ describe('serializeRoom — spectator hand lockout (§3.2)', () => {
     expect(view.spectatedPlayerId).toBeUndefined();
   });
 
-  it('only the caller ever sees a hand — opponents are limited to handSize', () => {
+  it('only the caller ever sees a hand - opponents are limited to handSize', () => {
     const room = makeOnlineRoom(3);
     const [eliminated, alive1, alive2] = room.players;
     eliminated.status = 'eliminated';
@@ -73,7 +73,7 @@ describe('serializeRoom — spectator hand lockout (§3.2)', () => {
     setHand(room, alive2.id, [{ id: 'c2', type: 'shape', shape: 'square' }]);
 
     const view = serializeRoom(room, eliminated.id, { spectatingTargetId: alive1.id });
-    // No opponent hand array reaches the eliminated client — only counts.
+    // No opponent hand array reaches the eliminated client - only counts.
     const opponents = view.players.filter(p => p.id !== eliminated.id);
     for (const p of opponents) {
       expect(p).not.toHaveProperty('hand');
@@ -83,7 +83,7 @@ describe('serializeRoom — spectator hand lockout (§3.2)', () => {
   });
 });
 
-describe('serializeRoom — currentPromptTarget (#81)', () => {
+describe('serializeRoom - currentPromptTarget (#81)', () => {
   it('exposes Medic prompt target to eliminated callers during medic_pending', () => {
     const room = makeOnlineRoom(3);
     const [eliminated, medic] = room.players;
@@ -124,7 +124,7 @@ describe('serializeRoom — currentPromptTarget (#81)', () => {
     });
   });
 
-  it('NEVER leaks medicId to living callers — secret-role privacy', () => {
+  it('NEVER leaks medicId to living callers - secret-role privacy', () => {
     const room = makeOnlineRoom(3);
     const [aliveCaller, medic, victim] = room.players;
     room.phase = 'medic_pending';
@@ -137,7 +137,7 @@ describe('serializeRoom — currentPromptTarget (#81)', () => {
 
     const view = serializeRoom(room, aliveCaller.id);
     expect(view.currentPromptTarget).toBeNull();
-    // The public pendingMedicSave shape stays the same — amTargetMedic
+    // The public pendingMedicSave shape stays the same - amTargetMedic
     // is false for everyone except the medic themselves; no medicId
     // is exposed here.
     expect(view.pendingMedicSave).toBeTruthy();
@@ -145,7 +145,7 @@ describe('serializeRoom — currentPromptTarget (#81)', () => {
     expect(view.pendingMedicSave).not.toHaveProperty('medicId');
   });
 
-  it('NEVER leaks sniperId to living callers — secret-role privacy', () => {
+  it('NEVER leaks sniperId to living callers - secret-role privacy', () => {
     const room = makeOnlineRoom(4);
     const [aliveCaller, sniper, target] = room.players;
     room.phase = 'sniper_pending';
@@ -163,7 +163,7 @@ describe('serializeRoom — currentPromptTarget (#81)', () => {
     expect(view.pendingSniperRedirect).not.toHaveProperty('sniperId');
   });
 
-  it('returns null when phase is playing — no active prompt to ghost', () => {
+  it('returns null when phase is playing - no active prompt to ghost', () => {
     const room = makeOnlineRoom(3);
     const [eliminated] = room.players;
     eliminated.status = 'eliminated';
@@ -175,7 +175,7 @@ describe('serializeRoom — currentPromptTarget (#81)', () => {
   });
 });
 
-describe('serializeRoom — spectator field backward compat', () => {
+describe('serializeRoom - spectator field backward compat', () => {
   it('two-arg form (room, playerId) still works for non-spectator callers', () => {
     const room = makeOnlineRoom(2);
     const [alive] = room.players;

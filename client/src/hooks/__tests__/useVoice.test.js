@@ -30,7 +30,7 @@ const livekitMock = vi.hoisted(() => {
 
   class FakeRoom {
     constructor() {
-      // Mirror LiveKit's actual behaviour — the SDK exposes a
+      // Mirror LiveKit's actual behaviour - the SDK exposes a
       // boolean getter `isMicrophoneEnabled`. The hook reads it back
       // after each toggle to keep its `muted` flag honest, so the
       // mock has to actually track the state, not just record calls.
@@ -92,7 +92,7 @@ beforeEach(() => {
   livekitMock.state.disconnected = false;
 });
 
-describe('useVoice — initial state', () => {
+describe('useVoice - initial state', () => {
   it('starts idle and muted', () => {
     const { result } = renderHook(() =>
       useVoice({ roomCode: 'ROOM01', isAuthenticated: true }),
@@ -129,7 +129,7 @@ describe('useVoice — initial state', () => {
   });
 });
 
-describe('useVoice — connect flow', () => {
+describe('useVoice - connect flow', () => {
   it('requests a voice token from the server and joins the LiveKit room', async () => {
     socketHolder.socket.emit.mockImplementationOnce((event, payload, cb) => {
       expect(event).toBe('request_voice_token');
@@ -197,7 +197,7 @@ describe('useVoice — connect flow', () => {
   });
 });
 
-describe('useVoice — disconnect + mute', () => {
+describe('useVoice - disconnect + mute', () => {
   it('disconnect tears down the room and resets state', async () => {
     socketHolder.socket.emit.mockImplementationOnce((event, payload, cb) => {
       cb({ success: true, token: 'lk-token-xyz' });
@@ -282,14 +282,14 @@ describe('useVoice — disconnect + mute', () => {
     // getter goes back to "disabled". Calling toggleMute would
     // request enabled=true which the hook caps via read-back. We
     // emulate the silent re-mute by using setMicrophoneEnabled
-    // directly through toggleMute one more time — covered by the
+    // directly through toggleMute one more time - covered by the
     // above sibling test. The contract that matters here: read-back
     // is the source of truth, not the requested state.
   });
 });
 
 // ─── Auto-join (issue #49) ──────────────────────────────────────
-describe('useVoice — auto-join', () => {
+describe('useVoice - auto-join', () => {
   it('does NOT auto-connect when autoJoin is omitted (default)', async () => {
     const { result } = renderHook(() =>
       useVoice({ roomCode: 'ROOM01', isAuthenticated: true }),
@@ -377,7 +377,7 @@ describe('useVoice — auto-join', () => {
 });
 
 // ─── Manual leave after auto-join (issue #78) ──────────────────
-describe('useVoice — manual leave with autoJoin', () => {
+describe('useVoice - manual leave with autoJoin', () => {
   it('does NOT silently reconnect after the user manually leaves voice', async () => {
     // Auto-join completes.
     socketHolder.socket.emit.mockImplementationOnce((event, payload, cb) => {
@@ -402,7 +402,7 @@ describe('useVoice — manual leave with autoJoin', () => {
     });
     expect(result.current.status).toBe('idle');
 
-    // Flush any deferred effects — the auto-join effect re-runs on
+    // Flush any deferred effects - the auto-join effect re-runs on
     // status changing back to 'idle'. Before the fix it would call
     // connect() again here, triggering the throwing emit above.
     await act(async () => {});
@@ -427,7 +427,7 @@ describe('useVoice — manual leave with autoJoin', () => {
     });
     expect(result.current.status).toBe('idle');
 
-    // Explicit Join Voice click — should reconnect and clear the opt-out.
+    // Explicit Join Voice click - should reconnect and clear the opt-out.
     socketHolder.socket.emit.mockImplementationOnce((event, payload, cb) => {
       cb({ success: true, token: 'lk-rejoin' });
     });

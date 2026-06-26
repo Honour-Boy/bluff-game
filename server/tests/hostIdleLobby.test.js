@@ -1,13 +1,13 @@
 // ============================================================
 // Tests for the lobby host-idle timeout (issue #50).
 //
-// classifyLobbyIdle is a pure decision function — given a clock
+// classifyLobbyIdle is a pure decision function - given a clock
 // reading, the last-activity timestamp, whether a warning has
 // already fired, and the alive player count, it returns one of:
-//   'idle'       — within thresholds, do nothing
-//   'warn'       — emit lobby_idle_warning and stamp warnedAt
-//   'auto_start' — call engine.startGame
-//   'dismiss'    — emit game_ended + tear down room
+//   'idle'       - within thresholds, do nothing
+//   'warn'       - emit lobby_idle_warning and stamp warnedAt
+//   'auto_start' - call engine.startGame
+//   'dismiss'    - emit game_ended + tear down room
 // Sweep plumbing (intervals, broadcasts) is exercised by the
 // integration / staging environment; the unit tests here lock the
 // decision rules so future tweaks (warn at 3 min, act at 7 min,
@@ -17,7 +17,7 @@
 import { describe, it, expect, vi } from 'vitest';
 
 // socketHandlers calls createClient(SUPABASE_URL, ...) at module load.
-// We don't exercise Supabase here — we only test pure decision logic —
+// We don't exercise Supabase here - we only test pure decision logic -
 // but the import must succeed. Hoist env vars + a minimal stub so
 // the module loads in test isolation.
 vi.hoisted(() => {
@@ -41,7 +41,7 @@ const {
 const FOUR_MIN = 4 * 60 * 1000;
 const FIVE_MIN = 5 * 60 * 1000;
 
-describe('classifyLobbyIdle — thresholds', () => {
+describe('classifyLobbyIdle - thresholds', () => {
   it('exports the documented constants', () => {
     expect(HOST_IDLE_WARNING_MS).toBe(FOUR_MIN);
     expect(HOST_IDLE_ACTION_MS).toBe(FIVE_MIN);
@@ -66,7 +66,7 @@ describe('classifyLobbyIdle — thresholds', () => {
   });
 });
 
-describe('classifyLobbyIdle — action at 5 min', () => {
+describe('classifyLobbyIdle - action at 5 min', () => {
   it("returns 'auto_start' when 2+ alive and idle ≥ 5 min", () => {
     const now = 1_000_000;
     const last = now - FIVE_MIN;
@@ -95,7 +95,7 @@ describe('classifyLobbyIdle — action at 5 min', () => {
   });
 });
 
-describe('classifyLobbyIdle — overrideable thresholds', () => {
+describe('classifyLobbyIdle - overrideable thresholds', () => {
   it('respects custom warning/action durations', () => {
     const now = 1_000_000;
     const last = now - 30_000; // 30s idle

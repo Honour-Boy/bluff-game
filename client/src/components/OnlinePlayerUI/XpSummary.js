@@ -1,4 +1,4 @@
-// ─── XpSummary — the end-of-game XP strip (#205, #307) ────────────────────────
+// ─── XpSummary - the end-of-game XP strip (#205, #307) ────────────────────────
 // Rendered under the victory declaration at game_over when the server sent
 // this client a private `xp_awarded` payload. Shows the gain, an animated
 // level-progress bar, level-up + tier-promotion banners, any newly-unlocked
@@ -130,7 +130,7 @@ export function XpSummary({ xpAward, isMobile = false }) {
               letterSpacing: '0.1em',
               color: 'var(--accent)',
             }}>
-              Unlocked: {unlocked.map((u) => u.label).join(', ')} — see Cosmetics in the settings menu
+              Unlocked: {unlocked.map((u) => u.label).join(', ')} - see Cosmetics in the settings menu
             </div>
           )}
         </>

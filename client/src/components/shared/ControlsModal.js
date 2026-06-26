@@ -1,6 +1,6 @@
 'use client';
 
-// ─── ControlsModal — a small centred dialog for things launched from the
+// ─── ControlsModal - a small centred dialog for things launched from the
 // in-game Controls menu (game settings, leaderboard). Backdrop click + the
 // close button dismiss it; the body scrolls when content is tall so it never
 // pushes the table layout around.

@@ -1,5 +1,5 @@
 // ============================================================
-// HANDLERS — Game lifecycle (start/next/end) + card play
+// HANDLERS - Game lifecycle (start/next/end) + card play
 // ============================================================
 // Covers: start_game, next_turn, round_win, end_turn, play_card,
 // play_card_online, activate_power_card, spectate_player,
@@ -42,7 +42,7 @@ async function emitRoleReveals(io, room) {
   }
 }
 
-// Covenant — privately prompt the Pact Selector with the list of alive players
+// Covenant - privately prompt the Pact Selector with the list of alive players
 // they may bond with (everyone but themselves). Fired alongside the role reveals.
 async function emitPactSelectorPrompt(io, room) {
   const selector = room.players.find(p => p.id === room.pactSelectorId);
@@ -61,7 +61,7 @@ async function finalizePreGameAndBroadcast(io, code) {
   if (!room || room.phase !== 'pre_game') return;
   const result = engine.finalizePreGame(room);
   if (!result.ok) return;
-  // Covenant — grant the Pact Selector their reserved power card now that every
+  // Covenant - grant the Pact Selector their reserved power card now that every
   // other player's pre-game pick has been applied (no-op outside Covenant rooms).
   engine.grantPactSelectorCard(room);
   await saveRoom(room);
@@ -78,7 +78,7 @@ function schedulePreGameFinalize(io, code) {
   pregameTimers.set(code, handle);
 }
 
-// #2 — when the pre-game selection is skipped (0–1 powers enabled) there is no
+// #2 - when the pre-game selection is skipped (0–1 powers enabled) there is no
 // picker to open. Still honour the role-reveal display window, then finalize
 // straight into play. Mirrors the timing of schedulePreGameSelectionOpen but
 // without ever opening selection.
@@ -117,7 +117,7 @@ function schedulePreGameSelectionOpen(io, code) {
 function register(io, socket, deps) {
   const { groupSettingsRepo, leaderboardRepo, groupsRepo } = deps;
 
-  // Phase 6 (G5) — a persistent group whose OWNER has been promoted above the
+  // Phase 6 (G5) - a persistent group whose OWNER has been promoted above the
   // group's bound tier is in a mismatch state that blocks new games until the
   // owner re-tiers or hands over. Checked at start time (lazily) for group
   // rooms only; ad-hoc rooms and a matching owner pass straight through.
@@ -143,7 +143,7 @@ function register(io, socket, deps) {
     try {
       const room = await getRoom(roomCode);
       if (!room) return callback({ success: false, error: 'Room not found' });
-      // Tutorial bypass — the bot "hosts" a practice room (hostSocketId is null),
+      // Tutorial bypass - the bot "hosts" a practice room (hostSocketId is null),
       // so the host check would block the lone human. Let the seated human start
       // their own practice game; everything else still requires the real host.
       const isTutorialStarter = room.isTutorial
@@ -153,7 +153,7 @@ function register(io, socket, deps) {
         return callback({ success: false, error: 'Not the host' });
       }
 
-      // Phase 6 (G5) — block new games while the group owner is tier-mismatched.
+      // Phase 6 (G5) - block new games while the group owner is tier-mismatched.
       const mismatch = await groupOwnerTierMismatch(room);
       if (mismatch) {
         return callback({
@@ -163,7 +163,7 @@ function register(io, socket, deps) {
         });
       }
 
-      // v2 Phase E2 — Mirror Match auto-disable when alive count is odd.
+      // v2 Phase E2 - Mirror Match auto-disable when alive count is odd.
       let mirrorMatchAutoDisabled = false;
       if (
         room.mode === engine.MODES.ONLINE
@@ -174,7 +174,7 @@ function register(io, socket, deps) {
         mirrorMatchAutoDisabled = true;
       }
 
-      // Roulette Rotation needs 3+ players — with 2 the only repeat-free order
+      // Roulette Rotation needs 3+ players - with 2 the only repeat-free order
       // is plain alternation, so the modifier would be a no-op. Auto-disable it.
       let rouletteRotationAutoDisabled = false;
       if (
@@ -186,7 +186,7 @@ function register(io, socket, deps) {
         rouletteRotationAutoDisabled = true;
       }
 
-      // Last Stand (the final-two duel) only makes sense with a real field —
+      // Last Stand (the final-two duel) only makes sense with a real field -
       // disable it at 4 alive or fewer. Matches the lobby UI, which hides the
       // toggle under the same rule.
       let lastStandAutoDisabled = false;
@@ -202,7 +202,7 @@ function register(io, socket, deps) {
       delete room.groupLeaderboardWinnerRecorded;
       engine.startGame(room);
 
-      // #116 — online games run a pre_game phase (private role reveal
+      // #116 - online games run a pre_game phase (private role reveal
       // then per-player bonus-card selection) before play. startGame
       // has already dealt + assigned roles; beginPreGame just flips the
       // phase to 'pre_game' and builds the selection pools. Physical
@@ -211,7 +211,7 @@ function register(io, socket, deps) {
       // roles and powers are off, so the role-reveal + selection window would
       // just stall the learner on a "you are Barehand" card. Deal straight in.
       const runsPreGame = room.mode === engine.MODES.ONLINE && !room.isTutorial;
-      // Covenant — The Pact. Designate the secret Selector + a default Target
+      // Covenant - The Pact. Designate the secret Selector + a default Target
       // AFTER the deal/roles (startGame) but BEFORE beginPreGame builds the pools,
       // so the Selector's pool can be emptied (they forgo the normal pick for a
       // reserved power card granted at finalize).
@@ -283,12 +283,12 @@ function register(io, socket, deps) {
       // open selection once the reveal display window elapses.
       if (runsPreGame) {
         await emitRoleReveals(io, room);
-        // Covenant — privately prompt the Pact Selector to choose their partner
+        // Covenant - privately prompt the Pact Selector to choose their partner
         // (a sensible random default is already set; this lets them override it).
         if (isCovenant && room.pactSelectorId) {
           await emitPactSelectorPrompt(io, room);
         }
-        // #2 — skip the "Claim your edge" picker when fewer than 2 power types
+        // #2 - skip the "Claim your edge" picker when fewer than 2 power types
         // are enabled; otherwise open it after the role-reveal window.
         if (room.pregameSelectionSkipped) {
           schedulePreGameSkipFinalize(io, roomCode);
@@ -404,7 +404,7 @@ function register(io, socket, deps) {
       room.tourSpinAcked = false;
       // Basics teaches the core loop WITHOUT powers. The tour turned powers ON to
       // demo Peek (config is preserved across the reset), so turn them back OFF
-      // before dealing — otherwise a power card bleeds into the Basics hand the
+      // before dealing - otherwise a power card bleeds into the Basics hand the
       // learner hasn't been taught yet.
       if (room.config?.powerCards) {
         room.config.powerCards.enabled = {
@@ -440,11 +440,11 @@ function register(io, socket, deps) {
       });
       await broadcastRoomState(io, code);
 
-      // §2.1 Rule 1 — the 15s selection window ALWAYS runs to completion. We no
+      // §2.1 Rule 1 - the 15s selection window ALWAYS runs to completion. We no
       // longer finalise the instant the last player confirms (that "snap
       // forward" denied late pickers their review time and felt abrupt); the
       // schedulePreGameFinalize timer is the single resolve path.
-      // §2.1 Rule 2 — a late confirmation (at/after the 12s mark) earns the
+      // §2.1 Rule 2 - a late confirmation (at/after the 12s mark) earns the
       // picker a private review buffer; flag it + the duration back to them.
       callback?.({
         success: true,
@@ -538,7 +538,7 @@ function register(io, socket, deps) {
 
       // Power Clinic: refuse an off-script card play (e.g. playing a card during
       // the "Call Bluff" drill, which would strand the lesson). Inert outside the
-      // clinic — no effect on normal online play.
+      // clinic - no effect on normal online play.
       const clinicBlock = clinicActionBlock(room, 'play_card');
       if (clinicBlock) return callback({ success: false, error: clinicBlock.reason, tutorialLocked: true });
 
@@ -552,7 +552,7 @@ function register(io, socket, deps) {
       const result = engine.validateAndPlayCard(room, playerId, cardId);
       if (!result.ok) return callback({ success: false, error: result.error });
 
-      // #205 — only this INTERACTIVE path counts toward participation XP; idle
+      // #205 - only this INTERACTIVE path counts toward participation XP; idle
       // auto-plays (lib/idleTurn.js) and bot plays deliberately don't.
       engine.trackCardPlayed(room, playerId);
 
@@ -624,7 +624,7 @@ function register(io, socket, deps) {
       // Power Clinic: enforce the drill's scripted action (e.g. Call Bluff in the
       // bot-Shield demo, arm the power in Freeze/Assassin) before the turn can
       // end, so a learner can't skip a drill by ending early. Inert outside the
-      // clinic — no effect on normal gameplay.
+      // clinic - no effect on normal gameplay.
       const clinicBlock = clinicEndTurnBlock(room);
       if (clinicBlock) return callback({ success: false, error: clinicBlock.reason, tutorialLocked: true });
       if (!room.cardPlayedThisTurn) return callback({ success: false, error: 'Play a card first' });
@@ -647,7 +647,7 @@ function register(io, socket, deps) {
         }
       }
 
-      // v2 Phase C — Freeze trigger BEFORE advanceTurn.
+      // v2 Phase C - Freeze trigger BEFORE advanceTurn.
       let freezeTrigger = null;
       if (room.mode === engine.MODES.ONLINE) {
         freezeTrigger = engine.consumeFreezeOnTurnEnd(room, playerId);
@@ -656,11 +656,11 @@ function register(io, socket, deps) {
       room.cardPlayedThisTurn = false;
       room.bluffUsedThisTurn = false;
       engine.advanceTurn(room);
-      // §5 — turn ended: the ledger is cleared and the next player's window
+      // §5 - turn ended: the ledger is cleared and the next player's window
       // opens. advanceTurn also resets powerActivatedThisTurn.
       logTurnState(code, room.turnOrder[room.currentTurnIndex], 'turn_advanced', room, { endedBy: playerId });
 
-      // v2 Phase E2 — Sudden Death tick.
+      // v2 Phase E2 - Sudden Death tick.
       const suddenDeathBanner = engine.tickSuddenDeath(room);
 
       const gameOverWinner = engine.checkGameOver(room);
@@ -687,7 +687,7 @@ function register(io, socket, deps) {
     }
   });
 
-  // ─── Spectate a player's hand (REMOVED — §3.2 anti-cheat lockout) ────────
+  // ─── Spectate a player's hand (REMOVED - §3.2 anti-cheat lockout) ────────
   // Eliminated / dead players may no longer view any living opponent's hand.
   // The event is kept as an inert stub so older clients don't error: it never
   // stores a spectate target and always returns an empty hand. The hand is also
@@ -702,7 +702,7 @@ function register(io, socket, deps) {
     const code = roomCode?.toUpperCase();
     if (!code) return;
 
-    // The ack arrived in time — cancel the pendingGameOver safety net (Issue 2).
+    // The ack arrived in time - cancel the pendingGameOver safety net (Issue 2).
     _clearGameOverTimer(code);
 
     const room = await getRoom(code);
@@ -715,20 +715,20 @@ function register(io, socket, deps) {
     if (room?.pendingMirrorMatchSpin) {
       const pending = room.pendingMirrorMatchSpin;
       delete room.pendingMirrorMatchSpin;
-      // #241 — emit the dismiss for the PRIMARY spin's overlay BEFORE broadcasting
+      // #241 - emit the dismiss for the PRIMARY spin's overlay BEFORE broadcasting
       // the mirror spin. Socket.IO preserves per-connection order, so clients see
       // spin_acknowledged (clears the just-finished overlay) and then the mirror
       // spin_result (which resets spinDismissed=false and starts a FRESH overlay).
       // The previous order broadcast the mirror result first, so the trailing
       // spin_acknowledged left spinDismissed=true and the mirror overlay was torn
-      // down the instant its cylinder stopped — the spin appeared to play for only
+      // down the instant its cylinder stopped - the spin appeared to play for only
       // the first player. Now BOTH the liable player and their mirror visibly spin.
       io.to(code).emit('spin_acknowledged');
       await runMirrorMatchSpin(io, room, pending, leaderboardRepo);
       return;
     }
 
-    // Covenant — Blood Debt. The caller carried a debt, so an extra "debt spin"
+    // Covenant - Blood Debt. The caller carried a debt, so an extra "debt spin"
     // fires on them AFTER the primary resolution (mirrors the Mirror Match queue:
     // resume from the ack so it never interleaves with the primary overlay).
     // Inserted after Mirror Match but before Redemption (roadmap R3).
@@ -744,12 +744,12 @@ function register(io, socket, deps) {
         await applySpinAndBroadcast(io, code, room, debtor, leaderboardRepo, { spinReason: 'blood_debt' });
         return;
       }
-      // R3 — the debtor died on the primary spin; cancel the debt spin silently
+      // R3 - the debtor died on the primary spin; cancel the debt spin silently
       // and continue the normal ack flow.
       await saveRoom(room);
     }
 
-    // Redemption Spin (Phase E1) — the eliminating spin's overlay has been
+    // Redemption Spin (Phase E1) - the eliminating spin's overlay has been
     // dismissed; now open the redemption_pending offer to the eliminated player.
     if (room?.pendingRedemption) {
       await beginRedemption(io, room, leaderboardRepo);
@@ -770,7 +770,7 @@ function register(io, socket, deps) {
     }
   });
 
-  // ─── Covenant — Blood Debt target pick ───────────────────
+  // ─── Covenant - Blood Debt target pick ───────────────────
   // The just-eliminated player (from a correct-bluff spin in a Covenant room)
   // names which alive player carries their blood debt, inside the 10s window.
   // On expiry with no pick the server defaults to the bluff caller (see

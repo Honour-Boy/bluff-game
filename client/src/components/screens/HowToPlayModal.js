@@ -13,7 +13,7 @@ const TIERS = [
   {
     tier: "streets",
     levels: "Levels 1–2",
-    unlocks: "The core game — play cards, call bluffs, spin the chamber.",
+    unlocks: "The core game - play cards, call bluffs, spin the chamber.",
     cosmetics: "Steel · Classic Leather · Emerald (the base set).",
   },
   {
@@ -31,7 +31,7 @@ const TIERS = [
   {
     tier: "covenant",
     levels: "Levels 14–20",
-    unlocks: "The Pact and Blood Debt — always on in a Covenant room.",
+    unlocks: "The Pact and Blood Debt - always on in a Covenant room.",
     cosmetics: "The Kente + Cosmos sets.",
   },
 ];
@@ -44,12 +44,12 @@ const XP_SOURCES = [
   ["Players eliminated", "Send someone to the spin that ends them."],
   ["Power cards resolved", "Land a power card's effect (Backroads+)."],
   ["Last Stand win", "Take the final duel (Syndicate+)."],
-  ["Participation", "Play at least one card — no AFK farming."],
+  ["Participation", "Play at least one card - no AFK farming."],
 ];
 
 // ─── HowToPlayModal ───────────────────────────────────────────
 // Reference for the full v2 ruleset. Collapsible accordion so the
-// content fits on a phone — every section is closed by default
+// content fits on a phone - every section is closed by default
 // except the one we open from `initialTab`.
 //
 // Props
@@ -490,7 +490,7 @@ function ProgressionContent() {
       >
         Finishing online games earns XP. XP raises your <strong style={{ color: "var(--text)" }}>Level</strong> (1–20),
         and levels group into four <strong style={{ color: "var(--text)" }}>Tiers</strong>. Your tier sets which
-        mechanics a room you host can switch on — and unlocks a matching cosmetic set.
+        mechanics a room you host can switch on - and unlocks a matching cosmetic set.
       </div>
 
       {TIERS.map((t) => (
@@ -558,7 +558,7 @@ function ProgressionContent() {
           </div>
         ))}
         <div style={{ fontSize: 11, color: "var(--text-dim)", fontStyle: "italic", lineHeight: 1.6, marginTop: 2 }}>
-          Higher tiers pay more XP per event — and unlock event types lower tiers can't earn from.
+          Higher tiers pay more XP per event - and unlock event types lower tiers can't earn from.
         </div>
       </div>
     </div>
@@ -632,7 +632,7 @@ function JumpTab({ label, active, onClick }) {
   );
 }
 
-// ─── Modal — paged wizard ─────────────────────────────────────
+// ─── Modal - paged wizard ─────────────────────────────────────
 // One section per page with Back / Next at the foot (Basics → Rank &
 // Progression → Power Cards → …). A quick-nav pill strip lets you jump, and
 // ←/→ page through; Esc closes. `initialTab` picks the opening page:
@@ -787,7 +787,7 @@ export function HowToPlayModal({ onClose, initialTab = "physical" }) {
           </div>
         </div>
 
-        {/* Section content — the only scrolling region, so the nav stays put.
+        {/* Section content - the only scrolling region, so the nav stays put.
             Keyed on the section so each page fades in fresh. */}
         <div
           key={key}
@@ -797,7 +797,7 @@ export function HowToPlayModal({ onClose, initialTab = "physical" }) {
           <Render />
         </div>
 
-        {/* Footer nav — Back / Next (last page closes). */}
+        {/* Footer nav - Back / Next (last page closes). */}
         <div style={{ display: "flex", gap: 10, marginTop: 16, flexShrink: 0 }}>
           <button
             type="button"

@@ -1,13 +1,13 @@
 import { useEffect, useMemo, useState } from 'react';
 
-// Covenant — Blood Debt. The just-eliminated player (killed by a correct bluff
+// Covenant - Blood Debt. The just-eliminated player (killed by a correct bluff
 // call's spin) names which alive player carries their debt: the next time that
 // player calls a bluff, an extra "debt spin" fires on them. Rendered from the
 // private `blood_debt_assign` event (held in `bloodDebtPrompt`). A 10s deadline
 // drives the countdown; on expiry or pick the overlay clears itself. The server
 // defaults the debt to the bluff caller if the window lapses.
 //
-// Gated by the caller to Covenant rooms — no Blood Debt UI elsewhere.
+// Gated by the caller to Covenant rooms - no Blood Debt UI elsewhere.
 export function BloodDebtOverlay({ prompt, onPick, onDismiss }) {
   const deadline = prompt?.deadline || null;
   const [secondsLeft, setSecondsLeft] = useState(() =>
@@ -73,7 +73,7 @@ export function BloodDebtOverlay({ prompt, onPick, onDismiss }) {
           ⛧ BLOOD DEBT
         </div>
         <div style={{ fontSize: 12, color: 'var(--text-dim)', marginBottom: 16, lineHeight: 1.55 }}>
-          They put you in the ground. Choose who carries your debt — when they
+          They put you in the ground. Choose who carries your debt - when they
           next call a bluff, the chamber turns for them too.
         </div>
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(110px, 1fr))', gap: 8, marginBottom: 14 }}>
@@ -100,7 +100,7 @@ export function BloodDebtOverlay({ prompt, onPick, onDismiss }) {
         </div>
         <div style={{ fontSize: 11, color: 'var(--text-dim)' }}>
           {secondsLeft > 0
-            ? `${secondsLeft}s — or the debt falls to the one who pulled the trigger.`
+            ? `${secondsLeft}s - or the debt falls to the one who pulled the trigger.`
             : 'The debt is sealed…'}
         </div>
       </div>

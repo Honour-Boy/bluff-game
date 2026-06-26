@@ -1,6 +1,6 @@
 'use client';
 
-// ─── ChatPanel — floating button + slide-in panel ─────────────
+// ─── ChatPanel - floating button + slide-in panel ─────────────
 //
 // Mobile-first. iOS safe-area aware. 16px font on inputs to prevent
 // iOS auto-zoom on focus. 44×44 minimum touch targets.
@@ -17,7 +17,7 @@ import { CloseIcon } from './shared/CloseIcon';
 const TEXT_MAX = 500;
 const GROUP_WINDOW_MS = 60_000;
 
-// "12:34" — small, dim timestamp shown above first message in a run
+// "12:34" - small, dim timestamp shown above first message in a run
 function formatTime(ts) {
   try {
     return new Date(ts).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
@@ -45,7 +45,7 @@ export function ChatPanel({
   onClose,
   onSend,
   myUserId,
-  // Issue #102 — on mobile the chat trigger lives inside the
+  // Issue #102 - on mobile the chat trigger lives inside the
   // MobileFabMenu sheet, so the floating 💬 button is suppressed.
   // The slide-in panel itself still mounts when `open` is true.
   hideTrigger = false,

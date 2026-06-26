@@ -1,14 +1,14 @@
 import { motion } from 'framer-motion';
 import { CenterTablePanel } from './CenterTablePanel';
 
-// ─── TableScene — a medium, fixed-size card table on a pannable canvas ────────
-// (Module 1) The whole board — the fixed oval felt, the dealer's tray, and the
-// seated players — is ONE unit inside a Framer Motion <motion.div drag> plane.
+// ─── TableScene - a medium, fixed-size card table on a pannable canvas ────────
+// (Module 1) The whole board - the fixed oval felt, the dealer's tray, and the
+// seated players - is ONE unit inside a Framer Motion <motion.div drag> plane.
 // The plane is flex-centred in the viewport, so when the board fits it sits
 // dead-centre and can't drift; when more players are seated than fit, the board
 // grows past the viewport and you drag it in ANY direction to bring far seats
 // into view (elastic + dampened so it can't be flung off-screen). The oval
-// itself stays a fixed "medium" size — only the ring of seats around it grows.
+// itself stays a fixed "medium" size - only the ring of seats around it grows.
 //
 // Seat placement is responsive (chosen in index.js): desktop spreads seats
 // top / left / right around the table (distributePlayers); mobile fans them all
@@ -170,7 +170,7 @@ export function TableScene({
               // Reserve a box at least as large as the absolutely-positioned felt
               // (same clamp as the oval below) so the felt is fully CONTAINED and
               // never bleeds sideways/up into the seat columns or top band. The
-              // seats then sit clearly OUTSIDE the rail on desktop — no longer
+              // seats then sit clearly OUTSIDE the rail on desktop - no longer
               // tucked under the table (lobby + in-game, all large screens).
               boxSizing: 'border-box',
               minWidth: 'clamp(360px, 70vmin, 600px)',

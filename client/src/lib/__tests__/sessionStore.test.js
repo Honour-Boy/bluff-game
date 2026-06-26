@@ -9,7 +9,7 @@ beforeEach(() => {
   localStorage.clear();
 });
 
-describe('sessionStore — primary + recovery layering (#M4)', () => {
+describe('sessionStore - primary + recovery layering (#M4)', () => {
   it('saveRoomSession writes both the primary and recovery stores', () => {
     saveRoomSession({ roomCode: 'ABC123', isHost: true, playerId: 'p1' });
 

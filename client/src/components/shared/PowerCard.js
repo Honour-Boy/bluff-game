@@ -1,7 +1,7 @@
 "use client";
 
 // ─── PowerCard ────────────────────────────────────────────────
-// Visual identity for v2 power cards. Pure presentational — no
+// Visual identity for v2 power cards. Pure presentational - no
 // state, no triggers, no game wiring. The Phase B agent will plumb
 // activation logic on top of this.
 //
@@ -64,7 +64,7 @@ export const POWER_ICONS = {
     </g>
   ),
 
-  // Hand mirror — circle on a stem with reflective highlight
+  // Hand mirror - circle on a stem with reflective highlight
   mirror: (c) => (
     <g fill="none" stroke={c} strokeWidth="6" strokeLinejoin="round" strokeLinecap="round">
       <circle cx="50" cy="38" r="26" fill={`${c}22`} />
@@ -140,7 +140,7 @@ export function PowerCard({ type, size = "md", style }) {
         width: s.w,
         height: s.h,
         position: "relative",
-        // #205 — wears the equipped deck skin when a frame skin sets
+        // #205 - wears the equipped deck skin when a frame skin sets
         // --cardface-bg (in-game contexts); the near-black gradient is the
         // default look everywhere else (landing, how-to-play, pickers).
         background:
@@ -230,7 +230,7 @@ export function PowerCard({ type, size = "md", style }) {
             textTransform: "uppercase",
             textAlign: "center",
             lineHeight: 1,
-            // Dark drop under the glow — legible over bright skin fields.
+            // Dark drop under the glow - legible over bright skin fields.
             textShadow: `0 0 8px ${meta.color}aa, 0 1px 2px rgba(0,0,0,0.85)`,
           }}
         >

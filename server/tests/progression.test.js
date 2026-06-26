@@ -1,5 +1,5 @@
 // ============================================================
-// #205 — Meta-progression engine: levels, cosmetics, XP formula
+// #205 - Meta-progression engine: levels, cosmetics, XP formula
 // ============================================================
 
 import { describe, expect, it } from 'vitest';
@@ -122,7 +122,7 @@ describe('cosmetics catalog + equip validation', () => {
     const out = validateEquipped(
       {
         tableFelt: 'felt_noir',     // unlocked at Backroads (level 3)
-        cardBack: 'back_kente',     // needs Covenant (level 14) — locked
+        cardBack: 'back_kente',     // needs Covenant (level 14) - locked
         gunSkin: 'felt_kente',      // wrong slot
       },
       350, // level 3 (Backroads)
@@ -137,7 +137,7 @@ describe('cosmetics catalog + equip validation', () => {
     const owner = room.players.find(p => p.id === 'owner');
     owner.cosmetics = { gunSkin: 'gun_cosmos', cardBack: 'back_noir', tableFelt: 'felt_kente' };
 
-    // Cosmetics are public — the whole point is the table seeing your look.
+    // Cosmetics are public - the whole point is the table seeing your look.
     const forViewer = serializeRoom(room, 'viewer');
     expect(forViewer.players.find(p => p.id === 'owner').cosmetics).toEqual(owner.cosmetics);
     const forOwner = serializeRoom(room, 'owner');

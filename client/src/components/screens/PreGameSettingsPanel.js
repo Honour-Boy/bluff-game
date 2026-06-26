@@ -1,13 +1,13 @@
 'use client';
 
 // ============================================================
-// PreGameSettingsPanel — host-only v2 toggles, collected before
-// `create_room` is sent. Pure data collection — nothing reads
+// PreGameSettingsPanel - host-only v2 toggles, collected before
+// `create_room` is sent. Pure data collection - nothing reads
 // these values yet (Phase A2 is pure plumbing per the v2 roadmap).
 //
 // Default config is exported so server + tests can share the
 // canonical shape. All toggles default OFF; copiesPerDeck = 1.
-// secretRoles is intentionally absent — that activates
+// secretRoles is intentionally absent - that activates
 // automatically when alive count >= 3 and is not host-toggleable.
 // ============================================================
 
@@ -220,11 +220,11 @@ function setAllInGroup(items, value) {
 // reflect that in the lobby so the host never picks something that won't
 // apply. `mode: 'disable'` greys the toggle with a reason but keeps it
 // visible; `mode: 'hide'` removes the row entirely.
-//   • Roulette Rotation — needs 3+ (with 2 the only repeat-free order is
+//   • Roulette Rotation - needs 3+ (with 2 the only repeat-free order is
 //     plain alternation, so it's a no-op). Shown-but-disabled below 3.
-//   • Mirror Match — spins land on the opposite seat, so it needs an even
+//   • Mirror Match - spins land on the opposite seat, so it needs an even
 //     table of 4+. Hidden otherwise.
-//   • Last Stand — the final-two duel only makes sense with a real field,
+//   • Last Stand - the final-two duel only makes sense with a real field,
 //     so it's hidden at 4 players or fewer.
 // `playerCount == null` means "caller didn't supply a count" → no gating.
 function gatingFor(playerCount) {
@@ -247,7 +247,7 @@ function gatingFor(playerCount) {
 // Mirrors the server's `applyTierCapsToConfig`: a host can only enable the
 // mechanics their progression tier has unlocked. The client gate is purely
 // informational (the server forces disallowed flags off at create_room anyway)
-// — it greys the row and tells the host which tier unlocks it. Keyed by toggle
+// - it greys the row and tells the host which tier unlocks it. Keyed by toggle
 // key (unique across all four sections). When `tier` is null (e.g. the standalone
 // tests, or an in-flight room without a tier), no tier gating is applied.
 const ALL_POWER_KEYS = ['shield', 'mirror', 'swap', 'peek', 'freeze', 'assassin'];
@@ -375,7 +375,7 @@ export function PreGameSettingsPanel({ config, onChange, isGroupRoom = false, sa
     onChange({ ...config, systems: { ...config.systems, [key]: value } });
   };
 
-  // ─── #66 — Select All / Deselect All helpers ─────────────
+  // ─── #66 - Select All / Deselect All helpers ─────────────
   const setAllPowerCards = (value) => {
     onChange({
       ...config,
@@ -470,7 +470,7 @@ export function PreGameSettingsPanel({ config, onChange, isGroupRoom = false, sa
           maxHeight: '60vh',
           overflowY: 'auto',
         }}>
-          {/* (Module 5) Sandbox intro note — only power cards are configurable today. */}
+          {/* (Module 5) Sandbox intro note - only power cards are configurable today. */}
           {sandbox && (
             <div style={{
               fontSize: 10, color: 'var(--text-dim)', lineHeight: 1.6,
@@ -481,7 +481,7 @@ export function PreGameSettingsPanel({ config, onChange, isGroupRoom = false, sa
             </div>
           )}
 
-          {/* Global Enable/Disable bar (hidden in sandbox — only powers apply). */}
+          {/* Global Enable/Disable bar (hidden in sandbox - only powers apply). */}
           {!sandbox && (
           <div style={{
             display: 'flex',
@@ -606,7 +606,7 @@ export function PreGameSettingsPanel({ config, onChange, isGroupRoom = false, sa
             )}
           </Section>
 
-          {/* Covenant rooms get the two exclusive mechanics for free — they
+          {/* Covenant rooms get the two exclusive mechanics for free - they
               ride room.tier and aren't host-toggleable (#308). */}
           {tier === 'covenant' && (
             <div style={{
@@ -620,7 +620,7 @@ export function PreGameSettingsPanel({ config, onChange, isGroupRoom = false, sa
               borderRadius: 'var(--radius)',
               boxShadow: '0 0 10px var(--glow-gold)',
             }}>
-              THE PACT &amp; BLOOD DEBT are always active in Covenant rooms — no toggle needed.
+              THE PACT &amp; BLOOD DEBT are always active in Covenant rooms - no toggle needed.
             </div>
           )}
           {isGroupRoom && (

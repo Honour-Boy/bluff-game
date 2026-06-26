@@ -30,7 +30,7 @@ import { LoadingSplash } from '../components/shared/LoadingScreen';
 import { useIsMobile } from '../hooks/useIsMobile';
 import { shouldShowIntro, markIntroSeen, rearmIntro } from '../lib/intro';
 
-// §M4 — non-blocking "reconnecting" pill shown while the socket is down but the
+// §M4 - non-blocking "reconnecting" pill shown while the socket is down but the
 // player is still in a room. Sits top-centre, above the table; the resilient
 // rejoin in useGame restores state automatically once the transport recovers.
 function ReconnectingBanner() {
@@ -86,7 +86,7 @@ function HomeContent() {
   // Phases: 'video' → 'loading' → null (app shows). The video plays in
   // full, then a branded 3s progress bar masks the auth/socket bootstrap.
   const [introPhase, setIntroPhase] = useState(null); // null | 'video' | 'loading'
-  // #274 — the background music must NOT start until the intro splash (video →
+  // #274 - the background music must NOT start until the intro splash (video →
   // 3s loading beat) has fully finished, or the lobby track bleeds over the
   // intro's own audio. Stays false while an intro is showing; flips true the
   // moment there's no intro to play, or once the loading beat completes.
@@ -96,7 +96,7 @@ function HomeContent() {
     if (introCheckedRef.current) return;
     introCheckedRef.current = true;
     if (shouldShowIntro()) setIntroPhase('video');
-    else setIntroResolved(true); // no intro this open — music may start now
+    else setIntroResolved(true); // no intro this open - music may start now
   }, []);
   // Mark "seen" when the video ends (so a reload during the loading beat
   // doesn't replay it), then hand off to the 5s loading screen.
@@ -106,7 +106,7 @@ function HomeContent() {
   }, []);
   const finishIntroLoading = useCallback(() => {
     setIntroPhase(null);
-    setIntroResolved(true); // intro fully done — landing music may fade in now
+    setIntroResolved(true); // intro fully done - landing music may fade in now
   }, []);
   const [groupsLoading, setGroupsLoading] = useState(false);
 
@@ -181,7 +181,7 @@ function HomeContent() {
     ghostVote,
     lastStandSpin,
     lastStandEndTurn,
-    // #205 — meta-progression: XP summary + cosmetics locker actions.
+    // #205 - meta-progression: XP summary + cosmetics locker actions.
     xpAward,
     getProgression,
     setCosmetics,
@@ -191,7 +191,7 @@ function HomeContent() {
     const uid = user?.id ?? null;
     const prev = prevUserIdRef.current;
     prevUserIdRef.current = uid;
-    if (prev === undefined) return; // initial mount — open-check effect owns it
+    if (prev === undefined) return; // initial mount - open-check effect owns it
     if (!prev && uid && shouldShowIntro()) {
       // Replaying the intro (same-tab logout → login): re-gate the music so the
       // lobby track doesn't keep bleeding over the replayed splash (#274).
@@ -206,7 +206,7 @@ function HomeContent() {
   // _setSection arms the mobile autoplay unlock, so no explicit gesture
   // listener is needed here. Muteable from the settings gear.
   const { musicEnabled, musicVolume, toggleMusic, setMusicVolume, setSection, setGameStage, nextTrack, prevTrack } = useMusic();
-  // A group room's lobby belongs to the Groups area — keep it on the GROUPS
+  // A group room's lobby belongs to the Groups area - keep it on the GROUPS
   // track instead of switching to the normal online-lobby sound. It only moves
   // to 'game' once the match actually starts (phase leaves lobby), and to
   // 'gameover' at the end.
@@ -219,7 +219,7 @@ function HomeContent() {
             : (inGroupRoom ? 'groups' : 'lobby'))
     : (homeView === 'groups' || homeView === 'group') ? 'groups' : 'lobby';
   useEffect(() => {
-    // #274 — hold all music until the intro splash has fully resolved. Because
+    // #274 - hold all music until the intro splash has fully resolved. Because
     // _setSection is the sole place that arms the audio unlock + starts the
     // playlist, gating here also stops a Skip-tap gesture from kick-starting the
     // bed mid-intro.
@@ -248,10 +248,10 @@ function HomeContent() {
   // ─── Groups cache (issue #106) ─────────────────────────────
   // In-memory only (sessionStorage is overkill for socket payloads
   // and they shouldn't survive tab close). Two scopes:
-  //   list.loadedAt    — most recent successful list_my_groups +
+  //   list.loadedAt    - most recent successful list_my_groups +
   //                      list_my_invites pair; rendered state in
   //                      groupsList / groupInvites is the payload.
-  //   detail (Map)     — per-groupId snapshots of get_group plus
+  //   detail (Map)     - per-groupId snapshots of get_group plus
   //                      their loadedAt; lets us re-render the
   //                      detail screen instantly when revisiting
   //                      the same group within the TTL.
@@ -335,7 +335,7 @@ function HomeContent() {
       setSelectedGroup(cached.group);
       setHomeView('group');
       if (age >= GROUPS_SWR_AFTER_MS) {
-        // Background refresh — don't block the screen transition,
+        // Background refresh - don't block the screen transition,
         // just update once the response arrives.
         fetchGroupDetail(groupId);
       }
@@ -351,7 +351,7 @@ function HomeContent() {
     }
   }, [fetchGroupDetail, setError]);
 
-  // #160 — manual in-place reload of the open group detail (members +
+  // #160 - manual in-place reload of the open group detail (members +
   // pending invites). Forces past the cache so the user sees changes other
   // members made without leaving the view.
   const refreshGroupDetail = useCallback(async () => {
@@ -438,7 +438,7 @@ function HomeContent() {
     return res;
   }, [fetchGroupDetail, invalidateGroupsCache, refreshGroupsHome, selectedGroup?.id, handBackHost]);
 
-  // Phase 6 (G5) — owner tier-mismatch resolution.
+  // Phase 6 (G5) - owner tier-mismatch resolution.
   const handleTransferOwnership = useCallback(async (newOwnerUserId) => {
     if (!selectedGroup?.id) return { success: false, error: 'Group not found' };
     const res = await transferOwnership(selectedGroup.id, newOwnerUserId);
@@ -521,7 +521,7 @@ function HomeContent() {
     return res;
   }, [invalidateGroupsCache, leaveGroup, refreshGroupsHome, selectedGroup?.id]);
 
-  // Signing out must also drop us out of any live game first — leaveGame emits
+  // Signing out must also drop us out of any live game first - leaveGame emits
   // leave_room (host-leave/elimination handled server-side) and clears the
   // local session so we can't linger as a ghost player after sign-out.
   const handleSignOut = useCallback(async () => {
@@ -538,13 +538,13 @@ function HomeContent() {
     await signOutGuest();
   }, [leaveGame, signOutSocket, signOutGuest]);
 
-  // Voice — auto-joins muted on room entry (issue #49). Mic stays
+  // Voice - auto-joins muted on room entry (issue #49). Mic stays
   // unpublished until first user-gesture toggle, so first-time visitors
   // don't get a permission prompt before they ask for one. Hook tears
   // down on roomCode change.
   const voice = useVoice({ roomCode, isAuthenticated: authenticated, autoJoin: true });
 
-  // Issue #102 — drives mobile-only consolidation: hide the
+  // Issue #102 - drives mobile-only consolidation: hide the
   // ChatPanel floating trigger so the new MobileFabMenu owns the
   // single entry point on small screens.
   const isMobile = useIsMobile();
@@ -599,7 +599,7 @@ function HomeContent() {
   }
 
   // ─── Auth gate ─────────────────────────────────────────────
-  // useAuth returns a unified `user` — real Supabase user wins,
+  // useAuth returns a unified `user` - real Supabase user wins,
   // guest fills in otherwise. AuthScreen only shows when neither
   // identity is present.
   if (!user) {
@@ -657,16 +657,16 @@ function HomeContent() {
         onSignOut={handleSignOut}
         onSignOutGuest={handleSignOutGuest}
         onUpdateUsername={updateUsername}
-        // #205 — XP + cosmetic locker (hidden for guests inside the gear).
+        // #205 - XP + cosmetic locker (hidden for guests inside the gear).
         getProgression={getProgression}
         setCosmetics={setCosmetics}
-        // ── In-room controls (Module 2) — only inside an online room ──
+        // ── In-room controls (Module 2) - only inside an online room ──
         inRoom={inRoomOnline}
         chatUnread={chatUnread}
         onOpenChat={inRoomOnline ? openChat : undefined}
         onOpenGameSettings={inRoomOnline ? () => setGameSettingsOpen(true) : undefined}
         onOpenLeaderboard={inRoomOnline && roomState?.groupId ? () => setLeaderboardOpen(true) : undefined}
-        // #244 — host-only: opens the Kick Player roster (presence of the
+        // #244 - host-only: opens the Kick Player roster (presence of the
         // callback is what gates the menu item, like the other in-room controls).
         onOpenKickPlayer={inRoomOnline && isHost ? () => setKickOpen(true) : undefined}
         onLeaveTable={inRoomOnline ? handleLeaveTable : undefined}
@@ -688,7 +688,7 @@ function HomeContent() {
               savedMeta={roomState?.groupSettingsMeta}
               playerCount={aliveCount}
               // Phase 5 (#308): tier-gate the toggles to the room's tier
-              // (host's tier at creation). Informational only — the server
+              // (host's tier at creation). Informational only - the server
               // enforces caps at create_room.
               tier={roomState?.tier || null}
               // (Module 5) Sandbox: only power cards are configurable today; the
@@ -734,7 +734,7 @@ function HomeContent() {
           onClose={closeChat}
           onSend={sendChatMessage}
           myUserId={user?.id}
-          // #146 — the consolidated in-game menu (online mode, any screen size)
+          // #146 - the consolidated in-game menu (online mode, any screen size)
           // owns the chat entry point, so suppress ChatPanel's own trigger
           // there. Physical-mode desktop still uses the standalone trigger.
           hideTrigger={isMobile || gameMode === 'online'}

@@ -1,9 +1,9 @@
 // ============================================================
-// useVoice HOOK — LiveKit voice chat for the in-game room
+// useVoice HOOK - LiveKit voice chat for the in-game room
 // ============================================================
 //
 // Always-on voice; default-muted on join (Zoom-style). Caller decides
-// when to connect (opt-in via Join Voice button — first connect
+// when to connect (opt-in via Join Voice button - first connect
 // triggers the browser mic permission prompt).
 //
 // Speaking detection is driven by LiveKit's `isSpeakingChanged` event;
@@ -32,7 +32,7 @@ export function useVoice({ roomCode, isAuthenticated, autoJoin = false }) {
 
   // Tracks whether the user has explicitly clicked Leave Voice this
   // room session. When true, auto-join must NOT re-engage on status
-  // returning to 'idle' — otherwise the user is silently reconnected
+  // returning to 'idle' - otherwise the user is silently reconnected
   // and the Join Voice button never reappears (issue #78). Cleared on
   // an explicit connect() (re-opt-in) and on roomCode change (fresh
   // session). A ref, not state, so flipping it doesn't re-render.
@@ -93,7 +93,7 @@ export function useVoice({ roomCode, isAuthenticated, autoJoin = false }) {
       publishDefaults: { videoSimulcastLayers: [] },
     });
 
-    // Track who's currently speaking — drives the "🔊" indicator.
+    // Track who's currently speaking - drives the "🔊" indicator.
     const updateSpeaking = () => {
       const speaking = new Set();
       // Local participant first
@@ -123,7 +123,7 @@ export function useVoice({ roomCode, isAuthenticated, autoJoin = false }) {
     // UI's `muted` flag drifts: button says "Mic ON" while the SDK
     // has the track muted, or vice versa, and pressing it produces
     // a confusing no-op. The getter `isMicrophoneEnabled` is the
-    // source of truth — `muted = !enabled`.
+    // source of truth - `muted = !enabled`.
     const syncMutedFromTrack = () => {
       const lp = room.localParticipant;
       if (!lp) return;
@@ -163,7 +163,7 @@ export function useVoice({ roomCode, isAuthenticated, autoJoin = false }) {
       // Try to publish the mic muted. setMicrophoneEnabled(false) on
       // a not-yet-published mic still calls getUserMedia, which the
       // browser may reject without a user gesture (auto-join path,
-      // issue #49). Don't fail the whole connect on that — the user
+      // issue #49). Don't fail the whole connect on that - the user
       // can stay in the LiveKit room as a listener and the publish
       // retries on first toggleMute, which IS user-gesture-driven.
       try {
@@ -191,7 +191,7 @@ export function useVoice({ roomCode, isAuthenticated, autoJoin = false }) {
   // (mic publish is gesture-deferred via the catch above and the
   // toggleMute path). Opt-in via autoJoin so existing manual-control
   // tests stay valid. Skips if voice isn't configured, or if the
-  // user has manually clicked Leave Voice this session (issue #78 —
+  // user has manually clicked Leave Voice this session (issue #78 -
   // otherwise status returning to 'idle' on disconnect would re-fire
   // this effect and silently reconnect them). If connect() fails,
   // status='error' surfaces the manual retry button rather than
@@ -246,7 +246,7 @@ export function useVoice({ roomCode, isAuthenticated, autoJoin = false }) {
     try {
       setMuted(!room.localParticipant.isMicrophoneEnabled);
     } catch (_) {
-      // Getter unavailable for a beat — fall back to the requested state.
+      // Getter unavailable for a beat - fall back to the requested state.
       setMuted(!desiredEnabled);
     }
   }, [muted]);

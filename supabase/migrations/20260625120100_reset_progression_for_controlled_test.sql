@@ -1,7 +1,7 @@
 -- One-time reset for the controlled user test.
 -- Everyone starts the test fresh so the new career-stat tally is clean: level 1,
 -- 0 XP, 0 games, all lifetime stats zeroed, and equipped cosmetics back to slot
--- defaults (higher-tier skins re-lock until re-earned — the server already
+-- defaults (higher-tier skins re-lock until re-earned - the server already
 -- downgrades locked items on read, but this makes the reset explicit).
 --
 -- Tracked migration → runs exactly once against the remote. Safe to ship: on a

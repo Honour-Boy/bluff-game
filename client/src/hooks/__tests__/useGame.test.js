@@ -18,14 +18,14 @@ import { useGame } from '../useGame';
 
 beforeEach(() => {
   socketHolder.socket = makeMockSocket({ connected: false });
-  // Tests run in JSDOM — sessionStorage + localStorage are real, but we don't
+  // Tests run in JSDOM - sessionStorage + localStorage are real, but we don't
   // want state leaking between tests. localStorage holds the §M4 recovery
   // snapshot, so clear it too.
   if (typeof sessionStorage !== 'undefined') sessionStorage.clear();
   if (typeof localStorage !== 'undefined') localStorage.clear();
 });
 
-describe('useGame — initial state', () => {
+describe('useGame - initial state', () => {
   it('starts with no room and no player id', () => {
     const { result } = renderHook(() => useGame(null));
     expect(result.current.roomCode).toBeNull();
@@ -41,7 +41,7 @@ describe('useGame — initial state', () => {
   });
 });
 
-describe('useGame — chat', () => {
+describe('useGame - chat', () => {
   it('appends incoming chat messages and increments unread when closed', async () => {
     const { result } = renderHook(() => useGame(null));
 
@@ -140,7 +140,7 @@ describe('useGame — chat', () => {
   });
 });
 
-describe('useGame — room state + actions', () => {
+describe('useGame - room state + actions', () => {
   it('createRoom on success sets roomCode + isHost', async () => {
     const { result } = renderHook(() => useGame(null));
     socketHolder.socket.emit.mockImplementationOnce((event, payload, cb) => {
@@ -290,7 +290,7 @@ describe('useGame - groups', () => {
     expect(response.leaderboard[0].wins).toBe(4);
   });
 
-  // ─── Issue #106 — leaderboard cache ────────────────────────
+  // ─── Issue #106 - leaderboard cache ────────────────────────
   it('serves a cached leaderboard within the TTL without re-emitting', async () => {
     const { result } = renderHook(() => useGame(null));
     socketHolder.socket.emit.mockImplementation((event, payload, cb) => {
@@ -372,7 +372,7 @@ describe('useGame - groups', () => {
   });
 });
 
-describe('useGame — connection lifecycle', () => {
+describe('useGame - connection lifecycle', () => {
   it('flips connected to false on disconnect', async () => {
     socketHolder.socket = makeMockSocket({ connected: true });
     const { result } = renderHook(() => useGame(null));
@@ -398,7 +398,7 @@ describe('useGame — connection lifecycle', () => {
   });
 });
 
-describe('useGame — authentication', () => {
+describe('useGame - authentication', () => {
   it('emits authenticate with the token when connect fires', async () => {
     const getAccessToken = vi.fn().mockResolvedValue('jwt-abc');
     renderHook(() => useGame(getAccessToken));
@@ -487,8 +487,8 @@ describe('useGame — authentication', () => {
   });
 });
 
-describe('useGame — disconnect removes you (no reconnection)', () => {
-  it('does NOT auto-rejoin on reconnect — only re-authenticates', async () => {
+describe('useGame - disconnect removes you (no reconnection)', () => {
+  it('does NOT auto-rejoin on reconnect - only re-authenticates', async () => {
     socketHolder.socket = makeMockSocket({ connected: true });
     const getAccessToken = vi.fn().mockResolvedValue('jwt');
     const { result } = renderHook(() => useGame(getAccessToken));
@@ -500,7 +500,7 @@ describe('useGame — disconnect removes you (no reconnection)', () => {
     act(() => result.current.createRoom('online'));
     await waitFor(() => expect(result.current.roomCode).toBe('REJN01'));
 
-    // A reconnect must NOT resurrect the room — the server already removed us.
+    // A reconnect must NOT resurrect the room - the server already removed us.
     socketHolder.socket.emit.mockImplementation((event, payload, cb) => {
       if (typeof cb === 'function') cb({ success: true });
     });

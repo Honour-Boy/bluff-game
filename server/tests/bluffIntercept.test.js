@@ -5,8 +5,8 @@
 // OFF-turn) gets a short window to arm a DEFENSIVE power card in
 // response BEFORE the bluff resolves. The engine half is two helpers
 // (canInterceptBluff / listInterceptCards) + an off-turn arm
-// (armInterceptCard). The key design property — the resolution
-// pipeline already reads `accused.armedPowerCard` at every tier — is
+// (armInterceptCard). The key design property - the resolution
+// pipeline already reads `accused.armedPowerCard` at every tier - is
 // proven by arming a Shield via the intercept path and then resolving:
 // the bluff comes back BLOCKED with no pipeline change.
 //
@@ -174,10 +174,10 @@ describe('intercept → pipeline resolution (§1.1)', () => {
   });
 });
 
-// ─── §1.2 — passing / timing out the intercept never ends a turn ──────────────
+// ─── §1.2 - passing / timing out the intercept never ends a turn ──────────────
 //
 // The intercept window is the accused's (OFF-turn) defensive chance. The handler
-// closes it by restoring `phase = 'playing'` and resolving the bluff — it must
+// closes it by restoring `phase = 'playing'` and resolving the bluff - it must
 // never call advanceTurn, so the on-turn ACCUSER keeps priority and can still
 // act. resolveBluff is the exact resolution the pass / timeout paths funnel into.
 describe('intercept pass / timeout retains the on-turn player (§1.2)', () => {
@@ -189,7 +189,7 @@ describe('intercept pass / timeout retains the on-turn player (§1.2)', () => {
 
     const { outcome } = resolveBluff(room, 'p1');
 
-    // The bluff resolved, but the turn pointer is untouched — the accuser is
+    // The bluff resolved, but the turn pointer is untouched - the accuser is
     // NOT force-ended, exactly the §1.2 guarantee.
     expect(['spin', 'blocked', 'eliminated', 'assassin_backfire']).toContain(outcome.kind);
     expect(room.currentTurnIndex).toBe(turnIndexBefore);

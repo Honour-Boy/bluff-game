@@ -1,8 +1,8 @@
 // ============================================================
-// #205 — Build colored deck-skin SVGs from monochrome traces
+// #205 - Build colored deck-skin SVGs from monochrome traces
 // ============================================================
 // Inputs: potrace-style monochrome SVGs (cosmetic-previews/img{1..5}.svg at
-// the repo root — black paths = the card FIELD, the ornament shows through
+// the repo root - black paths = the card FIELD, the ornament shows through
 // as holes). For each design we emit a self-contained colored SVG:
 //
 //   <svg viewBox>
@@ -15,7 +15,7 @@
 // Output: client/public/cosmetics/deck_<name>.svg (committed; the traces and
 // JPG references stay untracked design sources).
 //
-// The CHAMBER (cylinder) skins are NOT built here — they come straight from
+// The CHAMBER (cylinder) skins are NOT built here - they come straight from
 // the owner's traced art via scripts/build-chamber-skins.mjs.
 //
 // Usage: node scripts/build-cosmetic-decks.mjs
@@ -113,11 +113,11 @@ ${paths}
 }
 
 // ============================================================
-// Table-felt underlays — same five identities, procedural art
+// Table-felt underlays - same five identities, procedural art
 // ============================================================
 // The felt element is an ellipse (border-radius:50% clips a rect), so each
 // design is drawn full-bleed in a 1200×880 box and every ornament is kept
-// inside the inscribed ellipse (cx 600, cy 440). The centre stays quiet —
+// inside the inscribed ellipse (cx 600, cy 440). The centre stays quiet -
 // the dealer tray / reveal cards / lobby copy all live there. Each SVG is
 // self-contained (base gradient included) and goes through the same
 // `--felt-bg` CSS-var slot the deck skins use for `--cardback-bg`.

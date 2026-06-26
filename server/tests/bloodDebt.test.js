@@ -1,5 +1,5 @@
 // ============================================================
-// Phase 4 (#301, #303) — Blood Debt (Covenant-exclusive).
+// Phase 4 (#301, #303) - Blood Debt (Covenant-exclusive).
 //
 // Pure engine flag transitions + the call_bluff queueing of a debt spin and
 // the blood_debt_target assignment handler. The full correct-bluff → spin →
@@ -28,7 +28,7 @@ function roomWith(ids = ['a', 'b', 'c']) {
   return room;
 }
 
-describe('engine/bloodDebt — pure flag transitions', () => {
+describe('engine/bloodDebt - pure flag transitions', () => {
   it('createPlayer starts with hasBloodDebt false', () => {
     expect(createPlayer('x', 'X', 's').hasBloodDebt).toBe(false);
   });

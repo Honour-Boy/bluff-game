@@ -5,7 +5,7 @@
 //  1. Holder activates freeze at turn start (Phase B already arms it
 //     via engine.activatePowerCard).
 //  2. After the holder ends their turn, the next player in turn
-//     order is skipped completely — they get no turn at all.
+//     order is skipped completely - they get no turn at all.
 //  3. The player AFTER the skipped player takes their turn but
 //     CANNOT call bluff (the previous turn never produced a card to
 //     challenge).
@@ -15,7 +15,7 @@
 //
 // These tests exercise the engine helpers directly (consumeFreeze
 // OnTurnEnd + advanceTurn). The socket-level integration with the
-// `bluffBlockedThisTurn` flag in call_bluff is a thin wrapper —
+// `bluffBlockedThisTurn` flag in call_bluff is a thin wrapper -
 // tested here at the engine layer by reading the flag the engine
 // stamps on the room.
 // ============================================================

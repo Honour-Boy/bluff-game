@@ -179,7 +179,7 @@ describe('#205 â€” progression handlers', () => {
   it('get_progression returns xp/level/catalog with validated equipped set', async () => {
     const repo = makeRepo({
       getProgression: vi.fn().mockResolvedValue({
-        xp: 350, gamesPlayed: 3, // level 3 (Backroads) — felt_noir unlocked
+        xp: 350, gamesPlayed: 3, // level 3 (Backroads) - felt_noir unlocked
         equipped: { tableFelt: 'felt_noir', cardBack: 'back_kente' }, // kente needs Covenant (L14)
       }),
     });

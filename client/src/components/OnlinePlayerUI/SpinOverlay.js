@@ -6,7 +6,7 @@ const CY = 100;
 const ORBIT = 58;
 const CHAM_R = 20;
 
-// #205 — `skin` carries the SPINNER's equipped gun-skin palette (everyone at
+// #205 - `skin` carries the SPINNER's equipped gun-skin palette (everyone at
 // the table sees the spinner's own cylinder). Defaults to the original steel.
 function CylinderSVG({ bulletChambers, bulletChambersAfter, eliminated, landingChamberIndex, rotation, animating, spinComplete, skin }) {
   // While the cylinder is spinning we show the PRE-spin bullets (you watch the
@@ -14,14 +14,14 @@ function CylinderSVG({ bulletChambers, bulletChambersAfter, eliminated, landingC
   // a survival just added (always +1, +2 under Hot Potato) visibly pop in (#238).
   const activeBullets = spinComplete && bulletChambersAfter ? bulletChambersAfter : bulletChambers;
   // Art skins carry the SIX measured centres of their painted holes (the
-  // owner artwork's holes deviate slightly from a perfect ring — see
+  // owner artwork's holes deviate slightly from a perfect ring - see
   // cosmetic-previews/table-previews/measure3.mjs) plus their radius, so
   // bullets sit exactly in the paint. Flat skins keep the exact ring.
   const holeR = skin.holeR || CHAM_R;
   const chambers = [0, 1, 2, 3, 4, 5].map((index) => {
     const angleRad = ((index * 60 - 90) * Math.PI) / 180;
     // The landing slot always reflects the actual outcome: empty on a survival,
-    // bullet on an elimination — never contradicted by a freshly-added bullet.
+    // bullet on an elimination - never contradicted by a freshly-added bullet.
     const isLanding = spinComplete && index === landingChamberIndex;
     const isBullet = isLanding ? !!eliminated : activeBullets.has(index);
     const [x, y] = skin.holes
@@ -53,14 +53,14 @@ function CylinderSVG({ bulletChambers, bulletChambersAfter, eliminated, landingC
         {/* Art skins paint the whole disc (body, decorated rims, hole
             interiors, hub) via a geometry-matched SVG underlay; the flat
             circle below it stays as the decode-time fallback. The live game
-            state — bullets and the landing ring — is ALWAYS drawn on top,
+            state - bullets and the landing ring - is ALWAYS drawn on top,
             so empty holes show the artwork through while chamber state
             keeps its contrast. */}
         <circle cx={CX} cy={CY} r={ORBIT + CHAM_R + 8} fill={skin.body} stroke={skin.bodyStroke} strokeWidth={2} />
         {skin.art && <image href={skin.art} x={0} y={0} width={CYL} height={CYL} />}
         {chambers.map((chamber, index) => (
           <g key={index}>
-            {/* The landing highlight ring is a flat-skin affordance only —
+            {/* The landing highlight ring is a flat-skin affordance only -
                 on the art skins it fought the artwork (and read as a stray
                 green ring), so there the outcome is told by the pointer +
                 the landing slot's bullet/empty state alone. */}
@@ -91,7 +91,7 @@ function CylinderSVG({ bulletChambers, bulletChambersAfter, eliminated, landingC
                 strokeWidth={skin.art ? 1.6 : chamber.isLanding ? 2.5 : 1.5}
               />
             )}
-            {/* The round's core is themed per skin (skin.bullet) — only the
+            {/* The round's core is themed per skin (skin.bullet) - only the
                 default steel keeps the original red. */}
             {chamber.isBullet && (
               <circle
@@ -154,7 +154,7 @@ export function SpinOverlay({
         }}
       >
         {spinData.spinReason === 'blood_debt'
-          ? `⛧ Blood Debt — the price comes due for ${spinData.spinTargetName}…`
+          ? `⛧ Blood Debt - the price comes due for ${spinData.spinTargetName}…`
           : spinData.spinReason === 'pact_volunteer'
             ? `🜂 ${spinData.spinTargetName} takes the bullet for their partner…`
             : `${spinData.spinTargetName} pulls the trigger…`}

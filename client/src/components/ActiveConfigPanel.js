@@ -1,11 +1,11 @@
 'use client';
 
 // ============================================================
-// ActiveConfigPanel — small collapsible badge that shows which
+// ActiveConfigPanel - small collapsible badge that shows which
 // power cards / risk modifiers / room modifiers / systems are
 // active in the current game. Mirrors the lists in
 // PreGameSettingsPanel so labels stay in lock-step with the
-// host's setup screen. Reads `roomState.config` directly — same
+// host's setup screen. Reads `roomState.config` directly - same
 // shape exposed to every client (including spectators) via
 // `serializeRoom`.
 //
@@ -20,7 +20,7 @@
 import { useMemo, useState } from 'react';
 import { CloseIcon } from './shared/CloseIcon';
 
-// Label tables kept ASCII-only here — these are display text only
+// Label tables kept ASCII-only here - these are display text only
 // and don't need to share imports with the host settings panel
 // (we want this to render independent of host bundle changes).
 const POWER_CARDS = [
@@ -78,7 +78,7 @@ export function ActiveConfigPanel({ config }) {
 
   if (totalEnabled === 0) return null;
 
-  // Collapsed chip — always rendered; tap to expand. Anchored to
+  // Collapsed chip - always rendered; tap to expand. Anchored to
   // the top-left where the OnlinePlayerUI keeps nothing else fixed
   // (the bottom-left already hosts the centre-on-table button).
   if (!open) {

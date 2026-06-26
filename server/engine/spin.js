@@ -1,5 +1,5 @@
 // ============================================================
-// ENGINE — Spin orchestration + bounty + survival hand reset
+// ENGINE - Spin orchestration + bounty + survival hand reset
 // ============================================================
 // spinGun wraps pullTrigger with the role-aware survival rules
 // (Gambler) and the risk-modifier flags pulled off room.config.
@@ -18,19 +18,19 @@ const { shuffleDeck } = require('./deck');
 function getSpinModifiers(room) {
   const r = room?.config?.riskModifiers || {};
   // Double Barrel is a start-of-game chamber load (initChamber(2)), not a
-  // pull-time modifier — only Hot Potato changes pullTrigger behaviour.
+  // pull-time modifier - only Hot Potato changes pullTrigger behaviour.
   return {
     hotPotato: !!r.hotPotato,
   };
 }
 
 /**
- * v2 Phase D — Gambler role: risk level NEVER increases from
+ * v2 Phase D - Gambler role: risk level NEVER increases from
  * surviving spins. We spin normally to determine elimination, but on
  * SURVIVAL we revert the chamber back to its pre-spin state. External
- * modifiers like Sudden Death still bump Gambler's risk — spec.
+ * modifiers like Sudden Death still bump Gambler's risk - spec.
  *
- * v2 Phase E1 — the Hot Potato risk modifier is forwarded to
+ * v2 Phase E1 - the Hot Potato risk modifier is forwarded to
  * pullTrigger via `modifiers`.
  */
 function spinGun(player, modifiers = {}) {
@@ -64,7 +64,7 @@ function spinGun(player, modifiers = {}) {
  *     count (omit cardsToDeal).
  *   - Redemption Spin survival → 3 fresh cards (caller passes 3).
  *
- * #184 — the surrendered cards are returned to the DRAW PILE (`room.deck`) and
+ * #184 - the surrendered cards are returned to the DRAW PILE (`room.deck`) and
  * reshuffled, NOT pushed to the discard pile. The discard pile is never recycled
  * (ensureDrawPile only feeds off the played pile), so discarding here permanently
  * bled the draw-pile count down on every survival/global reshuffle. Returning
@@ -92,7 +92,7 @@ function resetHandOnSurvival(room, playerId, cardsToDeal = null) {
   // Retain the armed power card across the re-deal as long as the card itself
   // still lives in the player's slot. Power cards are extracted out of
   // `room.hands` into `room.powerCardSlot[playerId]` at game start
-  // (`_extractPowerCardsToSlot`), so the slot — not the (shape-only) hand — is
+  // (`_extractPowerCardsToSlot`), so the slot - not the (shape-only) hand - is
   // the source of truth, and the armed marker stores the card under `cardId`
   // (see powerCards.js). #195: the previous guard read `room.hands` + `.id`,
   // so it always disarmed.
@@ -121,10 +121,10 @@ function resetHandOnSurvival(room, playerId, cardsToDeal = null) {
 }
 
 /**
- * §1.1 — Global bluff reshuffle.
+ * §1.1 - Global bluff reshuffle.
  *
  * The moment a Bluff ("Block") challenge is CALLED AND RESOLVED, the table is
- * rotated uniformly for everyone still in the match — not just the player who
+ * rotated uniformly for everyone still in the match - not just the player who
  * survived/lost the specific interaction:
  *
  *   • Global Card Change: EVERY alive player has their SHAPE hand discarded and
@@ -133,7 +133,7 @@ function resetHandOnSurvival(room, playerId, cardsToDeal = null) {
  *   • Required Target Shift: the match's "card to clear" (`currentCardType`)
  *     cycles to a fresh random type immediately.
  *
- * Online-only — hands and the target type only exist in online mode. No-op (and
+ * Online-only - hands and the target type only exist in online mode. No-op (and
  * safe) for physical rooms or rooms without a dealt deck. Returns a summary the
  * caller can fold into `lastAction` / telemetry.
  */
@@ -151,7 +151,7 @@ function applyGlobalBluffReshuffle(room) {
   return { reshuffled: true, playerIds: aliveIds, cardType: room.currentCardType ?? null };
 }
 
-// ─── v2 Phase F — Bounty ─────────────────────────────────────
+// ─── v2 Phase F - Bounty ─────────────────────────────────────
 //
 // When a player survives 3 spins in a row, a bounty is placed on
 // them. A successful bluff call against a bounty holder drops the
@@ -185,7 +185,7 @@ function onSurvivalForBounty(room, playerId) {
 }
 
 /**
- * Called when a bullet hits — counter resets, and if the player held
+ * Called when a bullet hits - counter resets, and if the player held
  * a bounty it's cleared (no reward, just gone).
  */
 function onEliminationForBounty(room, playerId) {

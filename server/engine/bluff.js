@@ -1,5 +1,5 @@
 // ============================================================
-// ENGINE — Bluff resolution + online round reset
+// ENGINE - Bluff resolution + online round reset
 // ============================================================
 // Physical mode is the host's verdict (`resolveBluff` with a manual
 // flag); online mode is server-authoritative (`resolveBluffOnline`
@@ -16,7 +16,7 @@ const {
   _snapshotSwapHolders,
 } = require('./powerCards');
 
-// ─── Bluff correctness — the single source of truth ──────────
+// ─── Bluff correctness - the single source of truth ──────────
 //
 // A bluff call is "correct" when the previously played card did NOT
 // satisfy the required shape: a Whot (wild) never counts as truthful,
@@ -24,7 +24,7 @@ const {
 // truth. `bluffPipeline.js`'s Tier-3 (#119) consumes this so the
 // correctness rule lives in exactly one place.
 //
-// The card under accusation is `room.challengeableCard` — the previous
+// The card under accusation is `room.challengeableCard` - the previous
 // player's play, snapshotted at the turn boundary (`advanceTurn`) and
 // validated against `room.challengeableCardType` (the required shape in
 // effect when they played). We deliberately do NOT read the live
@@ -40,7 +40,7 @@ function isBluffCorrect(room) {
 
 // Tier-3 (Bluff Validation) of the ResolutionQueue. Returns the
 // computed correctness, the revealed card, and the typed base
-// `GameEvent` (#119) — a `SPIN_CONSEQUENCE` that targets the accused
+// `GameEvent` (#119) - a `SPIN_CONSEQUENCE` that targets the accused
 // on a correct call or the accuser on a wrong one. It is `redirectable`
 // so Tier-4 Mirror/Sniper may retarget it; power-card branches in the
 // pipeline re-type it into a non-redirectable event when needed.

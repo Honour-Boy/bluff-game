@@ -3,19 +3,19 @@
 import { useState } from 'react';
 
 // ============================================================
-// SessionConflictScreen — "your account is active on another device"
+// SessionConflictScreen - "your account is active on another device"
 // ============================================================
 //
 // Single-active-session: when a login is contested by another LIVE device,
 // the server refuses (instead of silently kicking either side) and reports
 // which device holds the account. We show it here so the user can SEE that
-// device by name and choose to log it out and continue — guaranteeing only
+// device by name and choose to log it out and continue - guaranteeing only
 // one active session at a time, but on the user's terms.
 //
 // Props:
-//   activeDevice : { name, since } — the device currently holding the account
-//   onTakeOver   : () => Promise<boolean> — end that session, continue here
-//   onUseAnother : () => void — sign out locally (back to the auth screen)
+//   activeDevice : { name, since } - the device currently holding the account
+//   onTakeOver   : () => Promise<boolean> - end that session, continue here
+//   onUseAnother : () => void - sign out locally (back to the auth screen)
 
 function sinceText(ts) {
   if (!ts || typeof ts !== 'number') return null;
@@ -66,7 +66,7 @@ export function SessionConflictScreen({ activeDevice, onTakeOver, onUseAnother }
           margin: '0 0 18px',
         }}>
           Your account is active on another device. Only one device can be
-          signed in at a time — log that one out to continue here.
+          signed in at a time - log that one out to continue here.
         </p>
 
         {/* The contested device */}

@@ -2,7 +2,7 @@
 // Tests for createRoom + v2 config plumbing.
 //
 // Phase A2 only stores host-selected v2 toggles on `room.config`
-// — nothing reads them yet. These tests lock the *shape* and
+// - nothing reads them yet. These tests lock the *shape* and
 // the normalisation behaviour so later phases have a stable
 // contract to build on.
 // ============================================================
@@ -101,7 +101,7 @@ describe('normalizeRoomConfig', () => {
     const cfg = normalizeRoomConfig({
       powerCards: { enabled: { shield: 'yes', peek: 1 } },
     });
-    // Non-boolean values aren't trusted as truthy — default (false) is kept.
+    // Non-boolean values aren't trusted as truthy - default (false) is kept.
     expect(cfg.powerCards.enabled.shield).toBe(false);
     expect(cfg.powerCards.enabled.peek).toBe(false);
   });
@@ -125,7 +125,7 @@ describe('createRoom + config storage', () => {
     expect(room.config.systems.lastStand).toBe(false);
   });
 
-  it('does NOT trust raw client input — unknown keys are stripped', () => {
+  it('does NOT trust raw client input - unknown keys are stripped', () => {
     const malicious = {
       powerCards: { enabled: { __proto__: { shield: true }, evil: true } },
       systems: { secretRoles: true }, // not a host toggle
@@ -153,7 +153,7 @@ describe('serializeRoom exposes config', () => {
   });
 });
 
-// Issue #54 — replaying in the same room.
+// Issue #54 - replaying in the same room.
 describe('resetRoomForReplay', () => {
   function buildFinishedRoom() {
     const room = createRoom('host-sock', MODES.ONLINE, {
@@ -208,7 +208,7 @@ describe('resetRoomForReplay', () => {
     expect(room.chatLog).toHaveLength(1);
   });
 
-  it('re-creates each player at default state — alive, ability flags reset', () => {
+  it('re-creates each player at default state - alive, ability flags reset', () => {
     const room = buildFinishedRoom();
     resetRoomForReplay(room);
     expect(room.players).toHaveLength(2);
@@ -265,7 +265,7 @@ describe('resetRoomForReplay', () => {
 
   it('does not stamp sandbox onto a non-sandbox tutorial replay', () => {
     const room = buildFinishedRoom();
-    room.isTutorial = true; // coached Basics/clinic room — never sandbox
+    room.isTutorial = true; // coached Basics/clinic room - never sandbox
     resetRoomForReplay(room);
     expect(room.isTutorial).toBe(true);
     expect('sandbox' in room).toBe(false);
@@ -281,8 +281,8 @@ describe('resetRoomForReplay', () => {
   });
 });
 
-// ─── Phase 2 — Tier validation & mechanic gating ─────────────
-describe('normalizeRoomConfig — secretRoles', () => {
+// ─── Phase 2 - Tier validation & mechanic gating ─────────────
+describe('normalizeRoomConfig - secretRoles', () => {
   it('reads input.secretRoles as a boolean, defaulting false', () => {
     expect(normalizeRoomConfig({}).secretRoles).toBe(false);
     expect(normalizeRoomConfig({ secretRoles: true }).secretRoles).toBe(true);

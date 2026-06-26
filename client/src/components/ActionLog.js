@@ -33,7 +33,7 @@ export function ActionLog({ lastAction }) {
     game_over: ({ winnerName }) => `🎉 GAME OVER - ${winnerName} is the last player standing!`,
     continued: ({ playerId }) => `→ Player continued their turn.`,
     disconnected: ({ playerName }) => `🔌 ${playerName} disconnected - eliminated.`,
-    // v2 Phase C — power-card outcome lines.
+    // v2 Phase C - power-card outcome lines.
     bluff_blocked: () => `🛡 Shield blocked the bluff.`,
     assassin_strike: ({ eliminatedName, assassinHolderName }) => {
       if (eliminatedName && assassinHolderName) {

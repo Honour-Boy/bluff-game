@@ -62,7 +62,7 @@ function deleteCallsOn(calls, table) {
   return calls.filter((c) => c.table === table && c.op === 'delete');
 }
 
-describe('issue #144 — rejoin after removal clears stale invites', () => {
+describe('issue #144 - rejoin after removal clears stale invites', () => {
   it('removeMember deletes the member row AND their group_invites history', async () => {
     const { client, calls, data } = makeSupabaseMock({
       groups: [{ id: GROUP_ID, host_user_id: HOST_ID, deleted_at: null, code: 'ABC234', name: 'G' }],

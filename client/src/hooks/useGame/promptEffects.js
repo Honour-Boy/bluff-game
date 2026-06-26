@@ -16,7 +16,7 @@ export function usePromptEvents({
     const onSniperRedirectPending = (payload) => {
       setSniperPrompt(payload || null);
     };
-    // Covenant — private prompt to the just-eliminated player to name their
+    // Covenant - private prompt to the just-eliminated player to name their
     // blood-debt target. The overlay self-dismisses on its own countdown (and
     // on pick), so no phase-based teardown is needed here.
     const onBloodDebtAssign = (payload) => {
@@ -39,7 +39,7 @@ export function usePromptEvents({
   }, [medicPrompt, roomPhase, setMedicPrompt, setSniperPrompt, sniperPrompt]);
 }
 
-// ─── Covenant — The Pact ──────────────────────────────────────
+// ─── Covenant - The Pact ──────────────────────────────────────
 // The secret bond's offer + partner badge are reconnect-safe via the serialized
 // `room_state.pact` block, so only the TIMED volunteer-pull prompt needs transient
 // event state. The confirm / deny / bluff-blocked events surface as quick toasts.
@@ -73,7 +73,7 @@ export function usePactEvents({ socket, roomPhase, pactVolunteer, setPactVolunte
 
 // ─── Pre-game selection & role reveal (#116) ──────────────────
 // The serialized `pregame` block on room_state is the authoritative,
-// reconnect-safe source — it's mirrored directly into local state and
+// reconnect-safe source - it's mirrored directly into local state and
 // drives the reveal/selection UI. The transient events layer on top for
 // immediacy (acting on them avoids a frame of room_state lag and tears
 // the modal down the instant the round resolves).

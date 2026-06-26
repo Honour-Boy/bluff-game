@@ -1,5 +1,5 @@
 // ============================================================
-// Phase 4 (#302, #303) — Blood Debt end-to-end server flow.
+// Phase 4 (#302, #303) - Blood Debt end-to-end server flow.
 //
 //   • A correct-bluff spin death in a Covenant room emits `blood_debt_assign`
 //     to the fallen player and arms the 10s window (assignment).

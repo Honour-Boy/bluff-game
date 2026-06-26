@@ -3,14 +3,14 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 
 // ============================================================
-// IntroVideo — full-screen brand splash on a genuine game open
+// IntroVideo - full-screen brand splash on a genuine game open
 // ============================================================
 //
 // Plays the revolver-blast crimson-paint splash edge-to-edge, IN FULL, then
 // calls `onDone`. The 16:9 landscape clip (`/videos/intro.mp4`) gets heavily
 // cropped under `objectFit: cover` on a portrait phone, so phones play the
 // purpose-cut vertical clip (`/videos/intro_mobile.mp4`) instead. The source is
-// chosen ONCE at mount (lazy initializer) so it never swaps mid-playback —
+// chosen ONCE at mount (lazy initializer) so it never swaps mid-playback -
 // IntroVideo only ever mounts client-side (the intro phase is set in an effect),
 // so reading matchMedia at first render is hydration-safe. Dismissal paths, all
 // routed through the same guarded `finish` so it fires once:
@@ -22,8 +22,8 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 // quietly PAUSE it a beat later (the "video plays half then stops" bug). We
 // attempt sound first, but a `pause` before the real end mutes and resumes
 // so the clip always reaches its end. The safety timeout is derived from the
-// actual duration (+buffer) once metadata loads — never a guess that could
-// cut an 8s clip short — with a generous fallback only if metadata never
+// actual duration (+buffer) once metadata loads - never a guess that could
+// cut an 8s clip short - with a generous fallback only if metadata never
 // arrives, so the splash can't trap the player either.
 
 const FALLBACK_SAFETY_MS = 15_000; // only used if loadedmetadata never fires
@@ -35,9 +35,9 @@ export function IntroVideo({ onDone }) {
   const soundedPauseRef = useRef(false); // saw a pause while sound was on
   const [leaving, setLeaving] = useState(false);
   // True once we've had to fall back to muted because the browser blocked
-  // sound-on autoplay — surfaces the "tap for sound" pill.
+  // sound-on autoplay - surfaces the "tap for sound" pill.
   const [needsTap, setNeedsTap] = useState(false);
-  // Pick the source once, at mount: phones (portrait, ≤640px — the project's
+  // Pick the source once, at mount: phones (portrait, ≤640px - the project's
   // mobile breakpoint) get the vertical cut so the 16:9 clip isn't cropped.
   const [src] = useState(() => {
     if (typeof window !== 'undefined' && typeof window.matchMedia === 'function'
@@ -65,7 +65,7 @@ export function IntroVideo({ onDone }) {
     if (!el) return undefined;
     let cancelled = false;
 
-    // Bring sound back and keep playing — invoked on the first user gesture (or
+    // Bring sound back and keep playing - invoked on the first user gesture (or
     // the "tap for sound" pill) after the browser blocked sound-on autoplay.
     const enableSound = () => {
       if (doneRef.current || cancelled) return;
@@ -80,7 +80,7 @@ export function IntroVideo({ onDone }) {
     // splash sits on a black frame. Retry play() whenever new data arrives
     // (canplay / loadeddata). We ask for SOUND first; only if the browser
     // refuses sound-on autoplay do we fall back to muted (always allowed) and
-    // surface a tap-to-unmute affordance. Idempotent — once it's running, the
+    // surface a tap-to-unmute affordance. Idempotent - once it's running, the
     // extra attempts are harmless.
     const tryPlay = () => {
       if (doneRef.current || cancelled || !el.paused) return;
@@ -123,7 +123,7 @@ export function IntroVideo({ onDone }) {
     el.addEventListener('loadedmetadata', onMeta);
     el.addEventListener('canplay', tryPlay);
     el.addEventListener('loadeddata', tryPlay);
-    // First real interaction anywhere unmutes — covers the common case where
+    // First real interaction anywhere unmutes - covers the common case where
     // sound-on autoplay is blocked but the user taps/clicks/keys while watching.
     window.addEventListener('pointerdown', enableSound, { once: true });
     window.addEventListener('touchstart', enableSound, { once: true });

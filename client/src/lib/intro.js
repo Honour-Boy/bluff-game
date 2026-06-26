@@ -1,5 +1,5 @@
 // ============================================================
-// INTRO SPLASH GATING — "genuine game open" detector
+// INTRO SPLASH GATING - "genuine game open" detector
 // ============================================================
 //
 // The revolver-blast intro video (`/videos/intro.mp4`) is a brand
@@ -12,7 +12,7 @@
 // It must NOT replay on a same-tab refresh, a socket reconnect, or any
 // in-app navigation. The gate is a single sessionStorage flag:
 //
-//   bluff_intro_seen  — present once the intro has played in this tab.
+//   bluff_intro_seen  - present once the intro has played in this tab.
 //
 // Because it lives in sessionStorage (tab-local), a refresh keeps the
 // flag set → no replay on data loads / reconnects, matching the rest of
@@ -28,7 +28,7 @@ export function shouldShowIntro() {
   try {
     return !sessionStorage.getItem(INTRO_SEEN_KEY);
   } catch (_) {
-    // private mode / storage disabled — never block on the splash.
+    // private mode / storage disabled - never block on the splash.
     return false;
   }
 }

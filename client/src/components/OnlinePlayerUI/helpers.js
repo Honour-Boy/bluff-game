@@ -6,7 +6,7 @@ export const GAME_UI_STYLE = `
     0%, 100% { opacity: 1; }
     50% { opacity: 0.5; }
   }
-  /* Card flips in from face-down — physics slide */
+  /* Card flips in from face-down - physics slide */
   @keyframes cardFlipIn {
     0%   { transform: rotateY(90deg) scaleX(0.3) translateY(8px); opacity: 0; }
     55%  { transform: rotateY(-6deg) scaleX(1.03) translateY(-2px); opacity: 1; }
@@ -61,7 +61,7 @@ export const GAME_UI_STYLE = `
     30%       { opacity: 0.3; }
     60%       { opacity: 1; }
   }
-  /* Lobby ambience — an imaginary dealer flicks face-down cards out to the
+  /* Lobby ambience - an imaginary dealer flicks face-down cards out to the
      empty seats while patrons wait. Each card flies from the centre deck to its
      fanned spot (--lx/--ly/--lr), holds, then fades so the loop re-deals. Per-
      card animation-delay staggers the flick into a continuous cascade. */
@@ -125,12 +125,12 @@ export const GAME_UI_STYLE = `
     position: absolute;
     inset: 18px;
     border-radius: 50%;
-    /* #205 — felt colours come from the viewer's equipped cosmetic via CSS
+    /* #205 - felt colours come from the viewer's equipped cosmetic via CSS
        custom properties (set on the OnlinePlayerUI root from lib/cosmetics.js);
        the fallbacks ARE the original emerald felt. Art felts additionally set
        --felt-bg (a full-bleed SVG underlay, clipped to the ellipse by the
        border-radius) which sits between the lamp sheen and the colour
-       gradient — same slot mechanism as --cardback-bg on the deck skins. */
+       gradient - same slot mechanism as --cardback-bg on the deck skins. */
     background:
       radial-gradient(ellipse 56% 44% at 50% 38%, rgba(220,164,76,0.18) 0%, rgba(220,164,76,0.05) 42%, transparent 72%),
       var(--felt-bg, none) center center / 100% 100% no-repeat,
@@ -172,7 +172,7 @@ export const GAME_UI_STYLE = `
     border-radius: 7px;
   }
   .reveal-card-front {
-    /* #205 — when a frame deck skin is equipped, --cardface-bg paints its art
+    /* #205 - when a frame deck skin is equipped, --cardface-bg paints its art
        behind the revealed shape/number; fallback = the original radial face. */
     background: var(--cardface-bg, radial-gradient(ellipse at 50% 35%, rgba(45,34,18,0.96) 0%, rgba(18,13,8,0.96) 100%));
     background-size: 100% 100%;
@@ -180,7 +180,7 @@ export const GAME_UI_STYLE = `
   }
   .reveal-card-back {
     transform: rotateY(180deg);
-    /* #205 — the equipped deck skin paints the back. A frame skin sets
+    /* #205 - the equipped deck skin paints the back. A frame skin sets
        --cardback-bg to its SVG art; CSS-only skins fall back to the gradient
        built from --cardback-a/b/c (defaults = original leather). */
     background: var(--cardback-bg,
@@ -214,7 +214,7 @@ export const GAME_UI_STYLE = `
 // outcome (pre-#121 every unmapped kind fell through to
 // "BLUFF BLOCKED").
 //
-// NOTE on Peek: `peek_used` is intentionally absent — Peek is private
+// NOTE on Peek: `peek_used` is intentionally absent - Peek is private
 // to its holder and is delivered via the activate_power_card callback,
 // never broadcast as `power_card_triggered`, so it never reaches here.
 const ANNOUNCEMENT_MAP = {
@@ -243,7 +243,7 @@ const ANNOUNCEMENT_MAP = {
   ghost_vote_result: { preset: 'ghost_vote_result', title: 'GHOST COUNCIL DECIDES', subtitle: (e) => e.result || e.winningOption || '' },
   last_stand_entered: { preset: 'last_stand_entered', title: 'LAST STAND', subtitle: () => 'two finalists remain' },
   system_notice: { preset: 'system_notice', title: 'NOTICE', subtitle: (e) => e.message || '' },
-  // #6 — highlight callouts (first_blood removed per design — survival only)
+  // #6 - highlight callouts (first_blood removed per design - survival only)
   survival_streak: { preset: 'survival_streak', title: 'NERVES OF STEEL', subtitle: (e) => `${e.holderName || 'Survivor'} - ${e.streak || 3} spins survived in a row` },
 };
 
@@ -269,7 +269,7 @@ export function buildAnnouncementBannerProps(evt) {
 // Whether the guided COACHING layer should be active for this room. The
 // "Just Practice with Bot" SANDBOX carries `room.isTutorial` server-side (it
 // reuses the tutorial room's start/restart host-bypass + leave/disconnect
-// teardown), but it is otherwise a plain online game vs the bot — no coach
+// teardown), but it is otherwise a plain online game vs the bot - no coach
 // hints, no clinic gates, no end-of-game replay POP-UP, and the header shows
 // "Rules" rather than "? Guide". So coaching is active only for a tutorial that
 // is NOT a sandbox. Drives the local `isTutorial` flag in OnlinePlayerUI.

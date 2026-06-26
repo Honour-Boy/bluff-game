@@ -18,7 +18,7 @@ supabase/.env
 # Local-only working docs (roadmap + engineering notes; not version-controlled)
 docs/
 
-# Cosmetic design sources (#205) — owner-supplied frame traces + color
+# Cosmetic design sources (#205) - owner-supplied frame traces + color
 # reference JPGs consumed by client/scripts/build-cosmetic-decks.mjs.
 # The BUILT skins (client/public/cosmetics/*.svg) are committed; the
 # sources stay local-only.

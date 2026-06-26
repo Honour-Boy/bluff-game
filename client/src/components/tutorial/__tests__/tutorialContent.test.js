@@ -164,7 +164,7 @@ describe('introSlidesFor (Phase 4 lessons)', () => {
   });
 });
 
-describe('coachFor — power-cards lesson', () => {
+describe('coachFor - power-cards lesson', () => {
   it('prompts a block when the player is bluff-called while holding a defence', () => {
     const c = coachFor({ phase: 'bluff_intercept_pending', amAccusedIntercept: true, heldPowerLabel: 'Shield' });
     expect(c.key).toBe('intercept-defend');

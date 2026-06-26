@@ -1,5 +1,5 @@
 // ============================================================
-// SOCKET LIB — Supabase admin client + default repo singletons
+// SOCKET LIB - Supabase admin client + default repo singletons
 // ============================================================
 // Used to verify JWT tokens, look up profiles, and seed the default
 // repo dependencies. Tests inject mock repos via the `deps` argument

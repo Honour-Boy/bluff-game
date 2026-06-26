@@ -1,5 +1,5 @@
 // ============================================================
-// HANDLERS — Chat (send_chat_message)
+// HANDLERS - Chat (send_chat_message)
 // ============================================================
 // Rate-limited to 5 messages / 3s per socket. Stored in
 // room.chatLog (capped at 50, broadcast in room_state for
@@ -24,7 +24,7 @@ function register(io, socket) {
       const now = Date.now();
       socket.chatTimestamps = (socket.chatTimestamps || []).filter(t => now - t < 3000);
       if (socket.chatTimestamps.length >= 5) {
-        return callback?.({ success: false, error: 'Sending too fast — slow down' });
+        return callback?.({ success: false, error: 'Sending too fast - slow down' });
       }
       socket.chatTimestamps.push(now);
 

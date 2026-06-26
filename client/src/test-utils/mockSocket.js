@@ -1,4 +1,4 @@
-// ─── Fake socket — EventEmitter-backed stand-in for socket.io-client.
+// ─── Fake socket - EventEmitter-backed stand-in for socket.io-client.
 //
 // Used by hook tests that import getSocket() from lib/socket. Keeping
 // this in one place means every test gets the same shape and we can
@@ -8,7 +8,7 @@ import { vi } from 'vitest';
 
 export function makeMockSocket({ connected = true, autoCallback = true } = {}) {
   const ee = new EventEmitter();
-  // Bump max listeners — useGame attaches ~7 handlers and tests that
+  // Bump max listeners - useGame attaches ~7 handlers and tests that
   // re-render multiple times can trip the default limit (10) and dump
   // a noisy warning to stderr.
   ee.setMaxListeners(100);

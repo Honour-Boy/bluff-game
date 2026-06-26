@@ -1,5 +1,5 @@
 // ============================================================
-// Phase 3 (#294–300) — The Pact (Covenant) engine + server flow.
+// Phase 3 (#294–300) - The Pact (Covenant) engine + server flow.
 //
 //   • Pure engine: role assignment, response, bluff block, volunteer eligibility,
 //     partner death (bullet dock), dual win, dual-win game-over sentinel.
@@ -80,7 +80,7 @@ beforeEach(() => { rooms.clear(); });
 afterEach(() => { _clearPactVolunteerTimer('PACT01'); _clearSpinPendingTimer('PACT01'); vi.clearAllMocks(); });
 
 // ─── Pure engine ─────────────────────────────────────────────
-describe('pact engine — pure helpers', () => {
+describe('pact engine - pure helpers', () => {
   it('assignPactRoles designates a selector + a distinct default target', () => {
     const room = makeRoom();
     const res = assignPactRoles(room);
@@ -219,7 +219,7 @@ describe('pact volunteer pull (spin)', () => {
     expect(pactVolunteerTimers.has('PACT01')).toBe(true);
     expect(log.some(l => l.event === 'pact_volunteer_prompt')).toBe(true);
 
-    // The partner volunteers — resolves against p1 (deterministic empty chamber).
+    // The partner volunteers - resolves against p1 (deterministic empty chamber).
     const volunteer = room.players.find(p => p.id === 'p1');
     volunteer.chamber = Array(CHAMBER_SIZE).fill(null);
     const handlers = {};
@@ -229,7 +229,7 @@ describe('pact volunteer pull (spin)', () => {
     expect(res.success).toBe(true);
     expect(room.pendingPactVolunteer).toBeNull();
     const spin = log.filter(l => l.event === 'room_state').pop();
-    // p1 took the spin (survived) — last spin_result targeted p1.
+    // p1 took the spin (survived) - last spin_result targeted p1.
     expect(room.lastAction.spinTargetId).toBe('p1');
     expect(room.lastAction.spinReason).toBe('pact_volunteer');
   });

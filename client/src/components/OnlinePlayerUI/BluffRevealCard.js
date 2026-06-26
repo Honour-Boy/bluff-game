@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { ShapeIcon } from '../shared/ShapeIcon';
 
-// ─── BluffRevealCard — the challenged card, flipped in 3D ─────────────────────
+// ─── BluffRevealCard - the challenged card, flipped in 3D ─────────────────────
 // (Module 3) On a bluff challenge the played card is docked next to the Required
 // template and flipped face-up (preserve-3d / rotateY) for every client at once.
 // It stays face-up until the liable player pulls the trigger, then reverse-flips
@@ -12,7 +12,7 @@ export function BluffRevealCard({ card, revealed, outcomeColor = 'var(--accent)'
   const [flipped, setFlipped] = useState(false);
 
   useEffect(() => {
-    // Defer one frame so the initial (face-down) state paints before we flip —
+    // Defer one frame so the initial (face-down) state paints before we flip -
     // otherwise the CSS transition has no "from" state and the flip won't animate.
     const id = requestAnimationFrame(() => setFlipped(!!revealed));
     return () => cancelAnimationFrame(id);
@@ -25,7 +25,7 @@ export function BluffRevealCard({ card, revealed, outcomeColor = 'var(--accent)'
   return (
     <div style={{ width: 66, height: 92, perspective: 700 }}>
       <div className={`reveal-card-3d${flipped ? ' flipped' : ''}`}>
-        {/* Face-down back — themed by the equipped deck skin (#205); the
+        {/* Face-down back - themed by the equipped deck skin (#205); the
             filigree hides itself when a frame skin carries its own art. */}
         <div className="reveal-card-face reveal-card-back" aria-hidden="true">
           <svg width="40" height="58" viewBox="0 0 44 64" style={{ opacity: 'var(--cardback-filigree-opacity, 0.3)' }} aria-hidden>

@@ -32,7 +32,7 @@ describe('eliminatePlayer', () => {
   it('keeps currentTurnIndex on the next player when the current player is removed', () => {
     const r = room(['a', 'b', 'c', 'd'], 1); // 'b' is current
     eliminatePlayer(r, 'b');
-    // 'c' slides into index 1 and acts next — no skipped turn.
+    // 'c' slides into index 1 and acts next - no skipped turn.
     expect(r.turnOrder).toEqual(['a', 'c', 'd']);
     expect(r.currentTurnIndex).toBe(1);
   });

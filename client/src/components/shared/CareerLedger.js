@@ -1,10 +1,10 @@
 // ============================================================
-// CareerLedger — lifetime stats that feed a player's XP
+// CareerLedger - lifetime stats that feed a player's XP
 // ============================================================
 // So a player can see what's carrying them. Reads `progression.stats` (served
 // by get_progression) + `progression.gamesPlayed`; any missing field counts as
 // 0 so a pre-stats payload renders a clean zero board. Pure inline styles, no
-// deps — surfaced in the Landing profile drawer (the rank/XP home).
+// deps - surfaced in the Landing profile drawer (the rank/XP home).
 
 export function CareerLedger({ progression }) {
   const s = progression?.stats || {};

@@ -11,7 +11,7 @@ function renderPanel({ initialConfig = DEFAULT_V2_CONFIG } = {}) {
   return { ...utils, onChange };
 }
 
-describe('PreGameSettingsPanel — Select All controls (#66)', () => {
+describe('PreGameSettingsPanel - Select All controls (#66)', () => {
   it('per-section "All" enables only that section', () => {
     const { onChange } = renderPanel();
     fireEvent.click(screen.getByLabelText('Enable all in POWER CARDS'));
@@ -44,7 +44,7 @@ describe('PreGameSettingsPanel — Select All controls (#66)', () => {
 
     const next = onChange.mock.calls[0][0];
     expect(Object.values(next.powerCards.enabled).some(Boolean)).toBe(false);
-    // Systems stay enabled — the button is scoped to its section.
+    // Systems stay enabled - the button is scoped to its section.
     expect(Object.values(next.systems).every(Boolean)).toBe(true);
   });
 

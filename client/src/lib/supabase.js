@@ -1,5 +1,5 @@
 // ============================================================
-// SUPABASE CLIENT — browser-side singleton
+// SUPABASE CLIENT - browser-side singleton
 // ============================================================
 
 import { createClient } from "@supabase/supabase-js";

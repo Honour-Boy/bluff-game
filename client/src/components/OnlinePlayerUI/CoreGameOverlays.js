@@ -37,7 +37,7 @@ export function CoreGameOverlays({
   setShowTurnModal,
   isTutorial = false,
   suppressTurnNotice = false,
-  // #205 — the spin target's equipped gun-skin id (resolved in index.js).
+  // #205 - the spin target's equipped gun-skin id (resolved in index.js).
   spinGunSkinId = null,
 }) {
   // Launch a hand→pile card-fly. The hand card element (data-card-id) is still
@@ -86,7 +86,7 @@ export function CoreGameOverlays({
                 style={{
                   width: 72,
                   height: 100,
-                  // #205 — the confirm preview wears the equipped deck skin.
+                  // #205 - the confirm preview wears the equipped deck skin.
                   background: 'var(--cardface-bg, var(--surface2))',
                   backgroundSize: '100% 100%',
                   border: '2px solid var(--accent)',

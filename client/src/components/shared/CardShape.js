@@ -8,7 +8,7 @@ import { ShapeIcon, SHAPE_META } from './ShapeIcon';
 // dark power cards: subtle gradient backplate, double-rule edge,
 // stronger shape glow, and refined uppercase label typography.
 //
-// API unchanged: props are { type, size } — same callers everywhere.
+// API unchanged: props are { type, size } - same callers everywhere.
 // ──────────────────────────────────────────────────────────────
 
 export function CardShape({ type, size = 'md' }) {
@@ -31,7 +31,7 @@ export function CardShape({ type, size = 'md' }) {
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
-          // Soft top-down gradient — feels like cardstock catching light
+          // Soft top-down gradient - feels like cardstock catching light
           background: `
             linear-gradient(160deg,
               rgba(255,255,255,0.04) 0%,

@@ -36,7 +36,7 @@ function configWith(enabled = {}, copiesPerDeck = 1) {
  *
  * Layout: 2 players, p0 = accused (just played a card), p1 = accuser
  * (current turn, about to call bluff). lastPlayedCard is configurable
- * — by default it MATCHES the required shape (so a bluff would be
+ * - by default it MATCHES the required shape (so a bluff would be
  * wrong), so unless the test overrides currentCardType / shape, the
  * accuser is the spin target by default.
  */
@@ -45,7 +45,7 @@ function buildBluffScenario({
   accuserArmed = null,
   lastPlayedShape = 'circle',
   currentCardType = 'circle',
-  swapPicked = null,      // unused here — kept for symmetry
+  swapPicked = null,      // unused here - kept for symmetry
 } = {}) {
   const room = createRoom('host', MODES.ONLINE, configWith({
     shield: true, mirror: true, swap: true, assassin: true,
@@ -74,7 +74,7 @@ function buildBluffScenario({
   room.playedPile = [playedCard];
   room.lastPlayedCard = playedCard;
   room.currentCardType = currentCardType;
-  // The accused's card is what a bluff resolves against — set the turn-boundary
+  // The accused's card is what a bluff resolves against - set the turn-boundary
   // snapshot directly since these scenarios bypass advanceTurn.
   room.challengeableCard = playedCard;
   room.challengeableCardType = currentCardType;
@@ -108,7 +108,7 @@ function buildBluffScenario({
   return { room, p0, p1 };
 }
 
-// ─── Stage 1 — Shield ────────────────────────────────────────
+// ─── Stage 1 - Shield ────────────────────────────────────────
 
 describe('pipeline / Shield', () => {
   it('blocks the bluff and consumes the Shield', () => {
@@ -132,7 +132,7 @@ describe('pipeline / Shield', () => {
     expect(room.hands.get('p0')).toEqual([]);
   });
 
-  it('is a one-shot — only blocks the next bluff', () => {
+  it('is a one-shot - only blocks the next bluff', () => {
     const { room, p0 } = buildBluffScenario({
       accusedArmed: { power: 'shield', cardId: 'shield-A' },
     });
@@ -147,7 +147,7 @@ describe('pipeline / Shield', () => {
   });
 });
 
-// ─── Stage 2 — Assassin ──────────────────────────────────────
+// ─── Stage 2 - Assassin ──────────────────────────────────────
 
 describe('pipeline / Assassin', () => {
   it('eliminates the bluff caller on a WRONG bluff (accused told truth)', () => {
@@ -169,7 +169,7 @@ describe('pipeline / Assassin', () => {
     expect(room.discardPile.find(c => c.id === 'kill-A')).toBeTruthy();
   });
 
-  it('backfires on a CORRECT bluff — accused draws +3, no elimination, no spin (#63)', () => {
+  it('backfires on a CORRECT bluff - accused draws +3, no elimination, no spin (#63)', () => {
     // Accused played a wrong-shape card → bluff is CORRECT → accused
     // would normally spin. With Assassin armed, the strike backfires:
     // the holder takes the +3 penalty and no one spins.
@@ -196,10 +196,10 @@ describe('pipeline / Assassin', () => {
   });
 });
 
-// ─── Stage 3 — Mirror ────────────────────────────────────────
+// ─── Stage 3 - Mirror ────────────────────────────────────────
 
 describe('pipeline / Mirror', () => {
-  it('scenario 1 — incoming bluff on holder is reflected back to accuser', () => {
+  it('scenario 1 - incoming bluff on holder is reflected back to accuser', () => {
     const { room, p0, p1 } = buildBluffScenario({
       accusedArmed: { power: 'mirror', cardId: 'mir-A' },
       lastPlayedShape: 'square',  // bluff would be CORRECT → accused
@@ -219,7 +219,7 @@ describe('pipeline / Mirror', () => {
     expect(outcome.mirrorEndsAccusedTurn).toBe(true);
   });
 
-  it('scenario 2 — outgoing wrong bluff by Mirror holder reflects to accused', () => {
+  it('scenario 2 - outgoing wrong bluff by Mirror holder reflects to accused', () => {
     // Accuser holds Mirror. Calls bluff on accused who told the truth
     // (last played card matches required) → bluff is WRONG → accuser
     // would normally spin → Mirror redirects to accused.
@@ -241,7 +241,7 @@ describe('pipeline / Mirror', () => {
   });
 
   it('scenario 2 does NOT trigger when the Mirror holder calls a CORRECT bluff', () => {
-    // If the bluff is correct, the accuser doesn't spin — accused
+    // If the bluff is correct, the accuser doesn't spin - accused
     // does. Mirror only fires on the "would normally spin me" path.
     const { room, p1 } = buildBluffScenario({
       accuserArmed: { power: 'mirror', cardId: 'mir-out' },
@@ -257,7 +257,7 @@ describe('pipeline / Mirror', () => {
   });
 });
 
-// ─── Stage 4 — Swap ──────────────────────────────────────────
+// ─── Stage 4 - Swap ──────────────────────────────────────────
 
 describe('pipeline / Swap', () => {
   function buildSwapScenario({ pickedShape = 'circle' } = {}) {
@@ -284,13 +284,13 @@ describe('pipeline / Swap', () => {
     const { events, outcome } = resolveBluff(room, 'p1');
     expect(outcome.kind).toBe('swap_pending');
     expect(outcome.swapHolderId).toBe('p0');
-    // No banner events fire yet — the swap event lands on resume.
+    // No banner events fire yet - the swap event lands on resume.
     expect(events).toEqual([]);
     // Swap card NOT yet consumed (waiting for pick).
     expect(p0.armedPowerCard).not.toBeNull();
   });
 
-  it('resumeAfterSwap re-runs bluff check against the swapped card — match → accuser spins', () => {
+  it('resumeAfterSwap re-runs bluff check against the swapped card - match → accuser spins', () => {
     const { room, earlierCard } = buildSwapScenario({ pickedShape: 'circle' });
     resolveBluff(room, 'p1');
 
@@ -345,7 +345,7 @@ describe('pipeline / clash priorities', () => {
   it('Shield > Assassin: Shield blocks before Assassin can fire', () => {
     // Accused holds Assassin AND Shield. Per spec the activation
     // model only allows ONE armed card at a time. To test the clash
-    // we DIRECTLY simulate "Shield is armed" — the spec text is
+    // we DIRECTLY simulate "Shield is armed" - the spec text is
     // "Shield blocks BEFORE Assassin can fire", which in a
     // single-card-armed world means: an armed Shield blocks a bluff
     // before the pipeline ever evaluates whether Assassin would
@@ -358,7 +358,7 @@ describe('pipeline / clash priorities', () => {
     expect(outcome.kind).toBe('blocked');
     expect(events[0].kind).toBe('shield_blocked');
     // Shield consumed, but if there had been a *second* armed card
-    // (future Collector role), Assassin's stage would never fire —
+    // (future Collector role), Assassin's stage would never fire -
     // the pipeline short-circuited.
     expect(p0.armedPowerCard).toBeNull();
   });
@@ -366,7 +366,7 @@ describe('pipeline / clash priorities', () => {
   it('Assassin > Mirror: Mirror cannot deflect an Assassin elimination', () => {
     // Spec: "Mirror cannot deflect an Assassin elimination. Bluff
     // caller is eliminated regardless of Mirror." Same single-armed
-    // constraint applies — we test that the pipeline runs Assassin
+    // constraint applies - we test that the pipeline runs Assassin
     // BEFORE Mirror, so even if a hypothetical setup had both, the
     // accuser dies. We simulate this by stamping both armed states.
     const { room, p0, p1 } = buildBluffScenario({
@@ -397,7 +397,7 @@ describe('pipeline / clash priorities', () => {
       lastPlayedShape: 'square',
       currentCardType: 'circle',
     });
-    // Add an earlier card to swap with — also wrong-shape, so the
+    // Add an earlier card to swap with - also wrong-shape, so the
     // bluff check still says CORRECT after swap.
     const earlier = { id: 'old-1', type: 'shape', shape: 'star', number: 3 };
     room.playedPile = [earlier, room.playedPile[0]];
@@ -409,7 +409,7 @@ describe('pipeline / clash priorities', () => {
     expect(outcome.kind).toBe('spin');
     expect(outcome.bluffIsCorrect).toBe(true); // swapped card still wrong
     // Without Mirror, accused would spin. With outgoing Mirror it's
-    // only triggered when bluff is WRONG — so here Mirror does NOT
+    // only triggered when bluff is WRONG - so here Mirror does NOT
     // fire and accused spins. Confirms Mirror runs AFTER swap+check.
     expect(outcome.spinTargetId).toBe('p0');
     // Mirror was not triggered (correct bluff path).
@@ -502,7 +502,7 @@ describe('applyAssassinBackfirePenalty', () => {
     room.currentTurnIndex = 0;
     room.phase = 'playing';
     room.hands = new Map();
-    // Hand of 4 shape cards — Assassin already consumed by the
+    // Hand of 4 shape cards - Assassin already consumed by the
     // pipeline before this helper runs.
     const fillers = Array.from({ length: 4 }).map((_, i) => ({
       id: `s-${i}`, type: 'shape', shape: 'circle', number: i + 1,

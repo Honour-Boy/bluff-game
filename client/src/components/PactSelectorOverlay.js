@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { PactModalShell, pactGhostBtnStyle } from './pact/PactSigil';
 
-// Covenant — The Pact selector. During pre_game ONE player is secretly chosen to
+// Covenant - The Pact selector. During pre_game ONE player is secretly chosen to
 // forge a bond; instead of the normal power-card pick they choose a partner here.
 // A sensible random default is already locked in server-side, so this is an
 // override: pick whoever you trust (or close it and keep the default). Driven by

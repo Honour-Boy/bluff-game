@@ -2,10 +2,10 @@ import { describe, it, expect, vi } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
 import { distributePlayers, orderClockwiseFromLocal, CardHand, coachingActive } from '../OnlinePlayerUI';
 
-// Compact fixture helper — only the fields seating cares about.
+// Compact fixture helper - only the fields seating cares about.
 const mkPlayers = (...ids) => ids.map((id) => ({ id, username: id.toUpperCase(), status: 'alive' }));
 
-// Compact card factory — only the fields CardHand looks at.
+// Compact card factory - only the fields CardHand looks at.
 const card = (id, overrides = {}) => ({
   id,
   shape: overrides.shape ?? 'circle',
@@ -13,7 +13,7 @@ const card = (id, overrides = {}) => ({
   ...overrides,
 });
 
-describe('coachingActive — sandbox is a plain online game (no coaching layer)', () => {
+describe('coachingActive - sandbox is a plain online game (no coaching layer)', () => {
   it('is true for a coached tutorial room (Basics / Power Clinic)', () => {
     expect(coachingActive({ isTutorial: true })).toBe(true);
     expect(coachingActive({ isTutorial: true, sandbox: false })).toBe(true);
@@ -21,7 +21,7 @@ describe('coachingActive — sandbox is a plain online game (no coaching layer)'
 
   it('is FALSE for a sandbox room even though it is flagged isTutorial', () => {
     // Sandbox carries isTutorial server-side (start/restart bypass + teardown)
-    // but must NOT mount TutorialLayer / coach hints — and the header must show
+    // but must NOT mount TutorialLayer / coach hints - and the header must show
     // "Rules", not "? Guide". This gate is what turns all of that off.
     expect(coachingActive({ isTutorial: true, sandbox: true })).toBe(false);
   });
@@ -34,7 +34,7 @@ describe('coachingActive — sandbox is a plain online game (no coaching layer)'
   });
 });
 
-describe('orderClockwiseFromLocal — issue #82', () => {
+describe('orderClockwiseFromLocal - issue #82', () => {
   it('returns the input unchanged when turnOrder is missing or empty', () => {
     const others = mkPlayers('a', 'b', 'c');
     expect(orderClockwiseFromLocal(others, undefined, 'me')).toEqual(others);
@@ -44,7 +44,7 @@ describe('orderClockwiseFromLocal — issue #82', () => {
 
   it('returns the input unchanged when the local user is not in turnOrder', () => {
     const others = mkPlayers('a', 'b', 'c');
-    // 'me' missing from turnOrder — bail out, don't crash
+    // 'me' missing from turnOrder - bail out, don't crash
     expect(orderClockwiseFromLocal(others, ['a', 'b', 'c'], 'me')).toEqual(others);
   });
 
@@ -65,14 +65,14 @@ describe('orderClockwiseFromLocal — issue #82', () => {
 
   it('appends players present in others but missing from turnOrder', () => {
     // Spectator/eliminated player 'ghost' lives in others but is no
-    // longer in turnOrder — must still appear in the seating list.
+    // longer in turnOrder - must still appear in the seating list.
     const others = mkPlayers('a', 'ghost', 'b');
     const ordered = orderClockwiseFromLocal(others, ['me', 'a', 'b'], 'me');
     expect(ordered.map(p => p.id)).toEqual(['a', 'b', 'ghost']);
   });
 });
 
-describe('distributePlayers — clockwise seating (issue #82)', () => {
+describe('distributePlayers - clockwise seating (issue #82)', () => {
   it('returns empty seats when no other players', () => {
     expect(distributePlayers([])).toEqual({ top: [], left: [], right: [] });
   });
@@ -99,7 +99,7 @@ describe('distributePlayers — clockwise seating (issue #82)', () => {
   });
 
   it('right column reads bottom→top in clockwise order (last array entry is closest to local)', () => {
-    // 7 others — enough to fill right with multiple chips.
+    // 7 others - enough to fill right with multiple chips.
     // n=7: topCount=ceil(7/3)=3, remaining=4, rightCount=2, leftCount=2
     const others = mkPlayers('a', 'b', 'c', 'd', 'e', 'f', 'g');
     const seats = distributePlayers(others);
@@ -107,12 +107,12 @@ describe('distributePlayers — clockwise seating (issue #82)', () => {
     expect(seats.top.map(p => p.id)).toEqual(['e', 'd', 'c']);
     expect(seats.left.map(p => p.id)).toEqual(['f', 'g']);
     // The chip rendered at the bottom of the right column (last entry)
-    // is the player closest in clockwise order — i.e. the next-in-turn.
+    // is the player closest in clockwise order - i.e. the next-in-turn.
     expect(seats.right[seats.right.length - 1].id).toBe('a');
   });
 
   it('odd remainder favours the right column (next-in-turn keeps a right seat)', () => {
-    // 5 others — n=5: topCount=2, remaining=3, rightCount=2, leftCount=1.
+    // 5 others - n=5: topCount=2, remaining=3, rightCount=2, leftCount=1.
     const others = mkPlayers('a', 'b', 'c', 'd', 'e');
     const seats = distributePlayers(others);
     expect(seats.right.map(p => p.id)).toEqual(['b', 'a']);
@@ -121,14 +121,14 @@ describe('distributePlayers — clockwise seating (issue #82)', () => {
   });
 
   it('caps each side at 6 chips and pushes overflow to the top (large lobby)', () => {
-    // 14 others — n=14, n>10 so topCount = max(0, 14 - 12) = 2,
+    // 14 others - n=14, n>10 so topCount = max(0, 14 - 12) = 2,
     // remaining=12, rightCount=6, leftCount=6.
     const others = mkPlayers(...Array.from({ length: 14 }, (_, i) => `p${i}`));
     const seats = distributePlayers(others);
     expect(seats.right).toHaveLength(6);
     expect(seats.left).toHaveLength(6);
     expect(seats.top).toHaveLength(2);
-    // Sum equals input length — no chip dropped.
+    // Sum equals input length - no chip dropped.
     expect(seats.right.length + seats.top.length + seats.left.length).toBe(14);
     // No duplicates across seats.
     const allIds = [...seats.right, ...seats.top, ...seats.left].map(p => p.id);
@@ -171,7 +171,7 @@ describe('clockwise seating reflows on elimination (issue #82)', () => {
   });
 });
 
-describe('CardHand — armed power-card visual state (issue #64)', () => {
+describe('CardHand - armed power-card visual state (issue #64)', () => {
   it('renders the placeholder when the hand is empty', () => {
     render(<CardHand hand={[]} />);
     expect(screen.getByText(/No cards in hand/i)).toBeInTheDocument();
@@ -202,7 +202,7 @@ describe('CardHand — armed power-card visual state (issue #64)', () => {
     );
     const lock = screen.getByLabelText(/Activated - awaiting trigger/i);
     // The lock badge is a sibling of the dimmed inner. The dimmed
-    // inner is its previousElementSibling — assert it's dimmed to the
+    // inner is its previousElementSibling - assert it's dimmed to the
     // shipped 0.48 (CardHand.js sets opacity: isArmed ? 0.48 : 1).
     const inner = lock.previousElementSibling;
     expect(inner).not.toBeNull();
@@ -223,7 +223,7 @@ describe('CardHand — armed power-card visual state (issue #64)', () => {
     const outer = lock.parentElement; // the per-card wrapper
     expect(outer.style.pointerEvents).toBe('none');
 
-    // Defence in depth — even if the test fires click directly,
+    // Defence in depth - even if the test fires click directly,
     // the onClick guard (`cardInteractive && onCardClick`) ignores it.
     fireEvent.click(outer);
     expect(onCardClick).not.toHaveBeenCalled();

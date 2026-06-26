@@ -1,5 +1,5 @@
 // ============================================================
-// Tests for v2 Phase G — Pre-game selection & role reveal (#116)
+// Tests for v2 Phase G - Pre-game selection & role reveal (#116)
 //
 // Covers:
 //   - isBarehandVisible threshold (> 9)
@@ -184,7 +184,7 @@ describe('beginPreGame', () => {
     }
   });
 
-  // #2 — the "Claim your edge" picker is only worth showing when there are at
+  // #2 - the "Claim your edge" picker is only worth showing when there are at
   // least two power types to choose between. With 0–1 powers enabled it's
   // skipped: no pools are built and a flag tells the handler to chain straight
   // to finalize after the role-reveal window.
@@ -223,9 +223,9 @@ describe('beginPreGame', () => {
   });
 });
 
-// ─── finalizePreGame — skipped selection (#2) ────────────────
+// ─── finalizePreGame - skipped selection (#2) ────────────────
 
-describe('finalizePreGame — skipped selection', () => {
+describe('finalizePreGame - skipped selection', () => {
   it('resumes play without touching deal-time grants when selection was skipped', () => {
     const room = makeOnlineRoom(2, defaultRoomConfig()); // all powers off → skip
     startGame(room);
@@ -346,7 +346,7 @@ describe('finalizePreGame', () => {
     expect(room.pregameSelectionDeadline).toBeUndefined();
   });
 
-  // #140 — a power pick becomes the player's power slot card (the deal-time
+  // #140 - a power pick becomes the player's power slot card (the deal-time
   // grant is replaced) and is NOT also appended to the playable hand.
   it('routes a power pick into the power slot, not the hand', () => {
     const room = makeRoomInPreGameSelection(2);
@@ -363,7 +363,7 @@ describe('finalizePreGame', () => {
     expect(room.hands.get('p0')).toHaveLength(6);
   });
 
-  // #140 — the "Additional Card" (shape) pick is the replacement penalty for
+  // #140 - the "Additional Card" (shape) pick is the replacement penalty for
   // forgoing a power card: +1 shape in hand and an EMPTY power slot.
   it('routes an Additional (shape) pick into the hand with no power card', () => {
     const room = makeRoomInPreGameSelection(2);
@@ -377,7 +377,7 @@ describe('finalizePreGame', () => {
     expect(room.hands.get('p0').some(c => c.id === chosen.id)).toBe(true);
   });
 
-  // #140 — no player ever ends pre-game holding two power cards (a power pick
+  // #140 - no player ever ends pre-game holding two power cards (a power pick
   // OR an additional card, never both), including auto-assigned non-responders.
   it('never grants both a power card and an additional card (double-reward fix)', () => {
     const room = makeRoomInPreGameSelection(4);
@@ -399,7 +399,7 @@ describe('finalizePreGame', () => {
     }
   });
 
-  // #140 — a player who never picked (auto-assigned) must not open the game.
+  // #140 - a player who never picked (auto-assigned) must not open the game.
   it('seeds the first active turn to a player who selected on time', () => {
     const room = makeRoomInPreGameSelection(3);
     // Only the LAST player in turn order picks; the first two are auto-assigned.
@@ -412,7 +412,7 @@ describe('finalizePreGame', () => {
     expect(opener).toBe(lastId);
   });
 
-  it('is idempotent — a second finalise after playing is a no-op', () => {
+  it('is idempotent - a second finalise after playing is a no-op', () => {
     const room = makeRoomInPreGameSelection(2);
     finalizePreGame(room); // auto-assigns both
     const second = finalizePreGame(room);
@@ -420,7 +420,7 @@ describe('finalizePreGame', () => {
   });
 });
 
-// ─── §2.1 — late-pick threshold + first-turn deprioritisation ─
+// ─── §2.1 - late-pick threshold + first-turn deprioritisation ─
 
 describe('§2.1 late pickers (12s threshold)', () => {
   it('flags an early confirmation as not late and records nobody', () => {
@@ -470,7 +470,7 @@ describe('§2.1 late pickers (12s threshold)', () => {
 
 // ─── serializeRoom pregame block ─────────────────────────────
 
-describe('serializeRoom — pregame block', () => {
+describe('serializeRoom - pregame block', () => {
   it('exposes only the requesting player own pool + live counts', () => {
     const room = makeRoomInPreGameSelection(11); // > 9 → barehandVisible
     const view0 = serializeRoom(room, 'p0');

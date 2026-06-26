@@ -1,5 +1,5 @@
 // ============================================================
-// HANDLERS — Voice (LiveKit token minting)
+// HANDLERS - Voice (LiveKit token minting)
 // ============================================================
 // Returns a JWT scoped to the LiveKit room `bluff:<roomCode>`. The
 // caller must already be authenticated AND a member of the game room.

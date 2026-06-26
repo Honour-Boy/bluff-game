@@ -1,8 +1,8 @@
 // ============================================================
-// ENGINE — Chamber / spin-trigger system
+// ENGINE - Chamber / spin-trigger system
 // ============================================================
 // Backend-authoritative randomness. Outcome-first, chamber-consistent
-// model (issue #67) — see pullTrigger doc.
+// model (issue #67) - see pullTrigger doc.
 
 const { CHAMBER_SIZE } = require('./constants');
 
@@ -16,7 +16,7 @@ const { CHAMBER_SIZE } = require('./constants');
  *   bullets │ 1   2    3    4    5    6
  *   death % │ 15  24   33   50   75   100
  *
- * 0 bullets → 0% (you cannot die from an empty chamber — chamber
+ * 0 bullets → 0% (you cannot die from an empty chamber - chamber
  * realism is preserved; see pullTrigger). The curve only sets the
  * *probability*; pullTrigger then selects a chamber slot consistent
  * with the drawn outcome so visuals never contradict the result.
@@ -43,7 +43,7 @@ function deathProbability(bulletCount) {
 /**
  * Create a fresh chamber with `bullets` bullets at random positions.
  * Default = 1 bullet (vanilla rules). Russian Roulette risk modifier
- * (Phase E1) starts every chamber with 2 bullets — pass `bullets: 2`
+ * (Phase E1) starts every chamber with 2 bullets - pass `bullets: 2`
  * (≈24% first-spin death on the issue #67 curve).
  */
 function initChamber(bullets = 1) {
@@ -74,7 +74,7 @@ function addBulletToChamber(chamber) {
 /**
  * Pull the trigger.
  *
- * Issue #67 — outcome-first, chamber-consistent model:
+ * Issue #67 - outcome-first, chamber-consistent model:
  *   1. Death is drawn from the non-linear DEATH_CURVE keyed by the
  *      *pre-spin* bullet count (NOT raw `slot has bullet`). This makes
  *      the early game gentler and the late game spike.
@@ -82,18 +82,18 @@ function addBulletToChamber(chamber) {
  *      the outcome is decided we *select* `spinIndex` from the slots
  *      that agree with it: a bullet slot on death, an empty slot on
  *      survival. The emitted `chamber`/`chamberAfter`/`spinIndex` and
- *      `eliminated` are therefore always logically consistent —
+ *      `eliminated` are therefore always logically consistent -
  *      `chamber[spinIndex] === 'bullet'` iff `eliminated`.
  *   3. Chamber realism is preserved: 0 bullets ⇒ 0% (curve), so you
  *      can never "die" with no bullet; 6 bullets ⇒ 100%, so you can
  *      never "survive" a full chamber. Defensive guards keep the
  *      invariant even if a caller passes an impossible state.
  *
- * v2 Phase E1 — Risk modifiers:
+ * v2 Phase E1 - Risk modifiers:
  *   - hotPotato: on SURVIVAL, add 2 bullets instead of 1. Clamps at
  *     full chamber.
  *
- * (Double Barrel is NOT a pull-time modifier — it loads two bullets into
+ * (Double Barrel is NOT a pull-time modifier - it loads two bullets into
  * every chamber at game start; see initChamber(2) in engine/room.js.)
  *
  * Returns { spinIndex, eliminated, chamber, bulletCount }.

@@ -1,18 +1,18 @@
 // ============================================================
-// ENGINE — Spotlight tour staged instances (pure)
+// ENGINE - Spotlight tour staged instances (pure)
 // ============================================================
 // The "Show me around" tour runs its Part-B (in-game) beats over REAL staged
 // instances in the live practice room, firing the REAL socket events. This
 // module deterministically stages each instance and exposes the completion
-// predicate the director (lib/tutorialDirector.js) polls to advance — mirroring
+// predicate the director (lib/tutorialDirector.js) polls to advance - mirroring
 // engine/tutorialScenarios.js (the Power Clinic), just simpler.
 //
 // Three ordered steps cover the nine Part-B beats:
-//   play_card        (B1–B4) — browse the hand, tap a card, confirm, end turn.
-//   call_bluff_chain (B5–B7) — call a (truthful) bluff → it's WRONG → you face
+//   play_card        (B1–B4) - browse the hand, tap a card, confirm, end turn.
+//   call_bluff_chain (B5–B7) - call a (truthful) bluff → it's WRONG → you face
 //                              the chamber → pull the trigger (survive: empty
 //                              chamber) → continue.
-//   activate_power   (B8–B10) — tap a seeded Peek, activate it, read the result.
+//   activate_power   (B8–B10) - tap a seeded Peek, activate it, read the result.
 //
 // Pure: no I/O, no sockets, no timers. The director owns timing + broadcasts; the
 // bot is FROZEN for the whole tour (lib/bots.js bails on lesson 'tour'), so the
@@ -24,7 +24,7 @@ const BOT_ID = 'bot:1';
 const REQUIRED_SHAPE = 'circle';
 const MISMATCH_SHAPES = ['triangle', 'square', 'cross', 'star'];
 
-// Ordered step ids — the director stages these one at a time.
+// Ordered step ids - the director stages these one at a time.
 const TOUR_STEPS = ['play_card', 'call_bluff_chain', 'activate_power'];
 
 // ─── Deterministic card factories (namespaced ids, never collide) ─────────────
@@ -113,7 +113,7 @@ const _STEP_DEFS = {
       room.hands.set(hid, [_shape(REQUIRED_SHAPE, 7), _shape(REQUIRED_SHAPE, 3), _shape(REQUIRED_SHAPE, 11)]);
       room.hands.set(BOT_ID, [_shape('triangle', 3), _shape('cross', 8)]);
     },
-    // Done once the human has played a card AND ended their turn — the (frozen)
+    // Done once the human has played a card AND ended their turn - the (frozen)
     // bot is now on turn.
     complete(room) {
       return room.turnOrder?.[room.currentTurnIndex] === BOT_ID;
@@ -166,7 +166,7 @@ const _STEP_DEFS = {
       room.turnOrder = [hid, BOT_ID];
       room.currentTurnIndex = 0;          // human on turn
       room.isFirstTurn = false;
-      room.prevTurnPlayerId = BOT_ID;     // bot "just played" — Peek reveals it
+      room.prevTurnPlayerId = BOT_ID;     // bot "just played" - Peek reveals it
       const botPlay = _mismatch(0);
       room.challengeableCard = botPlay;
       room.challengeableCardType = REQUIRED_SHAPE;

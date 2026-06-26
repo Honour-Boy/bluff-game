@@ -1,5 +1,5 @@
 // ============================================================
-// ENGINE — Card-type helpers + online-mode card play
+// ENGINE - Card-type helpers + online-mode card play
 // ============================================================
 // validateAndPlayCard, ensureDrawPile, drawCardForPlayer are the
 // engine-side mutators behind the play_card_online / draw paths.
@@ -86,7 +86,7 @@ function drawCardForPlayer(room, playerId) {
 
     if (card?.type === 'power') {
       if (slot.length >= cap) {
-        // Slot full — discard silently; caller may emit power_card_discarded.
+        // Slot full - discard silently; caller may emit power_card_discarded.
         room.discardPile.push(card);
         continue;
       }
@@ -106,7 +106,7 @@ function drawCardForPlayer(room, playerId) {
   return null;
 }
 
-// #239 — pick a sensible card for the idle-turn auto-resolver to play on an AFK
+// #239 - pick a sensible card for the idle-turn auto-resolver to play on an AFK
 // player's behalf. Prefers an HONEST play (shape matches the required
 // `currentCardType`) so the auto-played card can't be successfully bluff-called
 // and spin the absent player; otherwise falls back to any plain shape card. Whot

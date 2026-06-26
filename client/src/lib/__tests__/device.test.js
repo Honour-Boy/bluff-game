@@ -7,7 +7,7 @@ beforeEach(() => {
   localStorage.clear();
 });
 
-describe('getDeviceId — persistent per-browser device id', () => {
+describe('getDeviceId - persistent per-browser device id', () => {
   it('mints a UUID-shaped id and persists it to localStorage', () => {
     const id = getDeviceId();
     expect(id).toMatch(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i);

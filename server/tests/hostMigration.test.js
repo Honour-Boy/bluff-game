@@ -1,5 +1,5 @@
 // ============================================================
-// Tests for §2.2 — in-room host migration helper.
+// Tests for §2.2 - in-room host migration helper.
 //
 // pickReplacementHost is the pure engine half of the leave_room
 // host-migration flow: when the acting host leaves a live game it

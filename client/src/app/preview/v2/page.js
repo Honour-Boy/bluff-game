@@ -2,7 +2,7 @@
 
 // ─── /preview/v2 ──────────────────────────────────────────────
 // Internal preview route for the Phase G2 + G3 visual components.
-// Not linked from the main app — visit /preview/v2 directly.
+// Not linked from the main app - visit /preview/v2 directly.
 // ──────────────────────────────────────────────────────────────
 
 import { useState } from "react";

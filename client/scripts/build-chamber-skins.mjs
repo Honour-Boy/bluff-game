@@ -1,13 +1,13 @@
 // ============================================================
-// #205 — Build chamber (cylinder) skin art from the owner traces
+// #205 - Build chamber (cylinder) skin art from the owner traces
 // ============================================================
-// Inputs: cosmetic-previews/chamber{1..5}.svg at the repo root — full-color
+// Inputs: cosmetic-previews/chamber{1..5}.svg at the repo root - full-color
 // auto-traced vectorizations of the owner's chamber art (1.3–4.1 MB each,
 // LOCAL-ONLY / gitignored). 1=noir 2=neon 3=crimson 4=cosmos 5=kente.
 //
 // Each trace's disc is measured (centre + radius, hardcoded below from a
-// pixel scan) and mapped onto CylinderSVG's exact geometry — body disc r 86
-// at (100,100) in a 200×200 box — then clipped to the disc and rasterized
+// pixel scan) and mapped onto CylinderSVG's exact geometry - body disc r 86
+// at (100,100) in a 200×200 box - then clipped to the disc and rasterized
 // ONCE to a transparent 640×640 PNG (the in-game cylinder is 200 CSS px, so
 // 640 stays sharp up to 3× DPR; shipping the raw traces as SVG would mean
 // 1–4 MB per skin). Output: client/public/cosmetics/chamber_<name>.png
@@ -33,7 +33,7 @@ const { chromium } = require('playwright-core');
 // Disc centre + radius measured from each 1024×1024 trace (brightness scan
 // against the near-black background).
 //
-// `sectors`: the kente art has EIGHT recesses at 45° spacing — a six-shot
+// `sectors`: the kente art has EIGHT recesses at 45° spacing - a six-shot
 // cylinder needs six at 60°. The disc is recomposed from the art itself:
 // six 60° wedges, each holding a copy of the artwork re-clocked by the
 // given rotation so a real recess lands in each game position (45°→60°,
@@ -60,7 +60,7 @@ for (const d of CHAMBER_SKINS) {
   const inner = raw.slice(open + 1, close);
   const s = (86 / d.r).toFixed(6);
 
-  // The clip must sit on an UNTRANSFORMED group — clip-path on the same
+  // The clip must sit on an UNTRANSFORMED group - clip-path on the same
   // element as the transform gets mapped into the trace's coordinate space.
   let body;
   let sectorDefs = '';

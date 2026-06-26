@@ -64,7 +64,7 @@ export function useGameSocketEvents({
         }
       }
       if (state?.lastAction?.type === 'spin_result') setSpinDismissed(false);
-      // #205 — the XP summary belongs to the game_over screen only; a fresh
+      // #205 - the XP summary belongs to the game_over screen only; a fresh
       // deal / reset (any other phase) clears it. The xp_awarded event itself
       // arrives just BEFORE the game_over room_state on the same socket.
       if (state?.phase && state.phase !== 'game_over') setXpAward(null);
@@ -89,7 +89,7 @@ export function useGameSocketEvents({
       }
     };
 
-    // §2.1 — answer the server's keepalive heartbeat so there's a steady trickle
+    // §2.1 - answer the server's keepalive heartbeat so there's a steady trickle
     // of INBOUND traffic (on top of the engine-level pong), helping free-tier
     // hosts keep the instance awake during a live game. Pure liveness; no state.
     const onServerKeepalive = () => {
@@ -103,7 +103,7 @@ export function useGameSocketEvents({
       const id = `${event.kind}:${event.holderId || '?'}:${Date.now()}:${Math.random().toString(36).slice(2, 8)}`;
       setPowerEventQueue((queue) => [...queue, { id, ...event }]);
     };
-    // #205 — private end-of-game XP summary for this client.
+    // #205 - private end-of-game XP summary for this client.
     const onXpAwarded = (payload = {}) => {
       if (typeof payload?.gained !== 'number') return;
       setXpAward(payload);
@@ -117,7 +117,7 @@ export function useGameSocketEvents({
     const onHostDisconnecting = ({ countdown } = {}) => {
       notify(`Host disconnected. Game ends in ${countdown ?? 30}s if they don't return.`, 'error');
     };
-    // #183 — a group stand-in was appointed, or the owner reclaimed / was
+    // #183 - a group stand-in was appointed, or the owner reclaimed / was
     // handed host back. Host controls already followed via room_state; this
     // toast just tells the table who now holds them.
     const onHostChanged = ({ hostName, reason } = {}) => {
@@ -129,7 +129,7 @@ export function useGameSocketEvents({
         'info',
       );
     };
-    // #183 — the acting host left mid-game and the seat migrated to a remaining
+    // #183 - the acting host left mid-game and the seat migrated to a remaining
     // player (handlers/room.js leave_room). Same user-facing notice.
     const onHostMigrated = ({ newHostName } = {}) => {
       if (!newHostName) return;
@@ -140,14 +140,14 @@ export function useGameSocketEvents({
       clearSession();
       notify(reason || 'The game has ended.', 'error');
     };
-    // #156 — host removed us from the group; drop out of any live room and
+    // #156 - host removed us from the group; drop out of any live room and
     // return to the landing screen, mirroring how game_ended is handled.
     const onRemovedFromGroup = ({ reason } = {}) => {
       clearRoomSession();
       clearSession();
       notify(reason || 'You were removed from the group.', 'error');
     };
-    // #244 — the host kicked us from the room; drop out and return to landing,
+    // #244 - the host kicked us from the room; drop out and return to landing,
     // mirroring game_ended / removed_from_group.
     const onKicked = ({ reason } = {}) => {
       clearRoomSession();

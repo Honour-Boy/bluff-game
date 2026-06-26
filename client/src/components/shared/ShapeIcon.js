@@ -10,7 +10,7 @@ export const SHAPE_COLORS = {
   whot: "#e8ff4a",
 };
 
-// ─── SVG paths — all in a 100×100 viewBox ────────────────────
+// ─── SVG paths - all in a 100×100 viewBox ────────────────────
 // Every shape is drawn with comparable visual weight so they feel
 // consistent when placed side-by-side at the same pixel size.
 const PATHS = {
@@ -38,7 +38,7 @@ const PATHS = {
     />
   ),
 
-  // Whot wild-card — "W" glyph in a circle
+  // Whot wild-card - "W" glyph in a circle
   whot: (c) => (
     <g>
       <circle cx="50" cy="50" r="44" fill="none" stroke={c} strokeWidth="6" />
@@ -59,7 +59,7 @@ const PATHS = {
 };
 
 /**
- * ShapeIcon — renders a crisp SVG icon for a Whot shape.
+ * ShapeIcon - renders a crisp SVG icon for a Whot shape.
  *
  * Props
  *   shape   : 'circle' | 'triangle' | 'cross' | 'square' | 'star' | 'whot'

@@ -5,7 +5,7 @@ import { POWER_META, POWER_ICONS } from '../shared/PowerCard';
 // ─── Card-fly animation (#5, done properly) ───────────────────────────────────
 // A fixed-position clone of the played card flies from its spot in the hand to
 // the centre discard pile, then fades. Because it's rendered fixed at the app
-// root (top z-index) it can never be clipped by the hand trough's overflow —
+// root (top z-index) it can never be clipped by the hand trough's overflow -
 // the problem that sank the earlier in-trough attempt.
 //
 // Usage:
@@ -32,7 +32,7 @@ export function useCardFlight() {
   return { flights, launch };
 }
 
-// Card back — used while a card is travelling to/from the deck face-down.
+// Card back - used while a card is travelling to/from the deck face-down.
 // Colours follow the viewer's equipped cosmetic (#205, CSS vars set on the
 // OnlinePlayerUI root); the fallbacks are the original leather look.
 function FlyingCardBack() {
@@ -64,7 +64,7 @@ function FlyingCardFace({ card }) {
     <div style={{
       width: '100%',
       height: '100%',
-      // #205 — all faces follow the equipped deck skin (frame art via
+      // #205 - all faces follow the equipped deck skin (frame art via
       // --cardface-bg); each fallback is the card type's original gradient.
       background: isPower
         ? 'var(--cardface-bg, linear-gradient(160deg, #1a0e08 0%, #0d0805 55%, #090503 100%))'

@@ -1,5 +1,5 @@
 // ============================================================
-// Tests for v2 Phase E — Risk + Room modifiers
+// Tests for v2 Phase E - Risk + Room modifiers
 //
 // Covers, per the locked roadmap (sections 3 + 4):
 //
@@ -7,20 +7,20 @@
 //     - Double Barrel: every chamber starts with 2 bullets at startGame
 //       (≈24% first-spin on the issue #67 curve). NOT a pull-time modifier.
 //     - Russian Roulette: a failed bluff fires an IMMEDIATE spin (no manual
-//       pull / betting pause) — see shouldImmediateSpin + the bluff handlers.
+//       pull / betting pause) - see shouldImmediateSpin + the bluff handlers.
 //       Does NOT change the chamber load (stays at 1 bullet).
 //     - Hot Potato: +2 bullets on survival; clamps at 6
 //     - Redemption Spin: K-by-table selection, fresh 3-card hand on
 //       success, chamber resets to 1 bullet on success, stays dead on
 //       failure
 //
-//   Issue #67 — Math.random() draw order assumed in tests below:
+//   Issue #67 - Math.random() draw order assumed in tests below:
 //     [0]   outcome roll (vs DEATH_CURVE[bulletCount])
 //     [n]   spinIndex slot pick within the consistent slot subset
 //     [n+]  addBulletToChamber slot pick(s) on survival (1, or 2 w/ HP)
 //
 //   Room:
-//     - Speed Mode: 15s timer plumbing (state-only — no real timer in
+//     - Speed Mode: 15s timer plumbing (state-only - no real timer in
 //       these tests; we verify engine-level helpers + serialisation)
 //     - Sudden Death: counter increments, threshold bump, reset on
 //       elimination
@@ -77,7 +77,7 @@ function makeOnlineRoom(playerCount, cfg = null) {
 
 const countBullets = (chamber) => chamber.filter((s) => s === 'bullet').length;
 
-// Pin a deterministic Math.random sequence — pop one at a time. When
+// Pin a deterministic Math.random sequence - pop one at a time. When
 // the sequence is exhausted, return 0 (safe default).
 function pinRandom(seq) {
   const queue = [...seq];
@@ -95,10 +95,10 @@ afterEach(() => {
 // Risk: Double Barrel
 // ============================================================
 
-describe('Risk modifier — Double Barrel', () => {
+describe('Risk modifier - Double Barrel', () => {
   // Double Barrel loads TWO bullets into every chamber at game start
   // (≈24% first-spin death on the issue #67 curve). It is NOT a pull-time
-  // modifier — pullTrigger ignores a `doubleBarrel` flag.
+  // modifier - pullTrigger ignores a `doubleBarrel` flag.
 
   it('startGame loads every chamber with 2 bullets when enabled', () => {
     const cfg = configWith({ risk: { doubleBarrel: true } });
@@ -121,7 +121,7 @@ describe('Risk modifier — Double Barrel', () => {
     }
   });
 
-  it('pullTrigger ignores a doubleBarrel flag — only ONE outcome roll', () => {
+  it('pullTrigger ignores a doubleBarrel flag - only ONE outcome roll', () => {
     // [0]=0.9 → survive on the 1-bullet curve (p=0.15). The next value (0.05)
     // is NOT consumed as a second outcome roll; it falls to the spinIndex pick.
     pinRandom([0.9, 0.05, 0]);
@@ -136,8 +136,8 @@ describe('Risk modifier — Double Barrel', () => {
 // Risk: Russian Roulette
 // ============================================================
 
-describe('Risk modifier — Russian Roulette', () => {
-  // Russian Roulette no longer loads extra bullets — it makes a FAILED bluff
+describe('Risk modifier - Russian Roulette', () => {
+  // Russian Roulette no longer loads extra bullets - it makes a FAILED bluff
   // fire an immediate spin (handled in the bluff handlers via
   // shouldImmediateSpin). Chambers still start at the vanilla 1 bullet.
   it('startGame leaves chambers at 1 bullet when enabled (no extra load)', () => {
@@ -207,7 +207,7 @@ describe('Risk modifier — Russian Roulette', () => {
 // Risk: Hot Potato
 // ============================================================
 
-describe('Risk modifier — Hot Potato', () => {
+describe('Risk modifier - Hot Potato', () => {
   it('adds 2 bullets on survival', () => {
     // 1 bullet → p=0.15. [0]=0.9 ≥ 0.15 → survive; [1..] slot picks.
     pinRandom([0.9, 0, 0, 0]);
@@ -221,14 +221,14 @@ describe('Risk modifier — Hot Potato', () => {
   it('survival + the following global reshuffle KEEP the +2 bullets (real-game path)', () => {
     // Mirrors what applySpinAndBroadcast does: spinGun(player, getSpinModifiers
     // (room)) on survival, then applyGlobalBluffReshuffle. The reshuffle re-deals
-    // HANDS only — it must not reset chambers, or Hot Potato would appear to
+    // HANDS only - it must not reset chambers, or Hot Potato would appear to
     // "add no bullets" once the dust settled.
     const cfg = configWith({ risk: { hotPotato: true } });
     const room = makeOnlineRoom(4, cfg);
     startGame(room);
     const player = room.players.find((p) => p.status === 'alive');
     // Pin Barehand so a randomly-assigned role (notably Gambler, whose risk is
-    // frozen on survival) can't suppress the Hot Potato bullet adds — this test
+    // frozen on survival) can't suppress the Hot Potato bullet adds - this test
     // is about the +2 mechanic, not role interactions.
     player.role = ROLES.BAREHAND;
     player.chamber = [null, null, null, null, null, 'bullet'];
@@ -280,7 +280,7 @@ describe('Risk modifier — Hot Potato', () => {
 // Risk: Redemption Spin
 // ============================================================
 
-describe('Risk modifier — Redemption Spin', () => {
+describe('Risk modifier - Redemption Spin', () => {
   it('off by default → pickRedemptionCandidates returns []', () => {
     const room = makeOnlineRoom(6);
     startGame(room);
@@ -427,11 +427,11 @@ describe('Risk modifier — Redemption Spin', () => {
 });
 
 // ============================================================
-// Room: Speed Mode (engine-side surface only — full timer
+// Room: Speed Mode (engine-side surface only - full timer
 // behaviour lives in socketHandlers and is integration-tested)
 // ============================================================
 
-describe('Room modifier — Speed Mode (engine surface)', () => {
+describe('Room modifier - Speed Mode (engine surface)', () => {
   it('serializeRoom exposes speedModeMsRemaining when enabled + deadline set', () => {
     const cfg = configWith({ room: { speedMode: true } });
     const room = makeOnlineRoom(3, cfg);
@@ -463,7 +463,7 @@ describe('Room modifier — Speed Mode (engine surface)', () => {
 // Room: Sudden Death
 // ============================================================
 
-describe('Room modifier — Sudden Death', () => {
+describe('Room modifier - Sudden Death', () => {
   it('off by default → tickSuddenDeath returns null', () => {
     const room = makeOnlineRoom(4);
     startGame(room);
@@ -546,7 +546,7 @@ describe('Room modifier — Sudden Death', () => {
 // Room: Mirror Match
 // ============================================================
 
-describe('Room modifier — Mirror Match', () => {
+describe('Room modifier - Mirror Match', () => {
   it('isMirrorMatchEligibleAtStart: true when alive count is even', () => {
     const room = makeOnlineRoom(6);
     expect(isMirrorMatchEligibleAtStart(room)).toBe(true);

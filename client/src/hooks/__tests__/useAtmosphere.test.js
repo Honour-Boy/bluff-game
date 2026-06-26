@@ -6,7 +6,7 @@ const players = (alive, dead = 0) => [
   ...Array.from({ length: dead }, (_, i) => ({ id: `d${i}`, status: 'eliminated' })),
 ];
 
-describe('gameMusicStage — progressive intensity scaled to the playlist', () => {
+describe('gameMusicStage - progressive intensity scaled to the playlist', () => {
   it('returns 0 with no room / no players', () => {
     expect(gameMusicStage(null)).toBe(0);
     expect(gameMusicStage({})).toBe(0);
@@ -29,7 +29,7 @@ describe('gameMusicStage — progressive intensity scaled to the playlist', () =
     expect(stageAt(5)).toBe(1);
     expect(stageAt(4)).toBe(2);
     expect(stageAt(3)).toBe(3);
-    expect(stageAt(2)).toBe(4); // final two — peak track
+    expect(stageAt(2)).toBe(4); // final two - peak track
   });
 
   it('the final two always hit the peak stage (= last track)', () => {

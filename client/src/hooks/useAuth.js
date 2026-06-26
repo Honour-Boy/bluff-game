@@ -1,12 +1,12 @@
 // ============================================================
-// useAuth HOOK — Supabase auth + profile management
+// useAuth HOOK - Supabase auth + profile management
 // ============================================================
 //
 // Two identity flavours, mutually exclusive within a tab:
 //
-// 1. Authenticated (Supabase) — magic link or Google. Profile row in
+// 1. Authenticated (Supabase) - magic link or Google. Profile row in
 //    the `profiles` table, username editable, persists across tabs.
-// 2. Guest — typed display name, no email, ephemeral. Identity is a
+// 2. Guest - typed display name, no email, ephemeral. Identity is a
 //    `guest:<uuid>` string the client mints client-side and stashes
 //    in sessionStorage so a tab refresh keeps the same id (and the
 //    server's room.players entry still matches on reconnect).
@@ -21,7 +21,7 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 import { supabase } from '../lib/supabase';
 import { getSocket } from '../lib/socket';
 
-// sessionStorage keys — scoped per browser tab so closing the tab
+// sessionStorage keys - scoped per browser tab so closing the tab
 // (or opening a new one) starts fresh. Identity in this game is
 // always tab-local; localStorage would surprise users who expect
 // "I closed it" to mean "I'm signed out".
@@ -37,7 +37,7 @@ const GUEST_USERNAME_MAX = 20;
 const AUTH_LOGIN_AT_KEY = 'bluff_auth_login_at';
 const MAX_SESSION_MS    = 30 * 24 * 60 * 60 * 1000; // 30 days
 
-// Mirrors the server-side regex (server is the authority — this is
+// Mirrors the server-side regex (server is the authority - this is
 // only a UX hint so we surface validation before round-tripping).
 function isValidGuestUsername(raw) {
   const cleaned = String(raw || '').trim();
@@ -46,12 +46,12 @@ function isValidGuestUsername(raw) {
 
 // crypto.randomUUID() is available in every modern browser and Node.
 // Fall back to a Math.random construction only on truly ancient
-// environments — keeps the hook usable in tests without polyfills.
+// environments - keeps the hook usable in tests without polyfills.
 function generateGuestId() {
   if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
     return crypto.randomUUID();
   }
-  // Loose v4-shaped fallback — server validates the format and will
+  // Loose v4-shaped fallback - server validates the format and will
   // mint its own if this one is rejected.
   return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c) => {
     const r = (Math.random() * 16) | 0;
@@ -111,14 +111,14 @@ export function useAuth() {
   const [loading, setLoading] = useState(true);   // true while session is loading
   const [authError, setAuthError] = useState(null);
   // Single-device sessions: set when this device was signed out NOT by the
-  // user — evicted by a login elsewhere ('signed_in_elsewhere') or refused
+  // user - evicted by a login elsewhere ('signed_in_elsewhere') or refused
   // because the account is seated at a table on another device
   // ('account_in_room'). AuthScreen renders it as a banner; cleared when the
   // user starts a fresh sign-in.
   const [signedOutReason, setSignedOutReason] = useState(null);
 
   // Guest user: { id: 'guest:<uuid>', username, isGuest: true } | null
-  // Lives alongside `user`. Mutually exclusive — sign-in clears the
+  // Lives alongside `user`. Mutually exclusive - sign-in clears the
   // guest, signOutGuest() clears the guest. Authenticated user always
   // wins so a stale guest entry can't shadow a fresh sign-in.
   const [guestUser, setGuestUser] = useState(null);
@@ -151,7 +151,7 @@ export function useAuth() {
   // ─── Session bootstrap ─────────────────────────────────────
   // Order matters: rehydrate the guest first (synchronous, cheap) so
   // the AuthScreen never flashes for a refreshing guest. The async
-  // Supabase getSession resolves moments later — if it returns a real
+  // Supabase getSession resolves moments later - if it returns a real
   // user, that takes precedence and we drop the guest entry.
   useEffect(() => {
     let mounted = true;
@@ -167,7 +167,7 @@ export function useAuth() {
 
       // Enforce absolute 30-day session cap. If the stored login
       // timestamp is absent (first-ever load) we treat the session as
-      // unexpired — writeLoginAt fires on the next SIGNED_IN event.
+      // unexpired - writeLoginAt fires on the next SIGNED_IN event.
       if (u && isSessionExpired()) {
         clearLoginAt();
         supabase.auth.signOut().finally(() => { if (mounted) setLoading(false); });
@@ -176,7 +176,7 @@ export function useAuth() {
 
       setUser(u);
       if (u) {
-        // A real Supabase session shadows any stale guest entry —
+        // A real Supabase session shadows any stale guest entry -
         // signing in via a fresh tab while old guest data still
         // sits in storage shouldn't keep the guest alive.
         clearGuestFromStorage();
@@ -194,10 +194,10 @@ export function useAuth() {
       // the first one ever (handles sign-out → sign-in resets).
       if (_event === 'SIGNED_IN') writeLoginAt();
       const u = session?.user ?? null;
-      // §M4.2 — router isolation. A transient null session (e.g. a
+      // §M4.2 - router isolation. A transient null session (e.g. a
       // TOKEN_REFRESHED that briefly fails during a network blip) must NOT flip
       // `user` to null, because page.js would unmount the in-room view into the
-      // AuthScreen — exactly the mid-game "kicked to login/landing" bounce we're
+      // AuthScreen - exactly the mid-game "kicked to login/landing" bounce we're
       // eliminating. Only an explicit SIGNED_OUT clears the user.
       if (!u && _event !== 'SIGNED_OUT') return;
       setUser(u);
@@ -223,7 +223,7 @@ export function useAuth() {
   // Replaces password signup. Supabase's signInWithOtp creates the
   // user if they don't exist (shouldCreateUser default true) and
   // emails a code. If the address is invalid, the user never
-  // receives a code and the verification step fails — no more
+  // receives a code and the verification step fails - no more
   // false-positive "confirmation sent" claims for typo'd emails.
   //
   // emailRedirectTo: the magic link in the email is honored by
@@ -282,7 +282,7 @@ export function useAuth() {
   // ─── Forced sign-out (single-device sessions) ─────────────
   // Triggered by the socket layer when the server evicts this device
   // (`force_logout`) or refuses the login because the account is seated
-  // elsewhere (`account_in_room`). Local scope only — signs THIS device out
+  // elsewhere (`account_in_room`). Local scope only - signs THIS device out
   // without touching the device that won the seat. Records the reason so the
   // AuthScreen can explain why the user landed back at login.
   const forceSignOut = useCallback(async (reason) => {
@@ -301,7 +301,7 @@ export function useAuth() {
   // sessionStorage so a refresh keeps the same guest identity, and
   // returns { ok, user } so the caller can decide what to do.
   // The server runs its own sanitisation on the actual authenticate
-  // event — this is just for surfacing the error before the round
+  // event - this is just for surfacing the error before the round
   // trip.
   const signInAsGuest = useCallback(({ username }) => {
     setAuthError(null);
@@ -346,7 +346,7 @@ export function useAuth() {
     // Best-effort socket sync. If the socket isn't authenticated
     // (e.g. user is signed out or transport just dropped), the next
     // reconnect's `authenticate` re-reads the profile, so the rename
-    // still propagates — just on the next reconnect rather than now.
+    // still propagates - just on the next reconnect rather than now.
     try {
       const socket = getSocket();
       if (socket?.connected) {
@@ -366,7 +366,7 @@ export function useAuth() {
   // Pulls the persisted guest identity directly from sessionStorage
   // so authenticate-on-reconnect always gets the fresh value (the
   // useState mirror lags one render). useGame calls this on every
-  // reconnect — a brief stale read here would resolve to a different
+  // reconnect - a brief stale read here would resolve to a different
   // guestId on the server and the room.players entry wouldn't match.
   const getGuestAuth = useCallback(() => {
     const stored = readGuestFromStorage();

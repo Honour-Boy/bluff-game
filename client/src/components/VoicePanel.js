@@ -1,6 +1,6 @@
 'use client';
 
-// ─── VoicePanel — connect / mute / leave ──────────────────────
+// ─── VoicePanel - connect / mute / leave ──────────────────────
 // Compact pill that lives at the top of HostUI / PlayerUI /
 // OnlinePlayerUI. Three states:
 //   - idle       → "🎤 Join Voice" button
@@ -8,11 +8,11 @@
 //   - connected  → mute toggle + leave link
 //   - error      → red message + retry
 //
-// Issue #102 — the panel sits inside a flex-wrap header next to
+// Issue #102 - the panel sits inside a flex-wrap header next to
 // the top-right info HUD. The connected state is wider than idle,
 // so transitioning between them was reflowing the parent and
 // pushing the HUD onto a new line. Wrap content in a fixed-size
-// slot so dimensions stay constant across every state — internal
+// slot so dimensions stay constant across every state - internal
 // content can wrap, but the outer footprint never changes.
 
 const SLOT_WIDTH = 240;
@@ -72,7 +72,7 @@ export function VoicePanel({ status, error, muted, isConnected, connect, disconn
     );
   }
 
-  // connected — (Module 5.2) the mute toggle reads a flat "Muted" / "Mic on",
+  // connected - (Module 5.2) the mute toggle reads a flat "Muted" / "Mic on",
   // and the toggle + Leave Voice sit on a single horizontal row (no wrap).
   return (
     <div data-testid="voice-panel-slot" style={{ ...SLOT_STYLE, flexWrap: 'nowrap' }}>

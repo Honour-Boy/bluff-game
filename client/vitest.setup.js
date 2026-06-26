@@ -1,11 +1,11 @@
-// ─── Test setup — extends Vitest's expect with jest-dom matchers and
+// ─── Test setup - extends Vitest's expect with jest-dom matchers and
 // shims a few browser APIs that JSDOM doesn't ship.
 import '@testing-library/jest-dom/vitest';
 import { afterEach, vi } from 'vitest';
 import { cleanup } from '@testing-library/react';
 
 // JSDOM doesn't implement matchMedia. A handful of components / hooks
-// can poke it indirectly (e.g. via libraries) — stub it once globally.
+// can poke it indirectly (e.g. via libraries) - stub it once globally.
 if (typeof window !== 'undefined' && !window.matchMedia) {
   window.matchMedia = (query) => ({
     matches: false,
@@ -32,7 +32,7 @@ if (typeof window !== 'undefined' && !window.ResizeObserver) {
 // Wake-lock is browser-only. The useGame hook calls navigator.wakeLock
 // when entering a room; provide a noop so the hook doesn't blow up.
 if (typeof navigator !== 'undefined' && !navigator.wakeLock) {
-  // @ts-ignore — JSDOM types don't include wakeLock
+  // @ts-ignore - JSDOM types don't include wakeLock
   navigator.wakeLock = {
     request: async () => ({ release: async () => {} }),
   };
@@ -40,7 +40,7 @@ if (typeof navigator !== 'undefined' && !navigator.wakeLock) {
 
 // Web Storage shim. Node 22+/26 ship a native experimental `localStorage` that
 // is unavailable unless `--localstorage-file` is passed, and it shadows JSDOM's
-// implementation on the global — so bare `localStorage.*` throws in tests while
+// implementation on the global - so bare `localStorage.*` throws in tests while
 // `sessionStorage` (in-memory) keeps working. When the global store is missing
 // or broken, install a spec-ish in-memory Storage on both global + window. On
 // Node 20 (where JSDOM's store works) the check passes and nothing is replaced.
@@ -67,7 +67,7 @@ function _ensureStorage(name) {
   const install = (obj) => {
     if (!obj) return;
     try { Object.defineProperty(obj, name, { value: store, configurable: true, writable: true }); }
-    catch (_) { try { obj[name] = store; } catch (_) { /* read-only — give up */ } }
+    catch (_) { try { obj[name] = store; } catch (_) { /* read-only - give up */ } }
   };
   install(globalThis);
   if (typeof window !== 'undefined' && window !== globalThis) install(window);
@@ -75,7 +75,7 @@ function _ensureStorage(name) {
 _ensureStorage('localStorage');
 _ensureStorage('sessionStorage');
 
-// Each test runs in isolation — make sure mounted components are
+// Each test runs in isolation - make sure mounted components are
 // unmounted between tests so refs / listeners don't leak.
 afterEach(() => {
   cleanup();

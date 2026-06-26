@@ -22,7 +22,7 @@ function TavernDivider({ label = 'or' }) {
   );
 }
 
-// ─── Google button — polished brass seal ─────────────────────────────────────
+// ─── Google button - polished brass seal ─────────────────────────────────────
 function GoogleButton({ onClick }) {
   return (
     <button
@@ -58,7 +58,7 @@ function GoogleButton({ onClick }) {
   );
 }
 
-// ─── AuthScreen — the tavern gate ────────────────────────────────────────────
+// ─── AuthScreen - the tavern gate ────────────────────────────────────────────
 // Redesigned as a moody inn-registry: sign your name in the ledger or produce
 // your seal (Google) to enter. Guests may enter under a pseudonym, but their
 // place at the table vanishes when they leave.

@@ -7,7 +7,7 @@
 // and re-broadcast.
 //
 // Step (2) depends on Supabase, which we don't try to mock for
-// CJS-required modules — vitest 4 hoisting interacts badly with
+// CJS-required modules - vitest 4 hoisting interacts badly with
 // the live createClient call in socketHandlers.js. Instead the
 // room-mutation logic is extracted into the pure helper
 // `applyUsernameToRooms`, which IS testable in isolation here.
@@ -33,7 +33,7 @@ import {
 } from '../socketHandlers.js';
 import { createRoom, createPlayer, MODES } from '../gameEngine.js';
 
-// ─── applyUsernameToRooms — pure helper ──────────────────────
+// ─── applyUsernameToRooms - pure helper ──────────────────────
 
 describe('applyUsernameToRooms', () => {
   it('returns empty when the user is in no rooms', () => {
@@ -106,7 +106,7 @@ describe('applyUsernameToRooms', () => {
   });
 });
 
-// ─── update_username handler — auth gates only ───────────────
+// ─── update_username handler - auth gates only ───────────────
 
 function setup({ userId, username = 'OldName', isGuest = false } = {}) {
   const handlers = new Map();
@@ -128,7 +128,7 @@ function setup({ userId, username = 'OldName', isGuest = false } = {}) {
   return { socket, updateUsername: handlers.get('update_username') };
 }
 
-describe('update_username handler — auth gates', () => {
+describe('update_username handler - auth gates', () => {
   it('rejects when socket.userId is unset', async () => {
     const { updateUsername } = setup({ userId: undefined });
     const cb = vi.fn();

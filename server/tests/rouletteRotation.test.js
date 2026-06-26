@@ -1,8 +1,8 @@
 // ============================================================
-// Roulette Rotation — spontaneous turn order (online room modifier).
+// Roulette Rotation - spontaneous turn order (online room modifier).
 //
 // Rules under test:
-//   • Each cycle is a random permutation of the alive players — everyone
+//   • Each cycle is a random permutation of the alive players - everyone
 //     takes exactly one turn before anyone repeats.
 //   • No player plays twice back-to-back (the only place this can happen
 //     is across a cycle boundary).
@@ -35,7 +35,7 @@ function makeRouletteRoom(ids) {
   return room;
 }
 
-// Record the player whose turn it is, then advance — so the returned array is
+// Record the player whose turn it is, then advance - so the returned array is
 // the chronological order of turns actually taken.
 function takeTurns(room, n) {
   const seq = [];
@@ -50,7 +50,7 @@ function aliveIds(room) {
   return room.players.filter(p => p.status === 'alive').map(p => p.id);
 }
 
-describe('Roulette Rotation — cycle structure', () => {
+describe('Roulette Rotation - cycle structure', () => {
   it('every cycle is a full permutation of the alive players (one turn each)', () => {
     const ids = ['a', 'b', 'c', 'd'];
     const room = makeRouletteRoom(ids);
@@ -93,7 +93,7 @@ describe('Roulette Rotation — cycle structure', () => {
   });
 });
 
-describe('Roulette Rotation — eliminations', () => {
+describe('Roulette Rotation - eliminations', () => {
   it('finishes the current cycle, then reshuffles only the remaining alive players', () => {
     const room = makeRouletteRoom(['a', 'b', 'c', 'd']);
     // a takes a turn, advance to whoever is next, then eliminate c mid-cycle.
@@ -118,11 +118,11 @@ describe('Roulette Rotation — eliminations', () => {
   });
 });
 
-// #242 — direct regression for "a player must never take two turns in a row",
+// #242 - direct regression for "a player must never take two turns in a row",
 // stressed with eliminations interleaved (the realistic online path, where the
 // just-acted or just-eliminated player must never be re-seated at the front of
 // the next reshuffled cycle).
-describe('Roulette Rotation — #242 no consecutive turns under eliminations', () => {
+describe('Roulette Rotation - #242 no consecutive turns under eliminations', () => {
   it('never seats the same player twice in a row across many cycles + random eliminations', () => {
     const room = makeRouletteRoom(['a', 'b', 'c', 'd', 'e', 'f']);
     // Deterministic-ish: a fixed pseudo-random elimination schedule so the test
@@ -138,7 +138,7 @@ describe('Roulette Rotation — #242 no consecutive turns under eliminations', (
       const actingId = room.turnOrder[room.currentTurnIndex];
       seq.push(actingId);
 
-      // Occasionally eliminate a still-alive, non-acting player — but keep at
+      // Occasionally eliminate a still-alive, non-acting player - but keep at
       // least two players standing so the duel/last-one cases stay out of scope.
       const alive = aliveIds(room);
       if (alive.length > 2 && nextRand() < 0.06) {
@@ -176,7 +176,7 @@ describe('Roulette Rotation — #242 no consecutive turns under eliminations', (
   });
 });
 
-describe('Roulette Rotation — bluff target after a reshuffle', () => {
+describe('Roulette Rotation - bluff target after a reshuffle', () => {
   it('the bluff accuses the previous turn-taker across a cycle boundary, not turnOrder[index-1]', () => {
     const room = makeRouletteRoom(['a', 'b', 'c', 'd']);
 
@@ -192,11 +192,11 @@ describe('Roulette Rotation — bluff target after a reshuffle', () => {
     expect(getPreviousTurnPlayerId(room)).toBe(finisher);
 
     // And it is NOT necessarily the last slot of the new cycle (the naive
-    // arithmetic) — prove the helper diverges from index math at the boundary.
+    // arithmetic) - prove the helper diverges from index math at the boundary.
     const len = room.turnOrder.length;
     const naivePrev = room.turnOrder[(room.currentTurnIndex - 1 + len) % len];
     // finisher can't be first of the new cycle (no back-to-back), so if it also
-    // isn't the last slot, the two differ — which is the whole point.
+    // isn't the last slot, the two differ - which is the whole point.
     if (naivePrev !== finisher) {
       expect(getPreviousTurnPlayerId(room)).not.toBe(naivePrev);
     }

@@ -1,10 +1,10 @@
 // ============================================================
-// SOCKET LIB — Single-active-session registry (one device at a time)
+// SOCKET LIB - Single-active-session registry (one device at a time)
 // ============================================================
 // Enforces the owner's "one active session per account" policy. Supabase
 // happily issues sessions to many devices and revoking a refresh token
 // doesn't kill a live socket, so the Socket.IO server is the real-time
-// authority — this registry IS that authority.
+// authority - this registry IS that authority.
 //
 // Policy (owner decision 2026-06-15):
 //   • Same physical device (refresh / tab, matched by deviceId) → replace
@@ -23,7 +23,7 @@
 // this gate is reached. resolveLogin is only ever called with real user ids.
 
 // userId → { socketId, deviceId, deviceName, username, authedAt }. One entry
-// per account — that single-entry invariant IS the policy.
+// per account - that single-entry invariant IS the policy.
 const sessions = new Map();
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -36,7 +36,7 @@ function isValidDeviceId(id) {
 }
 
 // Normalise the client-supplied deviceId. A missing/invalid id degrades to a
-// unique-per-connection synthetic (the socket id) — such a login can still be
+// unique-per-connection synthetic (the socket id) - such a login can still be
 // taken over, but can never impersonate another device's id to bypass the
 // takeover screen.
 function deviceIdFor(rawDeviceId, socketId) {
@@ -44,7 +44,7 @@ function deviceIdFor(rawDeviceId, socketId) {
 }
 
 // A human-readable device label from the client (e.g. "Chrome on Windows").
-// Untrusted input — strip angle brackets + control chars, collapse whitespace,
+// Untrusted input - strip angle brackets + control chars, collapse whitespace,
 // clamp length. Returns null when nothing usable remains.
 function sanitizeDeviceName(raw) {
   const cleaned = String(raw || '')
@@ -73,11 +73,11 @@ function isSeated(rooms, userId) {
 
 // Defense-in-depth (§3.6): is this account seated somewhere via a DIFFERENT,
 // still-live socket than the one acting now? Used at seat-creation
-// (create/join) so the same account can never hold two seats — even if the
+// (create/join) so the same account can never hold two seats - even if the
 // authenticate gate were ever bypassed. A same-socket rejoin (e.g. the
 // player's own stale entry in the very room they're joining) and dead sockets
 // both return false, so normal reconnect flows are untouched. `exceptCode`
-// skips one room — pass the room being (re)joined so a player's own stale-but-
+// skips one room - pass the room being (re)joined so a player's own stale-but-
 // live seat in that very room (e.g. the ~250ms before an evicted socket
 // finishes disconnecting) never blocks their legitimate rejoin.
 function seatedElsewhere(io, rooms, userId, socketId, exceptCode = null) {
@@ -94,9 +94,9 @@ function seatedElsewhere(io, rooms, userId, socketId, exceptCode = null) {
 }
 
 // Decide the fate of a fresh authenticated login. Returns one of:
-//   { ok: true,  evicted: null }        — no contest, or stale entry cleaned.
-//   { ok: true,  evicted: oldSocketId } — caller force-logs-out the old socket.
-//   { ok: false, reason: 'session_active_elsewhere', activeDevice } — a
+//   { ok: true,  evicted: null }        - no contest, or stale entry cleaned.
+//   { ok: true,  evicted: oldSocketId } - caller force-logs-out the old socket.
+//   { ok: false, reason: 'session_active_elsewhere', activeDevice } - a
 //        DIFFERENT live device holds the account; the new device must show the
 //        user a takeover screen (it names `activeDevice`) and re-attempt with
 //        `takeover: true` to evict it.
@@ -118,7 +118,7 @@ function resolveLogin(io, rooms, { userId, deviceId, socketId, takeover = false 
 
   // THE SAME socket re-authenticating (the client authenticates on `connect`
   // AND again when the auth identity settles, plus React strict-mode double
-  // effects) — there is nothing to evict, and we must NEVER force_logout the
+  // effects) - there is nothing to evict, and we must NEVER force_logout the
   // very socket asking. Without this guard a re-auth self-evicts and the user
   // is logged out for no reason. This is checked before the deviceId branch.
   if (existing.socketId === socketId) {

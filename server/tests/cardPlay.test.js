@@ -27,7 +27,7 @@ function setupOnlineRoom() {
   return room;
 }
 
-describe('validateAndPlayCard — one card per turn', () => {
+describe('validateAndPlayCard - one card per turn', () => {
   it('plays the first card and marks cardPlayedThisTurn', () => {
     const room = setupOnlineRoom();
     const result = validateAndPlayCard(room, 'p0', 'c1');

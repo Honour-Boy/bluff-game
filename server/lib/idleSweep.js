@@ -1,5 +1,5 @@
 // ============================================================
-// SOCKET LIB — Inactivity sweep + lobby host-idle sweep
+// SOCKET LIB - Inactivity sweep + lobby host-idle sweep
 // ============================================================
 
 const engine = require('../gameEngine');
@@ -39,7 +39,7 @@ function startInactivitySweep(io) {
       const idleMs = now - last;
       if (idleMs <= INACTIVITY_THRESHOLD_MS) continue;
 
-      // §2.1 Retention Override — a persistent group room is protected from the
+      // §2.1 Retention Override - a persistent group room is protected from the
       // generic sweep while a session is still live: anyone seated, or a game
       // in progress, keeps it alive no matter how quiet the socket traffic has
       // been (a long Sniper/Medic deliberation can look "idle"). Only a fully
@@ -109,7 +109,7 @@ const lobbyHostActivity = new Map();
 const lobbyHostWarnedAt = new Map();
 
 /**
- * Pure decision function — classifies what (if anything) should happen
+ * Pure decision function - classifies what (if anything) should happen
  * for one lobby on this tick. Exported for testing without timer mocks.
  */
 function classifyLobbyIdle(now, lastActivityMs, warnedAt, alivePlayerCount, {
@@ -188,7 +188,7 @@ function startHostIdleSweep(io) {
       }
 
       if (verdict === 'dismiss') {
-        await dismissIdleLobby(io, code, 'Host idle — lobby closed.');
+        await dismissIdleLobby(io, code, 'Host idle - lobby closed.');
         discardLobbyIdleState(code);
         continue;
       }
@@ -225,7 +225,7 @@ async function autoStartIdleLobby(io, room) {
   engine.startGame(room);
   await saveRoom(room);
   io.to(room.code).emit('lobby_auto_started', {
-    reason: 'Host idle — game auto-started.',
+    reason: 'Host idle - game auto-started.',
   });
   await broadcastRoomState(io, room.code);
 

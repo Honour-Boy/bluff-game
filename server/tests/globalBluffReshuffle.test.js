@@ -1,9 +1,9 @@
 // ============================================================
-// §1.1 — Global hand rotation + target-card reshuffle on bluff resolution.
+// §1.1 - Global hand rotation + target-card reshuffle on bluff resolution.
 //
 // The moment a Bluff ("Block") challenge resolves, EVERY alive player's shape
 // hand is re-dealt (power cards retained) and the match's required card type
-// cycles to a fresh random shape — uniformly, not just for the player in the
+// cycles to a fresh random shape - uniformly, not just for the player in the
 // specific interaction. These tests pin both the engine helper and its
 // integration via the orchestration's applyBluffOutcome.
 // ============================================================
@@ -144,14 +144,14 @@ describe('§1.1 reshuffle fires on a resolved bluff (orchestration)', () => {
   });
 });
 
-// ─── #184 — draw-pile count invariance ───────────────────────
+// ─── #184 - draw-pile count invariance ───────────────────────
 //
 // The reshuffle is a full-hand SWAP: every surrendered shape card is returned
 // to the draw pile before fresh ones are drawn, so the pile count is unchanged.
 // Previously the surrendered cards were pushed to room.discardPile, which
-// ensureDrawPile NEVER recycles — so the draw pile bled down on every reshuffle
+// ensureDrawPile NEVER recycles - so the draw pile bled down on every reshuffle
 // and drifted further wrong the more bluffs resolved.
-describe('#184 — draw-pile count stays constant across reshuffles', () => {
+describe('#184 - draw-pile count stays constant across reshuffles', () => {
   it('keeps the draw-pile (deck) count invariant across a single global reshuffle', () => {
     const room = onlineRoom(['p0', 'p1', 'p2']);
     room.hands.set('p0', [

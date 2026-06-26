@@ -1,7 +1,7 @@
-// ─── TierBadge — progression tier chip (Phase 5, #305) ────────────────────────
+// ─── TierBadge - progression tier chip (Phase 5, #305) ────────────────────────
 // A small inline chip naming the player's (or room's) tier, colour-treated per
 // tier using existing globals.css tokens. Used in CosmeticsPanel, LandingScreen,
-// and the OnlinePlayerUI lobby (host's tier). Pure presentational — pass a tier
+// and the OnlinePlayerUI lobby (host's tier). Pure presentational - pass a tier
 // string ('streets' | 'backroads' | 'syndicate' | 'covenant'); unknown values
 // fall back to Streets.
 

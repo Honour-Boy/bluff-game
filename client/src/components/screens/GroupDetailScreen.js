@@ -61,7 +61,7 @@ function RefreshButton({ onRefresh, loading, label = 'Refresh' }) {
   );
 }
 
-// ─── GroupDetailScreen — the guild ledger page ────────────────────────────────
+// ─── GroupDetailScreen - the guild ledger page ────────────────────────────────
 export function GroupDetailScreen({
   group,
   currentUserId,
@@ -96,7 +96,7 @@ export function GroupDetailScreen({
   const isActingHost = !!actingHostId && currentUserId === actingHostId;
   const standInActive = !!ownerUserId && !!actingHostId && ownerUserId !== actingHostId;
 
-  // Phase 6 — group tier + owner mismatch (G5). The server flags
+  // Phase 6 - group tier + owner mismatch (G5). The server flags
   // `ownerTierMismatch` and annotates each member with `.tier`/`.tierMatches`
   // (only when there IS a mismatch) so the owner can resolve it.
   const requiredTier = group?.requiredTier || 'streets';
@@ -288,7 +288,7 @@ export function GroupDetailScreen({
             className="primary"
             onClick={onEnterRoom}
             disabled={myEntryBlocked}
-            title={myEntryBlocked ? `This crew runs ${tierMeta(requiredTier).name} stakes — you've outgrown it.` : undefined}
+            title={myEntryBlocked ? `This crew runs ${tierMeta(requiredTier).name} stakes - you've outgrown it.` : undefined}
           >
             Enter the Room →
           </button>
@@ -349,7 +349,7 @@ export function GroupDetailScreen({
         </div>
       )}
 
-      {/* Phase 6 (G5) — owner tier-mismatch resolution. The owner has climbed
+      {/* Phase 6 (G5) - owner tier-mismatch resolution. The owner has climbed
           above the crew's bound tier; new games are blocked until they re-tier
           the guild up or hand it to a member who still matches. */}
       {ownerTierMismatch && (
@@ -383,7 +383,7 @@ export function GroupDetailScreen({
 
           {isOwner && (
             <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-              {/* (b) Re-tier up — evicts sub-tier members. */}
+              {/* (b) Re-tier up - evicts sub-tier members. */}
               <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
                 <button
                   type="button"

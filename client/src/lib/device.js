@@ -1,5 +1,5 @@
 // ============================================================
-// DEVICE IDENTITY — persistent per-browser id for single-device sessions
+// DEVICE IDENTITY - persistent per-browser id for single-device sessions
 // ============================================================
 //
 // One stable id per browser INSTALL, sent with `authenticate` so the
@@ -7,7 +7,7 @@
 // network blip) from "a genuinely different device logging in".
 //
 // localStorage, NOT sessionStorage: tabs on the same machine must share
-// it so two tabs read as ONE device — a same-device login then
+// it so two tabs read as ONE device - a same-device login then
 // deterministically replaces its own session instead of being refused as
 // "another device while in a room" (see docs/single-device-session.md §3.3).
 
@@ -54,7 +54,7 @@ export function getDeviceName() {
 }
 
 // Read (creating once) the persistent device id. Returns null only when
-// storage is entirely unavailable (SSR / hard private mode) — the server
+// storage is entirely unavailable (SSR / hard private mode) - the server
 // then treats the login as a unique device, which is the safe default.
 export function getDeviceId() {
   if (typeof window === 'undefined') return null;

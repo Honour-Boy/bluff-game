@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest';
 import { ALL_TOUR_BEATS, tourBeatsFor, nextBeat, TOUR_STEPS } from '../tourContent';
 import { TOUR_IDS } from '../tourIds';
 
-describe('tourContent — beat list shape', () => {
+describe('tourContent - beat list shape', () => {
   it('every beat has a unique id, a known anchorId, a shape, an advance mode and copy', () => {
     const ids = new Set();
     const knownAnchors = new Set(Object.values(TOUR_IDS));
@@ -38,7 +38,7 @@ describe('tourContent — beat list shape', () => {
   });
 });
 
-describe('tourBeatsFor — guest filtering', () => {
+describe('tourBeatsFor - guest filtering', () => {
   it('drops profile + cosmetics rows for guests', () => {
     const beats = tourBeatsFor({ isGuest: true });
     const anchors = beats.map((b) => b.anchorId);

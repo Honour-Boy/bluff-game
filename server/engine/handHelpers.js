@@ -1,5 +1,5 @@
 // ============================================================
-// ENGINE — Tiny hand-inspector + cap helpers (shared)
+// ENGINE - Tiny hand-inspector + cap helpers (shared)
 // ============================================================
 // Pulled out so both engine/cards.js (drawCardForPlayer) and
 // engine/powerCards.js (cap normalisation, etc.) can require them
@@ -26,7 +26,7 @@ function _hasPowerCardInHand(hand) {
   return _countPowerCardsInHand(hand) > 0;
 }
 
-// Per-player power-card hand cap — Collector lifts to 3, everyone
+// Per-player power-card hand cap - Collector lifts to 3, everyone
 // else is gated at 1. Used by deal normalisation + drawCardForPlayer.
 function _powerCardCapForPlayer(player) {
   if (!player) return 1;

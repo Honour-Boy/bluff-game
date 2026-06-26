@@ -1,14 +1,14 @@
 // ============================================================
-// ENGINE — Blood Debt (Covenant-exclusive mechanic)
+// ENGINE - Blood Debt (Covenant-exclusive mechanic)
 // ============================================================
-// Pure helpers only — no I/O, no socket access. Orchestration (the
+// Pure helpers only - no I/O, no socket access. Orchestration (the
 // assignment prompt + the queued debt spin) lives in the handler/lib layer;
 // this module just owns the player-flag transitions.
 //
 // Blood Debt: when a player is eliminated by a CORRECT bluff call's spin in a
 // Covenant room, they name one alive player to carry a "blood debt". The next
 // time that player calls a bluff, an extra "debt spin" fires on them after the
-// primary resolution — the dead reaching back to take someone with them. The
+// primary resolution - the dead reaching back to take someone with them. The
 // flag is consumed (one-shot) when the debt spin is queued.
 
 // Mark `debtTargetId` as carrying a blood debt. No-op if the player isn't

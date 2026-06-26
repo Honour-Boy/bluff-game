@@ -1,5 +1,5 @@
 // ============================================================
-// ENGINE — Pre-game selection & role reveal (v2 Phase G, #116)
+// ENGINE - Pre-game selection & role reveal (v2 Phase G, #116)
 // ============================================================
 // Pure functions for the lobby → pre_game → playing flow. Roles are
 // already assigned and hands already dealt by room.startGame(); this
@@ -29,8 +29,8 @@ function _nextPoolId(playerId, tag) {
  * Build ONE player's independent, non-finite selection pool: ONLY the
  * power types the host enabled for this room (`enabledPowers`) plus a
  * single randomly-generated normal shape card (the "Additional Card"
- * — the forgo-a-power option, always present). Pools are generated
- * per-player — duplicate picks across players are expected and fine
+ * - the forgo-a-power option, always present). Pools are generated
+ * per-player - duplicate picks across players are expected and fine
  * (nothing is drawn from the shared deck). Returned cards are real,
  * hand-ready card objects with unique ids; the order is shuffled so the
  * client's face-down layout doesn't betray which slot holds which
@@ -72,7 +72,7 @@ function _alivePlayers(room) {
  * Enter the pre_game phase. Call AFTER room.startGame() has dealt
  * hands and assigned roles (online mode only). Generates a pool per
  * alive player and resets selection bookkeeping. Selection is NOT yet
- * open — the handler opens it via startPreGameSelection once the
+ * open - the handler opens it via startPreGameSelection once the
  * role-reveal display window elapses.
  */
 function beginPreGame(room) {
@@ -84,7 +84,7 @@ function beginPreGame(room) {
   room.pregameSelectionsReady = new Set();
   room.pregameSelectionOpen = false;
   room.pregameSelectionDeadline = null;
-  // §2.1 — ids of players who confirmed at/after the 12s threshold. They get a
+  // §2.1 - ids of players who confirmed at/after the 12s threshold. They get a
   // private review buffer client-side and are kept off the first active turn.
   room.pregameLateSelectors = [];
   room.pregameSelectionSkipped = false;
@@ -94,7 +94,7 @@ function beginPreGame(room) {
   const enabledMap = room.config?.powerCards?.enabled || {};
   const enabledPowers = POWER_TYPES.filter(power => enabledMap[power]);
 
-  // #2 — the "Claim your edge" pick is only worth showing when there are at
+  // #2 - the "Claim your edge" pick is only worth showing when there are at
   // least TWO power types to choose between (the Additional card rounds out an
   // otherwise power-only pool). With 0–1 powers enabled there's no real
   // decision to make, so skip the selection entirely: the brief pre_game
@@ -156,7 +156,7 @@ function applyPreGameSelection(room, playerId, optionId) {
   room.pregameSelections[playerId] = chosen;
   room.pregameSelectionsReady.add(playerId);
 
-  // §2.1 Rule 2 — a confirmation landing at/after the 12s threshold (i.e. with
+  // §2.1 Rule 2 - a confirmation landing at/after the 12s threshold (i.e. with
   // at most TIMEOUT-THRESHOLD ms left on the clock) is "late". Record it so the
   // finaliser keeps the picker off the first turn, and flag it back to the
   // caller so the client can show the private review buffer.
@@ -177,14 +177,14 @@ function applyPreGameSelection(room, playerId, optionId) {
  * Resolve the pre_game phase: auto-assign a random pool option to any
  * alive player who didn't confirm, append every chosen card to its
  * owner's hand via the shared bonus-card mechanism, transition to
- * 'playing', and clear pre_game bookkeeping. Idempotent — a second
+ * 'playing', and clear pre_game bookkeeping. Idempotent - a second
  * call (e.g. timer firing after an early all-ready finalise) is a
  * no-op because the phase is no longer 'pre_game'.
  */
 function finalizePreGame(room) {
   if (room.phase !== 'pre_game') return { ok: false, error: 'Not in pre-game phase' };
 
-  // #2 — selection was skipped (0–1 powers enabled): there are no pool picks
+  // #2 - selection was skipped (0–1 powers enabled): there are no pool picks
   // to apply. Leave the deal-time grants untouched and resume normal play.
   if (room.pregameSelectionSkipped) {
     room.phase = 'playing';
@@ -210,7 +210,7 @@ function finalizePreGame(room) {
     autoAssigned.push(p.id);
   }
 
-  // #140 — the pre-game pick decides the power slot: a player gets EITHER a
+  // #140 - the pre-game pick decides the power slot: a player gets EITHER a
   // power card OR an extra ("Additional") shape card, never both. This
   // REPLACES the deal-time power grant (room.startGame guarantees one) so no
   // player starts with two power cards. A fresh power card is only obtainable
@@ -226,14 +226,14 @@ function finalizePreGame(room) {
       }
       room.powerCardSlot[pid] = [slotCard];
     } else {
-      // "Additional Card" — the replacement penalty for forgoing a power
+      // "Additional Card" - the replacement penalty for forgoing a power
       // card: one extra shape card in hand and an EMPTY power slot.
       if (room.hands?.has?.(pid)) room.hands.get(pid).push(card);
       room.powerCardSlot[pid] = [];
     }
   }
 
-  // #140 + §2.1 Rule 3 — deprioritise non-responders AND late pickers from the
+  // #140 + §2.1 Rule 3 - deprioritise non-responders AND late pickers from the
   // first active turn. A player who never picked (auto-assigned) shouldn't open
   // the game and stall it; a late picker (§2.1) is mid-review-buffer and must
   // not be put on the clock for the opening turn. Seed the turn to the first

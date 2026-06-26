@@ -30,7 +30,7 @@ function Harness({ isGuest = false, onComplete = () => {}, onSkip = () => {} }) 
   );
 }
 
-describe('OnlineTourLayer — Part A settings walk', () => {
+describe('OnlineTourLayer - Part A settings walk', () => {
   beforeEach(() => {
     vi.useFakeTimers();
     // jsdom returns a zero rect; give anchors a real size so they measure.

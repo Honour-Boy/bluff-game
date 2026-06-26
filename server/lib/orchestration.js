@@ -1,5 +1,5 @@
 // ============================================================
-// SOCKET LIB — Mid-flow orchestration (pauses, post-elim hooks)
+// SOCKET LIB - Mid-flow orchestration (pauses, post-elim hooks)
 // ============================================================
 // Pure-ish state mutators that handlers call to drive the game
 // through Sniper/Medic pauses, bluff outcomes, post-elim system
@@ -32,7 +32,7 @@ const { broadcastRoomState, emitPowerCardEvents } = require('./broadcast');
 const { maybeRecordGroupWinner } = require('./roomBuilders');
 
 /**
- * Compute the alive Sniper's eligible redirect targets — every
+ * Compute the alive Sniper's eligible redirect targets - every
  * alive player EXCEPT the Sniper themselves and any current Mirror
  * holder.
  */
@@ -47,7 +47,7 @@ function _sniperEligibleTargets(room, sniperId) {
 }
 
 function maybeStartSniperPause(io, room, outcome) {
-  // Only a redirectable spin consequence can be sniped — eliminations,
+  // Only a redirectable spin consequence can be sniped - eliminations,
   // blocks, backfires and swap-pauses are off-limits.
   if (!outcome || outcome.type !== engine.GAME_EVENT_TYPES.SPIN_CONSEQUENCE) return false;
   const sniper = engine.findAvailableSniper(room);
@@ -98,7 +98,7 @@ function maybeStartMedicPause(io, room, eliminatedPlayerId, source, finaliseFn) 
     finaliseFn,
   };
 
-  // #121 — the whole room must know the game is paused awaiting a Medic
+  // #121 - the whole room must know the game is paused awaiting a Medic
   // decision, not just the Medic. Broadcast a public `medic_deciding`
   // announcement to every client; the Medic additionally gets the
   // private save prompt below.
@@ -133,7 +133,7 @@ function finaliseAssassinElimination(room, outcome) {
   }
   room.phase = 'playing';
   room.spinTargetId = null;
-  // §1.1 — do NOT clear the turn-action ledger here. This resolves a bluff
+  // §1.1 - do NOT clear the turn-action ledger here. This resolves a bluff
   // mid-turn; the accuser is still the on-turn player. Clearing cardPlayedThisTurn
   // would re-open a second card play (the post-bluff double-play exploit). The
   // ledger is cleared only by advanceTurn when the turn genuinely changes.
@@ -253,11 +253,11 @@ function applyBluffOutcome(room, outcome) {
   if (eventType === E.BLUFF_BLOCKED) {
     room.phase = 'playing';
     room.spinTargetId = null;
-    // §1.1 — global hand reshuffle + target-card cycle on this resolved bluff.
+    // §1.1 - global hand reshuffle + target-card cycle on this resolved bluff.
     const reshuffle = engine.applyGlobalBluffReshuffle(room);
     room.lastAction = {
       type: 'bluff_blocked',
-      // §1.3 — the Shield holder is the event target (the accused for a
+      // §1.3 - the Shield holder is the event target (the accused for a
       // Tier-1 block, the accuser for an Assassin-strike block).
       shieldHolderId: outcome.shieldHolderId ?? outcome.accusedId,
       accuserId: outcome.accuserId,
@@ -268,7 +268,7 @@ function applyBluffOutcome(room, outcome) {
 
   if (eventType === E.FORCED_ELIMINATION) {
     finaliseAssassinElimination(room, outcome);
-    // §1.1 — reshuffle once the strike has settled, unless the elimination
+    // §1.1 - reshuffle once the strike has settled, unless the elimination
     // already ended the game (no point re-dealing a finished table).
     if (room.phase !== 'game_over') engine.applyGlobalBluffReshuffle(room);
     return outcome;
@@ -277,7 +277,7 @@ function applyBluffOutcome(room, outcome) {
   if (eventType === E.ASSASSIN_BACKFIRE) {
     room.phase = 'playing';
     room.spinTargetId = null;
-    // §1.1 — global hand reshuffle + target-card cycle on this resolved bluff.
+    // §1.1 - global hand reshuffle + target-card cycle on this resolved bluff.
     const reshuffle = engine.applyGlobalBluffReshuffle(room);
     // §1.1 turn-action ledger intentionally preserved (see
     // finaliseAssassinElimination): the on-turn player keeps their used-up
@@ -307,11 +307,11 @@ function applyBluffOutcome(room, outcome) {
   }
 
   // Default: spin
-  // #205 — the bluff verdict is authoritative here: credit the accuser's
+  // #205 - the bluff verdict is authoritative here: credit the accuser's
   // correct/incorrect call for end-of-game XP.
   if (outcome.accuserId != null && typeof outcome.bluffIsCorrect === 'boolean') {
     engine.trackBluffOutcome(room, outcome.accuserId, outcome.bluffIsCorrect);
-    // Progression overhaul — a wrong call means the accused "defended" the
+    // Progression overhaul - a wrong call means the accused "defended" the
     // bluff (the caller spins, the accused survives). Credit the accused.
     if (outcome.bluffIsCorrect === false) {
       engine.trackBluffDefended(room, outcome.accusedId);
@@ -339,10 +339,10 @@ function applyBluffOutcome(room, outcome) {
 
 /**
  * Trampoline: post-elimination, decide what's next on the table.
- *   1. game_over   — single survivor.
- *   2. last_stand  — exactly two alive (and Last Stand enabled).
- *   3. ghost_vote  — DMH threshold crossed (and DMH enabled).
- *   4. nothing     — caller continues normal flow.
+ *   1. game_over   - single survivor.
+ *   2. last_stand  - exactly two alive (and Last Stand enabled).
+ *   3. ghost_vote  - DMH threshold crossed (and DMH enabled).
+ *   4. nothing     - caller continues normal flow.
  */
 function applyPostElimSystemHooks(io, room) {
   const winner = engine.checkGameOver(room);
@@ -375,10 +375,10 @@ function applyPostElimSystemHooks(io, room) {
 // it server-side when the target never spins. Keeping ONE implementation means
 // an auto-spin produces byte-for-byte the same result as a manual one.
 
-// #6 — Highlight callouts. Updates the per-player survival streak and returns
+// #6 - Highlight callouts. Updates the per-player survival streak and returns
 // banner events to surface. Emitted over the same `power_card_triggered` channel
 // as bounty/betting so they queue AFTER the spin overlay resolves. Only a
-// RESOLVED outcome counts — a Medic-pending elimination is deferred (the streak
+// RESOLVED outcome counts - a Medic-pending elimination is deferred (the streak
 // is decided when Medic acts). (First-blood callout removed per design.)
 function _computeSpinHighlights(room, player, spinResult, medicPaused) {
   if (medicPaused) return [];
@@ -400,9 +400,9 @@ function _computeSpinHighlights(room, player, spinResult, medicPaused) {
  * Run a spin for `player` and broadcast the result. Assumes the caller has
  * already validated phase/target. Returns the raw spinResult.
  */
-// #237 — Russian Roulette auto-end-of-turn. Under Russian Roulette a failed bluff
+// #237 - Russian Roulette auto-end-of-turn. Under Russian Roulette a failed bluff
 // fires an IMMEDIATE spin (no manual "Pull the Trigger" step), so the on-turn
-// player's turn must also end on its own once the spin lands — otherwise play
+// player's turn must also end on its own once the spin lands - otherwise play
 // hangs forever waiting for an End Turn the modifier deliberately removed. Mirrors
 // the end_turn handler (freeze consume → advanceTurn → sudden-death tick) and is
 // gated tightly so it only fires for the genuine RR auto-spin in online play.
@@ -416,7 +416,7 @@ function _maybeAutoEndTurnAfterImmediateSpin(room, onTurnIdBefore) {
   if (room.mode !== engine.MODES.ONLINE) return null;
   if (!room.config?.riskModifiers?.russianRoulette) return null;
   if (room.phase !== 'playing') return null;       // last_stand / ghost_vote / swap own the flow
-  if (room.pendingGameOver) return null;           // decided match — let the game-over reveal run
+  if (room.pendingGameOver) return null;           // decided match - let the game-over reveal run
   if (room.pendingMirrorMatchSpin) return null;    // a mirror spin is still queued
   if (room.pendingRedemption) return null;         // a redemption spin is still queued
   const onTurnPlayer = room.players.find(p => p.id === onTurnIdBefore);
@@ -424,13 +424,13 @@ function _maybeAutoEndTurnAfterImmediateSpin(room, onTurnIdBefore) {
   if (!room.turnOrder.includes(onTurnIdBefore)) return null;
 
   const freezeTrigger = engine.consumeFreezeOnTurnEnd(room, onTurnIdBefore);
-  engine.advanceTurn(room); // NOTE: this nulls room.lastAction — the caller re-stamps spin_result after.
+  engine.advanceTurn(room); // NOTE: this nulls room.lastAction - the caller re-stamps spin_result after.
   const suddenDeathBanner = engine.tickSuddenDeath(room);
   return { freezeTrigger, suddenDeathBanner };
 }
 
 async function applySpinAndBroadcast(io, code, room, player, leaderboardRepo, opts = {}) {
-  // Covenant — capture the bluff verdict BEFORE lastAction is overwritten with
+  // Covenant - capture the bluff verdict BEFORE lastAction is overwritten with
   // the spin_result below. A spin death that followed a CORRECT bluff call is
   // the only trigger for assigning a Blood Debt. `opts.spinReason === 'blood_debt'`
   // marks the debt spin itself, which must never spawn a fresh debt (no chains).
@@ -438,7 +438,7 @@ async function applySpinAndBroadcast(io, code, room, player, leaderboardRepo, op
   const bluffWasCorrect = room.lastAction?.bluffCorrect === true;
   const bluffAccuserId = room.lastAction?.accuserId || null;
 
-  // Covenant — The Pact volunteer pull. If the spin would fall on one pact
+  // Covenant - The Pact volunteer pull. If the spin would fall on one pact
   // partner and the other is alive, PAUSE: privately offer the partner a 6s
   // window to take the bullet instead. Skipped for follow-up spins (debt /
   // volunteer resume) and outside spin_pending. Resumes via the pact_volunteer
@@ -484,7 +484,7 @@ async function applySpinAndBroadcast(io, code, room, player, leaderboardRepo, op
     _clearBettingTimer(code);
   }
 
-  // #237 — Russian Roulette auto-ends the turn after the immediate spin. Capture
+  // #237 - Russian Roulette auto-ends the turn after the immediate spin. Capture
   // who was on-turn BEFORE the spin can shuffle the order (eliminateFromTurnOrder
   // below moves the pointer when the spinner is themselves eliminated).
   const onTurnIdBefore = room.turnOrder[room.currentTurnIndex] || null;
@@ -494,7 +494,7 @@ async function applySpinAndBroadcast(io, code, room, player, leaderboardRepo, op
   const spinResult = engine.spinGun(player, engine.getSpinModifiers(room));
 
   // Tutorial CLINIC bot only (lesson 'powers'): the reflected Mirror/Swap spin
-  // must show a LOADED cylinder for drama, yet the bot can NEVER die here — a
+  // must show a LOADED cylinder for drama, yet the bot can NEVER die here - a
   // stray death would end the round (and the clinic) before the Assassin drill,
   // the one place the bot is meant to be eliminated. So FORCE a survival that
   // lands on an empty slot and keep a live round visible in a non-landing slot.
@@ -506,14 +506,14 @@ async function applySpinAndBroadcast(io, code, room, player, leaderboardRepo, op
     const survived = [...chamberBefore];
     // Safety belt: force the landing slot empty no matter what. emptySlots is
     // never empty today (_resetForDrill reloads a single bullet each drill), but
-    // this function makes no such guarantee — if the chamber were ever full,
+    // this function makes no such guarantee - if the chamber were ever full,
     // landing would fall back to slot 0 which could hold a live round, breaking
     // the invariant (chamber[spinIndex]==='bullet' iff eliminated). Clearing it
     // here keeps "survived" honest regardless of chamber state.
     survived[landing] = null;
     // Click one more live round into a NON-landing empty slot (mirrors a normal
     // survival's +1) so the cylinder visibly loads up over the drill AND the
-    // landing slot stays empty — keeping the invariant intact.
+    // landing slot stays empty - keeping the invariant intact.
     const nonLandingEmpties = emptySlots.filter(i => i !== landing);
     if (nonLandingEmpties.length) {
       survived[nonLandingEmpties[Math.floor(Math.random() * nonLandingEmpties.length)]] = 'bullet';
@@ -528,7 +528,7 @@ async function applySpinAndBroadcast(io, code, room, player, leaderboardRepo, op
     spinResult.riskLevel = player.riskLevel;
   }
 
-  // v2 Phase E2 — Mirror Match: queue an opposite-player spin.
+  // v2 Phase E2 - Mirror Match: queue an opposite-player spin.
   if (
     room.mirrorMatchActive
     && !room._mirrorMatchInFlight
@@ -540,10 +540,10 @@ async function applySpinAndBroadcast(io, code, room, player, leaderboardRepo, op
     }
   }
 
-  // #205 — survived spins feed end-of-game XP.
+  // #205 - survived spins feed end-of-game XP.
   engine.trackSpinOutcome(room, player.id, spinResult.eliminated);
 
-  // Progression overhaul — a spin death that followed a CORRECT bluff call
+  // Progression overhaul - a spin death that followed a CORRECT bluff call
   // credits the caller with an elimination (the accused's lie cost them the
   // round). Only correct-bluff spins count; survival and wrong-call self-spins
   // don't. accuserId is carried on lastAction by applyBluffOutcome.
@@ -551,7 +551,7 @@ async function applySpinAndBroadcast(io, code, room, player, leaderboardRepo, op
     engine.trackPlayerEliminated(room, room.lastAction?.accuserId);
   }
 
-  // v2 Phase F — Bounty + Betting evaluation.
+  // v2 Phase F - Bounty + Betting evaluation.
   const bountyEvents = [];
   if (spinResult.eliminated) {
     _bountyOnElimination(room, player.id);
@@ -562,7 +562,7 @@ async function applySpinAndBroadcast(io, code, room, player, leaderboardRepo, op
   const betEvents = engine.evaluateBets(room, spinResult.eliminated);
   _clearBettingTimer(code);
 
-  // v2 Phase D — Medic interception for spin elimination.
+  // v2 Phase D - Medic interception for spin elimination.
   let medicPaused = false;
   if (spinResult.eliminated) {
     const finalise = () => {
@@ -584,7 +584,7 @@ async function applySpinAndBroadcast(io, code, room, player, leaderboardRepo, op
     if (!medicPaused) finalise();
   }
 
-  // Covenant — The Pact. If the fallen player was one of two pact partners, the
+  // Covenant - The Pact. If the fallen player was one of two pact partners, the
   // bond breaks and the surviving partner loses one chamber bullet (the price of
   // the broken pact). Done before the last-stand snapshot so the dock is in force.
   let pactPartnerDeathEvent = null;
@@ -602,7 +602,7 @@ async function applySpinAndBroadcast(io, code, room, player, leaderboardRepo, op
 
   if (!medicPaused) {
     room.phase = 'playing';
-    // v2 Phase F — post-elim system check. Skipped on a decided match: a Covenant
+    // v2 Phase F - post-elim system check. Skipped on a decided match: a Covenant
     // Pact dual win (both partners last standing) sets pendingGameOver in finalise
     // above and must take precedence over a Last Stand duel between them.
     if (spinResult.eliminated && room.mode === engine.MODES.ONLINE && !room.pendingGameOver) {
@@ -614,7 +614,7 @@ async function applySpinAndBroadcast(io, code, room, player, leaderboardRepo, op
     }
   }
 
-  // §1.1 — global bluff reshuffle once the spin (the bluff's tail) settles:
+  // §1.1 - global bluff reshuffle once the spin (the bluff's tail) settles:
   // re-deal EVERY alive player's hand + cycle the target card. Skipped while a
   // Medic is deciding, when the game is ending, or after Last Stand / Ghost Vote
   // (those own their hand handling).
@@ -629,14 +629,14 @@ async function applySpinAndBroadcast(io, code, room, player, leaderboardRepo, op
   }
 
   room.spinTargetId = null;
-  // §1.1 — a spin only happens as the tail of a bluff the on-turn player already
+  // §1.1 - a spin only happens as the tail of a bluff the on-turn player already
   // called. Mark the bluff used; do NOT clear cardPlayedThisTurn (the turn has
-  // not advanced — re-opening it would allow a post-bluff double play). The
+  // not advanced - re-opening it would allow a post-bluff double play). The
   // ledger clears only on advanceTurn (end_turn).
   room.bluffUsedThisTurn = true;
   logTurnState(code, room.turnOrder[room.currentTurnIndex], 'bluff_resolved_spin', room, { spunBy: player.id, eliminated: spinResult.eliminated });
 
-  // Redemption Spin (Phase E1) — queue an offer for the just-eliminated player
+  // Redemption Spin (Phase E1) - queue an offer for the just-eliminated player
   // to fire once this spin is acknowledged (see beginRedemption). Mirrors the
   // Mirror Match queue so it never interleaves with the spin overlay.
   let redemptionPending = false;
@@ -645,7 +645,7 @@ async function applySpinAndBroadcast(io, code, room, player, leaderboardRepo, op
     redemptionPending = true;
   }
 
-  // #237 — Russian Roulette: end the turn automatically now the auto-spin landed.
+  // #237 - Russian Roulette: end the turn automatically now the auto-spin landed.
   // Done BEFORE stamping lastAction because advanceTurn nulls lastAction; we then
   // re-stamp spin_result so every client still animates the cylinder.
   const autoEnd = _maybeAutoEndTurnAfterImmediateSpin(room, onTurnIdBefore);
@@ -667,7 +667,7 @@ async function applySpinAndBroadcast(io, code, room, player, leaderboardRepo, op
     riskLevel: spinResult.riskLevel,
     riskLevelBefore,
     medicPending: medicPaused,
-    // Covenant — flags the debt spin so the client shows different flavour text.
+    // Covenant - flags the debt spin so the client shows different flavour text.
     ...(spinReason ? { spinReason } : {}),
     ...(redemptionPending ? { redemptionPending: true } : {}),
     ...(reshuffle.reshuffled
@@ -675,7 +675,7 @@ async function applySpinAndBroadcast(io, code, room, player, leaderboardRepo, op
       : (spinResult.eliminated && !medicPaused ? { newCardType: room.currentCardType } : {})),
   };
 
-  // Covenant — Blood Debt. A correct-bluff spin death lets the fallen player
+  // Covenant - Blood Debt. A correct-bluff spin death lets the fallen player
   // name a revenge target (10s window; defaults to the bluff caller on expiry).
   // Set the pending state BEFORE save so it persists; the private prompt is
   // emitted AFTER the broadcast so the client already has the fresh room state.
@@ -686,7 +686,7 @@ async function applySpinAndBroadcast(io, code, room, player, leaderboardRepo, op
     && spinReason !== 'blood_debt'   // the debt spin itself never spawns a debt
     && bluffWasCorrect
     && engine.getRoomTier(room) === 'covenant'
-    && !room.pendingGameOver         // game's decided — nobody left to collect
+    && !room.pendingGameOver         // game's decided - nobody left to collect
     && !room.pendingBloodDebt        // one assignment at a time
   ) {
     const eligible = room.players.filter(p => p.status === 'alive' && p.id !== player.id);
@@ -709,7 +709,7 @@ async function applySpinAndBroadcast(io, code, room, player, leaderboardRepo, op
     }
   }
 
-  // #6 — highlight callouts (first blood / survival streak). Computed before
+  // #6 - highlight callouts (first blood / survival streak). Computed before
   // save so the streak counter + first-blood flag persist; emitted after.
   const highlightEvents = _computeSpinHighlights(room, player, spinResult, medicPaused);
 
@@ -720,13 +720,13 @@ async function applySpinAndBroadcast(io, code, room, player, leaderboardRepo, op
   for (const ev of bountyEvents) io.to(code).emit('power_card_triggered', ev);
   for (const ev of betEvents) io.to(code).emit('power_card_triggered', ev);
   for (const ev of highlightEvents) io.to(code).emit('power_card_triggered', ev);
-  // #237 — turn-end side effects from the Russian Roulette auto-advance (freeze
+  // #237 - turn-end side effects from the Russian Roulette auto-advance (freeze
   // skip / sudden-death tick), emitted on the same channel as the other banners.
   if (autoEnd?.freezeTrigger) io.to(code).emit('power_card_triggered', autoEnd.freezeTrigger);
   if (autoEnd?.suddenDeathBanner) io.to(code).emit('power_card_triggered', autoEnd.suddenDeathBanner);
-  // Covenant — broken-pact banner (survivor lost a bullet).
+  // Covenant - broken-pact banner (survivor lost a bullet).
   if (pactPartnerDeathEvent) io.to(code).emit('power_card_triggered', pactPartnerDeathEvent);
-  // Covenant — private Blood Debt prompt to the just-eliminated player (after
+  // Covenant - private Blood Debt prompt to the just-eliminated player (after
   // the broadcast so their client already sees the spin result / spectator view).
   if (bloodDebtPrompt?.socketId) {
     io.to(bloodDebtPrompt.socketId).emit('blood_debt_assign', bloodDebtPrompt.payload);
@@ -734,7 +734,7 @@ async function applySpinAndBroadcast(io, code, room, player, leaderboardRepo, op
   return spinResult;
 }
 
-// Covenant — Pact volunteer window expired with no volunteer: the ORIGINAL spin
+// Covenant - Pact volunteer window expired with no volunteer: the ORIGINAL spin
 // target takes the bullet after all. Resumes the paused spin server-side.
 async function _onPactVolunteerExpire(io, code, leaderboardRepo) {
   _clearPactVolunteerTimer(code);
@@ -752,7 +752,7 @@ async function _onPactVolunteerExpire(io, code, leaderboardRepo) {
   await applySpinAndBroadcast(io, code, room, player, leaderboardRepo, { _pactVolunteerResume: true });
 }
 
-// Covenant — Blood Debt window expired with no pick: the debt defaults to the
+// Covenant - Blood Debt window expired with no pick: the debt defaults to the
 // bluff caller (the one who pulled the trigger on the fallen player).
 async function _onBloodDebtExpire(io, code) {
   _clearBloodDebtTimer(code);
@@ -766,7 +766,7 @@ async function _onBloodDebtExpire(io, code) {
 }
 
 /**
- * Issue 1 — arm the spin_pending auto-resolve timer. If the target never emits
+ * Issue 1 - arm the spin_pending auto-resolve timer. If the target never emits
  * player_spin within SPIN_PENDING_TIMEOUT_MS (and the room is still parked on
  * the same spin), the server performs the spin itself. Cleared on player_spin
  * and on room teardown. Idempotent: re-arming clears any prior handle.
@@ -781,7 +781,7 @@ function _scheduleSpinPendingTimeout(io, code, leaderboardRepo) {
       if (!room || room.phase !== 'spin_pending') return;
       const player = room.players.find(p => p.id === room.spinTargetId);
       if (!player || player.status !== 'alive') return;
-      console.log(`[Room ${code}] spin_pending TIMED OUT — auto-spinning for ${player.username} server-side.`);
+      console.log(`[Room ${code}] spin_pending TIMED OUT - auto-spinning for ${player.username} server-side.`);
       await applySpinAndBroadcast(io, code, room, player, leaderboardRepo);
     } catch (err) {
       console.error('[spin_pending timeout]', err);
@@ -797,7 +797,7 @@ function _scheduleSpinPendingTimeout(io, code, leaderboardRepo) {
  * ack never arrives.
  */
 function _stampPendingGameOver(io, room, winner, leaderboardRepo) {
-  // Covenant — a Pact dual win carries both partners through to resolve.
+  // Covenant - a Pact dual win carries both partners through to resolve.
   engine.markDualWinners(room, winner);
   room.pendingGameOver = winner?.dualWin && Array.isArray(winner.dualWinners)
     ? {
@@ -818,7 +818,7 @@ function _scheduleGameOverTimeout(io, code, leaderboardRepo) {
     try {
       const room = await getRoom(code);
       if (!room || !room.pendingGameOver) return;
-      console.log(`[Room ${code}] pendingGameOver auto-finalised — spin_acknowledged never arrived.`);
+      console.log(`[Room ${code}] pendingGameOver auto-finalised - spin_acknowledged never arrived.`);
       await resolvePendingGameOver(io, room, leaderboardRepo);
     } catch (err) {
       console.error('[pendingGameOver timeout]', err);
@@ -830,7 +830,7 @@ function _scheduleGameOverTimeout(io, code, leaderboardRepo) {
 /**
  * Transition a held pendingGameOver into the final game_over state. The single
  * implementation shared by the spin_acknowledged handler (client-driven) and
- * the pendingGameOver safety timer (server-driven) — identical behaviour either
+ * the pendingGameOver safety timer (server-driven) - identical behaviour either
  * way.
  */
 async function resolvePendingGameOver(io, room, leaderboardRepo) {
@@ -859,7 +859,7 @@ async function resolvePendingGameOver(io, room, leaderboardRepo) {
 // ─── Redemption Spin (Phase E1) ──────────────────────────────
 //
 // User decision: trigger AT ELIMINATION. When a spin eliminates a player and
-// the modifier is on, that player is offered ONE redemption spin — survive and
+// the modifier is on, that player is offered ONE redemption spin - survive and
 // rejoin (fresh chamber + 3 cards, pushed back into turn order); take the
 // bullet and stay out. To avoid interleaving with the eliminating spin's
 // overlay (the documented spin-overlay fragility), the offer is QUEUED on the
@@ -882,7 +882,7 @@ function _redemptionEligible(room, playerId) {
   if (room.pendingGameOver) return false;
   const p = room.players.find(pp => pp.id === playerId);
   if (!p || p.status !== 'eliminated' || p._redemptionConsumed) return false;
-  // At least two players must remain alive — otherwise the elimination decided
+  // At least two players must remain alive - otherwise the elimination decided
   // the match and there's no game left to rejoin.
   const alive = room.players.filter(pp => pp.status === 'alive').length;
   return alive >= 2;
@@ -958,7 +958,7 @@ async function resolveRedemption(io, code, room, leaderboardRepo) {
     riskLevelBefore: result.riskLevel,
   };
 
-  // A redemption can only KEEP someone out or bring them back — it can't end
+  // A redemption can only KEEP someone out or bring them back - it can't end
   // the game. Re-check defensively all the same.
   const winner = engine.checkGameOver(room);
   if (winner) _stampPendingGameOver(io, room, winner, leaderboardRepo);
@@ -976,7 +976,7 @@ function _scheduleRedemptionTimeout(io, code, leaderboardRepo) {
     try {
       const room = await getRoom(code);
       if (!room || room.phase !== 'redemption_pending' || !room.redemption) return;
-      console.log(`[Room ${code}] redemption_pending TIMED OUT — spinning server-side for ${room.redemption.playerId}.`);
+      console.log(`[Room ${code}] redemption_pending TIMED OUT - spinning server-side for ${room.redemption.playerId}.`);
       await resolveRedemption(io, code, room, leaderboardRepo);
     } catch (err) {
       console.error('[redemption_pending timeout]', err);
@@ -986,7 +986,7 @@ function _scheduleRedemptionTimeout(io, code, leaderboardRepo) {
 }
 
 /**
- * v2 Phase E2 — Mirror Match second-spin runner.
+ * v2 Phase E2 - Mirror Match second-spin runner.
  * Called from spin_acknowledged after the primary spin's overlay is
  * dismissed. Runs an additional engine.spinGun against the queued
  * opposite-player target, broadcasts a spin_result lastAction, and
@@ -1006,7 +1006,7 @@ async function runMirrorMatchSpin(io, room, pending, leaderboardRepo) {
     const riskLevelBefore = target.riskLevel;
     const chamberBefore = [...target.chamber];
     const spinResult = engine.spinGun(target, engine.getSpinModifiers(room));
-    // #205 — mirror-match spins count toward survived-spin XP too.
+    // #205 - mirror-match spins count toward survived-spin XP too.
     engine.trackSpinOutcome(room, target.id, spinResult.eliminated);
 
     let medicPaused = false;
@@ -1014,7 +1014,7 @@ async function runMirrorMatchSpin(io, room, pending, leaderboardRepo) {
       const finalise = () => {
         engine.eliminateFromTurnOrder(room, target.id);
         engine.newCardType(room);
-        // NOTE (bugfix): no extra draw for the current player on elimination —
+        // NOTE (bugfix): no extra draw for the current player on elimination -
         // it inflates their hand by one (the "re-deal adds cards" bug). Hand
         // refresh is owned by the survival reset / §1.1 global reshuffle.
         const gameOverWinner = engine.checkGameOver(room);
@@ -1069,7 +1069,7 @@ function resolveLeaverPendingPauses(io, code, room, playerId) {
     if (typeof pending.finaliseFn === 'function') pending.finaliseFn();
     room.pendingMedicSave = null;
     if (room.phase === 'medic_pending') room.phase = 'playing';
-    // #121 — the Medic vanished, so the suppressed death is now final.
+    // #121 - the Medic vanished, so the suppressed death is now final.
     // Release the deferred announcement (or the generic skip notice).
     const deferred = Array.isArray(pending.deferredBanners) ? pending.deferredBanners : [];
     if (deferred.length > 0) {
@@ -1105,7 +1105,7 @@ function resolveLeaverPendingPauses(io, code, room, playerId) {
       room.phase = 'playing';
     }
   }
-  // §1.1 — a leaver in an open interception window. If the accused OR the
+  // §1.1 - a leaver in an open interception window. If the accused OR the
   // accuser is the one leaving, the pending bluff is moot: cancel the window
   // cleanly so the (immediate) leave-elimination + turn advance proceed, and
   // the 8s timer can't later resolve against a changed turn order. A third
@@ -1136,14 +1136,14 @@ function _scheduleBluffInterceptTimeout(io, code, leaderboardRepo, ms = engine.B
       const room = await getRoom(code);
       if (!room || room.phase !== 'bluff_intercept_pending') return;
       const accuserId = room.pendingBluffIntercept?.accuserId || null;
-      // §1.2 — closing the window must NOT end anyone's turn. The accused only
+      // §1.2 - closing the window must NOT end anyone's turn. The accused only
       // ever DEFENDED (off-turn); the on-turn player is the accuser, who keeps
       // priority. We clear the window + restore `playing` here (never advance
       // the turn) so a timed-out pass routes straight back into normal play.
       const onTurnBefore = room.turnOrder?.[room.currentTurnIndex] ?? null;
       room.pendingBluffIntercept = null;
       room.phase = 'playing';
-      console.log(`[Room ${code}] bluff-intercept window TIMED OUT (no defence) — on-turn player ${onTurnBefore} retains the turn; resolving bluff.`);
+      console.log(`[Room ${code}] bluff-intercept window TIMED OUT (no defence) - on-turn player ${onTurnBefore} retains the turn; resolving bluff.`);
       if (!accuserId) {
         await saveRoom(room);
         await broadcastRoomState(io, code);
@@ -1160,7 +1160,7 @@ function _scheduleBluffInterceptTimeout(io, code, leaderboardRepo, ms = engine.B
 // If the accused (the previous player, who is OFF-turn) still holds an un-armed
 // defensive power card, pause and open the interception window so they can arm
 // it BEFORE the bluff resolves. Returns true when the window opened (the caller
-// must NOT resolve the bluff — bluff_intercept / the timeout above resumes it),
+// must NOT resolve the bluff - bluff_intercept / the timeout above resumes it),
 // false when there's nothing to intercept with (caller resolves immediately).
 // Used by both the human call_bluff handler and the bot driver, so a bot's
 // challenge gives the accused human the same defence pop-up a human's would.
@@ -1205,7 +1205,7 @@ async function maybeOpenBluffIntercept(io, code, room, accuserId, leaderboardRep
 // The full post-`resolveBluff` flow (Sniper/Medic pauses, Assassin backfire,
 // outcome application, post-elim hooks, betting, broadcast). Shared by the
 // interactive `call_bluff` path, the §1.1 interception resume, AND the
-// server-driven bot opponent (lib/bots.js) so every challenger — human or bot —
+// server-driven bot opponent (lib/bots.js) so every challenger - human or bot -
 // resolves identically. Performs its own save + emit + broadcast; the caller (if
 // any) only acks. Lives here, alongside every helper it calls, so it can be
 // reused without dragging handler scope around.
@@ -1213,7 +1213,7 @@ async function _resolveOnlineBluff(io, code, room, accuserId, leaderboardRepo) {
   const { events, outcome } = bluffPipeline.resolveBluff(room, accuserId);
   const E = engine.GAME_EVENT_TYPES;
 
-  // v2 Phase D — Sniper interception (only a spin can be sniped).
+  // v2 Phase D - Sniper interception (only a spin can be sniped).
   if (outcome.type === E.SPIN_CONSEQUENCE && maybeStartSniperPause(io, room, outcome)) {
     await saveRoom(room);
     emitPowerCardEvents(io, code, events);
@@ -1221,14 +1221,14 @@ async function _resolveOnlineBluff(io, code, room, accuserId, leaderboardRepo) {
     return;
   }
 
-  // v2 Phase D — Medic interception (Assassin path).
+  // v2 Phase D - Medic interception (Assassin path).
   if (outcome.type === E.FORCED_ELIMINATION) {
     const medicStarted = maybeStartMedicPause(io, room, outcome.eliminatedPlayerId, 'assassin', () => {
       finaliseAssassinElimination(room, outcome);
       applyPostElimSystemHooks(io, room);
     });
     if (medicStarted) {
-      // #121 — hold the death announcement until the Medic resolves.
+      // #121 - hold the death announcement until the Medic resolves.
       const deferred = events.filter(e => e?.kind === 'assassin_strike');
       const immediate = events.filter(e => e?.kind !== 'assassin_strike');
       if (room.pendingMedicSave) room.pendingMedicSave.deferredBanners = deferred;
@@ -1239,7 +1239,7 @@ async function _resolveOnlineBluff(io, code, room, accuserId, leaderboardRepo) {
     }
   }
 
-  // #63 — Assassin backfire penalty before applyBluffOutcome.
+  // #63 - Assassin backfire penalty before applyBluffOutcome.
   if (outcome.type === E.ASSASSIN_BACKFIRE && outcome.accusedId) {
     engine.applyAssassinBackfirePenalty(room, outcome.accusedId, outcome.cardsToDrawForAccused || 3);
   }
@@ -1252,7 +1252,7 @@ async function _resolveOnlineBluff(io, code, room, accuserId, leaderboardRepo) {
     await maybeRecordGroupWinner(io, room, leaderboardRepo);
   }
 
-  // Russian Roulette — a failed bluff fires an IMMEDIATE spin: no manual
+  // Russian Roulette - a failed bluff fires an IMMEDIATE spin: no manual
   // "pull the trigger" pause, no betting window. Emit the bluff power events
   // first, then run the spin pipeline (which saves + broadcasts itself).
   if (engine.shouldImmediateSpin(room)) {
@@ -1265,7 +1265,7 @@ async function _resolveOnlineBluff(io, code, room, accuserId, leaderboardRepo) {
 
   if (room.phase === 'spin_pending') {
     _maybeOpenBetting(io, room);
-    // Issue 1 — guard against a spin that never gets performed.
+    // Issue 1 - guard against a spin that never gets performed.
     _scheduleSpinPendingTimeout(io, room.code, leaderboardRepo);
   }
 

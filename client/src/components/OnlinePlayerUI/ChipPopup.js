@@ -1,4 +1,4 @@
-// ─── ChipPopup — a contextual bubble anchored above a player's avatar ─────────
+// ─── ChipPopup - a contextual bubble anchored above a player's avatar ─────────
 // (Module 2) Replaces the large global status banners that used to run across
 // the centre of the table. Render it as a child of a `position: relative`
 // wrapper around a PlayerChip; it floats just above the chip with a little
@@ -6,7 +6,7 @@
 //
 // `tone` themes the bubble; `pulse` adds a soft attention pulse (uses the global
 // `pulse` keyframe). `interactive` flips pointer-events back on for bubbles that
-// hold a button (e.g. the Pull Trigger in Module 3) — status bubbles stay
+// hold a button (e.g. the Pull Trigger in Module 3) - status bubbles stay
 // click-through so they never steal taps from the table beneath them.
 export function ChipPopup({ tone = 'neutral', pulse = false, interactive = false, children }) {
   const tones = {

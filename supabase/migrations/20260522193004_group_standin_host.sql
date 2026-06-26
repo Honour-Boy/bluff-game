@@ -1,4 +1,4 @@
--- Issue #145 — temporary stand-in host.
+-- Issue #145 - temporary stand-in host.
 -- `host_user_id` is the CURRENT acting host (unchanged meaning, still used by
 -- every host check + room-control path). `owner_user_id` is the PERMANENT
 -- owner. "Make Host" now appoints a temporary stand-in (sets host_user_id but

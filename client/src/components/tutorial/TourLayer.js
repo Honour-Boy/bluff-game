@@ -5,7 +5,7 @@ import { TourSpotlight } from './TourSpotlight';
 import { useTourAnchor } from './useTourAnchor';
 import { TOUR_IDS } from './tourIds';
 
-// ─── TourLayer — the spotlight tour state machine ─────────────────────────────
+// ─── TourLayer - the spotlight tour state machine ─────────────────────────────
 // Walks a filtered beat list one beat at a time, rendering TourSpotlight over
 // the live UI. Advance handling per beat:
 //   - 'next'          → a Next button in the popup.
@@ -19,11 +19,11 @@ import { TOUR_IDS } from './tourIds';
 // at any time.
 //
 // Props:
-//   beats     — filtered ordered beat list (tourContent.tourBeatsFor).
-//   signals   — { [waitForKey]: boolean } observable state, supplied by the host
+//   beats     - filtered ordered beat list (tourContent.tourBeatsFor).
+//   signals   - { [waitForKey]: boolean } observable state, supplied by the host
 //               (DOM/menu state + serialized room/overlay state).
-//   onComplete() / onSkip()  — terminal callbacks.
-//   onBeatChange(beat)       — optional, fired on each beat entry.
+//   onComplete() / onSkip()  - terminal callbacks.
+//   onBeatChange(beat)       - optional, fired on each beat entry.
 
 export function TourLayer({ beats, signals = {}, onComplete, onSkip, onBeatChange }) {
   const [index, setIndex] = useState(0);
@@ -89,7 +89,7 @@ export function TourLayer({ beats, signals = {}, onComplete, onSkip, onBeatChang
 
   if (!beat) return null;
   // While the anchor is resolving (not yet measured, not yet missing) render
-  // nothing — TourSpotlight no-ops on a null rect anyway.
+  // nothing - TourSpotlight no-ops on a null rect anyway.
   if (!rect) return null;
 
   const interactive = beat.advance === 'click-target' || beat.advance === 'do-action';

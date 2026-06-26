@@ -1,19 +1,19 @@
 // ============================================================
-// SystemsOverlays.js — v2 Phase F UI overlays
+// SystemsOverlays.js - v2 Phase F UI overlays
 // ============================================================
 //
 // Compact, functional overlays for the four Phase F systems.
 // Visual treatment is consistent with the existing CSS-variable
-// styling throughout the app — no new design system. Dedicated
+// styling throughout the app - no new design system. Dedicated
 // polish + the top-down table view comes in Phase G.
 //
 // Components:
-//   <BettingPopup />       — non-target player picks survive/elim.
-//   <BettingWaitOverlay /> — shown to the spin target while window
+//   <BettingPopup />       - non-target player picks survive/elim.
+//   <BettingWaitOverlay /> - shown to the spin target while window
 //                            is open.
-//   <GhostVotePopup />     — eliminated players cast their vote.
-//   <GhostVoteWaitOverlay/>— alive players see "ghost council..."
-//   <LastStandCinematic /> — full-screen Last Stand stage.
+//   <GhostVotePopup />     - eliminated players cast their vote.
+//   <GhostVoteWaitOverlay/>- alive players see "ghost council..."
+//   <LastStandCinematic /> - full-screen Last Stand stage.
 // ============================================================
 
 'use client';
@@ -268,7 +268,7 @@ export function LastStandCinematic({
   const active = finalists.find(p => p.id === lastStand?.activeFinalistId);
   const me = finalists.find(p => p.id === myPlayerId);
   const amActive = active?.id === myPlayerId;
-  // #243 — the ONE shared gun both finalists pass back and forth. Prefer the
+  // #243 - the ONE shared gun both finalists pass back and forth. Prefer the
   // authoritative shared chamber from serialize; fall back to the active
   // finalist's (server-mirrored) chamber for older payloads.
   const sharedChamber = lastStand?.chamber || active?.chamber || [];

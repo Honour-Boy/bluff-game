@@ -1,5 +1,5 @@
 // ============================================================
-// #241 — Mirror Match: the spin animation must play for BOTH the player the
+// #241 - Mirror Match: the spin animation must play for BOTH the player the
 // bluff landed on AND the mirrored opposite player, on every client.
 //
 // The two spins are sequential: the primary spin's overlay resolves, the spin
@@ -10,7 +10,7 @@
 //   • a `spin_acknowledged`                    → spinDismissed = true  (tear down)
 // So the mirror spin_result MUST be the LAST event the server emits, otherwise a
 // trailing `spin_acknowledged` tears the fresh mirror overlay down the instant
-// its cylinder stops — the spin then appears to play for only the first player.
+// its cylinder stops - the spin then appears to play for only the first player.
 //
 // This test drives the real `spin_acknowledged` handler and asserts the emit
 // order: spin_acknowledged is sent BEFORE the mirror spin_result room_state.
@@ -93,7 +93,7 @@ afterEach(() => {
   vi.clearAllMocks();
 });
 
-describe('#241 — Mirror Match spin overlay ordering', () => {
+describe('#241 - Mirror Match spin overlay ordering', () => {
   it('emits spin_acknowledged BEFORE the mirror spin_result so the second overlay survives', async () => {
     const { io, log } = makeOrderedIo(4);
     const room = makeMirrorRoom();
@@ -110,7 +110,7 @@ describe('#241 — Mirror Match spin overlay ordering', () => {
     expect(ackIdx).toBeGreaterThanOrEqual(0);      // the primary overlay IS dismissed
     expect(mirrorStateIdx).toBeGreaterThanOrEqual(0); // the mirror spin IS broadcast
     // The dismiss must come first so the mirror room_state (spinDismissed=false)
-    // is the last word — otherwise the fresh mirror overlay is torn down at once.
+    // is the last word - otherwise the fresh mirror overlay is torn down at once.
     expect(ackIdx).toBeLessThan(mirrorStateIdx);
   });
 

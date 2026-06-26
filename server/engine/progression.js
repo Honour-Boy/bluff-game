@@ -1,7 +1,7 @@
 // ============================================================
-// ENGINE — Meta-progression: per-game stats, XP, cosmetic unlocks
+// ENGINE - Meta-progression: per-game stats, XP, cosmetic unlocks
 // ============================================================
-// Issue #205. Pure helpers only — no I/O, no socket access.
+// Issue #205. Pure helpers only - no I/O, no socket access.
 //
 // • Per-game stats (`player.gameStats`) are initialised by startGame and
 //   bumped from the orchestration layer at the moments the outcome is
@@ -71,10 +71,10 @@ const XP_TABLE = {
 // ─── Cosmetics catalog ────────────────────────────────────────
 //
 // Ids are the wire contract with the client (lib/cosmetics.js renders
-// them); never rename one once shipped — players' equipped rows persist
+// them); never rename one once shipped - players' equipped rows persist
 // the id. unlockLevel gates equipping server-side (validateEquipped).
 //
-// Cosmetics now unlock by TIER, not arbitrary levels — each cosmetic SET maps
+// Cosmetics now unlock by TIER, not arbitrary levels - each cosmetic SET maps
 // to a tier and its unlockLevel is that tier's MIN level (LEVEL_XP_THRESHOLDS /
 // TIER_LEVELS), so reaching a tier unlocks its whole set at once:
 //   Streets   (Lv 1)  → Steel · Classic Leather · Emerald   (the base set)
@@ -91,7 +91,7 @@ const COSMETICS = [
   { id: 'gun_neon', slot: 'gunSkin', label: 'Neon', unlockLevel: 9 },       // Syndicate
   { id: 'gun_kente', slot: 'gunSkin', label: 'Kente', unlockLevel: 14 },    // Covenant
   { id: 'gun_cosmos', slot: 'gunSkin', label: 'Cosmos', unlockLevel: 14 },  // Covenant
-  // Deck skins — theme the card BACKS (deck / played pile / reveal / flights)
+  // Deck skins - theme the card BACKS (deck / played pile / reveal / flights)
   // AND the player's own hand's card faces (frame + shape/number). Rendered
   // from framed SVG art in client/public/cosmetics (built by
   // client/scripts/build-cosmetic-decks.mjs); 'back_leather' stays the
@@ -168,7 +168,7 @@ function initGameStats(room) {
 }
 
 // Only the INTERACTIVE play path calls this (handlers/game.js). The idle
-// auto-resolver and the practice bot deliberately don't — an AFK player
+// auto-resolver and the practice bot deliberately don't - an AFK player
 // whose turns get auto-played must not accrue participation credit.
 function trackCardPlayed(room, playerId) {
   const p = room.players.find(pl => pl.id === playerId);
@@ -188,7 +188,7 @@ function trackBluffOutcome(room, accuserId, bluffCorrect) {
   if (bluffCorrect) p.gameStats.correctBluffCalls++;
 }
 
-// The accused survived a wrong bluff call — they "defended" the bluff.
+// The accused survived a wrong bluff call - they "defended" the bluff.
 function trackBluffDefended(room, accusedId) {
   const p = room.players.find(pl => pl.id === accusedId);
   if (p?.gameStats) p.gameStats.bluffDefended++;
@@ -231,10 +231,10 @@ function computeStandings(room) {
 /**
  * Compute one player's XP for the finished game using the tier-keyed
  * XP_TABLE. `tier` selects the rate column (defaults to 'streets' for old
- * rooms without `room.tier`). Returns { total, placement, breakdown } —
+ * rooms without `room.tier`). Returns { total, placement, breakdown } -
  * total is 0 (null breakdown) when the player never actively played a card
  * (anti-AFK) or has no stats. `placement` is the standings index (1-based),
- * kept for display only — it is no longer an XP component.
+ * kept for display only - it is no longer an XP component.
  */
 function computeXpAward(room, player, tier = 'streets', standings = computeStandings(room)) {
   const stats = player?.gameStats;
@@ -244,7 +244,7 @@ function computeXpAward(room, player, tier = 'streets', standings = computeStand
   }
 
   const rates = XP_TABLE[tier] || XP_TABLE.streets;
-  // Covenant — a Pact dual win credits BOTH surviving partners with the win XP,
+  // Covenant - a Pact dual win credits BOTH surviving partners with the win XP,
   // even though only the placement-1 partner is the nominal "winner".
   const dualWinnerIds = Array.isArray(room?.dualWinnerIds) ? room.dualWinnerIds : [];
   const isWinner = player.status === 'alive'

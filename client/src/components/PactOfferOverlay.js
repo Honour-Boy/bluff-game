@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { PactModalShell, pactPrimaryBtnStyle, pactGhostBtnStyle } from './pact/PactSigil';
 
-// Covenant — The Pact. A private offer shown to the chosen partner once play
+// Covenant - The Pact. A private offer shown to the chosen partner once play
 // begins. Accepting seals a secret bond (neither can call the other's bluff,
 // either can take the other's spin, surviving as the last two wins together);
 // denying strips the proposer's reserved power card. Driven by the reconnect-safe
@@ -22,7 +22,7 @@ export function PactOfferOverlay({ selectorName, onRespond }) {
     >
       <div style={{ fontFamily: "'Crimson Text', serif", fontSize: 13, color: 'var(--text-dim)', marginBottom: 20, lineHeight: 1.6 }}>
         Seal the bond and neither of you can call the other&apos;s bluff. Stand as
-        the last two and you win together — but if one of you falls, the other
+        the last two and you win together - but if one of you falls, the other
         loses a round from their chamber.
       </div>
       <div style={{ display: 'flex', gap: 10 }}>

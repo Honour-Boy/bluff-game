@@ -1,9 +1,9 @@
 // ============================================================
-// ENGINE — v2 Phase E2/F — Risk + Room modifier helpers
+// ENGINE - v2 Phase E2/F - Risk + Room modifier helpers
 // ============================================================
 // Sudden Death (E2), Mirror Match (E2), Redemption Spin (E1/F),
 // Last Stand (F), Ghost Vote / Dead Man's Hand (F).
-// All pure mutations / pure helpers — callers in socketHandlers.js
+// All pure mutations / pure helpers - callers in socketHandlers.js
 // orchestrate timing.
 
 const {
@@ -81,7 +81,7 @@ function getMirrorMatchOpposite(room, originalPlayerId) {
 }
 
 // Mirror Match spins the seat opposite the current player, so it needs an
-// EVEN table of at least 4 (with 2 the "opposite" is just the other player —
+// EVEN table of at least 4 (with 2 the "opposite" is just the other player -
 // degenerate). The lobby UI hides the toggle under the same rule.
 function isMirrorMatchEligibleAtStart(room) {
   const alive = room.players.filter(p => p.status === 'alive').length;
@@ -142,7 +142,7 @@ function runRedemptionSpin(room, playerId) {
   player.isSpectator = false;
   player.chamber = initChamber(1);
   player.riskLevel = 1;
-  // #205 — back in the game, so the elimination-order stamp no longer applies
+  // #205 - back in the game, so the elimination-order stamp no longer applies
   // (a later death re-stamps via eliminateFromTurnOrder).
   player.eliminatedSeq = null;
   if (!room.turnOrder.includes(playerId)) {
@@ -189,7 +189,7 @@ function _allPendingPhasesClear(room) {
 function shouldEnterLastStand(room) {
   if (!room?.config?.systems?.lastStand) return false;
   if (room.phase === 'last_stand') return false;
-  // #243 — only a game that STARTED with more than 3 players narrows into a Last
+  // #243 - only a game that STARTED with more than 3 players narrows into a Last
   // Stand. `startingAliveCount` is stamped by startGame; fall back to the roster
   // size (eliminated players remain as ghosts mid-game, so it equals the starting
   // count) for callers/tests that build a room without going through startGame.
@@ -200,13 +200,13 @@ function shouldEnterLastStand(room) {
   return _allPendingPhasesClear(room);
 }
 
-// #243 — current bullet count of the one shared Last Stand gun.
+// #243 - current bullet count of the one shared Last Stand gun.
 function _lastStandBulletCount(room) {
   const ch = room?.lastStand?.chamber || [];
   return ch.filter(s => s === 'bullet').length;
 }
 
-// #243 — keep both finalists' display chambers in lock-step with the single
+// #243 - keep both finalists' display chambers in lock-step with the single
 // shared gun so each seat / cinematic card renders the same escalating cylinder.
 function _syncLastStandChamberToFinalists(room) {
   const chamber = room.lastStand?.chamber || [];
@@ -223,7 +223,7 @@ function enterLastStand(room) {
 
   if (!room.discardPile) room.discardPile = [];
 
-  // No cards, no bluffs in the duel — surrender hands and disarm everyone.
+  // No cards, no bluffs in the duel - surrender hands and disarm everyone.
   for (const p of alive) {
     if (room.hands && room.hands.has(p.id)) {
       const hand = room.hands.get(p.id) || [];
@@ -242,7 +242,7 @@ function enterLastStand(room) {
   const orderedFinalists = room.turnOrder.filter(id => alive.some(p => p.id === id));
   const finalistIds = orderedFinalists.length === 2 ? orderedFinalists : alive.map(p => p.id);
 
-  // #243 — ONE shared gun. It starts with a single bullet and escalates on the
+  // #243 - ONE shared gun. It starts with a single bullet and escalates on the
   // normal survival curve (pullTrigger adds a bullet every time SOMEONE survives),
   // so the alternating duel is guaranteed to terminate. The two finalists pass
   // this same chamber back and forth; their per-seat chambers mirror it.
@@ -273,7 +273,7 @@ function lastStandSpin(room, playerId) {
   const player = room.players.find(p => p.id === playerId);
   if (!player) return { ok: false, error: 'Player not found' };
 
-  // Spin the ONE shared gun — NOT the player's own chamber. On survival the
+  // Spin the ONE shared gun - NOT the player's own chamber. On survival the
   // pull adds a bullet to the shared chamber (normal curve), which the next
   // finalist then inherits. The turn pass is handled by lastStandEndTurn (the
   // handler calls it on survive), so this stays pass-free.
@@ -421,7 +421,7 @@ function resolveGhostVote(room) {
 
 // ─── Russian Roulette (Phase E1) ─────────────────────────────
 //
-// Russian Roulette: a FAILED bluff forces an IMMEDIATE spin — no manual
+// Russian Roulette: a FAILED bluff forces an IMMEDIATE spin - no manual
 // "pull the trigger" pause and no betting window. Returns true only when the
 // room has just entered `spin_pending` off a resolved bluff, the modifier is
 // enabled, and the spin target is still alive. The bluff handlers consult this

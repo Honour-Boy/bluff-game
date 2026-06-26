@@ -34,16 +34,16 @@ export function useOnlinePlayerUiController({
   const [preArmLockSignal, setPreArmLockSignal] = useState(0);
   // Flashes a corrective coach hint when the learner tries an off-script card
   // play during a clinic drill (e.g. plays a card when they should Call Bluff).
-  // { n, text } — n is a monotonic counter the TutorialLayer reacts to.
+  // { n, text } - n is a monotonic counter the TutorialLayer reacts to.
   const [clinicActionHint, setClinicActionHint] = useState({ n: 0, text: '' });
   // Every spin identity already shown this session. A Set (not just the last key)
-  // so a re-broadcast of an OLDER spin_result — after a newer spin moved the
-  // "last" key on — can never replay that older spin a second time ("spin playing
+  // so a re-broadcast of an OLDER spin_result - after a newer spin moved the
+  // "last" key on - can never replay that older spin a second time ("spin playing
   // twice"). Each spin animates exactly once.
   const seenSpinKeysRef = useRef(new Set());
   const [spinData, setSpinData] = useState(null);
   const [spinComplete, setSpinComplete] = useState(false);
-  // #185 — what the "Last Event" panel renders. Mirrors roomState.lastAction
+  // #185 - what the "Last Event" panel renders. Mirrors roomState.lastAction
   // for every action type EXCEPT a spin_result, which is held back until its
   // cylinder animation finishes (see the spin effect below).
   const [displayedLastAction, setDisplayedLastAction] = useState(null);
@@ -54,16 +54,16 @@ export function useOnlinePlayerUiController({
   const [justEliminated, setJustEliminated] = useState(false);
   // Practice hand-off gate: true from the instant the local player is eliminated
   // until they dismiss the "Eliminated" card. While held, the tutorial layer must
-  // NOT pop the Power Clinic briefing — the learner first watches their spin land,
+  // NOT pop the Power Clinic briefing - the learner first watches their spin land,
   // reads the elimination card, THEN moves on to powers (the server stages the
   // clinic ~2.6s in, so without this hold the briefing races over the spin/card).
   const [eliminationHold, setEliminationHold] = useState(false);
   const [peekedCard, setPeekedCard] = useState(null);
-  // #139 — manual (click-to-open) power-card activation confirmation. There is
+  // #139 - manual (click-to-open) power-card activation confirmation. There is
   // NO turn-start auto-prompt: the Activate/Skip modal opens only when the
   // player taps their held power card (this flag), and closes on activate/skip.
   const [powerConfirmOpen, setPowerConfirmOpen] = useState(false);
-  // #197 — which held power card the activation modal is targeting. A Collector
+  // #197 - which held power card the activation modal is targeting. A Collector
   // holds up to 3; everyone else holds one. null = fall back to slot[0] server-side.
   const [pendingPowerCardId, setPendingPowerCardId] = useState(null);
   const [activating, setActivating] = useState(false);
@@ -79,7 +79,7 @@ export function useOnlinePlayerUiController({
 
   // ── Spin detection: a NEW spin_result → snapshot it into spinData ──
   // Only sets state; the animation timers live in a SEPARATE effect keyed on the
-  // spin identity (spinData.key) — NOT on lastAction. That decoupling is the fix
+  // spin identity (spinData.key) - NOT on lastAction. That decoupling is the fix
   // for the "spin hangs on every pull" bug: the old effect's cleanup cleared the
   // 8s completion timer whenever lastAction changed, and in practice mode the bot
   // plays its next card ~1.1s after a spin, swapping lastAction to `card_played`
@@ -136,7 +136,7 @@ export function useOnlinePlayerUiController({
     }, 80);
     const completeTimer = setTimeout(() => {
       setSpinComplete(true);
-      // #185 — surface the outcome to the Last Event panel only now, once stopped.
+      // #185 - surface the outcome to the Last Event panel only now, once stopped.
       setDisplayedLastAction(spinData.action);
     }, 8080);
     return () => {
@@ -145,12 +145,12 @@ export function useOnlinePlayerUiController({
     };
   }, [spinData?.key]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // #185 — keep the Last Event panel showing the event that LED to the spin
+  // #185 - keep the Last Event panel showing the event that LED to the spin
   // while the cylinder animates, then reveal the outcome only once it stops.
   // Two action types are withheld here so `displayedLastAction` retains the
   // prior *renderable* event instead of going blank:
-  //   • `spin_result`  — surfaced by the spin effect's completion timer above.
-  //   • `spin_pending` — the "must spin" marker; ActionLog renders nothing for
+  //   • `spin_result`  - surfaced by the spin effect's completion timer above.
+  //   • `spin_pending` - the "must spin" marker; ActionLog renders nothing for
   //     it, so letting it through would empty the panel during the wait + spin.
   // Every other (renderable) action still flows straight through.
   useEffect(() => {
@@ -159,7 +159,7 @@ export function useOnlinePlayerUiController({
     setDisplayedLastAction(action);
   }, [roomState?.lastAction]);
 
-  // §3.2 — spectator hand lockout. The server no longer emits `spectatedHand`,
+  // §3.2 - spectator hand lockout. The server no longer emits `spectatedHand`,
   // so there is nothing to sync. `spectatedHand` stays an empty array and
   // `spectatingId` stays null; the picker UI is replaced by a hands-hidden
   // notice (see BottomSeat). Kept as inert state so prop contracts are stable.
@@ -168,8 +168,8 @@ export function useOnlinePlayerUiController({
     const currentStatus = myPlayer?.status || null;
     if (prevStatusRef.current === 'alive' && currentStatus === 'eliminated') {
       pendingEliminatedRef.current = true;
-      // Start holding the clinic hand-off at the moment of elimination — before
-      // the spin even completes — so the briefing can't surface mid-animation.
+      // Start holding the clinic hand-off at the moment of elimination - before
+      // the spin even completes - so the briefing can't surface mid-animation.
       setEliminationHold(true);
     }
     prevStatusRef.current = currentStatus;
@@ -185,7 +185,7 @@ export function useOnlinePlayerUiController({
   // learner LOSES Basics (the bot wins) they're eliminated, which latches
   // `eliminationHold` (+ the "Eliminated" card). The clinic still stages
   // server-side, but those gates would keep its briefing/coach hidden behind a
-  // manual "Continue Watching" tap — so a loss never visibly progressed to
+  // manual "Continue Watching" tap - so a loss never visibly progressed to
   // powers (only a win did). Once the clinic actually stages (lesson 'powers' +
   // a scenario), drop the stale Basics-elimination hold so the clinic surfaces
   // automatically, exactly like the win path. The death spin still animates
@@ -200,7 +200,7 @@ export function useOnlinePlayerUiController({
 
   // Settle a finished spin: clear the overlay LOCALLY and (when it's our spin or a
   // bot's) notify the server. STABLE (ref-backed) so the auto-dismiss timer below
-  // is never reset by an unrelated re-render. Self-contained on purpose — the
+  // is never reset by an unrelated re-render. Self-contained on purpose - the
   // shared `spinDismissed` flag is reset on every `spin_result` re-broadcast
   // (socketEvents), so depending on it to dismiss raced and stranded the overlay.
   const ackRef = useRef(acknowledgeSpinResult);
@@ -264,7 +264,7 @@ export function useOnlinePlayerUiController({
 
   useEffect(() => {
     if (!peekedCard) return undefined;
-    // Module 4 — the tutorial gives a long, deliberate pause to study the peeked
+    // Module 4 - the tutorial gives a long, deliberate pause to study the peeked
     // card before the layout moves on; a real game dismisses it quickly.
     const timer = setTimeout(() => setPeekedCard(null), isTutorialRoom ? 10000 : 3000);
     return () => clearTimeout(timer);
@@ -276,7 +276,7 @@ export function useOnlinePlayerUiController({
 
   const scrollToCenter = useCallback(() => {
     if (tableCenterRef.current) {
-      // The table scene pans horizontally now — bring the dealer's cards back
+      // The table scene pans horizontally now - bring the dealer's cards back
       // into the centre of the view.
       tableCenterRef.current.scrollIntoView({ behavior: 'smooth', inline: 'center', block: 'nearest' });
     }
@@ -288,10 +288,10 @@ export function useOnlinePlayerUiController({
     if (!card) return;
     // Power Clinic: refuse an off-script card play (mirrors the server
     // clinicActionBlock) and flash the corrective coach line instead of opening
-    // the confirm modal — so a stray tap can never break the lesson.
+    // the confirm modal - so a stray tap can never break the lesson.
     const playLock = clinicCardPlayLock(roomState?.tutorialScenario, {
       powerActivatedThisTurn: roomState?.powerActivatedThisTurn,
-      // (Module 3.1) Freeze bonus turn — the freeze has left the slot, so the free
+      // (Module 3.1) Freeze bonus turn - the freeze has left the slot, so the free
       // second play must not be blocked.
       freezeConsumed: !(roomState?.myPowerCardSlot || []).some((c) => c?.power === 'freeze'),
     });
@@ -308,21 +308,21 @@ export function useOnlinePlayerUiController({
     (roomState?.myPowerCardSlot || []).some((c) => c?.power === 'freeze'),
   ]);
 
-  // §3.2 — spectating an opponent's hand is disabled (anti-cheat lockout). This
+  // §3.2 - spectating an opponent's hand is disabled (anti-cheat lockout). This
   // is intentionally a no-op: eliminated / dead players can watch the table but
   // never reveal a living opponent's cards. Kept so callers don't need to drop
   // the handler wiring.
   const handleSpectatePlayer = useCallback(() => {}, []);
 
-  // #139 — open the activation confirmation modal by tapping the held power
+  // #139 - open the activation confirmation modal by tapping the held power
   // card. The three turn actions (play / call bluff / activate power) are fully
   // order-independent: a power card may be armed at any point in the holder's
-  // own turn — before OR after a card is played, and before OR after a bluff is
+  // own turn - before OR after a card is played, and before OR after a bluff is
   // called. The only block is being already armed (one activation per turn).
   const handlePowerCardClick = useCallback((cardId = null) => {
     if (!isMyTurn || !isPlaying) return;
     // Tutorial defensive drill: the Shield/Mirror/Swap is dimmed and can't be
-    // pre-armed on your own turn (it would stall the clinic — see the server
+    // pre-armed on your own turn (it would stall the clinic - see the server
     // block in activatePowerCard). Tapping it surfaces a "not yet" coach hint
     // instead of opening the activate modal. Bump a signal the TutorialLayer
     // watches (mirrors the reopenSignal pattern).
@@ -331,11 +331,11 @@ export function useOnlinePlayerUiController({
       return;
     }
     if (myPlayer?.armedPowerCard) return;
-    // §1.1 — one power activation per turn. `armedPowerCard` misses a consumed
+    // §1.1 - one power activation per turn. `armedPowerCard` misses a consumed
     // Peek (it leaves no armed marker), so also honour the server's ledger flag
     // to keep a Collector from Peeking then arming in the same turn.
     if (roomState?.powerActivatedThisTurn) return;
-    // #197 — remember which card was tapped so a Collector can activate any of
+    // #197 - remember which card was tapped so a Collector can activate any of
     // its held cards, not just slot[0].
     setPendingPowerCardId(typeof cardId === 'string' ? cardId : null);
     setPowerConfirmOpen(true);

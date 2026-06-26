@@ -7,7 +7,7 @@
 -- Map; the tables have always had 0 rows.
 --
 -- room_players references rooms (FK ON DELETE CASCADE) and
--- profiles (FK ON DELETE CASCADE) — drop the dependent table
+-- profiles (FK ON DELETE CASCADE) - drop the dependent table
 -- first.
 --
 -- If persistence ever ships, re-introduce via a fresh migration

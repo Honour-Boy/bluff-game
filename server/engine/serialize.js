@@ -1,5 +1,5 @@
 // ============================================================
-// ENGINE — Public room serialisation (the only thing over the wire)
+// ENGINE - Public room serialisation (the only thing over the wire)
 // ============================================================
 // serializeRoom is the engine's privacy boundary. Hands, secret
 // roles, and ability flags are gated to their owner. Spectators
@@ -17,8 +17,8 @@ function serializeRoom(room, requestingPlayerId = null, opts = {}) {
   // receive an opponent's hand. The old #81 "spectate one chosen player's hand"
   // feature is fully removed: `spectatedHand` is no longer emitted to anyone, so
   // there is no payload path that carries a living opponent's cards off-server.
-  // `currentPromptTarget` (below) carries only a player id + prompt kind — no
-  // card data — and stays gated to eliminated callers for the ghost overlays.
+  // `currentPromptTarget` (below) carries only a player id + prompt kind - no
+  // card data - and stays gated to eliminated callers for the ghost overlays.
   const requestingPlayer = requestingPlayerId
     ? room.players.find(p => p.id === requestingPlayerId)
     : null;
@@ -49,14 +49,14 @@ function serializeRoom(room, requestingPlayerId = null, opts = {}) {
     // Defaults to 'streets' for rooms created before the tier rollout.
     tier: room.tier || 'streets',
     // Host identity. Exposed so clients can RE-DERIVE isHost on every state
-    // push — host can change live (stand-in reclaim / hand-back / migration)
+    // push - host can change live (stand-in reclaim / hand-back / migration)
     // and that only arrives via room_state. `hostUserId` is the host's Supabase
     // id (same value the server compares in join_room); `amHost` is the
     // per-recipient convenience flag (only meaningful when a requestingPlayerId
     // was supplied, i.e. the per-socket online broadcast).
     hostUserId: room.hostUserId || null,
     amHost: requestingPlayerId != null ? (requestingPlayerId === room.hostUserId) : undefined,
-    // Tutorial / Practice — flag the room so the client can brand it (and the
+    // Tutorial / Practice - flag the room so the client can brand it (and the
     // guided layer can key off it). Always present (false for normal rooms).
     isTutorial: !!room.isTutorial,
     // Which guided lesson this practice room is running ('basics' | 'powers'),
@@ -72,10 +72,10 @@ function serializeRoom(room, requestingPlayerId = null, opts = {}) {
     // Active scripted Power-Clinic drill (engine/tutorialScenarios.js). The
     // client coach keys off { power, actor, step } to show the before/after copy;
     // `lockBluff` disables the Call-Bluff button during own-turn drills. null
-    // outside the clinic. No card data here — hands stay gated to their owner.
+    // outside the clinic. No card data here - hands stay gated to their owner.
     tutorialScenario: room.isTutorial && room.tutorialScenario
       ? (room.tutorialScenario.tour
-          // Spotlight "Show me around" tour instance — a different shape the
+          // Spotlight "Show me around" tour instance - a different shape the
           // client tour layer keys off (step + stepIndex drive the Part-B beats).
           ? {
               tour: true,
@@ -124,7 +124,7 @@ function serializeRoom(room, requestingPlayerId = null, opts = {}) {
         p.id === requestingPlayerId
           ? (p.role || 'barehand')
           : (room.phase === 'game_over' ? (p.role || 'barehand') : null),
-      // #120 — Medic save budget. Only exposed to its owner. Keep the
+      // #120 - Medic save budget. Only exposed to its owner. Keep the
       // derived `medicAbilityAvailable` boolean so existing consumers
       // keep working; add the raw count + remaining for UI ("2 saves left").
       medicSavesUsed: p.id === requestingPlayerId ? (p.medicSavesUsed || 0) : undefined,
@@ -135,10 +135,10 @@ function serializeRoom(room, requestingPlayerId = null, opts = {}) {
       hasBounty: !!p.hasBounty,
       consecutiveSurvivedSpins: p.consecutiveSurvivedSpins || 0,
       consecutiveCorrectBets: p.consecutiveCorrectBets || 0,
-      // #205 — equipped cosmetics (validated server-side at equip time).
+      // #205 - equipped cosmetics (validated server-side at equip time).
       // Purely visual and PUBLIC: every viewer sees each player's real look
       // (their deck skin on their seat chip, the spinner's gun skin on the
-      // cylinder) — showing off the unlocks IS the feature.
+      // cylinder) - showing off the unlocks IS the feature.
       cosmetics: p.cosmetics || null,
     })),
     turnOrder: room.turnOrder,
@@ -146,7 +146,7 @@ function serializeRoom(room, requestingPlayerId = null, opts = {}) {
     currentPlayerId: room.turnOrder[room.currentTurnIndex] || null,
     // The immediately-next player within the current cycle. Under Roulette
     // Rotation the rest of the cycle stays concealed (the next cycle isn't
-    // generated yet), so this is null on the final turn of a cycle — the next
+    // generated yet), so this is null on the final turn of a cycle - the next
     // player is a genuine surprise. The client reveals only this much.
     nextPlayerId: Array.isArray(room.turnOrder)
       ? (room.turnOrder[room.currentTurnIndex + 1] || null)
@@ -203,7 +203,7 @@ function serializeRoom(room, requestingPlayerId = null, opts = {}) {
               : undefined,
         }
       : null,
-    // §1.1 — bluff interception window. Everyone sees who's deciding; only the
+    // §1.1 - bluff interception window. Everyone sees who's deciding; only the
     // accused gets the list of cards they may arm.
     pendingBluffIntercept: isOnline && room.pendingBluffIntercept
       ? {
@@ -245,7 +245,7 @@ function serializeRoom(room, requestingPlayerId = null, opts = {}) {
       ? {
           finalistIds: room.lastStand.finalistIds,
           activeFinalistId: room.lastStand.activeFinalistId,
-          // #243 — the single shared gun both finalists pass back and forth.
+          // #243 - the single shared gun both finalists pass back and forth.
           chamber: room.lastStand.chamber || null,
           bulletCount: room.lastStand.bulletCount
             ?? (room.lastStand.chamber || []).filter(s => s === 'bullet').length,
@@ -257,7 +257,7 @@ function serializeRoom(room, requestingPlayerId = null, opts = {}) {
         : undefined,
     suddenDeathCounter: isOnline ? (room.suddenDeathCounter || 0) : undefined,
     mirrorMatchActive: isOnline ? !!room.mirrorMatchActive : undefined,
-    // Redemption Spin (Phase E1) — who is being offered their one redemption
+    // Redemption Spin (Phase E1) - who is being offered their one redemption
     // spin and how long is left before the server takes it for them. Drives the
     // client's redemption_pending overlay (the prompt for the target; a waiting
     // notice for everyone else).
@@ -269,7 +269,7 @@ function serializeRoom(room, requestingPlayerId = null, opts = {}) {
             msRemaining: Math.max(0, (room.redemption.deadline || 0) - Date.now()),
           }
         : undefined,
-    // Covenant — The Pact. Reconnect-safe view, gated so it never leaks the
+    // Covenant - The Pact. Reconnect-safe view, gated so it never leaks the
     // secret bond: partnerId is exposed only to the two partners; the offer
     // (and the selector's identity) only to the target it's aimed at; amSelector
     // only to the selector themselves. null in non-Covenant rooms.
@@ -292,7 +292,7 @@ function serializeRoom(room, requestingPlayerId = null, opts = {}) {
         }
       : null,
     // Pre-game selection & role reveal (#116). Authoritative view for
-    // the requesting player — reconnect-safe. Only the caller's own
+    // the requesting player - reconnect-safe. Only the caller's own
     // pool/selection is exposed; other players' picks stay private,
     // and the ready Set is reduced to live counts (Sets don't survive
     // JSON over the wire).

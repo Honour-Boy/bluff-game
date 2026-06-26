@@ -1,5 +1,5 @@
 // ============================================================
-// HANDLERS — Role abilities (v2 Phase D)
+// HANDLERS - Role abilities (v2 Phase D)
 // ============================================================
 // Covers: medic_decide, saboteur_transfer, sniper_redirect.
 
@@ -30,7 +30,7 @@ function register(io, socket, deps) {
       if (!pending) return callback?.({ success: false, error: 'Lost Medic context' });
       if (pending.medicId !== socket.userId) return callback?.({ success: false, error: 'Not the Medic' });
 
-      // #121 — once the elimination is final (Medic declines or the save
+      // #121 - once the elimination is final (Medic declines or the save
       // fails), release the death announcement that was suppressed while
       // the room was paused. The Assassin path defers a specific
       // assassin_strike banner; every other path gets the generic
@@ -50,14 +50,14 @@ function register(io, socket, deps) {
       };
 
       if (save) {
-        // applyMedicSave enforces the rules a save can fail on — hand at
+        // applyMedicSave enforces the rules a save can fail on - hand at
         // the save-hand cap (MEDIC_SAVE_HAND_CAP), or the Medic's
         // MEDIC_MAX_SAVES budget spent (#120, error 'Save limit reached').
         // On any failure we finalise
         // the elimination instead and surface the error to the caller.
         const res = engine.applyMedicSave(room, pending.eliminatedPlayerId, pending.source);
         if (!res.ok) {
-          // Save rejected (hand full / save limit reached) — finalise.
+          // Save rejected (hand full / save limit reached) - finalise.
           if (typeof pending.finaliseFn === 'function') pending.finaliseFn();
           room.pendingMedicSave = null;
           if (room.phase === 'medic_pending') room.phase = 'playing';
@@ -68,7 +68,7 @@ function register(io, socket, deps) {
           return callback?.({ success: false, error: res.error });
         }
 
-        // Medic save banner — public.
+        // Medic save banner - public.
         io.to(code).emit('power_card_triggered', {
           kind: 'medic_saved',
           holderId: res.medicId,
@@ -105,7 +105,7 @@ function register(io, socket, deps) {
 
   // ─── PLAYER: Saboteur transfer ──────────────────────────
   // Once-per-game silent move of one random card from the holder's
-  // hand into the target's. No banner — only handSize updates.
+  // hand into the target's. No banner - only handSize updates.
   socket.on('saboteur_transfer', async ({ roomCode, targetPlayerId } = {}, callback) => {
     try {
       if (!socket.userId) return callback?.({ success: false, error: 'Not authenticated' });
@@ -133,7 +133,7 @@ function register(io, socket, deps) {
   // ─── PLAYER: Sniper redirect ────────────────────────────
   // Resumes a paused bluff resolution where the spin target was about
   // to be locked in. Sniper picks a new alive target (not self, not
-  // Mirror holder) — or passes by sending newTargetId=null.
+  // Mirror holder) - or passes by sending newTargetId=null.
   socket.on('sniper_redirect', async ({ roomCode, newTargetId } = {}, callback) => {
     try {
       if (!socket.userId) return callback?.({ success: false, error: 'Not authenticated' });
@@ -174,7 +174,7 @@ function register(io, socket, deps) {
       room.pendingSniperRedirect = null;
       applyBluffOutcome(room, outcome);
 
-      // Russian Roulette — the (re-targeted) failed bluff fires an immediate
+      // Russian Roulette - the (re-targeted) failed bluff fires an immediate
       // spin: no manual pull / betting pause.
       if (engine.shouldImmediateSpin(room)) {
         const target = room.players.find(p => p.id === room.spinTargetId);
@@ -186,7 +186,7 @@ function register(io, socket, deps) {
 
       if (room.phase === 'spin_pending') {
         _maybeOpenBetting(io, room);
-        // Issue 1 — guard against a spin that never gets performed.
+        // Issue 1 - guard against a spin that never gets performed.
         _scheduleSpinPendingTimeout(io, room.code, leaderboardRepo);
       }
 

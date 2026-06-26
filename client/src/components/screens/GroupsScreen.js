@@ -14,7 +14,7 @@ function formatInviteDate(value) {
   }
 }
 
-// ─── Shared panel style — dark aged-oak surface ───────────────────────────────
+// ─── Shared panel style - dark aged-oak surface ───────────────────────────────
 const panelStyle = {
   background: 'linear-gradient(160deg, rgba(22,17,11,0.95) 0%, rgba(13,10,7,0.97) 100%)',
   border: '1px solid var(--border-lit)',
@@ -63,7 +63,7 @@ function RefreshButton({ onRefresh, loading, label = 'Refresh' }) {
   );
 }
 
-// ─── GroupsScreen — the tavern bulletin board ─────────────────────────────────
+// ─── GroupsScreen - the tavern bulletin board ─────────────────────────────────
 export function GroupsScreen({
   username,
   getProgression,
@@ -417,7 +417,7 @@ export function GroupsScreen({
                 color: 'var(--text-dim)',
                 lineHeight: 1.5,
               }}>
-                The guild is bound to your current tier — only players of the same
+                The guild is bound to your current tier - only players of the same
                 tier can join. Climb higher and you’ll re-tier the crew or hand it on.
               </div>
               <button

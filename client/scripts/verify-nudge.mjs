@@ -1,5 +1,5 @@
 // ============================================================
-// Playwright — idle "tap a card" nudge alignment check (large screen)
+// Playwright - idle "tap a card" nudge alignment check (large screen)
 // ============================================================
 // Verifies that the tutorial idle nudge is centred over the real hand fan on a
 // wide viewport (the bug this fixes: it used to sit at a fixed offset and drift
@@ -7,7 +7,7 @@
 // waits for the idle nudge, then asserts its centre-x matches the hand
 // ([data-tour-id="my-hand"]) within a tolerance and saves a screenshot.
 //
-// PREREQUISITES (this needs the real app + env — it can't run headless without
+// PREREQUISITES (this needs the real app + env - it can't run headless without
 // Supabase credentials):
 //   1. server running:  (cd server && node index.js)
 //   2. client running:  (cd client && npm run dev)   with client/.env.local set
@@ -45,7 +45,7 @@ async function main() {
 
     // ── Guest sign-in (the practice table is guest-friendly). ──
     // The AuthScreen offers a guest path; fill a name and enter. Selectors are
-    // best-effort — adjust the text if the copy changes.
+    // best-effort - adjust the text if the copy changes.
     try {
       await clickByText(page, /continue as guest|guest/i, 6000);
     } catch { /* maybe already past auth */ }

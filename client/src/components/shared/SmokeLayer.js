@@ -1,13 +1,13 @@
 'use client';
 
-// ─── SmokeLayer — ambient smoke wisps drifting across the table ───────────────
+// ─── SmokeLayer - ambient smoke wisps drifting across the table ───────────────
 // Pure CSS animation. No canvas, no image assets.
 // Renders two wispy radial-gradient blobs that drift upward and fade out on a
 // staggered loop. Completely suppressed when prefers-reduced-motion is set.
 //
 // Props:
-//   active (bool)   — when false the layer is invisible (save GPU during lobby)
-//   intensity       — 'low' | 'medium' | 'high' (defaults 'low')
+//   active (bool)   - when false the layer is invisible (save GPU during lobby)
+//   intensity       - 'low' | 'medium' | 'high' (defaults 'low')
 
 const INTENSITIES = {
   low:    { opacity: 0.28, count: 2 },

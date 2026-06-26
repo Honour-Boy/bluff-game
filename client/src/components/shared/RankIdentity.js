@@ -1,12 +1,12 @@
 // ============================================================
-// RankIdentity — the player's rank/level/XP, surfaced everywhere
+// RankIdentity - the player's rank/level/XP, surfaced everywhere
 // ============================================================
 // Rank (tier), level, and XP progress used to live only inside the Cosmetics
 // panel. This widget makes them evident wherever a player's identity shows.
 //
-//   variant="full"  — a prominent identity panel (Landing header): tier sigil
+//   variant="full"  - a prominent identity panel (Landing header): tier sigil
 //                     + tier name + Level N + an XP-to-next bar with counts.
-//   variant="chip"  — a compact pill (groups, lobby, etc.): sigil + Lv N + tier.
+//   variant="chip"  - a compact pill (groups, lobby, etc.): sigil + Lv N + tier.
 //
 // Accepts the `get_progression` progression object ({ level, xp, levelFloorXp,
 // nextLevelXp }); tier is derived from level. Pure inline styles, no deps.
@@ -84,7 +84,7 @@ export function RankIdentity({ progression, variant = 'full', isGuest = false, s
         </div>
         <div style={{ fontFamily: "'Space Mono', monospace", fontSize: 9, letterSpacing: '0.08em', color: 'var(--text-dim)', marginTop: 4 }}>
           {isGuest
-            ? 'Guest — sign in to keep your XP & rank'
+            ? 'Guest - sign in to keep your XP & rank'
             : isMax
               ? `${p.xp} XP · the top of the ladder`
               : `${p.xp} / ${p.nextLevelXp} XP · ${p.nextLevelXp - p.xp} to next level`}

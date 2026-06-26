@@ -10,7 +10,7 @@ import {
 import { buildPersistentGroupRoom } from '../lib/roomBuilders.js';
 import { defaultRoomConfig } from '../gameEngine.js';
 
-// ─── G4 — group room caps ─────────────────────────────────────────────────────
+// ─── G4 - group room caps ─────────────────────────────────────────────────────
 
 describe('buildPersistentGroupRoom (G4 tier caps)', () => {
   function powersOnSettings() {
@@ -77,7 +77,7 @@ describe('tierRank', () => {
 describe('tierMismatchMessage', () => {
   it('names both tiers', () => {
     expect(tierMismatchMessage('backroads', 'streets'))
-      .toBe("This crew runs Backroads stakes — you're Streets.");
+      .toBe("This crew runs Backroads stakes - you're Streets.");
     expect(tierLabel('covenant')).toBe('Covenant');
   });
 });
