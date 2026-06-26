@@ -2,86 +2,729 @@
 
 import { Suspense } from 'react';
 import { useSearchParams } from 'next/navigation';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { useAuth } from '../hooks/useAuth';
 import { useGame } from '../hooks/useGame';
+import { useMusic, gameMusicStage } from '../hooks/useAtmosphere';
 import { useVoice } from '../hooks/useVoice';
-import { AuthScreen } from '../components/AuthScreen';
-import { LandingScreen } from '../components/LandingScreen';
+import { AuthScreen } from '../components/screens/AuthScreen';
+import { SessionConflictScreen } from '../components/screens/SessionConflictScreen';
+import { LandingScreen } from '../components/screens/LandingScreen';
+import { GroupsScreen } from '../components/screens/GroupsScreen';
+import { GroupDetailScreen } from '../components/screens/GroupDetailScreen';
 import { HostUI } from '../components/HostUI';
 import { PlayerUI } from '../components/PlayerUI';
 import { OnlinePlayerUI } from '../components/OnlinePlayerUI';
-import { Notification } from '../components/Notification';
+import { Notification } from '../components/shared/Notification';
+import { SettingsGear } from '../components/shared/SettingsGear';
 import { ChatPanel } from '../components/ChatPanel';
+import { ControlsModal } from '../components/shared/ControlsModal';
+import { KickPlayerPanel } from '../components/shared/KickPlayerPanel';
+import { PreGameSettingsPanel } from '../components/screens/PreGameSettingsPanel';
+import { LobbyConfigSummary } from '../components/LobbyConfigSummary';
+import { LeaderboardPanel } from '../components/LeaderboardPanel';
+import { IntroVideo } from '../components/shared/IntroVideo';
+import { IntroLoading } from '../components/shared/IntroLoading';
+import { ChamberSpinner } from '../components/shared/ChamberSpinner';
+import { LoadingSplash } from '../components/shared/LoadingScreen';
+import { useIsMobile } from '../hooks/useIsMobile';
+import { shouldShowIntro, markIntroSeen, rearmIntro } from '../lib/intro';
+
+// §M4 — non-blocking "reconnecting" pill shown while the socket is down but the
+// player is still in a room. Sits top-centre, above the table; the resilient
+// rejoin in useGame restores state automatically once the transport recovers.
+function ReconnectingBanner() {
+  return (
+    <div
+      role="status"
+      aria-live="polite"
+      style={{
+        position: 'fixed',
+        top: 12,
+        left: '50%',
+        transform: 'translateX(-50%)',
+        zIndex: 9999,
+        display: 'flex',
+        alignItems: 'center',
+        gap: 8,
+        padding: '7px 14px',
+        borderRadius: 999,
+        background: 'rgba(16,12,8,0.95)',
+        border: '1px solid var(--warning)',
+        color: 'var(--warning)',
+        fontSize: 11,
+        fontFamily: "'Space Mono', monospace",
+        letterSpacing: '0.08em',
+        boxShadow: '0 4px 20px rgba(0,0,0,0.55)',
+        pointerEvents: 'none',
+      }}
+    >
+      <span
+        style={{
+          width: 8,
+          height: 8,
+          borderRadius: '50%',
+          background: 'var(--warning)',
+          animation: 'pulse 1.2s ease-in-out infinite',
+        }}
+      />
+      Reconnecting…
+    </div>
+  );
+}
 
 // Inner component that safely calls useSearchParams inside a Suspense boundary
 function HomeContent() {
   const searchParams = useSearchParams();
   const initialJoinCode = searchParams.get('join') || null;
+  const [homeView, setHomeView] = useState('landing');
+  // ─── Intro splash (revolver-blast video → 5s loading beat) ─────────
+  // Fires once per genuine game open (fresh tab / first entry, and the
+  // next entry after sign-out). Gated in lib/intro.js so it never replays
+  // on a refresh, reconnect, or in-app navigation. Decided in an effect
+  // (not a lazy initializer) so it stays SSR/hydration-safe.
+  // Phases: 'video' → 'loading' → null (app shows). The video plays in
+  // full, then a branded 3s progress bar masks the auth/socket bootstrap.
+  const [introPhase, setIntroPhase] = useState(null); // null | 'video' | 'loading'
+  // #274 — the background music must NOT start until the intro splash (video →
+  // 3s loading beat) has fully finished, or the lobby track bleeds over the
+  // intro's own audio. Stays false while an intro is showing; flips true the
+  // moment there's no intro to play, or once the loading beat completes.
+  const [introResolved, setIntroResolved] = useState(false);
+  const introCheckedRef = useRef(false);
+  useEffect(() => {
+    if (introCheckedRef.current) return;
+    introCheckedRef.current = true;
+    if (shouldShowIntro()) setIntroPhase('video');
+    else setIntroResolved(true); // no intro this open — music may start now
+  }, []);
+  // Mark "seen" when the video ends (so a reload during the loading beat
+  // doesn't replay it), then hand off to the 5s loading screen.
+  const finishIntroVideo = useCallback(() => {
+    markIntroSeen();
+    setIntroPhase('loading');
+  }, []);
+  const finishIntroLoading = useCallback(() => {
+    setIntroPhase(null);
+    setIntroResolved(true); // intro fully done — landing music may fade in now
+  }, []);
+  const [groupsLoading, setGroupsLoading] = useState(false);
+
+  // Replay the intro on a fresh sign-in within the same tab (logout →
+  // login). `handleSignOut` re-armed the gate; the null → user transition
+  // here is the "new entry" that plays it again. Skips the initial mount
+  // (handled by the open-check effect above) so a restored session that
+  // already saw the splash doesn't double-fire it.
+  const prevUserIdRef = useRef(undefined);
+  const [groupsList, setGroupsList] = useState([]);
+  const [groupInvites, setGroupInvites] = useState([]);
+  const [selectedGroup, setSelectedGroup] = useState(null);
 
   const {
     user, profile, loading, authError, setAuthError,
-    sendEmailOtp, signInWithGoogle, signOut,
+    signedOutReason, forceSignOut,
+    sendEmailOtp, signInWithGoogle, signInAsGuest, signOut, signOutGuest,
     updateUsername,
-    getAccessToken, username,
+    getAccessToken, getGuestAuth, username, isGuest,
   } = useAuth();
 
-  const game = useGame(getAccessToken);
+  // Pass the effective auth identity so useGame re-authenticates
+  // the socket when the user transitions null → guest → real user.
+  // Without this third arg, the existing socket stays unauthenticated
+  // after guest sign-in and online-room actions get "Not authenticated"
+  // (issue #52).
+  const game = useGame(getAccessToken, getGuestAuth, user?.id ?? null, forceSignOut);
 
   const {
     roomCode, isHost, playerId,
     roomState, myPlayer, isMyTurn, currentPlayer,
     gameMode, error, connected, authenticated, notification,
-    createRoom, joinRoom, startGame,
+    sessionConflict, takeOverSession, signOutSocket,
+    createRoom, startTutorial, startSandbox, skipToPowers, advanceTutorial, startTour, finishTour, joinRoom, startGame,
+    createGroup, listMyGroups, getGroup,
+    inviteToGroup, listMyInvites, respondToInvite,
+    revokeInvite, removeMember, transferHost,
+    reclaimHost, handBackHost,
+    transferOwnership, regroupRetier,
+    deleteGroup, leaveGroup, getGroupLeaderboard,
     nextTurn, resolveBluff,
     playCard, endTurn, playerSpin,
     declareRoundWin, callBluff,
-    playCardOnline, startNextRound, spectatePlayer,
-    acknowledgeSpinResult, spinDismissed,
+    playCardOnline, spectatePlayer,
+    acknowledgeSpinResult, redemptionSpin, spinDismissed,
     chatMessages, chatUnread, chatOpen,
     sendChatMessage, openChat, closeChat,
-    leaveGame, setError,
+    leaveGame, restartRoom, resetRoom, kickPlayer, setError,
+    activatePowerCard,
+    swapPick,
+    preGameSelect,
+    updateRoomConfig,
+    medicDecide,
+    saboteurTransfer,
+    sniperRedirect,
+    bloodDebtTarget,
+    pactChoose,
+    pactRespond,
+    volunteerForPact,
+    pactVolunteer,
+    setPactVolunteer,
+    bluffIntercept,
+    medicPrompt,
+    sniperPrompt,
+    bloodDebtPrompt,
+    setBloodDebtPrompt,
+    pregame,
+    powerEventQueue,
+    consumePowerEvent,
+    leaderboardUpdateNonce,
+    placeBet,
+    ghostVote,
+    lastStandSpin,
+    lastStandEndTurn,
+    // #205 — meta-progression: XP summary + cosmetics locker actions.
+    xpAward,
+    getProgression,
+    setCosmetics,
   } = game;
 
-  // Voice — opt-in via Join Voice button. Hook tears down on roomCode change.
-  const voice = useVoice({ roomCode, isAuthenticated: authenticated });
+  useEffect(() => {
+    const uid = user?.id ?? null;
+    const prev = prevUserIdRef.current;
+    prevUserIdRef.current = uid;
+    if (prev === undefined) return; // initial mount — open-check effect owns it
+    if (!prev && uid && shouldShowIntro()) {
+      // Replaying the intro (same-tab logout → login): re-gate the music so the
+      // lobby track doesn't keep bleeding over the replayed splash (#274).
+      setIntroResolved(false);
+      setIntroPhase('video');
+    }
+  }, [user?.id]);
+
+  // ─── Section-based background music (#A) ──────────────────────────
+  // Each area of the app has its own track; the section is derived from the
+  // current screen + room phase and switched as the player moves around.
+  // _setSection arms the mobile autoplay unlock, so no explicit gesture
+  // listener is needed here. Muteable from the settings gear.
+  const { musicEnabled, musicVolume, toggleMusic, setMusicVolume, setSection, setGameStage, nextTrack, prevTrack } = useMusic();
+  // A group room's lobby belongs to the Groups area — keep it on the GROUPS
+  // track instead of switching to the normal online-lobby sound. It only moves
+  // to 'game' once the match actually starts (phase leaves lobby), and to
+  // 'gameover' at the end.
+  const inGroupRoom = !!roomState?.groupId;
+  const musicSection = roomCode
+    ? (roomState?.phase === 'game_over'
+        ? 'gameover'
+        : (roomState?.phase && roomState.phase !== 'lobby')
+            ? 'game'
+            : (inGroupRoom ? 'groups' : 'lobby'))
+    : (homeView === 'groups' || homeView === 'group') ? 'groups' : 'lobby';
+  useEffect(() => {
+    // #274 — hold all music until the intro splash has fully resolved. Because
+    // _setSection is the sole place that arms the audio unlock + starts the
+    // playlist, gating here also stops a Skip-tap gesture from kick-starting the
+    // bed mid-intro.
+    if (!introResolved) return;
+    setSection(musicSection);
+  }, [setSection, musicSection, introResolved]);
+
+  // Game-state progressive music: feed the in-game intensity stage (player
+  // attrition) so the 'game' section crossfades from quiet tension up to the
+  // anthems as the field thins. No-op outside the 'game' section.
+  const gameStage = gameMusicStage(roomState);
+  useEffect(() => {
+    setGameStage(gameStage);
+  }, [setGameStage, gameStage]);
+
+  // (Module 1) Lock page scrolling while inside the online game shell so the
+  // pannable table owns the whole viewport with no native page scroll on any
+  // device. Mirrors the `fullBleed` condition below; cleaned up on exit.
+  const inOnlineGame = !!roomCode && gameMode === 'online';
+  useEffect(() => {
+    if (typeof document === 'undefined') return undefined;
+    document.body.classList.toggle('game-noscroll', inOnlineGame);
+    return () => document.body.classList.remove('game-noscroll');
+  }, [inOnlineGame]);
+
+  // ─── Groups cache (issue #106) ─────────────────────────────
+  // In-memory only (sessionStorage is overkill for socket payloads
+  // and they shouldn't survive tab close). Two scopes:
+  //   list.loadedAt    — most recent successful list_my_groups +
+  //                      list_my_invites pair; rendered state in
+  //                      groupsList / groupInvites is the payload.
+  //   detail (Map)     — per-groupId snapshots of get_group plus
+  //                      their loadedAt; lets us re-render the
+  //                      detail screen instantly when revisiting
+  //                      the same group within the TTL.
+  // SWR: <30s = serve cache only. 30-60s = serve cache + refresh
+  // in background. >60s or invalidated = blocking refresh.
+  const GROUPS_CACHE_TTL_MS = 60_000;
+  const GROUPS_SWR_AFTER_MS = 30_000;
+  const groupsCacheRef = useRef({
+    list: { loadedAt: 0 },
+    detail: new Map(), // groupId → { group, loadedAt }
+  });
+
+  const invalidateGroupsCache = useCallback((scope = 'all', groupId = null) => {
+    const cache = groupsCacheRef.current;
+    if (scope === 'list' || scope === 'all') cache.list.loadedAt = 0;
+    if (scope === 'detail' || scope === 'all') {
+      if (groupId) cache.detail.delete(groupId);
+      else cache.detail.clear();
+    }
+  }, []);
+
+  // Always emits and updates state on success. Returns the raw
+  // server responses so callers (mutations) can react to errors.
+  const fetchGroupsList = useCallback(async () => {
+    const [groupsRes, invitesRes] = await Promise.all([
+      listMyGroups(),
+      listMyInvites(),
+    ]);
+    if (groupsRes?.success) setGroupsList(groupsRes.groups || []);
+    if (invitesRes?.success) setGroupInvites(invitesRes.invites || []);
+    if (groupsRes?.success && invitesRes?.success) {
+      groupsCacheRef.current.list.loadedAt = Date.now();
+    }
+    return { groupsRes, invitesRes };
+  }, [listMyGroups, listMyInvites]);
+
+  const refreshGroupsHome = useCallback(async ({ force = false } = {}) => {
+    setGroupsLoading(true);
+    try {
+      if (force) invalidateGroupsCache('list');
+      return await fetchGroupsList();
+    } finally {
+      setGroupsLoading(false);
+    }
+  }, [fetchGroupsList, invalidateGroupsCache]);
+
+  const openGroupsHome = useCallback(async () => {
+    setError(null);
+    setSelectedGroup(null);
+    setHomeView('groups');
+    const age = Date.now() - groupsCacheRef.current.list.loadedAt;
+    if (groupsCacheRef.current.list.loadedAt && age < GROUPS_CACHE_TTL_MS) {
+      // Cache hit: render rendered state (already in groupsList /
+      // groupInvites). Kick a background refresh if we're past the
+      // SWR threshold so the next visit is fresh too.
+      if (age >= GROUPS_SWR_AFTER_MS) fetchGroupsList();
+      return;
+    }
+    await refreshGroupsHome();
+  }, [fetchGroupsList, refreshGroupsHome, setError]);
+
+  // Returns the raw `get_group` response shape: { success, group, ... }
+  // so callers don't have to know the cache exists.
+  const fetchGroupDetail = useCallback(async (groupId) => {
+    const res = await getGroup(groupId);
+    if (res?.success && res.group) {
+      setSelectedGroup(res.group);
+      groupsCacheRef.current.detail.set(groupId, {
+        group: res.group,
+        loadedAt: Date.now(),
+      });
+    }
+    return res;
+  }, [getGroup]);
+
+  const openGroupDetail = useCallback(async (groupId) => {
+    setError(null);
+    const cached = groupsCacheRef.current.detail.get(groupId);
+    const age = cached ? Date.now() - cached.loadedAt : Infinity;
+    if (cached && age < GROUPS_CACHE_TTL_MS) {
+      setSelectedGroup(cached.group);
+      setHomeView('group');
+      if (age >= GROUPS_SWR_AFTER_MS) {
+        // Background refresh — don't block the screen transition,
+        // just update once the response arrives.
+        fetchGroupDetail(groupId);
+      }
+      return { success: true, group: cached.group };
+    }
+    setGroupsLoading(true);
+    try {
+      const res = await fetchGroupDetail(groupId);
+      if (res?.success) setHomeView('group');
+      return res;
+    } finally {
+      setGroupsLoading(false);
+    }
+  }, [fetchGroupDetail, setError]);
+
+  // #160 — manual in-place reload of the open group detail (members +
+  // pending invites). Forces past the cache so the user sees changes other
+  // members made without leaving the view.
+  const refreshGroupDetail = useCallback(async () => {
+    if (!selectedGroup?.id) return { success: false, error: 'Group not found' };
+    setGroupsLoading(true);
+    try {
+      invalidateGroupsCache('detail', selectedGroup.id);
+      return await fetchGroupDetail(selectedGroup.id);
+    } finally {
+      setGroupsLoading(false);
+    }
+  }, [fetchGroupDetail, invalidateGroupsCache, selectedGroup?.id]);
+
+  // ─── Mutations: each one invalidates the slices it touches and
+  // re-fetches blockingly (the UI already shows a busy state during
+  // these). The cache exists to skip *spontaneous* fetches, not
+  // mutation follow-ups.
+
+  const handleCreateGroup = useCallback(async (name) => {
+    const res = await createGroup(name);
+    if (res?.success && res.group?.id) {
+      invalidateGroupsCache('list');
+      await refreshGroupsHome();
+      await openGroupDetail(res.group.id);
+    }
+    return res;
+  }, [createGroup, invalidateGroupsCache, openGroupDetail, refreshGroupsHome]);
+
+  const handleRespondToInvite = useCallback(async (inviteId, accept) => {
+    const res = await respondToInvite(inviteId, accept);
+    if (res?.success) {
+      invalidateGroupsCache('all');
+      await refreshGroupsHome();
+    }
+    return res;
+  }, [invalidateGroupsCache, refreshGroupsHome, respondToInvite]);
+
+  const handleInviteToGroup = useCallback(async (identifier) => {
+    if (!selectedGroup?.id) return { success: false, error: 'Group not found' };
+    const res = await inviteToGroup(selectedGroup.id, identifier);
+    if (res?.success) {
+      invalidateGroupsCache('detail', selectedGroup.id);
+      await fetchGroupDetail(selectedGroup.id);
+    }
+    return res;
+  }, [fetchGroupDetail, inviteToGroup, invalidateGroupsCache, selectedGroup?.id]);
+
+  const handleTransferHost = useCallback(async (newHostUserId) => {
+    if (!selectedGroup?.id) return { success: false, error: 'Group not found' };
+    const res = await transferHost(selectedGroup.id, newHostUserId);
+    if (res?.success) {
+      invalidateGroupsCache('all', selectedGroup.id);
+      await Promise.all([
+        refreshGroupsHome(),
+        fetchGroupDetail(selectedGroup.id),
+      ]);
+    }
+    return res;
+  }, [fetchGroupDetail, invalidateGroupsCache, refreshGroupsHome, selectedGroup?.id, transferHost]);
+
+  const handleReclaimHost = useCallback(async () => {
+    if (!selectedGroup?.id) return { success: false, error: 'Group not found' };
+    const res = await reclaimHost(selectedGroup.id);
+    if (res?.success) {
+      invalidateGroupsCache('all', selectedGroup.id);
+      await Promise.all([
+        refreshGroupsHome(),
+        fetchGroupDetail(selectedGroup.id),
+      ]);
+    }
+    return res;
+  }, [fetchGroupDetail, invalidateGroupsCache, refreshGroupsHome, selectedGroup?.id, reclaimHost]);
+
+  const handleHandBackHost = useCallback(async () => {
+    if (!selectedGroup?.id) return { success: false, error: 'Group not found' };
+    const res = await handBackHost(selectedGroup.id);
+    if (res?.success) {
+      invalidateGroupsCache('all', selectedGroup.id);
+      await Promise.all([
+        refreshGroupsHome(),
+        fetchGroupDetail(selectedGroup.id),
+      ]);
+    }
+    return res;
+  }, [fetchGroupDetail, invalidateGroupsCache, refreshGroupsHome, selectedGroup?.id, handBackHost]);
+
+  // Phase 6 (G5) — owner tier-mismatch resolution.
+  const handleTransferOwnership = useCallback(async (newOwnerUserId) => {
+    if (!selectedGroup?.id) return { success: false, error: 'Group not found' };
+    const res = await transferOwnership(selectedGroup.id, newOwnerUserId);
+    if (res?.success) {
+      invalidateGroupsCache('all', selectedGroup.id);
+      await Promise.all([
+        refreshGroupsHome(),
+        fetchGroupDetail(selectedGroup.id),
+      ]);
+    }
+    return res;
+  }, [fetchGroupDetail, invalidateGroupsCache, refreshGroupsHome, selectedGroup?.id, transferOwnership]);
+
+  const handleRegroupRetier = useCallback(async () => {
+    if (!selectedGroup?.id) return { success: false, error: 'Group not found' };
+    const res = await regroupRetier(selectedGroup.id);
+    if (res?.success) {
+      invalidateGroupsCache('all', selectedGroup.id);
+      await Promise.all([
+        refreshGroupsHome(),
+        fetchGroupDetail(selectedGroup.id),
+      ]);
+    }
+    return res;
+  }, [fetchGroupDetail, invalidateGroupsCache, refreshGroupsHome, selectedGroup?.id, regroupRetier]);
+
+  const handleRemoveMember = useCallback(async (userId) => {
+    if (!selectedGroup?.id) return { success: false, error: 'Group not found' };
+    const res = await removeMember(selectedGroup.id, userId);
+    if (res?.success) {
+      invalidateGroupsCache('all', selectedGroup.id);
+      await Promise.all([
+        refreshGroupsHome(),
+        fetchGroupDetail(selectedGroup.id),
+      ]);
+    }
+    return res;
+  }, [fetchGroupDetail, invalidateGroupsCache, refreshGroupsHome, removeMember, selectedGroup?.id]);
+
+  const handleRevokeInvite = useCallback(async (inviteId) => {
+    const res = await revokeInvite(inviteId);
+    if (res?.success && selectedGroup?.id) {
+      invalidateGroupsCache('detail', selectedGroup.id);
+      await fetchGroupDetail(selectedGroup.id);
+    }
+    return res;
+  }, [fetchGroupDetail, invalidateGroupsCache, revokeInvite, selectedGroup?.id]);
+
+  const handleResetRoom = useCallback(async () => {
+    if (!selectedGroup?.code) return { success: false, error: 'Group not found' };
+    const res = await resetRoom(selectedGroup.code);
+    if (res?.success && selectedGroup?.id) {
+      // Refresh so the occupancy badge reflects the now-empty room.
+      await fetchGroupDetail(selectedGroup.id);
+    }
+    return res;
+  }, [resetRoom, fetchGroupDetail, selectedGroup?.code, selectedGroup?.id]);
+
+  const handleDeleteGroup = useCallback(async () => {
+    if (!selectedGroup?.id) return { success: false, error: 'Group not found' };
+    const res = await deleteGroup(selectedGroup.id);
+    if (res?.success) {
+      invalidateGroupsCache('all', selectedGroup.id);
+      setSelectedGroup(null);
+      setHomeView('groups');
+      await refreshGroupsHome();
+    }
+    return res;
+  }, [deleteGroup, invalidateGroupsCache, refreshGroupsHome, selectedGroup?.id]);
+
+  const handleLeaveGroup = useCallback(async () => {
+    if (!selectedGroup?.id) return { success: false, error: 'Group not found' };
+    const res = await leaveGroup(selectedGroup.id);
+    if (res?.success) {
+      invalidateGroupsCache('all', selectedGroup.id);
+      setSelectedGroup(null);
+      setHomeView('groups');
+      await refreshGroupsHome();
+    }
+    return res;
+  }, [invalidateGroupsCache, leaveGroup, refreshGroupsHome, selectedGroup?.id]);
+
+  // Signing out must also drop us out of any live game first — leaveGame emits
+  // leave_room (host-leave/elimination handled server-side) and clears the
+  // local session so we can't linger as a ghost player after sign-out.
+  const handleSignOut = useCallback(async () => {
+    leaveGame();
+    signOutSocket(); // release the server's single-active-session entry
+    rearmIntro(); // next entry after logout should replay the intro splash
+    await signOut();
+  }, [leaveGame, signOutSocket, signOut]);
+
+  const handleSignOutGuest = useCallback(async () => {
+    leaveGame();
+    signOutSocket();
+    rearmIntro();
+    await signOutGuest();
+  }, [leaveGame, signOutSocket, signOutGuest]);
+
+  // Voice — auto-joins muted on room entry (issue #49). Mic stays
+  // unpublished until first user-gesture toggle, so first-time visitors
+  // don't get a permission prompt before they ask for one. Hook tears
+  // down on roomCode change.
+  const voice = useVoice({ roomCode, isAuthenticated: authenticated, autoJoin: true });
+
+  // Issue #102 — drives mobile-only consolidation: hide the
+  // ChatPanel floating trigger so the new MobileFabMenu owns the
+  // single entry point on small screens.
+  const isMobile = useIsMobile();
+
+  // ─── In-room controls hoisted into the global settings gear (Module 2) ──────
+  // The old bottom-right FAB is gone; the online table's controls (chat, game
+  // settings, leaderboard, leave, voice) now live in the top-right SettingsGear.
+  // The "game settings" / "leaderboard" dialogs render here (page level) so the
+  // gear can open them; everything is gated to online rooms so other screens are
+  // untouched.
+  const [gameSettingsOpen, setGameSettingsOpen] = useState(false);
+  const [leaderboardOpen, setLeaderboardOpen] = useState(false);
+  const [kickOpen, setKickOpen] = useState(false); // #244 - host Kick Player modal
+  const inRoomOnline = !!roomCode && gameMode === 'online';
+  // The practice Power-Clinic progress bar is an in-flow 22px band at the very top
+  // of the online table (OnlinePlayerUI). When it's up, nudge the fixed settings
+  // gear down so it clears the bar's right edge instead of covering it.
+  const clinicBarVisible = inRoomOnline
+    && (!!roomState?.tutorialScenario || !!roomState?.tutorialClinicComplete);
+  const phase = roomState?.phase;
+  const isLobby = phase === 'lobby';
+  const isGameOver = phase === 'game_over';
+  const aliveCount = (roomState?.players || []).filter((p) => p?.status === 'alive').length;
+  const leaveDisabled = !!isMyTurn && phase === 'playing' && myPlayer?.status !== 'eliminated';
+  const handleLeaveTable = useCallback(() => {
+    if (!!isMyTurn && roomState?.phase === 'playing' && myPlayer?.status !== 'eliminated') return;
+    const ph = roomState?.phase;
+    const isMidGame = !!ph && !['lobby', 'game_over'].includes(ph);
+    if (isMidGame && typeof window !== 'undefined'
+      && !window.confirm('Leave the table? You will forfeit and cannot rejoin this round.')) return;
+    leaveGame();
+  }, [isMyTurn, roomState?.phase, myPlayer?.status, leaveGame]);
+  // Close the in-room dialogs whenever we leave the room so they can't linger.
+  useEffect(() => {
+    if (!inRoomOnline) { setGameSettingsOpen(false); setLeaderboardOpen(false); }
+  }, [inRoomOnline]);
+
+  // ─── Intro splash ──────────────────────────────────────────
+  // Takes the whole screen on a genuine open, over even the loading
+  // splash. The auth/socket hooks above keep bootstrapping underneath
+  // while it plays, so there's no extra wait once it dismisses.
+  if (introPhase === 'video') {
+    return <IntroVideo onDone={finishIntroVideo} />;
+  }
+  if (introPhase === 'loading') {
+    return <IntroLoading onDone={finishIntroLoading} />;
+  }
 
   // ─── Loading splash ────────────────────────────────────────
   if (loading) {
-    return (
-      <div style={{
-        minHeight: '100vh', display: 'flex',
-        alignItems: 'center', justifyContent: 'center',
-        flexDirection: 'column', gap: 16,
-      }}>
-        <div style={{
-          fontFamily: "'Bebas Neue', sans-serif",
-          fontSize: 64, color: 'var(--accent)', lineHeight: 1,
-        }}>
-          BLUFF
-        </div>
-        <div style={{ fontSize: 11, color: 'var(--text-dim)', letterSpacing: '0.15em' }}>
-          Loading...
-        </div>
-      </div>
-    );
+    return <LoadingSplash />;
   }
 
   // ─── Auth gate ─────────────────────────────────────────────
+  // useAuth returns a unified `user` — real Supabase user wins,
+  // guest fills in otherwise. AuthScreen only shows when neither
+  // identity is present.
   if (!user) {
     return (
       <AuthScreen
         onSendEmailOtp={sendEmailOtp}
         onGoogleSignIn={signInWithGoogle}
+        onGuestSignIn={signInAsGuest}
         error={authError}
         setError={setAuthError}
+        signedOutReason={signedOutReason}
       />
     );
   }
 
+  // ─── Single-active-session conflict ────────────────────────
+  // Signed in to Supabase but the socket login was refused because the account
+  // is active on another live device. Show the takeover screen (names that
+  // device) instead of the app until the user logs it out or switches account.
+  if (sessionConflict) {
+    return (
+      <SessionConflictScreen
+        activeDevice={sessionConflict}
+        onTakeOver={takeOverSession}
+        onUseAnother={handleSignOut}
+      />
+    );
+  }
+
+  // The online table runs as a full-bleed, viewport-height shell (no page
+  // scroll) so it stays compact; every other screen keeps normal padded flow.
+  const fullBleed = inOnlineGame;
   const wrap = (children) => (
-    <div style={{ minHeight: '100vh', padding: '24px 16px' }}>
+    <div style={fullBleed
+      ? { height: '100dvh', overflow: 'hidden', position: 'relative' }
+      : { minHeight: '100vh', padding: '24px 16px' }}>
       <Notification notification={notification} />
+      {/* §M4 - in-room reconnect indicator. While the socket is down but we're
+          still in a room, show a non-blocking banner instead of freezing or
+          bouncing to the landing screen; useGame's resilient rejoin recovers us. */}
+      {roomCode && !connected && <ReconnectingBanner />}
       {children}
+      {/* Global identity / settings gear - present on every signed-in screen
+          (landing, groups, in-game). Holds username, music toggle, profile,
+          and sign-out so the "main settings" are reachable everywhere. */}
+      <SettingsGear
+        username={username}
+        isGuest={isGuest}
+        musicEnabled={musicEnabled}
+        onToggleMusic={toggleMusic}
+        musicVolume={musicVolume}
+        onSetMusicVolume={setMusicVolume}
+        onPrevTrack={prevTrack}
+        onNextTrack={nextTrack}
+        onSignOut={handleSignOut}
+        onSignOutGuest={handleSignOutGuest}
+        onUpdateUsername={updateUsername}
+        // #205 — XP + cosmetic locker (hidden for guests inside the gear).
+        getProgression={getProgression}
+        setCosmetics={setCosmetics}
+        // ── In-room controls (Module 2) — only inside an online room ──
+        inRoom={inRoomOnline}
+        chatUnread={chatUnread}
+        onOpenChat={inRoomOnline ? openChat : undefined}
+        onOpenGameSettings={inRoomOnline ? () => setGameSettingsOpen(true) : undefined}
+        onOpenLeaderboard={inRoomOnline && roomState?.groupId ? () => setLeaderboardOpen(true) : undefined}
+        // #244 — host-only: opens the Kick Player roster (presence of the
+        // callback is what gates the menu item, like the other in-room controls).
+        onOpenKickPlayer={inRoomOnline && isHost ? () => setKickOpen(true) : undefined}
+        onLeaveTable={inRoomOnline ? handleLeaveTable : undefined}
+        leaveDisabled={leaveDisabled}
+        voice={inRoomOnline ? voice : undefined}
+        topOffset={clinicBarVisible ? 22 : 0}
+        // Landing redesign: the gear becomes a pill name chip that pairs with
+        // the top-left level chip. Everywhere else keeps the compact gear.
+        triggerVariant={!roomCode && homeView === 'landing' ? 'chip' : 'gear'}
+      />
+      {/* Game settings - host edits in the lobby, everyone else sees a summary */}
+      {inRoomOnline && gameSettingsOpen && (
+        <ControlsModal title="Game Settings" onClose={() => setGameSettingsOpen(false)}>
+          {isHost && isLobby && roomState?.config ? (
+            <PreGameSettingsPanel
+              config={roomState.config}
+              onChange={updateRoomConfig}
+              isGroupRoom={!!roomState?.groupId}
+              savedMeta={roomState?.groupSettingsMeta}
+              playerCount={aliveCount}
+              // Phase 5 (#308): tier-gate the toggles to the room's tier
+              // (host's tier at creation). Informational only — the server
+              // enforces caps at create_room.
+              tier={roomState?.tier || null}
+              // (Module 5) Sandbox: only power cards are configurable today; the
+              // rest render with a "Coming Soon" tag.
+              sandbox={!!roomState?.sandbox}
+            />
+          ) : roomState?.config ? (
+            <LobbyConfigSummary config={roomState.config} />
+          ) : (
+            <div style={{ color: 'var(--text-dim)', fontFamily: "'Crimson Text', serif", fontStyle: 'italic' }}>
+              No house rules configured yet.
+            </div>
+          )}
+        </ControlsModal>
+      )}
+      {inRoomOnline && leaderboardOpen && roomState?.groupId && (
+        <ControlsModal title="Leaderboard" onClose={() => setLeaderboardOpen(false)}>
+          <LeaderboardPanel
+            groupId={roomState.groupId}
+            currentUserId={myPlayer?.id || null}
+            highlightUserId={isGameOver ? (roomState?.lastAction?.winnerId || null) : null}
+            getGroupLeaderboard={getGroupLeaderboard}
+            leaderboardUpdateNonce={leaderboardUpdateNonce}
+          />
+        </ControlsModal>
+      )}
+      {/* #244 - host-only Kick Player roster */}
+      {inRoomOnline && isHost && kickOpen && (
+        <ControlsModal title="Kick Player" onClose={() => setKickOpen(false)}>
+          <KickPlayerPanel
+            players={roomState?.players || []}
+            hostId={roomState?.hostUserId || null}
+            onKick={kickPlayer}
+          />
+        </ControlsModal>
+      )}
       {roomCode && (
         <ChatPanel
           messages={chatMessages}
@@ -91,6 +734,10 @@ function HomeContent() {
           onClose={closeChat}
           onSend={sendChatMessage}
           myUserId={user?.id}
+          // #146 — the consolidated in-game menu (online mode, any screen size)
+          // owns the chat entry point, so suppress ChatPanel's own trigger
+          // there. Physical-mode desktop still uses the standalone trigger.
+          hideTrigger={isMobile || gameMode === 'online'}
         />
       )}
     </div>
@@ -98,17 +745,76 @@ function HomeContent() {
 
   // ─── Landing ────────────────────────────────────────────────
   if (!roomCode) {
+    if (homeView === 'groups' && !isGuest) {
+      return wrap(
+        <GroupsScreen
+          username={username}
+          getProgression={getProgression}
+          groups={groupsList}
+          invites={groupInvites}
+          loading={groupsLoading}
+          error={error}
+          onBack={() => {
+            setSelectedGroup(null);
+            setError(null);
+            setHomeView('landing');
+          }}
+          onCreateGroup={handleCreateGroup}
+          onOpenGroup={openGroupDetail}
+          onRespondToInvite={handleRespondToInvite}
+          onRefresh={() => refreshGroupsHome({ force: true })}
+        />
+      );
+    }
+
+    if (homeView === 'group' && selectedGroup && !isGuest) {
+      return wrap(
+        <GroupDetailScreen
+          group={selectedGroup}
+          currentUserId={user?.id}
+          loading={groupsLoading}
+          error={error}
+          onBack={async () => {
+            setError(null);
+            setHomeView('groups');
+            await refreshGroupsHome();
+          }}
+          onEnterRoom={() => joinRoom(selectedGroup.code)}
+          onInvite={handleInviteToGroup}
+          onTransferHost={handleTransferHost}
+          onReclaimHost={handleReclaimHost}
+          onHandBackHost={handleHandBackHost}
+          onTransferOwnership={handleTransferOwnership}
+          onRegroupRetier={handleRegroupRetier}
+          onRemoveMember={handleRemoveMember}
+          onDeleteGroup={handleDeleteGroup}
+          onLeaveGroup={handleLeaveGroup}
+          onRevokeInvite={handleRevokeInvite}
+          onResetRoom={handleResetRoom}
+          onRefresh={refreshGroupDetail}
+        />
+      );
+    }
+
     return wrap(
       <LandingScreen
         username={username}
+        isGuest={isGuest}
         onCreateRoom={createRoom}
+        onStartTutorial={startTutorial}
+        onStartSandbox={startSandbox}
         onJoinRoom={joinRoom}
-        onSignOut={signOut}
+        onOpenGroups={openGroupsHome}
+        onSignOut={handleSignOut}
+        onSignOutGuest={handleSignOutGuest}
         onUpdateUsername={updateUsername}
         initialJoinCode={initialJoinCode}
         error={error}
         setError={setError}
         connected={connected}
+        musicEnabled={musicEnabled}
+        onToggleMusic={toggleMusic}
+        getProgression={getProgression}
       />
     );
   }
@@ -124,16 +830,52 @@ function HomeContent() {
           isMyTurn={isMyTurn}
           isHost={true}
           startGame={startGame}
+          skipToPowers={skipToPowers}
+          advanceTutorial={advanceTutorial}
+          startTour={startTour}
+          finishTour={finishTour}
           playCardOnline={playCardOnline}
           callBluff={callBluff}
           endTurn={endTurn}
           playerSpin={playerSpin}
-          startNextRound={startNextRound}
           spectatePlayer={spectatePlayer}
           leaveGame={leaveGame}
+          restartRoom={restartRoom}
           acknowledgeSpinResult={acknowledgeSpinResult}
+          redemptionSpin={redemptionSpin}
           spinDismissed={spinDismissed}
+          activatePowerCard={activatePowerCard}
+          swapPick={swapPick}
+          preGameSelect={preGameSelect}
+          updateRoomConfig={updateRoomConfig}
+          getGroupLeaderboard={getGroupLeaderboard}
+          leaderboardUpdateNonce={leaderboardUpdateNonce}
+          medicDecide={medicDecide}
+          saboteurTransfer={saboteurTransfer}
+          sniperRedirect={sniperRedirect}
+          bloodDebtTarget={bloodDebtTarget}
+          pactChoose={pactChoose}
+          pactRespond={pactRespond}
+          volunteerForPact={volunteerForPact}
+          pactVolunteer={pactVolunteer}
+          setPactVolunteer={setPactVolunteer}
+          bluffIntercept={bluffIntercept}
+          medicPrompt={medicPrompt}
+          sniperPrompt={sniperPrompt}
+          bloodDebtPrompt={bloodDebtPrompt}
+          setBloodDebtPrompt={setBloodDebtPrompt}
+          pregame={pregame}
+          powerEventQueue={powerEventQueue}
+          consumePowerEvent={consumePowerEvent}
+          placeBet={placeBet}
+          ghostVote={ghostVote}
+          lastStandSpin={lastStandSpin}
+          lastStandEndTurn={lastStandEndTurn}
           voice={voice}
+          openChat={openChat}
+          chatUnread={chatUnread}
+          xpAward={xpAward}
+          isGuest={isGuest}
         />
       );
     }
@@ -146,6 +888,7 @@ function HomeContent() {
         resolveBluff={resolveBluff}
         declareRoundWin={declareRoundWin}
         leaveGame={leaveGame}
+        restartRoom={restartRoom}
         acknowledgeSpinResult={acknowledgeSpinResult}
         spinDismissed={spinDismissed}
         voice={voice}
@@ -162,16 +905,53 @@ function HomeContent() {
           roomState={roomState}
           myPlayer={myPlayer}
           isMyTurn={isMyTurn}
+          startGame={startGame}
+          skipToPowers={skipToPowers}
+          advanceTutorial={advanceTutorial}
+          startTour={startTour}
+          finishTour={finishTour}
           playCardOnline={playCardOnline}
           callBluff={callBluff}
           endTurn={endTurn}
           playerSpin={playerSpin}
-          startNextRound={startNextRound}
           spectatePlayer={spectatePlayer}
           leaveGame={leaveGame}
+          restartRoom={restartRoom}
           acknowledgeSpinResult={acknowledgeSpinResult}
+          redemptionSpin={redemptionSpin}
           spinDismissed={spinDismissed}
+          activatePowerCard={activatePowerCard}
+          swapPick={swapPick}
+          preGameSelect={preGameSelect}
+          updateRoomConfig={updateRoomConfig}
+          getGroupLeaderboard={getGroupLeaderboard}
+          leaderboardUpdateNonce={leaderboardUpdateNonce}
+          medicDecide={medicDecide}
+          saboteurTransfer={saboteurTransfer}
+          sniperRedirect={sniperRedirect}
+          bloodDebtTarget={bloodDebtTarget}
+          pactChoose={pactChoose}
+          pactRespond={pactRespond}
+          volunteerForPact={volunteerForPact}
+          pactVolunteer={pactVolunteer}
+          setPactVolunteer={setPactVolunteer}
+          bluffIntercept={bluffIntercept}
+          medicPrompt={medicPrompt}
+          sniperPrompt={sniperPrompt}
+          bloodDebtPrompt={bloodDebtPrompt}
+          setBloodDebtPrompt={setBloodDebtPrompt}
+          pregame={pregame}
+          powerEventQueue={powerEventQueue}
+          consumePowerEvent={consumePowerEvent}
+          placeBet={placeBet}
+          ghostVote={ghostVote}
+          lastStandSpin={lastStandSpin}
+          lastStandEndTurn={lastStandEndTurn}
           voice={voice}
+          openChat={openChat}
+          chatUnread={chatUnread}
+          xpAward={xpAward}
+          isGuest={isGuest}
         />
       );
     }
@@ -194,26 +974,18 @@ function HomeContent() {
   }
 
   return wrap(
-    <div style={{ textAlign: 'center', padding: 60, color: 'var(--text-dim)' }}>
-      Loading...
+    <div style={{
+      display: 'flex', justifyContent: 'center',
+      alignItems: 'center', padding: 60,
+    }}>
+      <ChamberSpinner size={56} />
     </div>
   );
 }
 
 // Loading fallback shown while useSearchParams resolves
 function PageLoading() {
-  return (
-    <div style={{
-      minHeight: '100vh', display: 'flex',
-      alignItems: 'center', justifyContent: 'center',
-      flexDirection: 'column', gap: 16,
-    }}>
-      <div style={{ fontFamily: "'Bebas Neue', sans-serif", fontSize: 64, color: 'var(--accent)', lineHeight: 1 }}>
-        BLUFF
-      </div>
-      <div style={{ fontSize: 11, color: 'var(--text-dim)', letterSpacing: '0.15em' }}>Loading...</div>
-    </div>
-  );
+  return <LoadingSplash />;
 }
 
 export default function Home() {

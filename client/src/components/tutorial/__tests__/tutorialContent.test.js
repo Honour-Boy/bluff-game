@@ -1,0 +1,304 @@
+import { describe, it, expect } from 'vitest';
+import {
+  INTRO_SLIDES,
+  BOT_NAME,
+  coachFor,
+  coachContextFromRoom,
+  introSlidesFor,
+  clinicCoachFor,
+  clinicBriefingFor,
+  clinicCardPlayLock,
+  clinicEndTurnLock,
+  BASICS_HANDOFF_COACH,
+  CLINIC_COMPLETE_COACH,
+} from '../tutorialContent';
+
+describe('INTRO_SLIDES', () => {
+  it('every slide has a unique id, a title and a body', () => {
+    const ids = new Set();
+    for (const s of INTRO_SLIDES) {
+      expect(typeof s.id).toBe('string');
+      expect(s.title).toBeTruthy();
+      expect(s.body).toBeTruthy();
+      expect(ids.has(s.id)).toBe(false);
+      ids.add(s.id);
+    }
+    expect(INTRO_SLIDES.length).toBeGreaterThanOrEqual(4);
+  });
+
+  it('the final slide carries a Begin CTA', () => {
+    expect(INTRO_SLIDES[INTRO_SLIDES.length - 1].cta).toBeTruthy();
+  });
+
+  it('includes a controls tour slide (settings / chat / leaderboard)', () => {
+    const controls = INTRO_SLIDES.find((s) => s.id === 'controls');
+    expect(controls).toBeTruthy();
+    expect(controls.controls.map((c) => c.label)).toEqual(
+      expect.arrayContaining(['Settings', 'Chat', 'Leaderboard']),
+    );
+  });
+});
+
+describe('coachFor', () => {
+  it('returns null in the lobby (intro modal owns that screen)', () => {
+    expect(coachFor({ phase: 'lobby' })).toBeNull();
+    expect(coachFor({})).toBeNull();
+  });
+
+  it('explains the deal during pre_game', () => {
+    const c = coachFor({ phase: 'pre_game' });
+    expect(c.key).toBe('dealing');
+    expect(c.tone).toBe('info');
+  });
+
+  it('prompts a play-or-bluff on the player turn before a card is played', () => {
+    const c = coachFor({ phase: 'playing', isMyTurn: true, cardPlayedThisTurn: false });
+    expect(c.key).toBe('play-or-bluff');
+    expect(c.tone).toBe('action');
+    expect(c.body).toContain(BOT_NAME);
+  });
+
+  it('states the turn-action rule (play/bluff/power; must play to End Turn)', () => {
+    const c = coachFor({ phase: 'playing', isMyTurn: true, cardPlayedThisTurn: false });
+    expect(c.body.toLowerCase()).toContain('end turn');
+    expect(c.body.toLowerCase()).toContain('call a bluff');
+  });
+
+  it('does NOT offer a bluff on the very first play of the round', () => {
+    const c = coachFor({ phase: 'playing', isMyTurn: true, cardPlayedThisTurn: false, isFirstTurn: true });
+    expect(c.key).toBe('first-play');
+    expect(c.body.toLowerCase()).not.toContain('call bluff');
+  });
+
+  it('tells the player to end their turn after a card is played', () => {
+    const c = coachFor({ phase: 'playing', isMyTurn: true, cardPlayedThisTurn: true });
+    expect(c.key).toBe('end-turn');
+  });
+
+  it('narrates the bot turn when it is not the player turn', () => {
+    const c = coachFor({ phase: 'playing', isMyTurn: false });
+    expect(c.key).toBe('bot-turn');
+    expect(c.tone).toBe('info');
+  });
+
+  it('distinguishes my spin from the bot spin', () => {
+    expect(coachFor({ phase: 'spin_pending', spinTargetIsMe: true }).key).toBe('spin-me');
+    const botSpin = coachFor({ phase: 'spin_pending', spinTargetIsMe: false, spinTargetName: 'Dealer Bot' });
+    expect(botSpin.key).toBe('spin-bot');
+    expect(botSpin.tone).toBe('danger');
+  });
+
+  it('celebrates a win and consoles a loss at game over', () => {
+    expect(coachFor({ phase: 'game_over', amWinner: true }).title.toLowerCase()).toContain('win');
+    const loss = coachFor({ phase: 'game_over', amWinner: false, winnerName: 'Dealer Bot' });
+    expect(loss.tone).toBe('win');
+    expect(loss.title).toContain('Dealer Bot');
+  });
+
+  it('switches to a spectator tip once the player is eliminated', () => {
+    const c = coachFor({ phase: 'playing', isMyTurn: false, eliminated: true });
+    expect(c.key).toBe('spectating');
+  });
+});
+
+describe('coachContextFromRoom', () => {
+  const room = {
+    phase: 'playing',
+    currentPlayerId: 'me',
+    spinTargetId: 'bot:1',
+    cardPlayedThisTurn: true,
+    isFirstTurn: false,
+    bluffBlockedThisTurn: false,
+    lastAction: { winnerId: 'bot:1', winnerName: 'Dealer Bot' },
+    players: [
+      { id: 'me', username: 'You', status: 'alive' },
+      { id: 'bot:1', username: 'Dealer Bot', status: 'alive' },
+    ],
+  };
+
+  it('derives turn / spin / winner flags relative to the local player', () => {
+    const ctx = coachContextFromRoom(room, 'me');
+    expect(ctx.isMyTurn).toBe(true);
+    expect(ctx.cardPlayedThisTurn).toBe(true);
+    expect(ctx.spinTargetIsMe).toBe(false);
+    expect(ctx.spinTargetName).toBe('Dealer Bot');
+    expect(ctx.amWinner).toBe(false);
+    expect(ctx.eliminated).toBe(false);
+  });
+
+  it('feeds straight into coachFor', () => {
+    const c = coachFor(coachContextFromRoom(room, 'me'));
+    expect(c.key).toBe('end-turn'); // my turn, card already played
+  });
+
+  it('is safe on a null room', () => {
+    expect(coachContextFromRoom(null, 'me')).toEqual({});
+  });
+
+  it('derives the held power label and the intercept flag (powers lesson)', () => {
+    const room = {
+      phase: 'bluff_intercept_pending',
+      currentPlayerId: 'me',
+      players: [{ id: 'me', username: 'You', status: 'alive' }],
+      myPowerCardSlot: [{ id: 'sh', type: 'power', power: 'shield' }],
+      pendingBluffIntercept: { amAccused: true },
+      lastAction: {},
+    };
+    const ctx = coachContextFromRoom(room, 'me');
+    expect(ctx.heldPowerLabel).toBe('Shield');
+    expect(ctx.amAccusedIntercept).toBe(true);
+  });
+});
+
+describe('introSlidesFor (Phase 4 lessons)', () => {
+  it('returns the basics deck unchanged for the basics lesson', () => {
+    expect(introSlidesFor('basics')).toBe(INTRO_SLIDES);
+    expect(introSlidesFor(undefined)).toBe(INTRO_SLIDES);
+  });
+
+  it('splices a Power Cards slide in for the powers lesson, keeping Begin last', () => {
+    const slides = introSlidesFor('powers');
+    expect(slides.length).toBe(INTRO_SLIDES.length + 1);
+    expect(slides.some((s) => s.id === 'powers')).toBe(true);
+    expect(slides[slides.length - 1].cta).toBeTruthy(); // final slide still deals the cards
+  });
+});
+
+describe('coachFor — power-cards lesson', () => {
+  it('prompts a block when the player is bluff-called while holding a defence', () => {
+    const c = coachFor({ phase: 'bluff_intercept_pending', amAccusedIntercept: true, heldPowerLabel: 'Shield' });
+    expect(c.key).toBe('intercept-defend');
+    expect(c.tone).toBe('danger');
+    expect(c.body).toContain('Shield');
+  });
+
+  it('shows a brief waiting tip while the bot decides on a challenge', () => {
+    const c = coachFor({ phase: 'bluff_intercept_pending', amAccusedIntercept: false });
+    expect(c.key).toBe('intercept-wait');
+  });
+
+  it('mentions a held power in the on-turn play tip', () => {
+    const c = coachFor({ phase: 'playing', isMyTurn: true, cardPlayedThisTurn: false, heldPowerLabel: 'Peek' });
+    expect(c.key).toBe('play-or-bluff');
+    expect(c.body).toContain('Peek');
+  });
+});
+
+describe('clinicCoachFor (Power Clinic drills)', () => {
+  const drills = [
+    ['peek', 'player'],
+    ['freeze', 'player'],
+    ['shield', 'player'],
+    ['shield', 'bot'],
+    ['mirror', 'player'],
+    ['swap', 'player'],
+    ['assassin', 'player'],
+  ];
+
+  it('returns distinct intro + resolved copy for every drill', () => {
+    for (const [power, actor] of drills) {
+      const intro = clinicCoachFor({ power, actor, step: 'intro', index: 0, total: 7 });
+      const resolved = clinicCoachFor({ power, actor, step: 'resolved', index: 0, total: 7 });
+      expect(intro.title).toBeTruthy();
+      expect(intro.body).toBeTruthy();
+      expect(resolved.title).toBeTruthy();
+      expect(resolved.body).toBeTruthy();
+      expect(intro.body).not.toBe(resolved.body);
+      expect(intro.key).toContain(power);
+    }
+  });
+
+  it('prefixes a "Power N of M" counter from playerStep/playerTotal', () => {
+    const c = clinicCoachFor({ power: 'mirror', actor: 'player', step: 'intro', playerStep: 4, playerTotal: 6 });
+    expect(c.title).toContain('Power 4 of 6');
+  });
+
+  it('does NOT number the bot demo', () => {
+    const c = clinicCoachFor({ power: 'shield', actor: 'bot', step: 'intro', playerStep: null, playerTotal: 6 });
+    expect(c.title).not.toMatch(/Power \d/);
+  });
+
+  it('frames the bot-Shield demo as the bot defending', () => {
+    const c = clinicCoachFor({ power: 'shield', actor: 'bot', step: 'resolved', playerStep: null, playerTotal: 6 });
+    expect(c.body).toContain(BOT_NAME);
+    expect(c.body.toLowerCase()).toContain('shield');
+  });
+
+  it('is null without a scenario', () => {
+    expect(clinicCoachFor(null)).toBeNull();
+    expect(clinicCoachFor({})).toBeNull();
+  });
+
+  it('shows a "play + end turn" prompt before the defensive window, then "defend"', () => {
+    const sc = { power: 'shield', actor: 'player', step: 'intro', expect: 'play_then_defend', playerStep: 1, playerTotal: 6 };
+    const before = clinicCoachFor(sc, { phase: 'playing' });
+    const during = clinicCoachFor(sc, { phase: 'bluff_intercept_pending' });
+    expect(before.body.toLowerCase()).toContain('end turn');
+    expect(during.title.toLowerCase()).toContain('shield');
+    expect(before.body).not.toBe(during.body);
+  });
+
+  it('exposes hand-off + completion copy', () => {
+    expect(BASICS_HANDOFF_COACH.body).toContain(BOT_NAME);
+    expect(CLINIC_COMPLETE_COACH.tone).toBe('win');
+  });
+});
+
+describe('clinicCardPlayLock (off-script card play guard)', () => {
+  it('blocks playing a card during the Call-Bluff drill', () => {
+    const msg = clinicCardPlayLock({ power: 'shield', actor: 'bot', step: 'intro', expect: 'call_bluff' });
+    expect(msg).toBeTruthy();
+    expect(msg.toLowerCase()).toContain('bluff');
+  });
+
+  it('blocks playing a card before a use_power / arm_then_play power is used', () => {
+    expect(clinicCardPlayLock({ power: 'peek', step: 'intro', expect: 'use_power' }, {})).toBeTruthy();
+    expect(clinicCardPlayLock({ power: 'freeze', step: 'intro', expect: 'arm_then_play' }, {})).toBeTruthy();
+    // Once the power is used/armed the play is allowed.
+    expect(clinicCardPlayLock({ power: 'peek', step: 'intro', expect: 'use_power' }, { powerActivatedThisTurn: true })).toBeNull();
+  });
+
+  it('never blocks a play_then_defend drill (playing IS the step)', () => {
+    expect(clinicCardPlayLock({ power: 'shield', step: 'intro', expect: 'play_then_defend' })).toBeNull();
+  });
+
+  it('is inert with no scenario or once resolved', () => {
+    expect(clinicCardPlayLock(null)).toBeNull();
+    expect(clinicCardPlayLock({ expect: 'call_bluff', step: 'resolved' })).toBeNull();
+  });
+});
+
+describe('clinicEndTurnLock (scripted-action gate)', () => {
+  it('requires the bluff call before End Turn in the Call-Bluff drill', () => {
+    expect(clinicEndTurnLock({ expect: 'call_bluff', step: 'intro' }, { bluffUsedThisTurn: false })).toBeTruthy();
+    expect(clinicEndTurnLock({ expect: 'call_bluff', step: 'intro' }, { bluffUsedThisTurn: true })).toBeNull();
+  });
+
+  it('requires the power before End Turn in arm_then_play / use_power drills', () => {
+    expect(clinicEndTurnLock({ power: 'freeze', expect: 'arm_then_play', step: 'intro' }, {})).toBeTruthy();
+    expect(clinicEndTurnLock({ power: 'freeze', expect: 'arm_then_play', step: 'intro' }, { powerActivatedThisTurn: true })).toBeNull();
+  });
+
+  it('allows End Turn for play_then_defend and once resolved', () => {
+    expect(clinicEndTurnLock({ expect: 'play_then_defend', step: 'intro' }, {})).toBeNull();
+    expect(clinicEndTurnLock({ expect: 'call_bluff', step: 'resolved' }, {})).toBeNull();
+  });
+});
+
+describe('clinicBriefingFor (per-power pop-up)', () => {
+  it('titles a player drill "Power Card N: <Name>"', () => {
+    const b = clinicBriefingFor({ power: 'shield', actor: 'player', playerStep: 1, playerTotal: 6 });
+    expect(b.title).toBe('Power Card 1 of 6: Shield');
+    expect(b.body).toBeTruthy();
+  });
+
+  it('frames the bot demo without a number', () => {
+    const b = clinicBriefingFor({ power: 'shield', actor: 'bot', playerStep: null });
+    expect(b.title).not.toMatch(/Power Card \d/);
+    expect(b.body).toContain(BOT_NAME);
+  });
+
+  it('is null without a scenario', () => {
+    expect(clinicBriefingFor(null)).toBeNull();
+  });
+});

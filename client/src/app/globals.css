@@ -1,219 +1,437 @@
-@import url('https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Space+Mono:ital,wght@0,400;0,700;1,400&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Cinzel:wght@400;600;700;900&family=Cinzel+Decorative:wght@400;700&family=Crimson+Text:ital,wght@0,400;0,600;1,400&family=Space+Mono:ital,wght@0,400;0,700;1,400&display=swap');
 
+/* ─── Tavern Design System ──────────────────────────────────────────────────── */
 :root {
-  --bg: #0a0a0b;
-  --surface: #111114;
-  --surface2: #18181d;
-  --border: #2a2a33;
-  --accent: #e8ff4a;
-  --accent2: #ff4a6e;
-  --accent3: #4affdb;
-  --text: #e8e8f0;
-  --text-dim: #6b6b80;
-  --alive: #4affdb;
-  --eliminated: #ff4a6e;
-  --warning: #ffaa4a;
-  --radius: 4px;
+  /* ── "Smoke & Amber" tavern palette ──
+     Charcoal-brown shadows lifted off near-black, a punchy amber highlight,
+     and a distinct ember-red focal accent for primary actions. */
+  /* Backgrounds — smoked seasoned hardwood */
+  --bg:        #100f0d;
+  --surface:   #1a1714;
+  --surface2:  #241f19;
+  --surface3:  #2f2820;
+
+  /* Borders — wood-grain edges */
+  --border:       #463728;
+  --border-lit:   #6a5232;
+  --border-glow:  #8f6f3e;
+
+  /* Accent palette — amber highlight, ember CTA, blood danger, verdigris */
+  --accent:     #f0b54a;   /* amber candlelight (highlight) */
+  --accent-dim: #b8862f;
+  --accent2:    #a8261d;   /* deep crimson / danger */
+  --accent3:    #3f8f7a;   /* aged verdigris-teal / success */
+  --ember:      #d4513a;   /* ember-red — primary focal CTA */
+  --ember-dim:  #a83a28;
+
+  /* Text — aged parchment tones */
+  --text:     #ece0c8;
+  --text-dim: #998660;
+  --text-mid: #c4ab82;
+
+  /* Game states */
+  --alive:      #3f8f7a;
+  --eliminated: #a8261d;
+  --warning:    #f0b54a;
+
+  /* Glow / shadow utilities (names kept stable so existing refs update) */
+  --glow-gold:    rgba(240, 181, 74, 0.24);
+  --glow-crimson: rgba(168, 38, 29, 0.24);
+  --glow-green:   rgba(63, 143, 122, 0.22);
+  --glow-ember:   rgba(212, 81, 58, 0.32);
+
+  /* Shape */
+  --radius: 3px;
+  --radius-lg: 6px;
+
+  /* 3D perspective depth */
+  --perspective: 1200px;
+
+  /* Timing */
+  --transition: 0.18s ease;
 }
 
+/* ─── Reset & base ──────────────────────────────────────────────────────────── */
 * { box-sizing: border-box; margin: 0; padding: 0; }
 
 html, body {
   background: var(--bg);
   color: var(--text);
-  font-family: 'Space Mono', monospace;
-  font-size: 14px;
-  line-height: 1.6;
+  font-family: 'Crimson Text', 'Georgia', serif;
+  font-size: 16px;
+  line-height: 1.65;
   min-height: 100vh;
-  overflow-x: hidden;
+  /* `clip` (not `hidden`) kills horizontal overflow WITHOUT turning html/body
+     into scroll containers — `hidden` on both axes' roots breaks wheel/track
+     scrolling on tall pages (e.g. the Groups list). Vertical page scroll stays
+     on the normal document scroller. */
+  overflow-x: clip;
+  /* (Module 1) Kill the native rubber-band / pull-to-refresh so it can't fight
+     the pannable table canvas or bounce padded screens. Vertical content on the
+     landing/groups screens still scrolls normally. */
+  overscroll-behavior-y: none;
 }
 
-/* Scanline overlay */
+/* (Module 1) Hard scroll-lock while inside the online game shell. Toggled on
+   <body> by page.js (fullBleed) so the table owns the whole viewport with no
+   page-level scrolling on any device; removed everywhere else. */
+body.game-noscroll {
+  overflow: hidden;
+  height: 100dvh;
+}
+
+/* ─── Global tavern atmosphere — wood grain + vignette ─────────────────────── */
 body::before {
   content: '';
   position: fixed;
   inset: 0;
-  background: repeating-linear-gradient(
-    0deg,
-    transparent,
-    transparent 2px,
-    rgba(0,0,0,0.03) 2px,
-    rgba(0,0,0,0.03) 4px
-  );
+  background:
+    radial-gradient(ellipse 80% 60% at 50% -10%, rgba(200,146,46,0.07) 0%, transparent 65%),
+    repeating-linear-gradient(
+      88deg,
+      transparent 0px,
+      transparent 18px,
+      rgba(0,0,0,0.06) 18px,
+      rgba(0,0,0,0.06) 19px
+    ),
+    repeating-linear-gradient(
+      2deg,
+      transparent 0px,
+      transparent 35px,
+      rgba(255,255,255,0.015) 35px,
+      rgba(255,255,255,0.015) 36px
+    );
   pointer-events: none;
-  z-index: 9999;
+  z-index: 9998;
 }
 
+/* Vignette border */
+body::after {
+  content: '';
+  position: fixed;
+  inset: 0;
+  background: radial-gradient(ellipse 100% 100% at 50% 50%, transparent 50%, rgba(0,0,0,0.72) 100%);
+  pointer-events: none;
+  z-index: 9997;
+}
+
+/* ─── Typography ────────────────────────────────────────────────────────────── */
 h1, h2, h3, h4 {
-  font-family: 'Bebas Neue', sans-serif;
-  letter-spacing: 0.05em;
+  font-family: 'Cinzel', 'Georgia', serif;
+  font-weight: 700;
+  letter-spacing: 0.08em;
   line-height: 1.1;
+  color: var(--text);
 }
 
+/* ─── Buttons — textured wooden plaques / metal seals ──────────────────────── */
 button {
   cursor: pointer;
-  font-family: 'Space Mono', monospace;
+  font-family: 'Cinzel', serif;
   font-size: 12px;
-  font-weight: 700;
-  letter-spacing: 0.1em;
+  font-weight: 600;
+  letter-spacing: 0.14em;
   text-transform: uppercase;
-  border: 1px solid var(--border);
+  border: 1px solid var(--border-lit);
   border-radius: var(--radius);
-  padding: 10px 20px;
-  background: var(--surface2);
-  color: var(--text);
-  transition: all 0.15s ease;
+  padding: 11px 22px;
+  background: linear-gradient(160deg, var(--surface3) 0%, var(--surface2) 50%, var(--surface) 100%);
+  color: var(--text-mid);
+  transition: all var(--transition);
   outline: none;
+  position: relative;
+  overflow: hidden;
+}
+
+/* Inner wood sheen highlight */
+button::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(180deg, rgba(255,255,255,0.04) 0%, transparent 50%);
+  pointer-events: none;
+  border-radius: inherit;
 }
 
 button:hover:not(:disabled) {
+  border-color: var(--border-glow);
+  color: var(--accent);
+  background: linear-gradient(160deg, var(--surface3) 0%, var(--surface2) 100%);
+  box-shadow: 0 0 14px var(--glow-gold), inset 0 1px 0 rgba(200,146,46,0.12);
+  /* No translateY lift on hover: a 1px shift moves the button out from under
+     the cursor at its edge, dropping :hover and re-triggering it — a sustained
+     pointer/arrow cursor flicker. The glow + colour shift carry the affordance;
+     the lift stays on :focus-visible / :active, which don't flicker. */
+}
+
+button:focus-visible {
   border-color: var(--accent);
   color: var(--accent);
-  background: rgba(232, 255, 74, 0.05);
+  box-shadow: 0 0 0 2px rgba(200,146,46,0.35), 0 0 18px var(--glow-gold), inset 0 1px 0 rgba(200,146,46,0.15);
+  outline: none;
+  transform: translateY(-1px);
 }
 
 button:active:not(:disabled) {
-  transform: scale(0.98);
+  transform: translateY(0) scale(0.99);
+  box-shadow: none;
 }
 
 button:disabled {
-  opacity: 0.3;
+  opacity: 0.32;
   cursor: not-allowed;
+  transform: none;
 }
 
+/* Primary — gilded amber seal */
 button.primary {
-  background: var(--accent);
-  color: #0a0a0b;
-  border-color: var(--accent);
+  background: linear-gradient(160deg, #b8862f 0%, #f0b54a 45%, #b8862f 100%);
+  border-color: #9a6f24;
+  color: #160d04;
+  font-weight: 700;
+  text-shadow: 0 1px 0 rgba(255,225,150,0.3);
+  box-shadow: 0 2px 8px rgba(0,0,0,0.5), inset 0 1px 0 rgba(255,228,120,0.25);
 }
 
 button.primary:hover:not(:disabled) {
-  background: #fff;
-  border-color: #fff;
-  color: #0a0a0b;
+  background: linear-gradient(160deg, #c89732 0%, #ffc861 45%, #c89732 100%);
+  border-color: var(--accent);
+  color: #120a03;
+  box-shadow: 0 4px 16px var(--glow-gold), inset 0 1px 0 rgba(255,235,140,0.35);
+  /* No hover lift — see button:hover note (prevents cursor flicker). */
 }
 
+button.primary:focus-visible {
+  box-shadow: 0 0 0 2px rgba(240,181,74,0.5), 0 4px 20px var(--glow-gold), inset 0 1px 0 rgba(255,235,140,0.35);
+}
+
+/* Ember — the dominant focal CTA (Host a Table, primary actions) */
+button.ember {
+  background: linear-gradient(160deg, #a83a28 0%, #d4513a 45%, #a83a28 100%);
+  border-color: #8f2f20;
+  color: #fdeede;
+  font-weight: 700;
+  text-shadow: 0 1px 0 rgba(0,0,0,0.4);
+  box-shadow: 0 2px 10px rgba(0,0,0,0.5), inset 0 1px 0 rgba(255,185,155,0.25), 0 0 16px var(--glow-ember);
+}
+button.ember:hover:not(:disabled) {
+  background: linear-gradient(160deg, #c0432e 0%, #e6613f 45%, #c0432e 100%);
+  border-color: var(--ember);
+  color: #fff4ec;
+  box-shadow: 0 4px 22px var(--glow-ember), inset 0 1px 0 rgba(255,195,165,0.35);
+  /* No hover lift — see button:hover note (prevents cursor flicker). */
+}
+button.ember:focus-visible {
+  box-shadow: 0 0 0 2px rgba(212,81,58,0.55), 0 4px 22px var(--glow-ember);
+}
+
+/* Bronze — aged metal: the dominant Play CTA, paired with the gold Practice
+   button so the two read as one warm family (darker slab + amber text vs the
+   brighter gold). */
+button.bronze {
+  background: linear-gradient(160deg, #3f3016 0%, #5e4a28 48%, #3f3016 100%);
+  border-color: #7a5f3e;
+  color: var(--accent);
+  font-weight: 700;
+  text-shadow: 0 1px 0 rgba(0,0,0,0.55), 0 0 14px rgba(240,181,74,0.25);
+  box-shadow: 0 2px 12px rgba(0,0,0,0.55), inset 0 1px 0 rgba(240,181,74,0.12);
+}
+button.bronze:hover:not(:disabled) {
+  background: linear-gradient(160deg, #4a3a1c 0%, #735a32 48%, #4a3a1c 100%);
+  border-color: var(--accent-dim);
+  color: #ffd877;
+  box-shadow: 0 4px 20px rgba(0,0,0,0.5), 0 0 22px var(--glow-gold), inset 0 1px 0 rgba(240,181,74,0.18);
+  /* No hover lift — see button:hover note (prevents cursor flicker). */
+}
+button.bronze:focus-visible {
+  box-shadow: 0 0 0 2px rgba(240,181,74,0.4), 0 4px 20px var(--glow-gold);
+}
+
+/* Danger — crimson wax */
 button.danger {
-  border-color: var(--accent2);
-  color: var(--accent2);
+  border-color: #6b1818;
+  color: #c85050;
 }
-
 button.danger:hover:not(:disabled) {
-  background: rgba(255, 74, 110, 0.1);
+  border-color: var(--accent2);
+  color: #e87070;
+  background: linear-gradient(160deg, var(--surface3), var(--surface2));
+  box-shadow: 0 0 14px var(--glow-crimson);
+}
+button.danger:focus-visible {
+  box-shadow: 0 0 0 2px rgba(155,28,28,0.4), 0 0 18px var(--glow-crimson);
 }
 
+/* Success — verdigris copper */
 button.success {
-  border-color: var(--accent3);
-  color: var(--accent3);
+  border-color: #2a5a3a;
+  color: #4a9a62;
 }
-
 button.success:hover:not(:disabled) {
-  background: rgba(74, 255, 219, 0.1);
+  border-color: var(--accent3);
+  color: #6ab87a;
+  box-shadow: 0 0 14px var(--glow-green);
+}
+button.success:focus-visible {
+  box-shadow: 0 0 0 2px rgba(58,122,82,0.4), 0 0 18px var(--glow-green);
 }
 
+/* ─── Inputs — parchment ink-wells ─────────────────────────────────────────── */
 input {
-  font-family: 'Space Mono', monospace;
-  font-size: 13px;
-  background: var(--surface2);
+  font-family: 'Crimson Text', 'Georgia', serif;
+  font-size: 15px;
+  background: rgba(10, 8, 5, 0.7);
   border: 1px solid var(--border);
   border-radius: var(--radius);
   color: var(--text);
-  padding: 10px 14px;
+  padding: 11px 14px;
   outline: none;
   width: 100%;
-  transition: border-color 0.15s;
+  transition: border-color var(--transition), box-shadow var(--transition);
 }
 
 input:focus {
-  border-color: var(--accent);
+  border-color: var(--border-glow);
+  box-shadow: 0 0 0 2px rgba(200,146,46,0.12), inset 0 1px 3px rgba(0,0,0,0.4);
 }
 
 input::placeholder {
   color: var(--text-dim);
+  font-style: italic;
 }
 
+/* ─── Card / Panel — dark lacquered wood ────────────────────────────────────── */
 .card {
-  background: var(--surface);
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
-  padding: 20px;
+  background: linear-gradient(160deg, var(--surface2) 0%, var(--surface) 100%);
+  border: 1px solid var(--border-lit);
+  border-radius: var(--radius-lg);
+  padding: 22px;
+  box-shadow:
+    0 8px 32px rgba(0,0,0,0.6),
+    inset 0 1px 0 rgba(255,255,255,0.04),
+    inset 0 -1px 0 rgba(0,0,0,0.3);
 }
 
+/* ─── Tilt panel — 3D tabletop perspective ──────────────────────────────────── */
+.tilt-panel {
+  transform: perspective(var(--perspective)) rotateY(-2.5deg) rotateX(1deg);
+  transform-style: preserve-3d;
+  transition: transform 0.35s ease;
+}
+.tilt-panel:hover {
+  transform: perspective(var(--perspective)) rotateY(-1deg) rotateX(0.5deg);
+}
+@media (max-width: 640px) {
+  .tilt-panel { transform: none; }
+  .tilt-panel:hover { transform: none; }
+}
+
+/* ─── Tags — branded wax-press labels ───────────────────────────────────────── */
 .tag {
   display: inline-block;
-  font-size: 10px;
+  font-family: 'Cinzel', serif;
+  font-size: 9px;
   font-weight: 700;
-  letter-spacing: 0.12em;
+  letter-spacing: 0.16em;
   text-transform: uppercase;
-  padding: 3px 8px;
+  padding: 3px 9px;
   border-radius: 2px;
   border: 1px solid currentColor;
 }
 
-.tag.alive { color: var(--alive); }
-.tag.eliminated { color: var(--eliminated); }
-.tag.host { color: var(--accent); border-color: var(--accent); }
-.tag.current { color: var(--warning); border-color: var(--warning); }
+.tag.alive     { color: var(--alive); border-color: var(--alive); }
+.tag.eliminated{ color: var(--eliminated); border-color: var(--eliminated); }
+.tag.host      { color: var(--accent); border-color: var(--accent); }
+.tag.current   { color: var(--warning); border-color: var(--warning); }
 
-/* Pulse animation for current player */
-@keyframes pulse-glow {
-  0%, 100% { box-shadow: 0 0 0 0 rgba(255, 170, 74, 0); }
-  50% { box-shadow: 0 0 12px 2px rgba(255, 170, 74, 0.25); }
+/* Standard browser focus ring — accessibility only, not keyboard nav */
+:focus-visible {
+  outline: 2px solid rgba(200,146,46,0.4);
+  outline-offset: 2px;
 }
 
+/* ─── Animations ─────────────────────────────────────────────────────────────── */
+
+/* Candle flicker — ambient ambient atmosphere */
+@keyframes candle-flicker {
+  0%, 100% { opacity: 1; text-shadow: 0 0 30px rgba(200,146,46,0.6); }
+  25%       { opacity: 0.96; text-shadow: 0 0 20px rgba(200,146,46,0.45); }
+  50%       { opacity: 1; text-shadow: 0 0 40px rgba(200,146,46,0.7); }
+  75%       { opacity: 0.97; text-shadow: 0 0 18px rgba(200,146,46,0.4); }
+}
+.candle-title { animation: candle-flicker 4s ease-in-out infinite; }
+
+/* Ember pulse — for active/current player */
+@keyframes ember-pulse {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(200,146,46,0); }
+  50%       { box-shadow: 0 0 14px 3px rgba(200,146,46,0.22); }
+}
 .current-player-row {
-  animation: pulse-glow 2s ease-in-out infinite;
+  animation: ember-pulse 2.4s ease-in-out infinite;
   border-color: var(--warning) !important;
 }
 
-/* Spin animation */
+/* Roulette spin */
 @keyframes spin-roulette {
-  0% { transform: rotate(0deg); }
-  60% { transform: rotate(720deg); }
-  80% { transform: rotate(680deg); }
-  90% { transform: rotate(705deg); }
+  0%   { transform: rotate(0deg); }
+  60%  { transform: rotate(720deg); }
+  80%  { transform: rotate(680deg); }
+  90%  { transform: rotate(705deg); }
   100% { transform: rotate(720deg); }
 }
+.spinning { animation: spin-roulette 1.5s cubic-bezier(0.2, 0, 0.3, 1) forwards; }
 
-.spinning {
-  animation: spin-roulette 1.5s cubic-bezier(0.2, 0, 0.3, 1) forwards;
+/* Tavern title reveal — carved stone emerge */
+@keyframes title-emerge {
+  0%   { opacity: 0; transform: perspective(600px) translateZ(-40px) translateY(12px); filter: blur(4px); }
+  100% { opacity: 1; transform: perspective(600px) translateZ(0px) translateY(0); filter: blur(0); }
 }
+.title-emerge { animation: title-emerge 0.7s cubic-bezier(0.22,1,0.36,1) forwards; }
 
-/* Glitch text effect */
-@keyframes glitch {
-  0%, 100% { text-shadow: none; transform: none; }
-  20% { text-shadow: -2px 0 var(--accent2); transform: translateX(2px); }
-  40% { text-shadow: 2px 0 var(--accent3); transform: translateX(-2px); }
-  60% { text-shadow: -2px 0 var(--accent); transform: translateX(1px); }
-}
-
-.glitch { animation: glitch 4s ease-in-out infinite; }
-
-/* Fade-in */
+/* Fade up */
 @keyframes fadeIn {
-  from { opacity: 0; transform: translateY(8px); }
-  to { opacity: 1; transform: translateY(0); }
+  from { opacity: 0; transform: translateY(10px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+.fade-in { animation: fadeIn 0.35s ease forwards; }
+
+/* Soft opacity pulse — reusable globally (e.g. the reconnecting indicator).
+   The in-game table redefines an identical `pulse` inside GAME_UI_STYLE. */
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50%      { opacity: 0.4; }
 }
 
-.fade-in { animation: fadeIn 0.3s ease forwards; }
-
-/* Notification */
+/* Slide in from right (notifications) */
 @keyframes slideIn {
   from { transform: translateX(120%); opacity: 0; }
-  to { transform: translateX(0); opacity: 1; }
+  to   { transform: translateX(0); opacity: 1; }
 }
+.notification { animation: slideIn 0.3s ease forwards; }
 
-.notification {
-  animation: slideIn 0.3s ease forwards;
-}
+/* Staggered children */
+.stagger-child:nth-child(1) { animation-delay: 0.00s; }
+.stagger-child:nth-child(2) { animation-delay: 0.06s; }
+.stagger-child:nth-child(3) { animation-delay: 0.12s; }
+.stagger-child:nth-child(4) { animation-delay: 0.18s; }
+.stagger-child:nth-child(5) { animation-delay: 0.24s; }
 
-/* Scrollbar */
-::-webkit-scrollbar { width: 6px; }
+/* Continuous rotation — the ChamberSpinner loading motif (and the post-intro
+   IntroLoading cylinder). Plain 360° loop; callers set the duration. */
+@keyframes spin { to { transform: rotate(360deg); } }
+
+/* Refresh spin */
+@keyframes groups-refresh-spin { to { transform: rotate(360deg); } }
+.groups-refresh-icon { display: inline-block; font-size: 13px; line-height: 1; }
+.groups-refresh-icon--spin { animation: groups-refresh-spin 0.8s linear infinite; }
+
+/* ─── Scrollbar — aged iron track ────────────────────────────────────────────── */
+::-webkit-scrollbar { width: 5px; }
 ::-webkit-scrollbar-track { background: var(--surface); }
-::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
-::-webkit-scrollbar-thumb:hover { background: var(--text-dim); }
+::-webkit-scrollbar-thumb { background: var(--border-lit); border-radius: 3px; }
+::-webkit-scrollbar-thumb:hover { background: var(--border-glow); }
 
-/* Card shape icons */
+/* ─── Shape icons ────────────────────────────────────────────────────────────── */
 .shape-icon {
   display: inline-flex;
   align-items: center;
@@ -221,4 +439,133 @@ input::placeholder {
   width: 32px;
   height: 32px;
   font-size: 18px;
+}
+
+/* ─── Phase 3: Screen-shake on bluff resolution ─────────────────────────────── */
+@keyframes screen-shake {
+  0%   { transform: translate(0, 0) rotate(0deg); }
+  10%  { transform: translate(-4px, -2px) rotate(-0.4deg); }
+  20%  { transform: translate(4px, 2px) rotate(0.4deg); }
+  30%  { transform: translate(-3px, 1px) rotate(-0.3deg); }
+  40%  { transform: translate(3px, -1px) rotate(0.3deg); }
+  50%  { transform: translate(-2px, 2px) rotate(-0.2deg); }
+  60%  { transform: translate(2px, -2px) rotate(0.2deg); }
+  70%  { transform: translate(-1px, 1px) rotate(-0.1deg); }
+  80%  { transform: translate(1px, -1px) rotate(0.1deg); }
+  90%  { transform: translate(0, 1px) rotate(0deg); }
+  100% { transform: translate(0, 0) rotate(0deg); }
+}
+
+/* ─── Phase 3: Smoke / ambient drift ────────────────────────────────────────── */
+@keyframes smoke-drift {
+  0%   { opacity: 0; transform: translateY(0) scaleX(1); }
+  20%  { opacity: 0.18; }
+  80%  { opacity: 0.08; }
+  100% { opacity: 0; transform: translateY(-60px) scaleX(1.4); }
+}
+
+@keyframes smoke-drift-b {
+  0%   { opacity: 0; transform: translateY(0) scaleX(1) translateX(0); }
+  15%  { opacity: 0.14; }
+  85%  { opacity: 0.06; }
+  100% { opacity: 0; transform: translateY(-50px) scaleX(1.6) translateX(20px); }
+}
+
+/* ─── Phase 3: Vignette pulse — intensifies during spin_pending ─────────────── */
+@keyframes vignette-intensify {
+  0%, 100% { opacity: 0.72; }
+  50%       { opacity: 0.88; }
+}
+
+/* Applied to body::after during high-tension phases */
+.phase-spin-pending body::after,
+body.phase-spin-pending::after {
+  animation: vignette-intensify 1.6s ease-in-out infinite;
+  background: radial-gradient(ellipse 100% 100% at 50% 50%, transparent 35%, rgba(60,0,0,0.85) 100%);
+}
+
+/* Screen shake class — added/removed by JS */
+.screen-shake {
+  animation: screen-shake 0.55s cubic-bezier(0.36, 0.07, 0.19, 0.97) both;
+}
+
+/* ─── Tavern UI refresh ───────────────────────────────────────────────────────── */
+/* Hanging tavern sign — gentle pendulum sway from its chains */
+@keyframes sign-sway {
+  0%, 100% { transform: rotate(-1.1deg); }
+  50%       { transform: rotate(1.1deg); }
+}
+
+.hanging-sign {
+  transform-origin: top center;
+  animation: sign-sway 6s ease-in-out infinite;
+}
+
+/* Ambient looping backdrop — large, faint Whot suits drift up and slowly rotate
+   forever behind the content. The landing's always-on background motion
+   (distinct from the rising ember sparks). 0% and 100% match so it loops
+   seamlessly; disabled under reduced motion. */
+@keyframes bg-suit-drift {
+  0%   { transform: translateY(0) rotate(0deg); }
+  50%  { transform: translateY(-34px) rotate(180deg); }
+  100% { transform: translateY(0) rotate(360deg); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .bg-suit-layer * { animation: none !important; }
+  .hanging-sign { animation: none; }
+}
+
+/* Subtle wood-grain / smoke texture overlay — drop inside a position:relative
+   panel as an absolutely-positioned, pointer-events:none child. */
+.wood-grain::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  border-radius: inherit;
+  opacity: 0.5;
+  background:
+    repeating-linear-gradient(96deg, rgba(0,0,0,0.16) 0px, rgba(0,0,0,0) 2px, rgba(255,255,255,0.012) 4px, rgba(0,0,0,0) 7px),
+    radial-gradient(ellipse 120% 80% at 50% -10%, rgba(240,181,74,0.05) 0%, transparent 60%);
+  mix-blend-mode: overlay;
+}
+
+/* Ember/candle focal glow ring — for the required-suit focal element */
+@keyframes focal-breathe {
+  0%, 100% { box-shadow: 0 0 18px rgba(240,181,74,0.25), inset 0 0 14px rgba(240,181,74,0.08); }
+  50%       { box-shadow: 0 0 30px rgba(240,181,74,0.42), inset 0 0 18px rgba(240,181,74,0.12); }
+}
+.focal-breathe { animation: focal-breathe 3.4s ease-in-out infinite; }
+
+/* ─── Dismissal "X" (Module 6) ──────────────────────────────────────────────
+   Every modal/dropdown/popup close control renders a raw literal uppercase "X"
+   (a plain Latin letter — unlike the ✕/× dingbats it always renders in the
+   display fonts). Flat and on-surface: a dim glyph with NO filled background,
+   brightening on hover, so it reads as a quiet dismiss control rather than a
+   loud crimson chip. */
+.bluff-close-x {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--text-dim);
+  font-family: ui-sans-serif, system-ui, -apple-system, sans-serif;
+  font-weight: 800;
+  font-size: 14px;
+  line-height: 1;
+  user-select: none;
+  transition: background 0.15s ease, color 0.15s ease;
+}
+.bluff-close-x:hover { background: rgba(255, 255, 255, 0.06); color: var(--text); }
+
+/* ─── Reduced-motion safety ─────────────────────────────────────────────────── */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
 }

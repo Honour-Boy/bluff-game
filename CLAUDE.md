@@ -22,16 +22,20 @@ node index.js          # or: npm start
 npm install
 npm run dev            # Next.js dev on :3000
 npm run build && npm start
+
+# Tests
+cd server && npx vitest run   # server suite (runs on any Node 20.x+)
+cd client && npm test         # client suite — REQUIRES Node ^20.19.0 || >=22.12.0
 ```
 
-There are **no tests, no linter, and no typechecker** configured. Don't claim verification by running `npm test` — it won't exist. Verify changes by running both processes and exercising the flow in a browser.
+**Node baseline:** the client test toolchain (Vite 8 via Vitest) requires Node `^20.19.0 || >=22.12.0` — pinned in `client/package.json` `engines` and `.nvmrc`. On an older 20.x LTS the client runner dies at config load with `ERR_REQUIRE_ESM` in `std-env` (see issue #196). The server suite has no such requirement. There is no linter or typechecker configured.
 
 ## Environment variables
 
 Required for anything beyond the landing page to work:
 
 **`server/.env`**
-- `PORT` — server port (defaults to `3001` in code; `.env.example` suggests `4000`)
+- `PORT` — server port (defaults to `3001` in code; `.env.example` also uses `3001`)
 - `CLIENT_URL` — CORS origin (defaults to `*`)
 - `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY` — used to verify Supabase JWTs on the `authenticate` socket event
 
@@ -39,7 +43,7 @@ Required for anything beyond the landing page to work:
 - `NEXT_PUBLIC_SERVER_URL` — where the socket connects (falls back to `http://localhost:3001` in `lib/socket.js`)
 - `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY` — browser Supabase client
 
-⚠️ **Port mismatch in the examples:** `server/.env.example` ships `PORT=4000` and `client/.env.local.example` ships `NEXT_PUBLIC_SERVER_URL=http://localhost:4000`, but the code defaults are `3001`. Pick one and keep both `.env` files aligned, or the client won't connect.
+ℹ️ **Ports are aligned on `3001`:** both `.env.example` files and the code defaults (`server/index.js`, `lib/socket.js`) use `3001`, so a fresh clone connects out of the box. If you change the server `PORT`, update `client` `NEXT_PUBLIC_SERVER_URL` to match.
 
 ## Architecture
 
@@ -67,6 +71,22 @@ Rooms have `mode: 'physical' | 'online'`:
 - **Online** — server deals a Whot-style deck (`generateDeck()` + optional doubled deck for >10 players), players play `cardId` from their hand via `play_card_online`. Bluff resolution is automatic (`resolveBluffOnline` checks the actual revealed card).
 
 Many handlers branch on `room.mode`. When adding behavior, decide whether it applies to one mode or both, and gate it explicitly. `serializeRoom()` already does mode-aware filtering (e.g. `myHand` only sent in online mode, only to its owner).
+
+### Tutorial / Practice mode (bot opponent)
+
+"Practice vs Bot" (landing screen) creates a normal **online** room via `create_tutorial_room`, flagged `room.isTutorial`, seated with the human (a **non-host player**) + one bot player (`id 'bot:1'`, `isBot: true`, `socketId: null`). The **bot is host-of-record** (`hostUserId = 'bot:1'`, `hostSocketId = null`) so a newbie never inherits Kick/Reset/config — `serializeRoom`'s `amHost` is false for the human and host controls disappear. The learner still starts/replays their own game via the **tutorial bypass** in `start_game` / `restart_room` (allow the sole non-bot human). Leaving OR disconnecting destroys the room (tutorial teardown in `leave_room` + `disconnect`), so a dropped human never strands a bot-only room.
+
+- The bot has no socket, so it can't emit events. It's driven **server-side** by `lib/bots.js` (`armBotTurn` / `_onBotActExpire`), modeled on the idle-turn auto-resolver: armed at the end of `broadcastRoomState` (next to `armIdleTurnTimer`), it runs the bot's beats (play a card → end turn; spin when it's the bluff-called target; **clinic-scripted** challenge / arm-defence) by calling the engine + shared `applySpinAndBroadcast` / `_resolveOnlineBluff` directly, then broadcasting. Decisions live in pure `engine/botStrategy.js`. **`armBotTurn` is a no-op without bots, so normal rooms are untouched** — gate any new bot/tutorial behavior on `isTutorial` / `isBot` the same way.
+- `lib/bots.js` is required at the top of `lib/broadcast.js`, so it must use **deferred requires** for `./broadcast` and `./orchestration` (inside the expiry fn) to avoid the cycle — same trick `lib/idleTurn.js` uses. Tutorial rooms are never group rooms, so pass an inert stub leaderboard repo (don't `require('./supabaseClient')`, which throws without env).
+- Basics: the bot is tuned (`engine/botStrategy.js`) to call bluff **≥2 times per game** (`room.botBluffCallsThisGame` counter) so the learner experiences being challenged.
+- **Progression director** (`lib/tutorialDirector.js`, same deferred-require + timer pattern, armed next to `armBotTurn`): when a Basics game ends it hands the learner into the **Power Clinic** (set `tutorialLesson='powers'`, enable powers, stage drill 0); inside the clinic it steps through the scripted drills (intro → wait for the player → "resolved" beat → next) and finishes on a clinic-complete `game_over`.
+- **Power Clinic** (`engine/tutorialScenarios.js`, pure): an ordered list of staged "instances" — Shield (Power 1), a bot-uses-Shield demo, then Peek/Freeze/Mirror/Swap/Assassin (Assassin LAST: its kill ends the round = clinic complete). `stageScenario(room, i)` deterministically writes hands / power slot / turn / `challengeableCard` / phase (defensive drills stage straight into `bluff_intercept_pending`); `scenarioComplete(room, i)` is the director's poll. The clinic bot carries a **loaded 1-bullet chamber** (drama — you see live rounds in the cylinder), but it can **never die in the clinic**: `applySpinAndBroadcast` (`lib/orchestration.js`) **force-survives** any clinic bot spin (gated `isTutorial && tutorialLesson==='powers' && isBot`) — it picks an empty landing slot, clicks one more live round into a *non-landing* slot, and stamps `eliminated:false`. This keeps a stray death from ending the round before the Assassin drill (the one place the bot IS meant to die, via the assassin strike, not a spin). The **Basics** bot is NOT force-survived (a normal killable chamber) so the learner can win Basics. `room.tutorialScenario` ({ power, actor, step, lockBluff, playerStep, playerTotal }) is serialized for the client.
+- **Onboarding routing** (client `TutorialLayer`): "Practice vs Bot" enters the room, then a `ChoiceModal` offers **Go through Basics** or **Skip to Power Cards** (`tutorial_skip_to_powers` → `engine.startGame` + `_beginPowerClinic`). Basics deals on the FIRST intro dismissal (Begin OR close), guarded by a sticky ref so reopening the guide can't re-deal. Each clinic drill is **modal-gated**: a briefing pop-up → the staged instance → an "I Understand" explanation that fires `tutorial_advance` (advancing is player-driven, NOT timed; the director only times intro→resolved).
+- **Spin overlay** (`useOnlinePlayerUiController`): the cylinder animation timers are keyed on the **spin identity** (`spinData.key`), NOT on `roomState.lastAction` — otherwise the fast bot playing its next card ~1.1s later swaps `lastAction` and the effect cleanup cancels the 8s completion timer, so `spinComplete` never fires and the cylinder spins forever ("spin hangs on every pull"). Each `spin_result` also carries a monotonic `spinSeq` (orchestration) for a collision-free dedup key (back-to-back clinic spins repeat otherwise), and the overlay **self-clears** via a stable `settleSpin` rather than the round-tripped `spinDismissed` flag. The dedup tracks **every** seen spin key in a `Set` (`seenSpinKeysRef`), not just the last one — a re-broadcast of an *older* `spin_result` after a newer spin can't replay it ("spin playing twice"); each spin animates exactly once. Applies to online mode too. Regression: `client/src/hooks/__tests__/spinOverlayLifecycle.test.js`.
+- **Defensive clinic drills are full loops** (Shield/Mirror/Swap): staged in `playing` with an all-mismatch hand; the player plays a card + ends their turn, then `lib/tutorialDirector.js` `open_intercept` opens the bluff-intercept window (the bot "challenges") so the player arms their defence. The director only times `start_clinic` / `open_intercept` / `resolve`; advancing past a resolved drill waits for the player's "I understand now" (`tutorial_advance`). The intercept overlay glows the defence card + hides its countdown in tutorial.
+  - **The staged defensive card must NOT be pre-armed on the player's own turn.** `open_intercept` is gated on `engine.canInterceptBluff(human)`, which returns false once `human.armedPowerCard` is set — so arming the Shield/Mirror/Swap early means the window never opens and the clinic hangs with the bot idle ("bot deciding forever"). `engine.activatePowerCard` therefore refuses an `INTERCEPTABLE_POWERS` card while `room.tutorialScenario.expect === 'play_then_defend'` and `step !== 'resolved'` (returns `{ ok:false, tutorialLocked:true }`). The client mirrors this: `isDefensivePreArmLocked(scenario, phase)` (`tutorialContent.js`) drives `powerLocked` → `CardHand` dims the card (still tappable), and a tap bumps `preArmLockSignal` so `TutorialLayer` flashes the `DEFENSE_PREARM_HINT` coach line instead of opening the activate modal. Offensive own-turn drills (Peek/Freeze/Assassin) aren't `play_then_defend`, so pre-arming stays allowed there (it's the actual mechanic — arm before you play).
+- Tutorial rooms opt out of the 40s idle auto-play (`_idleTurnActive`) and skip the `pre_game` role-reveal (`start_game`), so a learner is paced by the guided UI, not by timers.
+- Client guided layer: `components/tutorial/` (`TutorialLayer` intro modal + state-driven coach bar + clinic before/after coach + clinic-complete card, pure copy in `tutorialContent.js`), mounted in `OnlinePlayerUI` only when `roomState.isTutorial`. The idle "tap a card" nudge anchors to the real hand (`data-tour-id="my-hand"`). No DOM spotlights (deliberately — too fragile over the pannable/responsive table).
 
 ### Phase state machine
 

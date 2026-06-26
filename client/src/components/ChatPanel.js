@@ -12,6 +12,7 @@
 // surface tokens; radius pinned to the design-system 4px.
 
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { CloseIcon } from './shared/CloseIcon';
 
 const TEXT_MAX = 500;
 const GROUP_WINDOW_MS = 60_000;
@@ -44,6 +45,10 @@ export function ChatPanel({
   onClose,
   onSend,
   myUserId,
+  // Issue #102 — on mobile the chat trigger lives inside the
+  // MobileFabMenu sheet, so the floating 💬 button is suppressed.
+  // The slide-in panel itself still mounts when `open` is true.
+  hideTrigger = false,
 }) {
   const [draft, setDraft] = useState('');
   const listRef = useRef(null);
@@ -68,12 +73,13 @@ export function ChatPanel({
 
   return (
     <>
-      {/* Floating button */}
-      {!open && (
+      {/* Floating button - suppressed on mobile when the FAB sheet
+          owns the chat trigger (issue #102). */}
+      {!open && !hideTrigger && (
         <button
           type="button"
           onClick={onOpen}
-          aria-label={unread > 0 ? `Open chat — ${unread} new` : 'Open chat'}
+          aria-label={unread > 0 ? `Open chat - ${unread} new` : 'Open chat'}
           style={{
             position: 'fixed',
             right: 'max(16px, env(safe-area-inset-right))',
@@ -90,6 +96,9 @@ export function ChatPanel({
             boxShadow: '0 8px 24px rgba(0,0,0,0.45)',
             transition: 'transform 0.15s, border-color 0.15s',
             WebkitTapHighlightColor: 'transparent',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
           }}
           onMouseEnter={e => { e.currentTarget.style.transform = 'translateY(-2px)'; e.currentTarget.style.borderColor = 'var(--accent)'; }}
           onMouseLeave={e => { e.currentTarget.style.transform = 'none'; e.currentTarget.style.borderColor = 'var(--border)'; }}
@@ -120,7 +129,7 @@ export function ChatPanel({
         </button>
       )}
 
-      {/* Mobile backdrop — taps outside the panel close it. Hidden on
+      {/* Mobile backdrop - taps outside the panel close it. Hidden on
           desktop where the dock layout doesn't need it. */}
       {open && (
         <div
@@ -130,12 +139,15 @@ export function ChatPanel({
             position: 'fixed',
             inset: 0,
             background: 'rgba(0,0,0,0.45)',
-            zIndex: 9099,
+            // Above the SettingsGear (9200) so the panel's own close button isn't
+            // swallowed by the gear on mobile (both sit top-right); still below the
+            // controls modal (9300) so that hierarchy is preserved.
+            zIndex: 9210,
           }}
         />
       )}
 
-      {/* Panel — full width on mobile, 380px dock on desktop */}
+      {/* Panel - full width on mobile, 380px dock on desktop */}
       {open && (
         <div
           aria-modal="true"
@@ -146,7 +158,9 @@ export function ChatPanel({
             right: 0,
             top: 0,
             bottom: 0,
-            zIndex: 9100,
+            // Above the SettingsGear (9200) so the close button is reachable on
+            // mobile; below the controls modal (9300).
+            zIndex: 9220,
             width: '100%',
             maxWidth: 380,
             background: 'var(--surface)',
@@ -156,7 +170,7 @@ export function ChatPanel({
             boxShadow: '-12px 0 40px rgba(0,0,0,0.5)',
           }}
         >
-          {/* Header — safe-area aware so it sits below iOS notch */}
+          {/* Header - safe-area aware so it sits below iOS notch */}
           <div style={{
             padding: '14px 14px 12px',
             paddingTop: 'calc(14px + env(safe-area-inset-top))',
@@ -203,7 +217,7 @@ export function ChatPanel({
                 marginRight: -8,
                 WebkitTapHighlightColor: 'transparent',
               }}
-            >✕</button>
+            ><CloseIcon size={18} /></button>
           </div>
 
           {/* Messages */}
@@ -291,7 +305,7 @@ export function ChatPanel({
             })}
           </div>
 
-          {/* Composer — sticks to bottom, safe-area padded.
+          {/* Composer - sticks to bottom, safe-area padded.
               fontSize 16px on the textarea is non-negotiable: anything
               smaller triggers iOS Safari's auto-zoom on focus. */}
           <form

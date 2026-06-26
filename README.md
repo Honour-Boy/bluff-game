@@ -1,7 +1,53 @@
 # BLUFF — Real-Time Multiplayer Card Game
 
 A real-time multiplayer bluff card game built with Next.js, Node.js, Express, and Socket.IO.
-All state is held in-memory. No database required.
+Game state is held in-memory on the server (room state dies on restart). Supabase is used for auth + user profiles only. LiveKit handles voice chat (online mode).
+
+---
+
+## v2 features (online mode)
+
+The host configures these per-room from the pre-game settings panel before creating the room.
+
+**Power cards** — six wild cards mixed into the deck, activated at turn start, hidden until they trigger:
+- 🛡️ **Shield** — blocks the next bluff call against you
+- 🪞 **Mirror** — redirects bluff consequences back to the source
+- 🔄 **Swap** — exchange your played card with one from the round's pile (anonymous pick)
+- 👁️ **Peek** — see the last card played before your move
+- ❄️ **Freeze** — skip the next player's turn entirely
+- 💀 **Assassin** — eliminate anyone who dares call your bluff
+
+**Secret roles** (auto-activated at 9+ players):
+- **Barehand** — no special ability
+- **The Gambler** — risk level frozen on survivals; jumps to 4 if you're caught bluffing
+- **The Sheriff** — risk drops on every correct call you make; immune to Assassin
+- **The Medic** — once per game, save any player from elimination (+2 cards cost)
+- **The Saboteur** — once per game, secretly slip a card into someone else's hand
+- **The Sniper** — once per game, redirect a pending spin to anyone but the Mirror holder
+- **The Collector** — hold up to 3 power cards instead of 1
+
+**Risk modifiers** (host toggles):
+- **Double Barrel** — every spin uses two dice, takes the higher
+- **Russian Roulette** — everyone starts with 3 bullets loaded
+- **Hot Potato** — risk increases by 2 instead of 1 on survival
+- **Redemption Spin** — eliminated players get a second chance each round
+
+**Room modifiers**:
+- **Speed Mode** — 15-second turn timer, auto-spin penalty
+- **Sudden Death** — every 4 elim-free turns, all alive players +1 bullet
+- **Mirror Match** — when one player spins, the player opposite them spins too
+
+**Special systems**:
+- **Bounty** — survive 3 spins in a row, become a target; collecting a bounty drops your risk
+- **Betting** — 10-second window before each spin; predict the outcome, 3-streak = -1 risk
+- **Dead Man's Hand** — eliminated players form a ghost council, vote on round disruptions
+- **Last Stand** — final two players auto-enter a stripped-down duel: spin or pass, no cards
+
+**Other**:
+- **Practice vs Bot** — a solo tutorial table against a server-driven bot opponent, with a guided intro walkthrough + a live coach that narrates each beat. One click from the landing screen; no room code, no second player. See the "Tutorial / Practice mode" note in `CLAUDE.md`.
+- LiveKit voice chat (opt-in, mute toggle)
+- Per-room text chat (Socket.IO, 50-message rolling cap)
+- Magic-link email auth (passwordless) + Google OAuth via Supabase
 
 ---
 
@@ -63,7 +109,10 @@ bluff-game/
 ├── server/
 │   ├── index.js            — Express + Socket.IO entry point
 │   ├── gameEngine.js       — Pure game logic (no I/O, fully testable)
-│   └── socketHandlers.js   — Socket event handlers, in-memory room store
+│   ├── bluffPipeline.js    — Bluff resolution stages: Shield → Assassin →
+│   │                          correctness → Mirror → Swap → default → roles
+│   ├── socketHandlers.js   — Socket event handlers, in-memory room store
+│   └── tests/              — Vitest suite — engine + pipeline + clash sweep
 │
 └── client/
     └── src/
@@ -72,16 +121,26 @@ bluff-game/
         │   ├── layout.js       — HTML shell
         │   └── globals.css     — Design system (dark industrial theme)
         ├── hooks/
-        │   └── useGame.js      — All socket state + actions (single hook)
+        │   ├── useGame.js      — All socket state + actions (single hook)
+        │   └── useAuth.js      — Supabase auth wrapper
         ├── components/
-        │   ├── LandingScreen.js — Create / join room UI
-        │   ├── HostUI.js        — Game master panel
-        │   ├── PlayerUI.js      — Player panel
-        │   ├── PlayerList.js    — Turn-ordered player rows with risk
-        │   ├── CardShape.js     — Shape icon display (square/circle/etc.)
-        │   ├── RiskMeter.js     — 6-chamber gun risk display
-        │   ├── ActionLog.js     — Last event display
-        │   └── Notification.js  — Toast notification
+        │   ├── LandingScreen.js        — Create / join room UI
+        │   ├── HostUI.js               — Game master panel (physical mode)
+        │   ├── PlayerUI.js             — Player panel (physical mode)
+        │   ├── OnlinePlayerUI.js       — Online-mode top-down table view
+        │   ├── PreGameSettingsPanel.js — Host v2 toggles before start
+        │   ├── PowerCard.js            — Power card visual (front)
+        │   ├── PowerCardBack.js        — Power card back
+        │   ├── RoleRevealOverlay.js    — Once-per-game secret role card
+        │   ├── AnnouncementBanner.js   — Power-card / role event banner
+        │   ├── SystemsOverlays.js      — Bounty / Betting / DMH / Last Stand
+        │   ├── PlayerList.js           — Turn-ordered player rows with risk
+        │   ├── CardShape.js            — Shape icon display
+        │   ├── RiskMeter.js            — 6-chamber gun risk display
+        │   ├── ActionLog.js            — Last event display
+        │   ├── ChatPanel.js            — Per-room text chat
+        │   ├── VoicePanel.js           — LiveKit voice controls
+        │   └── Notification.js         — Toast notification
         └── lib/
             └── socket.js        — Socket.IO singleton
 ```
@@ -95,6 +154,8 @@ bluff-game/
 2. Host shares the code physically (or via any message channel)
 3. **Players** open the app → click "Join Room" → enter username + room code
 4. Host clicks **Start Game** (minimum 2 players, max 15)
+
+> **New here?** Click **Practice vs Bot** on the landing screen for a guided solo round against a bot — a stepped intro, then a live coach that tells you what to do each turn. No room code or second player needed.
 
 ### Turn Flow
 1. Server picks a random required card type (square, circle, triangle, cross, star)
@@ -133,6 +194,66 @@ So the more spins you survive, the more loaded your chamber gets. After 5 surviv
 
 ---
 
+## v2 Features (Online Mode)
+
+Online mode adds a layered "deck of consequences" on top of the base spin-the-gun game. Every layer is host-toggleable from the pre-game settings panel — defaults are all OFF, so a vanilla room behaves exactly like physical mode.
+
+### Power Cards
+Six abilities that arm at the start of a turn and trigger inside the bluff resolution pipeline:
+- **Shield** — block one incoming bluff penalty (the bluff "never officially registers")
+- **Mirror** — reflect a bluff back at the caller
+- **Swap** — anonymously swap the played card with one from the played pile, re-judging the bluff
+- **Peek** — privately see the previous player's card
+- **Freeze** — skip a target player's next turn
+- **Assassin** — multi-turn arming; eliminates whoever calls bluff on you (Shield blocks; Sheriff is immune)
+
+Players hold at most **one** power card at a time (Collector role lifts to three). Drawing a second auto-discards and replaces with a shape card.
+
+### Secret Roles
+Activate automatically at 9+ alive players (not host-toggleable). Each role has either a passive ability or a once-per-game prompt:
+- **Barehand** — vanilla, no special abilities
+- **Gambler** — risk doesn't grow on survival; getting caught bluffing jumps chamber to 4 bullets
+- **Sheriff** — every correct bluff call drops your risk by one; immune to Assassin
+- **Medic** — once per game, save anyone (or yourself) from elimination at the cost of +2 cards
+- **Saboteur** — once per game, silently move a random card from your hand into another player's
+- **Sniper** — once per game, after a bluff resolves, redirect the spin to anyone (Mirror holders off-limits)
+- **Collector** — hold up to three power cards instead of one
+
+Roles reveal privately at game start via an overlay; only the role's owner ever sees their card.
+
+### Risk Modifiers
+- **Double Barrel** — spin index = max of two rolls (deadlier)
+- **Russian Roulette** — every chamber starts with 3 bullets
+- **Hot Potato** — surviving a spin adds two bullets instead of one
+- **Redemption Spin** — eliminated players get one more chance per round (suspended once Last Stand begins)
+
+### Room Modifiers
+- **Speed Mode** — 15s turn timer, auto-spin penalty on miss
+- **Sudden Death** — every 4 elimination-free turns, all alive chambers gain a bullet
+- **Mirror Match** — when one player spins, the player opposite them in turn order spins too (eligibility check: even alive count at game start; falls back to next-alive-in-opposite-direction if the exact opposite is dead)
+
+### Special Systems
+- **Bounty** — survive 3 spins in a row → bounty placed; getting bluffed correctly while bountied drops the accuser's risk by one
+- **Betting** — 10s window after `spin_pending` for non-targets to wager; 3-correct streak rewards a risk drop
+- **Dead Man's Hand** — when 3+ players are eliminated, ghost council vote on a global twist (re-deal cards / change required shape / activate a random risk modifier)
+- **Last Stand** — at alive=2, the final two enter a cinematic spin-vs-spin duel: hands cleared, chambers reset, no power cards or roles in play
+
+### Clash Resolution Priorities
+The bluff pipeline enforces nine spec-locked priorities:
+1. **Assassin > Mirror** — Mirror cannot deflect an Assassin elimination
+2. **Shield > Assassin** — Shield blocks before Assassin can fire
+3. **Mirror > Sniper** — Sniper redirect refuses Mirror holders
+4. **Medic > Assassin** — Medic save can revert an Assassin elimination
+5. **Swap > Mirror** — Swap re-runs the bluff check; Mirror still applies to the post-swap world
+6. **Sudden Death > Gambler** — external modifiers still affect Gambler (only spin-survival is frozen)
+7. **Last Stand > Redemption Spin** — entering Last Stand suspends Redemption Spin
+8. **Mirror Match > eliminated opposite** — falls back to next alive in opposite direction
+9. **Sheriff > Assassin** — Sheriff is immune; pipeline emits `sheriff_protected` banner
+
+Tests for each priority live in `server/tests/clashResolution.test.js`.
+
+---
+
 ## Reconnection
 
 Session data is stored in `sessionStorage` under a single key `bluff_session`:
@@ -153,6 +274,18 @@ Timers are keyed by `${roomCode}:${playerId}` and cleared on reconnect.
 
 ---
 
+## Single-device sessions
+
+Exactly **one device is active per account at a time**, enforced at the socket `authenticate` gate (the realtime server is the authority — Supabase alone can't kill a live socket). An in-memory registry (`server/lib/sessions.js`) holds one entry per account, carrying the device's `deviceId`, a friendly `deviceName` (e.g. "Chrome on Windows"), and when it signed in.
+
+- **A different device signs in** → the server does **not** silently kick either side. It refuses the new login with `session_active_elsewhere` and the **name of the active device**, and the new device shows a takeover screen ("Already signed in elsewhere → Log out that device & continue"). On confirm, the new device re-authenticates with `takeover: true`; the old device gets a `force_logout` event and is disconnected. Net result: still only one active session, but the user chooses when to move it.
+- **Same physical device** (refresh / new tab / reconnect) → **silent replace**, identified by a persistent `localStorage['bluff_device_id']` sent with `authenticate`. Never prompts.
+- **Sign-out** emits a `sign_out` event so the server releases the entry immediately — a signed-out account is never seen as still active (the socket itself stays connected on the auth screen).
+
+**Guests are exempt** (per-browser id, no account to contest). Old clients that send no `deviceId` degrade safely to "unique device" semantics. A defense-in-depth seat guard in `handlers/room.js` (`seatedElsewhere`) blocks a second simultaneous seat at create/join.
+
+---
+
 ## Socket Events Reference
 
 ### Client → Server
@@ -169,6 +302,7 @@ Timers are keyed by `${roomCode}:${playerId}` and cleared on reconnect.
 | `round_win` | `{ roomCode, playerId }` | Host declares round winner |
 | `call_bluff` | `{ roomCode, playerId }` | Player calls bluff |
 | `player_continue` | `{ roomCode, playerId }` | Player continues turn |
+| `sign_out` | `{}` | Release this device's single-active-session entry on sign-out |
 
 ### Server → Client
 | Event | Payload | Description |
@@ -176,6 +310,7 @@ Timers are keyed by `${roomCode}:${playerId}` and cleared on reconnect.
 | `room_state` | Full room snapshot | Broadcast on every state change |
 | `bluff_called` | `{ callerId }` | Notify host of bluff |
 | `host_disconnected` | `{}` | Notify players if host drops |
+| `force_logout` | `{ reason }` | Single-device sessions: this device was signed in elsewhere; client signs out locally |
 
 ---
 

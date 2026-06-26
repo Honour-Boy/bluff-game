@@ -1,0 +1,563 @@
+import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { renderHook, act, waitFor } from '@testing-library/react';
+import { makeMockSocket } from '../../test-utils';
+
+// ─── Mock the socket singleton ─────────────────────────────────
+// useGame imports getSocket() from lib/socket. We swap that out for
+// our EventEmitter-backed fake so tests can drive incoming events
+// directly via socket.__emit().
+
+const socketHolder = vi.hoisted(() => ({ socket: null }));
+
+vi.mock('../../lib/socket', () => ({
+  getSocket: () => socketHolder.socket,
+  SERVER_URL: 'http://localhost:3001',
+}));
+
+import { useGame } from '../useGame';
+
+beforeEach(() => {
+  socketHolder.socket = makeMockSocket({ connected: false });
+  // Tests run in JSDOM — sessionStorage + localStorage are real, but we don't
+  // want state leaking between tests. localStorage holds the §M4 recovery
+  // snapshot, so clear it too.
+  if (typeof sessionStorage !== 'undefined') sessionStorage.clear();
+  if (typeof localStorage !== 'undefined') localStorage.clear();
+});
+
+describe('useGame — initial state', () => {
+  it('starts with no room and no player id', () => {
+    const { result } = renderHook(() => useGame(null));
+    expect(result.current.roomCode).toBeNull();
+    expect(result.current.playerId).toBeNull();
+    expect(result.current.isHost).toBe(false);
+    expect(result.current.roomState).toBeNull();
+  });
+
+  it('exposes connected = socket.connected', () => {
+    socketHolder.socket = makeMockSocket({ connected: true });
+    const { result } = renderHook(() => useGame(null));
+    expect(result.current.connected).toBe(true);
+  });
+});
+
+describe('useGame — chat', () => {
+  it('appends incoming chat messages and increments unread when closed', async () => {
+    const { result } = renderHook(() => useGame(null));
+
+    act(() => {
+      socketHolder.socket.__emit('chat_message', {
+        id: '1', userId: 'u1', username: 'A', text: 'hi', ts: 1,
+      });
+    });
+    await waitFor(() => expect(result.current.chatMessages).toHaveLength(1));
+    expect(result.current.chatUnread).toBe(1);
+  });
+
+  it('dedupes chat messages by id (room_state replay should not double-add)', async () => {
+    const { result } = renderHook(() => useGame(null));
+
+    act(() => {
+      socketHolder.socket.__emit('chat_message', {
+        id: 'dup', userId: 'u1', username: 'A', text: 'hi', ts: 1,
+      });
+    });
+    await waitFor(() => expect(result.current.chatMessages).toHaveLength(1));
+
+    act(() => {
+      // Simulate room_state replay containing the same message id.
+      socketHolder.socket.__emit('room_state', {
+        chatLog: [{ id: 'dup', userId: 'u1', username: 'A', text: 'hi', ts: 1 }],
+        players: [], turnOrder: [],
+      });
+    });
+    expect(result.current.chatMessages).toHaveLength(1);
+  });
+
+  it('does not increment unread once the chat is open', async () => {
+    const { result } = renderHook(() => useGame(null));
+
+    act(() => result.current.openChat());
+    expect(result.current.chatUnread).toBe(0);
+
+    act(() => {
+      socketHolder.socket.__emit('chat_message', {
+        id: 'a', userId: 'u1', username: 'A', text: 'hi', ts: 1,
+      });
+    });
+    await waitFor(() => expect(result.current.chatMessages).toHaveLength(1));
+    expect(result.current.chatUnread).toBe(0);
+  });
+
+  it('openChat resets unread to 0', async () => {
+    const { result } = renderHook(() => useGame(null));
+    act(() => {
+      socketHolder.socket.__emit('chat_message', {
+        id: 'a', userId: 'u1', username: 'A', text: 'hi', ts: 1,
+      });
+    });
+    await waitFor(() => expect(result.current.chatUnread).toBe(1));
+
+    act(() => result.current.openChat());
+    expect(result.current.chatUnread).toBe(0);
+    expect(result.current.chatOpen).toBe(true);
+  });
+
+  it('ignores chat_message events without an id', async () => {
+    const { result } = renderHook(() => useGame(null));
+    act(() => {
+      socketHolder.socket.__emit('chat_message', { userId: 'u1', text: 'no id' });
+    });
+    expect(result.current.chatMessages).toHaveLength(0);
+  });
+
+  it('sendChatMessage emits with trimmed text and roomCode', async () => {
+    const { result } = renderHook(() => useGame(null));
+    // Force a roomCode by simulating a successful create_room
+    socketHolder.socket.emit.mockImplementationOnce((event, payload, cb) => {
+      cb({ success: true, roomCode: 'ABCD12', playerId: 'p1' });
+    });
+    act(() => result.current.createRoom('online'));
+    await waitFor(() => expect(result.current.roomCode).toBe('ABCD12'));
+
+    act(() => result.current.sendChatMessage('  hello  '));
+    expect(socketHolder.socket.emit).toHaveBeenCalledWith(
+      'send_chat_message',
+      { roomCode: 'ABCD12', text: 'hello' },
+      expect.any(Function),
+    );
+  });
+
+  it('sendChatMessage no-ops when text is empty', () => {
+    const { result } = renderHook(() => useGame(null));
+    act(() => result.current.sendChatMessage('   '));
+    // Only no emit call should be made for the chat. emit is not
+    // called because we return early when text is empty.
+    const calls = socketHolder.socket.emit.mock.calls.filter(
+      ([event]) => event === 'send_chat_message',
+    );
+    expect(calls).toHaveLength(0);
+  });
+});
+
+describe('useGame — room state + actions', () => {
+  it('createRoom on success sets roomCode + isHost', async () => {
+    const { result } = renderHook(() => useGame(null));
+    socketHolder.socket.emit.mockImplementationOnce((event, payload, cb) => {
+      cb({ success: true, roomCode: 'ROOM01', playerId: 'p1' });
+    });
+    act(() => result.current.createRoom('physical'));
+    await waitFor(() => expect(result.current.roomCode).toBe('ROOM01'));
+    expect(result.current.isHost).toBe(true);
+  });
+
+  it('createRoom on failure surfaces error and leaves state', async () => {
+    const { result } = renderHook(() => useGame(null));
+    socketHolder.socket.emit.mockImplementationOnce((event, payload, cb) => {
+      cb({ success: false, error: 'boom' });
+    });
+    act(() => result.current.createRoom('online'));
+    await waitFor(() => expect(result.current.error).toBe('boom'));
+    expect(result.current.roomCode).toBeNull();
+  });
+
+  it('joinRoom uppercases the room code', () => {
+    const { result } = renderHook(() => useGame(null));
+    act(() => result.current.joinRoom('abc123'));
+    expect(socketHolder.socket.emit).toHaveBeenCalledWith(
+      'join_room',
+      { roomCode: 'ABC123' },
+      expect.any(Function),
+    );
+  });
+
+  it('joinRoom respects host membership returned by the server', async () => {
+    const { result } = renderHook(() => useGame(null));
+    socketHolder.socket.emit.mockImplementationOnce((event, payload, cb) => {
+      cb({ success: true, roomCode: 'GROUP1', playerId: 'p1', isHost: true });
+    });
+    act(() => result.current.joinRoom('group1'));
+    await waitFor(() => expect(result.current.roomCode).toBe('GROUP1'));
+    expect(result.current.isHost).toBe(true);
+  });
+
+  it('room_state updates roomState and clears spinDismissed on spin_result', async () => {
+    const { result } = renderHook(() => useGame(null));
+    act(() => {
+      socketHolder.socket.__emit('room_state', {
+        players: [{ id: 'p1', username: 'A' }],
+        turnOrder: ['p1'],
+        currentPlayerId: 'p1',
+        lastAction: { type: 'spin_result' },
+        chatLog: [],
+      });
+    });
+    await waitFor(() => expect(result.current.roomState).toBeTruthy());
+    expect(result.current.spinDismissed).toBe(false);
+  });
+
+  it('persists session to sessionStorage when in a room', async () => {
+    const { result } = renderHook(() => useGame(null));
+    socketHolder.socket.emit.mockImplementationOnce((event, payload, cb) => {
+      cb({ success: true, roomCode: 'XYZ999', playerId: 'p1' });
+    });
+    act(() => result.current.createRoom('online'));
+    await waitFor(() => expect(result.current.roomCode).toBe('XYZ999'));
+
+    const saved = JSON.parse(sessionStorage.getItem('bluff_session'));
+    expect(saved).toEqual({ roomCode: 'XYZ999', isHost: true, playerId: 'p1' });
+  });
+
+  it('leaveGame clears state and removes sessionStorage', async () => {
+    const { result } = renderHook(() => useGame(null));
+    socketHolder.socket.emit.mockImplementationOnce((event, payload, cb) => {
+      cb({ success: true, roomCode: 'LEAVE1', playerId: 'p1' });
+    });
+    act(() => result.current.createRoom('physical'));
+    await waitFor(() => expect(result.current.roomCode).toBe('LEAVE1'));
+
+    act(() => result.current.leaveGame());
+    expect(result.current.roomCode).toBeNull();
+    expect(sessionStorage.getItem('bluff_session')).toBeNull();
+  });
+});
+
+describe('useGame - groups', () => {
+  it('createGroup emits the expected payload and resolves the server response', async () => {
+    const { result } = renderHook(() => useGame(null));
+    socketHolder.socket.emit.mockImplementationOnce((event, payload, cb) => {
+      expect(event).toBe('create_group');
+      expect(payload).toEqual({ name: 'Friday Night' });
+      cb({ success: true, group: { id: 'g1', code: 'ABC234', name: 'Friday Night', role: 'host' } });
+    });
+
+    let response;
+    await act(async () => {
+      response = await result.current.createGroup('Friday Night');
+    });
+
+    expect(response).toEqual({
+      success: true,
+      group: { id: 'g1', code: 'ABC234', name: 'Friday Night', role: 'host' },
+    });
+  });
+
+  it('listMyInvites resolves invite rows from the socket callback', async () => {
+    const { result } = renderHook(() => useGame(null));
+    socketHolder.socket.emit.mockImplementationOnce((event, payload, cb) => {
+      expect(event).toBe('list_my_invites');
+      expect(payload).toEqual({});
+      cb({
+        success: true,
+        invites: [
+          {
+            id: 'i1',
+            group: { id: 'g1', name: 'Weekend Crew', code: 'QWERT2' },
+            invitedByUsername: 'HostUser',
+            createdAt: '2026-05-15T12:00:00.000Z',
+          },
+        ],
+      });
+    });
+
+    let response;
+    await act(async () => {
+      response = await result.current.listMyInvites();
+    });
+
+    expect(response?.invites).toHaveLength(1);
+    expect(response.invites[0].group.code).toBe('QWERT2');
+  });
+
+  it('getGroupLeaderboard emits the expected payload and resolves rows', async () => {
+    const { result } = renderHook(() => useGame(null));
+    socketHolder.socket.emit.mockImplementationOnce((event, payload, cb) => {
+      expect(event).toBe('get_group_leaderboard');
+      expect(payload).toEqual({ groupId: 'group-76' });
+      cb({
+        success: true,
+        leaderboard: [
+          { userId: 'u1', username: 'alice', wins: 4, gamesPlayed: 6 },
+        ],
+      });
+    });
+
+    let response;
+    await act(async () => {
+      response = await result.current.getGroupLeaderboard('group-76');
+    });
+
+    expect(response.leaderboard[0].wins).toBe(4);
+  });
+
+  // ─── Issue #106 — leaderboard cache ────────────────────────
+  it('serves a cached leaderboard within the TTL without re-emitting', async () => {
+    const { result } = renderHook(() => useGame(null));
+    socketHolder.socket.emit.mockImplementation((event, payload, cb) => {
+      if (event === 'get_group_leaderboard') {
+        cb({
+          success: true,
+          leaderboard: [{ userId: 'u1', username: 'alice', wins: 1, gamesPlayed: 1 }],
+        });
+      }
+    });
+
+    let first;
+    await act(async () => {
+      first = await result.current.getGroupLeaderboard('group-42');
+    });
+    expect(first?.leaderboard[0].wins).toBe(1);
+    const callsAfterFirst = socketHolder.socket.emit.mock.calls.filter(
+      ([e]) => e === 'get_group_leaderboard',
+    ).length;
+
+    let second;
+    await act(async () => {
+      second = await result.current.getGroupLeaderboard('group-42');
+    });
+    expect(second?.leaderboard[0].wins).toBe(1);
+    const callsAfterSecond = socketHolder.socket.emit.mock.calls.filter(
+      ([e]) => e === 'get_group_leaderboard',
+    ).length;
+
+    expect(callsAfterSecond).toBe(callsAfterFirst);
+  });
+
+  it('drops the cached leaderboard entry when group_leaderboard_updated fires for that group', async () => {
+    const { result } = renderHook(() => useGame(null));
+    socketHolder.socket.emit.mockImplementation((event, payload, cb) => {
+      if (event === 'get_group_leaderboard') {
+        cb({
+          success: true,
+          leaderboard: [{ userId: 'u1', username: 'alice', wins: 1, gamesPlayed: 1 }],
+        });
+      }
+    });
+
+    await act(async () => {
+      await result.current.getGroupLeaderboard('group-42');
+    });
+    const beforeInvalidation = socketHolder.socket.emit.mock.calls.filter(
+      ([e]) => e === 'get_group_leaderboard',
+    ).length;
+
+    act(() => {
+      socketHolder.socket.__emit('group_leaderboard_updated', { groupId: 'group-42' });
+    });
+
+    await act(async () => {
+      await result.current.getGroupLeaderboard('group-42');
+    });
+    const afterInvalidation = socketHolder.socket.emit.mock.calls.filter(
+      ([e]) => e === 'get_group_leaderboard',
+    ).length;
+
+    expect(afterInvalidation).toBeGreaterThan(beforeInvalidation);
+  });
+
+  it('increments leaderboardUpdateNonce when the server broadcasts an update', async () => {
+    const { result } = renderHook(() => useGame(null));
+
+    expect(result.current.leaderboardUpdateNonce).toBe(0);
+
+    act(() => {
+      socketHolder.socket.__emit('group_leaderboard_updated', {
+        groupId: 'group-76',
+        winnerUserId: 'u1',
+        newWins: 3,
+      });
+    });
+
+    await waitFor(() => expect(result.current.leaderboardUpdateNonce).toBe(1));
+  });
+});
+
+describe('useGame — connection lifecycle', () => {
+  it('flips connected to false on disconnect', async () => {
+    socketHolder.socket = makeMockSocket({ connected: true });
+    const { result } = renderHook(() => useGame(null));
+    expect(result.current.connected).toBe(true);
+
+    act(() => socketHolder.socket.__emit('disconnect'));
+    await waitFor(() => expect(result.current.connected).toBe(false));
+    expect(result.current.authenticated).toBe(false);
+  });
+
+  it('game_ended notification + clears the room/session', async () => {
+    const { result } = renderHook(() => useGame(null));
+    socketHolder.socket.emit.mockImplementationOnce((event, payload, cb) => {
+      cb({ success: true, roomCode: 'END001', playerId: 'p1' });
+    });
+    act(() => result.current.createRoom('online'));
+    await waitFor(() => expect(result.current.roomCode).toBe('END001'));
+
+    act(() => socketHolder.socket.__emit('game_ended', { reason: 'host left' }));
+    await waitFor(() => expect(result.current.roomCode).toBeNull());
+    expect(sessionStorage.getItem('bluff_session')).toBeNull();
+    expect(result.current.notification?.msg).toBe('host left');
+  });
+});
+
+describe('useGame — authentication', () => {
+  it('emits authenticate with the token when connect fires', async () => {
+    const getAccessToken = vi.fn().mockResolvedValue('jwt-abc');
+    renderHook(() => useGame(getAccessToken));
+
+    // Capture the auth callback so we can fire success.
+    socketHolder.socket.emit.mockImplementationOnce((event, payload, cb) => {
+      expect(event).toBe('authenticate');
+      // Single-device sessions: the persistent deviceId now rides along.
+      expect(payload).toEqual(expect.objectContaining({ token: 'jwt-abc' }));
+      expect(payload).toHaveProperty('deviceId');
+      cb({ success: true });
+    });
+
+    act(() => socketHolder.socket.__emit('connect'));
+    await waitFor(() => {
+      expect(getAccessToken).toHaveBeenCalled();
+    });
+  });
+
+  it('force_logout clears the local session and invokes onForceSignOut with the reason', async () => {
+    const onForceSignOut = vi.fn();
+    renderHook(() => useGame(null, null, null, onForceSignOut));
+
+    sessionStorage.setItem('bluff_session', JSON.stringify({
+      roomCode: 'AB12', isHost: false, playerId: 'p1',
+    }));
+
+    act(() => socketHolder.socket.__emit('force_logout', { reason: 'signed_in_elsewhere' }));
+
+    await waitFor(() => expect(onForceSignOut).toHaveBeenCalledWith('signed_in_elsewhere'));
+    expect(sessionStorage.getItem('bluff_session')).toBeNull();
+  });
+
+  it('a session_active_elsewhere refusal surfaces the conflict (does NOT sign out)', async () => {
+    const getAccessToken = vi.fn().mockResolvedValue('jwt-abc');
+    const onForceSignOut = vi.fn();
+    const { result } = renderHook(() => useGame(getAccessToken, null, null, onForceSignOut));
+
+    socketHolder.socket.emit.mockImplementationOnce((event, payload, cb) => {
+      cb({ success: false, code: 'session_active_elsewhere', activeDevice: { name: 'Chrome on Windows', since: Date.now() } });
+    });
+
+    act(() => socketHolder.socket.__emit('connect'));
+    await waitFor(() => expect(result.current.sessionConflict?.name).toBe('Chrome on Windows'));
+    expect(onForceSignOut).not.toHaveBeenCalled();
+  });
+
+  it('takeOverSession re-authenticates with takeover:true and clears the conflict', async () => {
+    const getAccessToken = vi.fn().mockResolvedValue('jwt-abc');
+    const { result } = renderHook(() => useGame(getAccessToken, null, null, vi.fn()));
+
+    // First auth fails with a conflict.
+    socketHolder.socket.emit.mockImplementationOnce((event, payload, cb) => {
+      cb({ success: false, code: 'session_active_elsewhere', activeDevice: { name: 'Safari on iPhone' } });
+    });
+    act(() => socketHolder.socket.__emit('connect'));
+    await waitFor(() => expect(result.current.sessionConflict).toBeTruthy());
+
+    // The takeover attempt sends takeover:true and succeeds.
+    let sentTakeover;
+    socketHolder.socket.emit.mockImplementationOnce((event, payload, cb) => {
+      sentTakeover = payload?.takeover;
+      cb({ success: true });
+    });
+    await act(async () => { await result.current.takeOverSession(); });
+
+    expect(sentTakeover).toBe(true);
+    await waitFor(() => expect(result.current.sessionConflict).toBeNull());
+  });
+
+  it('skips reconnect when there is no saved session', async () => {
+    const getAccessToken = vi.fn().mockResolvedValue('jwt-abc');
+    renderHook(() => useGame(getAccessToken));
+
+    socketHolder.socket.emit.mockImplementationOnce((event, payload, cb) => {
+      cb({ success: true });
+    });
+    act(() => socketHolder.socket.__emit('connect'));
+    await waitFor(() => expect(getAccessToken).toHaveBeenCalled());
+
+    // Only the authenticate emit should have run.
+    const authCalls = socketHolder.socket.emit.mock.calls.filter(
+      ([e]) => e === 'host_reconnect' || e === 'player_reconnect',
+    );
+    expect(authCalls).toHaveLength(0);
+  });
+});
+
+describe('useGame — disconnect removes you (no reconnection)', () => {
+  it('does NOT auto-rejoin on reconnect — only re-authenticates', async () => {
+    socketHolder.socket = makeMockSocket({ connected: true });
+    const getAccessToken = vi.fn().mockResolvedValue('jwt');
+    const { result } = renderHook(() => useGame(getAccessToken));
+
+    // Create a room so a session is persisted (host).
+    socketHolder.socket.emit.mockImplementationOnce((event, payload, cb) => {
+      cb({ success: true, roomCode: 'REJN01', playerId: 'p1' });
+    });
+    act(() => result.current.createRoom('online'));
+    await waitFor(() => expect(result.current.roomCode).toBe('REJN01'));
+
+    // A reconnect must NOT resurrect the room — the server already removed us.
+    socketHolder.socket.emit.mockImplementation((event, payload, cb) => {
+      if (typeof cb === 'function') cb({ success: true });
+    });
+    act(() => socketHolder.socket.__emit('connect'));
+
+    await waitFor(() => expect(getAccessToken).toHaveBeenCalled());
+    const events = socketHolder.socket.emit.mock.calls.map(([e]) => e);
+    expect(events).not.toContain('host_reconnect');
+    expect(events).not.toContain('player_reconnect');
+  });
+
+  it('clears the room and returns to landing when the socket disconnects', async () => {
+    socketHolder.socket = makeMockSocket({ connected: true });
+    const { result } = renderHook(() => useGame(null));
+
+    socketHolder.socket.emit.mockImplementationOnce((event, payload, cb) => {
+      cb({ success: true, roomCode: 'DROP01', playerId: 'p1' });
+    });
+    act(() => result.current.createRoom('online'));
+    await waitFor(() => expect(result.current.roomCode).toBe('DROP01'));
+
+    act(() => socketHolder.socket.__emit('disconnect'));
+    await waitFor(() => expect(result.current.roomCode).toBeNull());
+  });
+
+  it('does NOT clear the room on "room not found" while the socket is disconnected (transient drop, no bounce)', async () => {
+    const { result } = renderHook(() => useGame(null));
+    socketHolder.socket.emit.mockImplementationOnce((event, payload, cb) => {
+      cb({ success: true, roomCode: 'KEEP01', playerId: 'p1' });
+    });
+    act(() => result.current.createRoom('online'));
+    await waitFor(() => expect(result.current.roomCode).toBe('KEEP01'));
+
+    // Mid-drop: a queued action acks "Room not found" while the transport is down.
+    socketHolder.socket.connected = false;
+    socketHolder.socket.emit.mockImplementationOnce((event, payload, cb) => {
+      cb({ success: false, error: 'Room not found' });
+    });
+    act(() => result.current.startGame());
+
+    // The resilient rejoin should recover us; we must not be bounced to landing.
+    expect(result.current.roomCode).toBe('KEEP01');
+  });
+
+  it('clears the room on "room not found" when the socket is healthy (room genuinely gone)', async () => {
+    socketHolder.socket = makeMockSocket({ connected: true });
+    const { result } = renderHook(() => useGame(null));
+    socketHolder.socket.emit.mockImplementationOnce((event, payload, cb) => {
+      cb({ success: true, roomCode: 'GONE01', playerId: 'p1' });
+    });
+    act(() => result.current.createRoom('online'));
+    await waitFor(() => expect(result.current.roomCode).toBe('GONE01'));
+
+    socketHolder.socket.emit.mockImplementationOnce((event, payload, cb) => {
+      cb({ success: false, error: 'Room not found' });
+    });
+    act(() => result.current.startGame());
+    await waitFor(() => expect(result.current.roomCode).toBeNull());
+  });
+});

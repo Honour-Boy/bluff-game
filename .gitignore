@@ -4,6 +4,8 @@ server/node_modules/
 .next/
 .env
 .env.local
+handoff.md
+.claude/
 
 # Supabase local dev artifacts (migrations are committed; local state isn't)
 supabase/.branches/
@@ -12,3 +14,15 @@ supabase/.env
 
 # Playwright MCP snapshot artifacts (runtime-only)
 .playwright-mcp/
+
+# Local-only working docs (roadmap + engineering notes; not version-controlled)
+docs/
+
+# Cosmetic design sources (#205) — owner-supplied frame traces + color
+# reference JPGs consumed by client/scripts/build-cosmetic-decks.mjs.
+# The BUILT skins (client/public/cosmetics/*.svg) are committed; the
+# sources stay local-only.
+cosmetic-previews/
+
+# Local UI snapshot artifacts (Pact/progression review)
+client/.pact-snapshots/
