@@ -395,10 +395,11 @@ export function SettingsGear({
                 />
               )}
 
-              {/* #205 — XP level + cosmetic locker (gun skins / card backs / felts). */}
+              {/* #205 — cosmetic locker (gun skins / card backs / felts). Rank/XP
+                  lives in its own surface (Landing rank chip + profile drawer). */}
               {!isGuest && getProgression && setCosmetics && (
                 <SettingItem
-                  label="Cosmetics & XP"
+                  label="Cosmetics"
                   tourId={TOUR_IDS.settingsCosmetics}
                   onClick={() => { setOpen(false); setShowCosmetics(true); }}
                   icon={(

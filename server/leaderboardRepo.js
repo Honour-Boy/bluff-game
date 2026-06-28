@@ -110,12 +110,40 @@ function createLeaderboardRepo(supabase) {
   // (rather than a new one) so the game-over flow — which already threads
   // leaderboardRepo everywhere — can award XP without new dependencies.
 
+  // Career stats — lifetime aggregates surfaced on the profile ledger.
+  // Columns added by 20260625120000_player_progression_career_stats; older
+  // rows / test stubs without them read as 0.
+  function _statsFromRow(row) {
+    return {
+      wins: row.wins || 0,
+      spinsSurvived: row.spins_survived || 0,
+      correctBluffCalls: row.correct_bluff_calls || 0,
+      bluffsDefended: row.bluffs_defended || 0,
+      playersEliminated: row.players_eliminated || 0,
+      powerCardsResolved: row.power_cards_resolved || 0,
+      lastStandWins: row.last_stand_wins || 0,
+    };
+  }
+
+  function _emptyStats() {
+    return {
+      wins: 0,
+      spinsSurvived: 0,
+      correctBluffCalls: 0,
+      bluffsDefended: 0,
+      playersEliminated: 0,
+      powerCardsResolved: 0,
+      lastStandWins: 0,
+    };
+  }
+
   function _mapProgressionRow(row) {
     return {
       userId: row.user_id,
       xp: row.xp || 0,
       gamesPlayed: row.games_played || 0,
       equipped: row.equipped || {},
+      stats: _statsFromRow(row),
       updatedAt: row.updated_at || null,
     };
   }
@@ -123,12 +151,12 @@ function createLeaderboardRepo(supabase) {
   async function getProgression(userId) {
     const result = await supabase
       .from('player_progression')
-      .select('user_id, xp, games_played, equipped, updated_at')
+      .select('user_id, xp, games_played, equipped, updated_at, wins, spins_survived, correct_bluff_calls, bluffs_defended, players_eliminated, power_cards_resolved, last_stand_wins')
       .eq('user_id', userId)
       .maybeSingle();
     const row = maybeSingle(requireData(result));
     if (!row) {
-      return { userId, xp: 0, gamesPlayed: 0, equipped: {}, updatedAt: null };
+      return { userId, xp: 0, gamesPlayed: 0, equipped: {}, stats: _emptyStats(), updatedAt: null };
     }
     return _mapProgressionRow(row);
   }
@@ -145,15 +173,25 @@ function createLeaderboardRepo(supabase) {
     }
   }
 
-  async function addXp(userId, amount, now = new Date().toISOString()) {
-    const result = await supabase.rpc('player_progression_add_xp', {
+  // Credit one finished game: XP + lifetime stat increments, atomically.
+  // `stats` mirrors the per-game gameStats shape we want to accumulate; any
+  // field omitted counts as 0/false so callers can pass a partial object.
+  async function addXp(userId, amount, stats = {}, now = new Date().toISOString()) {
+    const result = await supabase.rpc('player_progression_record_game', {
       p_user_id: userId,
       p_amount: amount,
+      p_won: !!stats.won,
+      p_spins_survived: stats.spinsSurvived || 0,
+      p_correct_bluff_calls: stats.correctBluffCalls || 0,
+      p_bluffs_defended: stats.bluffsDefended || 0,
+      p_players_eliminated: stats.playersEliminated || 0,
+      p_power_cards_resolved: stats.powerCardsResolved || 0,
+      p_last_stand_win: !!stats.lastStandWin,
       p_now: now,
     });
     const row = maybeSingle(requireData(result));
     if (!row) {
-      return { userId, xp: amount, gamesPlayed: 1, equipped: {}, updatedAt: now };
+      return { userId, xp: amount, gamesPlayed: 1, equipped: {}, stats: _emptyStats(), updatedAt: now };
     }
     return _mapProgressionRow(row);
   }
@@ -168,7 +206,7 @@ function createLeaderboardRepo(supabase) {
       .select('user_id, xp, games_played, equipped, updated_at');
     const row = maybeSingle(requireData(result));
     if (!row) {
-      return { userId, xp: 0, gamesPlayed: 0, equipped: equipped || {}, updatedAt: now };
+      return { userId, xp: 0, gamesPlayed: 0, equipped: equipped || {}, stats: _emptyStats(), updatedAt: now };
     }
     return _mapProgressionRow(row);
   }

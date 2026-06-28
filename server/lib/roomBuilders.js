@@ -97,10 +97,25 @@ async function maybeAwardGameXp(io, room, leaderboardRepo) {
     if (!award.breakdown || award.total <= 0) continue;
 
     const isGuest = !isPersistentUserId(player.id);
+    // Lifetime career-stat increments for this finished game. `won` mirrors the
+    // win XP gate (placement 1 or a Covenant dual win); the rest are the raw
+    // per-game counts the ledger surfaces. computeXpAward already enforced the
+    // anti-AFK gate (no breakdown → we `continue`d above), so this only credits
+    // players who actively played.
+    const gs = player.gameStats || {};
+    const careerStats = {
+      won: award.breakdown.win > 0,
+      spinsSurvived: gs.spinsSurvived || 0,
+      correctBluffCalls: gs.correctBluffCalls || 0,
+      bluffsDefended: gs.bluffDefended || 0,
+      playersEliminated: gs.playersEliminated || 0,
+      powerCardsResolved: gs.powerCardsResolved || 0,
+      lastStandWin: !!gs.lastStandWin,
+    };
     let persisted = null;
     if (!isGuest) {
       try {
-        persisted = await leaderboardRepo.addXp(player.id, award.total);
+        persisted = await leaderboardRepo.addXp(player.id, award.total, careerStats);
       } catch (err) {
         console.error('[progression] failed to persist xp for', player.id, err);
         continue;

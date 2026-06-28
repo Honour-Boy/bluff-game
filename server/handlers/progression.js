@@ -12,8 +12,23 @@ const { socketRateLimit } = require('../lib/rateLimiter');
 const { broadcastRoomState } = require('../lib/broadcast');
 const { isPersistentUserId } = require('../groupsRepo');
 
+// Lifetime career stats surfaced on the profile ledger. Guests / missing rows
+// read as all-zero. Kept here so the payload shape stays stable regardless of
+// what the repo returns.
+function _emptyStats() {
+  return {
+    wins: 0,
+    spinsSurvived: 0,
+    correctBluffCalls: 0,
+    bluffsDefended: 0,
+    playersEliminated: 0,
+    powerCardsResolved: 0,
+    lastStandWins: 0,
+  };
+}
+
 // Shape the client-facing progression payload from a repo row.
-function _progressionPayload(xp, gamesPlayed, equipped) {
+function _progressionPayload(xp, gamesPlayed, equipped, stats = null) {
   const level = engine.levelForXp(xp);
   return {
     xp,
@@ -22,6 +37,7 @@ function _progressionPayload(xp, gamesPlayed, equipped) {
     levelFloorXp: engine.xpForLevel(level),
     nextLevelXp: engine.xpForLevel(level + 1),
     equipped,
+    stats: stats || _emptyStats(),
     catalog: engine.COSMETICS,
   };
 }
@@ -51,7 +67,7 @@ function register(io, socket, deps = {}) {
       callback?.({
         success: true,
         guest: false,
-        progression: _progressionPayload(row.xp, row.gamesPlayed, equipped),
+        progression: _progressionPayload(row.xp, row.gamesPlayed, equipped, row.stats),
       });
     } catch (err) {
       console.error('[get_progression]', err);

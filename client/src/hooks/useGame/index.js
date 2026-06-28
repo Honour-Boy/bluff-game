@@ -212,6 +212,7 @@ export function useGame(getAccessToken, getGuestAuth, authIdentityKey = null, on
     getGuestAuth,
     authenticateSocket,
     authIdentityKey,
+    authenticated,
   });
   useGameSocketEvents({
     socket,

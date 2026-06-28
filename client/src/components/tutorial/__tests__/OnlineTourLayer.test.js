@@ -88,7 +88,7 @@ describe('OnlineTourLayer — Part A settings walk', () => {
     act(() => { vi.advanceTimersByTime(120); });
     act(() => { fireEvent.click(screen.getByLabelText('Settings')); });
     expect(screen.queryByText('Edit profile')).toBeNull();
-    expect(screen.queryByText('Cosmetics & XP')).toBeNull();
+    expect(screen.queryByText('Cosmetics')).toBeNull();
 
     // …and the beat list omits them too, so the tour can't strand on a missing row.
     const guestAnchors = tourBeatsFor({ isGuest: true }).map((b) => b.anchorId);
