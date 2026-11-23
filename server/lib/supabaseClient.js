@@ -10,6 +10,8 @@ const { createClient } = require('@supabase/supabase-js');
 const { createGroupsRepo } = require('../groupsRepo');
 const { createGroupSettingsRepo } = require('../groupSettingsRepo');
 const { createLeaderboardRepo } = require('../leaderboardRepo');
+const { createXpRepo } = require('../xpRepo');
+const { createCosmeticsRepo } = require('../cosmeticsRepo');
 
 const supabase = createClient(
   process.env.SUPABASE_URL,
@@ -20,10 +22,14 @@ const supabase = createClient(
 const defaultGroupsRepo = createGroupsRepo(supabase);
 const defaultGroupSettingsRepo = createGroupSettingsRepo(supabase);
 const defaultLeaderboardRepo = createLeaderboardRepo(supabase);
+const defaultXpRepo = createXpRepo(supabase);
+const defaultCosmeticsRepo = createCosmeticsRepo(supabase);
 
 module.exports = {
   supabase,
   defaultGroupsRepo,
   defaultGroupSettingsRepo,
   defaultLeaderboardRepo,
+  defaultXpRepo,
+  defaultCosmeticsRepo,
 };

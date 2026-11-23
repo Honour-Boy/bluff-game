@@ -343,6 +343,19 @@ export function useGameActions({
     }
   }, [roomCode, socket]);
 
+  // ─── Profile / cosmetics ─────────────────────────────────
+  const getProfileData = useCallback(() => {
+    return new Promise((resolve) => {
+      socket.emit('get_profile_data', null, (res) => resolve(res));
+    });
+  }, [socket]);
+
+  const setCosmetic = useCallback((slot, id) => {
+    return new Promise((resolve) => {
+      socket.emit('set_cosmetic', { slot, id }, (res) => resolve(res));
+    });
+  }, [socket]);
+
   return {
     createRoom,
     startTutorial,
@@ -390,5 +403,7 @@ export function useGameActions({
     resetRoom,
     kickPlayer,
     refreshRoomState,
+    getProfileData,
+    setCosmetic,
   };
 }

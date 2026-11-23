@@ -29,7 +29,7 @@ const {
   logTurnState,
 } = require('./state');
 const { broadcastRoomState, emitPowerCardEvents } = require('./broadcast');
-const { maybeRecordGroupWinner } = require('./roomBuilders');
+const { maybeRecordGroupWinner, maybeAwardGameXp } = require('./roomBuilders');
 
 /**
  * Compute the alive Sniper's eligible redirect targets — every
@@ -850,6 +850,7 @@ async function resolvePendingGameOver(io, room, leaderboardRepo) {
     : { type: 'game_over', winnerId: pg.id, winnerName: pg.name };
   delete room.pendingGameOver;
   delete room.pendingMirrorMatchSpin;
+  await maybeAwardGameXp(room);   // self-resolves defaultXpRepo
   await maybeRecordGroupWinner(io, room, leaderboardRepo);
   await saveRoom(room);
   io.to(code).emit('spin_acknowledged');
@@ -1249,6 +1250,7 @@ async function _resolveOnlineBluff(io, code, room, accuserId, leaderboardRepo) {
   if (outcome.type === E.FORCED_ELIMINATION) {
     if (outcome.eliminatedPlayerId) _bountyOnElimination(room, outcome.eliminatedPlayerId);
     applyPostElimSystemHooks(io, room);
+    await maybeAwardGameXp(room);   // self-resolves defaultXpRepo
     await maybeRecordGroupWinner(io, room, leaderboardRepo);
   }
 

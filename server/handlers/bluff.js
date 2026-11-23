@@ -16,7 +16,7 @@ const {
   logTurnState,
 } = require('../lib/state');
 const { broadcastRoomState, emitPowerCardEvents } = require('../lib/broadcast');
-const { maybeRecordGroupWinner } = require('../lib/roomBuilders');
+const { maybeRecordGroupWinner, maybeAwardGameXp } = require('../lib/roomBuilders');
 const {
   _resolveOnlineBluff,
   _scheduleBluffInterceptTimeout,
@@ -41,7 +41,7 @@ const {
 // challenge + resolve identically. Imported above.
 
 function register(io, socket, deps) {
-  const { leaderboardRepo } = deps;
+  const { leaderboardRepo, xpRepo } = deps;
 
   // ─── HOST: Resolve bluff (physical) ─────────────────────
   socket.on('resolve_bluff', async ({ roomCode, bluffIsCorrect } = {}, callback) => {
@@ -326,6 +326,7 @@ function register(io, socket, deps) {
           _bountyOnElimination(room, outcome.eliminatedPlayerId);
         }
         applyPostElimSystemHooks(io, room);
+        await maybeAwardGameXp(room, xpRepo);
         await maybeRecordGroupWinner(io, room, leaderboardRepo);
       }
 
